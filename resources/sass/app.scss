@@ -1,0 +1,8 @@
+// Fonts
+@import url("{{ asset('fonts/Nunito.css') }}");
+
+// Variables
+@import 'variables';
+
+// Bootstrap
+@import 'bootstrap/scss/bootstrap';

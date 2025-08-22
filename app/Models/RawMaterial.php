@@ -1,0 +1,1271 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+
+class RawMaterial extends Model
+{
+    protected $connection = 'eudr_ts';
+
+    protected static $idTankSrc = "T00"; // STORAGE TANK
+    protected static $idTankTrf = "T02"; // TRF TANK
+    protected static $idTankFeed = "3"; // FEED TANK
+    protected static $movSeq = "00";
+    protected static $typeMaterial = "RM";
+    protected static $movType1 = "1";
+    protected static $movType2 = "9";
+    protected static $idPlantEob1 = "1002";
+
+    static function get_batchCode_bySupplier($request){
+        $idSupplier = $request->input('idSupplier');
+
+        $datSeq = DB::select('SELECT a.seq_no
+                                FROM ( SELECT LPAD(SUBSTRING(a.batch_sap,7,2) + 1, 2,0) AS seq_no
+                                         FROM t_balance_detail a
+                                         LEFT JOIN t_balance_header b
+                                           ON a.id_balance_head = b.id_balance_head
+                                        WHERE a.status = 1
+                                          AND SUBSTRING(a.batch_sap,1,6) = DATE_FORMAT(NOW(), "%y%m%d")
+                                          AND SUBSTRING(b.trace_no,1,1) = 1
+                                        ORDER BY SUBSTRING(a.batch_sap,1,8) DESC
+                                        LIMIT 1) a
+                                UNION ALL
+                               SELECT "01" AS seq_no
+                               LIMIT 1
+                              ');
+        $seqNo = $datSeq[0]->seq_no;
+
+        $db = DB::select('SELECT CONCAT(DATE_FORMAT(NOW(), "%y%m%d"),?,"-",UCASE(a.batch_code)) AS batchCode
+                            FROM m_supplier a
+                           WHERE a.status = 1
+                             AND a.id_supplier = ?
+                        ', [$seqNo, $idSupplier]);
+
+        return $db;
+    }
+    static function get_dtRmList($request){
+        DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
+        $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.status,
+                                 CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(SUM(DISTINCT a.qty),3) AS qty, a.created_by, a.created_at,
+                                 CONCAT(c.code, " :: ", c.description) AS material, FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
+                                 d.description AS tf_number, a.entry_date, b.batch_sap,
+                                 GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
+                                 GROUP_CONCAT(DISTINCT CONCAT(e.code, " :: ", e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty, 3), " MT / ", IF(b.out_qty = 0, "-", "BATCH TRANSFERRED")) SEPARATOR " | ") AS supplier,
+                                 IF(b.out_qty = 0, "N/A", "") AS traced, f.material_document, f.po_so, f.id_trace_head,
+                                 FORMAT(SUM(b.init_qty),3) AS balance_supplier
+                            FROM t_balance_header a
+                            LEFT JOIN t_balance_detail b
+                              ON a.id_balance_head = b.id_balance_head AND b.status = 1
+                            LEFT JOIN m_material c
+                              ON a.id_material = c.id_material
+                            LEFT JOIN m_tank d
+                              ON a.id_tank = d.id_tank AND d.status = 1 AND d.id_plant = ?
+                            LEFT JOIN m_supplier e
+                              ON e.id_supplier = b.id_supplier
+                            LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head
+									     FROM t_trace_header f
+									 	 LEFT JOIN t_material_document g
+                                           ON f.id_trace_head = g.id_trace_head
+                                        WHERE f.status = 1
+										GROUP BY f.id_balance_head) f
+                              ON f.id_balance_head = a.id_balance_head
+                           WHERE c.type = ?
+                             AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
+                             AND SUBSTRING(a.trace_no,8,2) = ?
+                             AND a.id_tank = 4
+                             AND a.status = 1
+                           GROUP BY a.trace_no
+                           ORDER BY a.id_balance_head DESC
+                           ', [self::$idPlantEob1, self::$typeMaterial, self::$movType1, self::$movType2, self::$movSeq]);
+        return $db;
+    }
+    static function get_dtRmListTrf($request){
+        DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
+        $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.status,
+                                 aa.qty, aa.init_qty, a.created_by, a.created_at, CAST(a.trace_no AS CHAR) AS trace_nos,
+                                 GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
+                                 d.description AS tf_number, a.entry_date, b.batch_sap,
+                                 GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
+                                 GROUP_CONCAT(DISTINCT CONCAT(e.code, " :: ", e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty, 3), " MT / ", IF(b.out_qty = 0, "-", "BATCH USED IN WIP")) SEPARATOR " | ") AS supplier,
+                                 IF(b.out_qty = 0, "N/A", "") AS traced, f.material_document, f.po_so, f.id_trace_head,
+                                 IFNULL(f.trace_no, CONCAT(a.trace_no, "|")) AS trace_no,
+                                 FORMAT(SUM(b.init_qty),3) AS balance_supplier
+                            FROM t_balance_header a
+                            LEFT JOIN (SELECT trace_no, FORMAT(SUM(qty),3) AS qty, FORMAT(SUM(init_qty),3) AS init_qty
+                                         FROM t_balance_header
+                                        WHERE `status` = 1
+                                          AND (SUBSTRING(trace_no,1,1) = ? OR SUBSTRING(trace_no,1,1) = ?)
+                                          AND id_tank = ?
+                                        GROUP BY trace_no
+                                        ) aa
+                              ON a.trace_no = aa.trace_no
+                            LEFT JOIN t_balance_detail b
+                              ON a.id_balance_head = b.id_balance_head AND b.status = 1
+                            LEFT JOIN m_material c
+                              ON a.id_material = c.id_material
+                            LEFT JOIN m_tank d
+                              ON a.id_tank = d.id_tank AND d.status = 1 AND d.id_plant = ?
+                            LEFT JOIN m_supplier e
+                              ON e.id_supplier = b.id_supplier
+                            LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head,
+                                              GROUP_CONCAT(DISTINCT CONCAT(CAST(h.from_trace_no AS CHAR), " >>> ", CAST(f.to_trace_no AS CHAR)) SEPARATOR " | ") AS trace_no
+									     FROM t_trace_header f
+									 	 LEFT JOIN t_material_document g
+                                           ON f.id_trace_head = g.id_trace_head
+                                         LEFT JOIN t_trace_header h
+                                           ON f.from_trace_no = h.to_trace_no
+                                        WHERE f.status = 1
+                                          AND (SUBSTRING(f.to_trace_no,1,1) = ? OR SUBSTRING(f.to_trace_no,1,1) = ?)
+										GROUP BY f.id_balance_head) f
+                              ON f.id_balance_head = a.id_balance_head
+                           WHERE c.type = ?
+                             AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
+                             AND a.id_tank = ?
+                             AND a.status = 1
+                           GROUP BY a.trace_no
+                           ORDER BY a.id_balance_head DESC
+                           ', [self::$movType1, self::$movType2, self::$idTankFeed, self::$idPlantEob1,
+                               self::$movType1, self::$movType2, self::$typeMaterial, self::$movType1, self::$movType2, self::$idTankFeed]);
+        return $db;
+    }
+
+    static function deactivateRmEntry($id, $user){
+
+        /* CHECK LOCK PERIOD */
+            $entryDate = DB::select('SELECT entry_date
+                                       FROM t_trace_header
+                                      WHERE id_balance_head = ?
+                                        AND `status` = 1',
+                                    [$id]);
+            $curr_entryDate = $entryDate[0]->entry_date;
+
+            $lockDateTime = new \DateTime($curr_entryDate);
+            // Mengambil tahun
+            $lockYear = $lockDateTime->format('Y');
+            // Mengambil bulan
+            $lockMonth = $lockDateTime->format('m');
+
+            $datLock = DB::select(' SELECT lock_status
+                                    FROM t_report_pspa_head
+                                    WHERE `status` = 1
+                                    AND YEAR(`period`) = ?
+                                    AND MONTH(`period`) = ?
+                                    UNION ALL
+                                    SELECT "0" AS lock_status',
+                                    [$lockYear, $lockMonth]);
+            $lockStatus = $datLock[0]->lock_status;
+            if ($lockStatus == 1){
+                $db = [ (object)['response' => 99 ]];
+                return $db;
+            }
+
+        /* MAIN ROUTE */
+            $dat = DB::select('SELECT COUNT(a.id_trace_head) AS used
+                                FROM t_trace_header a
+                                WHERE a.id_balance_head = ?
+                                AND a.out_qty <> 0
+                                AND a.status = 1', [$id]);
+
+            if ($dat[0]->used > 0){
+                $db = [ (object)['response' => 3 ]];
+                return $db;
+            }
+
+            DB::insert('INSERT INTO log_transactions
+                            (log_module, log_type, log_description, created_by)
+                        VALUES (?, ?, ?, ?)', [ 'RM_ENTRY', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user ]);
+
+            DB::update('UPDATE t_balance_detail
+                        SET `status` = "0",
+                            `updated_by` = ?
+                        WHERE id_balance_head = ?', [$user, $id]);
+            DB::update('UPDATE t_balance_header
+                        SET `status` = "0",
+                            `updated_by` = ?
+                        WHERE id_balance_head = ?', [$user, $id]);
+            $datTraceHead = DB::select('SELECT id_trace_head
+                                        FROM t_trace_header
+                                        WHERE `status` = 1
+                                        AND id_balance_head = ?', [$id]);
+            $idTraceHead = $datTraceHead[0]->id_trace_head;
+
+            DB::update('UPDATE t_trace_header
+                        SET `status` = "0",
+                            `updated_by` = ?
+                        WHERE id_balance_head = ?', [$user, $id]);
+            DB::update('UPDATE t_trace_detail
+                        SET `status` = "0",
+                            `updated_by` = ?
+                        WHERE id_trace_head = ?', [$user, $idTraceHead]);
+
+        /* THROW OUTPUT */
+            $db = [ (object)['response' => 1 ]];
+            return $db;
+    }
+    static function activateRmEntry($id, $user){
+        /* CHECK LOCK PERIOD */
+            $entryDate = DB::select('SELECT a.entry_date
+                                       FROM t_trace_header a
+                                      WHERE a.id_trace_head > (
+                                                SELECT b.id_trace_head
+                                                FROM t_trace_header b
+                                                WHERE b.id_balance_head = ?
+                                                LIMIT 1',
+                                    [$id]);
+            $curr_entryDate = $entryDate[0]->entry_date;
+
+            $lockDateTime = new \DateTime($curr_entryDate);
+            // Mengambil tahun
+            $lockYear = $lockDateTime->format('Y');
+            // Mengambil bulan
+            $lockMonth = $lockDateTime->format('m');
+
+            $datLock = DB::select(' SELECT lock_status
+                                    FROM t_report_pspa_head
+                                    WHERE `status` = 1
+                                    AND YEAR(`period`) = ?
+                                    AND MONTH(`period`) = ?
+                                    UNION ALL
+                                    SELECT "0" AS lock_status',
+                                    [$lockYear, $lockMonth]);
+            $lockStatus = $datLock[0]->lock_status;
+            if ($lockStatus == 1){
+                $db = [ (object)['response' => 99 ]];
+                return $db;
+            }
+        /* MAIN ROUTE */
+            $dat = DB::select('SELECT COUNT(*) AS next_trace
+                                FROM t_trace_header a
+                                WHERE a.id_trace_head > (
+                                        SELECT b.id_trace_head
+                                        FROM t_trace_header b
+                                        WHERE b.id_balance_head = ?
+                                        LIMIT 1
+                                    );', [$id]);
+            if ($dat[0]->next_trace > 0){
+                $db = [ (object)['response' => 4 ]];
+                return $db;
+            }
+
+            DB::update('UPDATE t_balance_detail
+                        SET `status` = "1",
+                            `updated_by` = ?
+                        WHERE id_balance_head = ?', [$user, $id]);
+            DB::update('UPDATE t_balance_header
+                        SET `status` = "1",
+                            `updated_by` = ?
+                        WHERE id_balance_head = ?', [$user, $id]);
+            DB::update('UPDATE t_trace_header
+                        SET `status` = "1",
+                            `updated_by` = ?
+                        WHERE id_balance_head = ?', [$user, $id]);
+            $datTraceHead = DB::select('SELECT id_trace_head
+                                        FROM t_trace_header
+                                        WHERE `status` = "0"
+                                        AND id_balance_head = ?', [$id]);
+            $idTraceHead = $datTraceHead[0]->id_trace_head;
+            DB::update('UPDATE t_trace_detail
+                        SET `status` = "1",
+                            `updated_by` = ?
+                        WHERE id_trace_head = ?', [$user, $idTraceHead]);
+
+
+        /* THROW OUTPUT */
+            $db = [ (object)['response' => 1 ]];
+            return $db;
+    }
+    static function get_rmNewEntryNumber(){
+        $db = DB::select('SELECT a.rm_number
+                            FROM (SELECT a.trace_no+1 AS rm_number
+                                    FROM t_balance_header a
+                                    WHERE SUBSTRING(a.trace_no,1,7) = CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"))
+                                      AND SUBSTRING(a.trace_no,8,2) = ?
+                                      AND a.status = 1
+                                    ORDER BY a.id_balance_head DESC
+                                    LIMIT 1 ) a
+                            UNION ALL
+                            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, "01") AS rm_number
+                            LIMIT 1', [self::$movSeq, self::$movSeq]);
+        return $db;
+    }
+    static function get_rmNewEntryNumberTrf(){
+        $db = DB::select('SELECT CONCAT(SUBSTRING(a.rm_number,1,7), ?, SUBSTRING(a.rm_number,10,2)) + 1 AS rm_number
+                            FROM (SELECT a.trace_no AS rm_number
+                                    FROM t_balance_header a
+                                    WHERE SUBSTRING(a.trace_no,1,7) = CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"))
+                                      AND SUBSTRING(a.trace_no,2,8) = CONCAT(DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
+                                      AND a.status = 1
+                                    ORDER BY a.id_balance_head DESC
+                                    LIMIT 1 ) a
+                            UNION ALL
+                            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, "01") AS rm_number
+                            LIMIT 1', [substr(self::$idTankSrc,1,2), "00", substr(self::$idTankSrc,1,2)]);
+        return $db;
+    }
+    static function get_cmbActiveTank(){
+        $db = DB::select('SELECT a.id_tank, a.description AS tank
+                            FROM m_tank a
+                           WHERE a.status = 1
+                             AND a.code_3 = "STORAGE"
+                             AND a.id_plant = ?
+                           ORDER BY a.code ASC', [self::$idPlantEob1]);
+        return $db;
+    }
+    static function get_cmbActiveTank_trf($request){
+        $sloc = $request->input('sloc');
+
+        $db = DB::select('SELECT a.id_tank, a.description AS tank
+                            FROM m_tank a
+                           WHERE a.status = 1
+                             AND a.code_3 = ?
+                             AND a.id_plant = ?
+                           ORDER BY a.code ASC', [$sloc, self::$idPlantEob1]);
+
+        return $db;
+    }
+    static function get_cmbActiveMaterial(){
+        $db = DB::select('SELECT a.id_material, CONCAT( UPPER(a.description), " (", a.code, " / ", a.type, " / Feed: ", a.qtf_feed, " / Rundown: ", a.qtf_rundown,  ")" ) AS material
+                            FROM m_material a
+                           WHERE a.status = 1
+                             AND a.type = "RM"
+                           ORDER BY a.code ASC');
+        return $db;
+    }
+    static function get_activeSupplier_bySelect2($request){
+        $supplier = $request->input('supplier');
+
+        $db = DB::select('SELECT CONCAT(a.code, " :: ", a.description) AS supplier, a.id_supplier
+                              FROM m_supplier a
+                             WHERE a.status = "1"
+                               AND a.description LIKE CONCAT("%",?,"%")
+                             ORDER BY a.description ASC', [$supplier]);
+
+        return $db;
+    }
+
+    static function get_dtSupplierList($request){
+        $mode = $request->input('mode');
+        $number = $request->input('number');
+
+        if ($mode == 'ADD'){
+            $db = DB::select('SELECT FORMAT(a.qty,3) AS qty, a.id_supplier, c.code AS material,
+                                     CONCAT(b.code, " :: ", b.description) AS supplier,
+                                     a.id_balance_temp AS idTail, a.entry_no, ? AS mode,
+                                     a.batch_sap
+                                FROM t_balance_temporary a
+                                LEFT JOIN m_supplier b
+                                  ON a.id_supplier = b.id_supplier
+                                LEFT JOIN m_material c
+                                  ON a.id_material = c.id_material
+                               WHERE a.entry_no = ?
+                                 AND a.status = 1', [$mode, $number]);
+        } else if ($mode == 'UPDATE'){
+            $db = DB::select('SELECT FORMAT(a.qty,3) AS qty, a.id_supplier, d.code AS material,
+                                     CONCAT(b.code, " :: ", b.description) AS supplier,
+                                     a.id_balance_tail AS idTail, c.trace_no AS entry_no, ? AS mode,
+                                     a.batch_sap
+                                FROM t_balance_detail a
+                                LEFT JOIN m_supplier b
+                                  ON a.id_supplier = b.id_supplier
+                                LEFT JOIN t_balance_header c
+                                  ON a.id_balance_head = c.id_balance_head
+                                LEFT JOIN m_material d
+                                  ON a.id_material = d.id_material
+                               WHERE a.id_balance_head = ?
+                                 AND a.status = 1', [$mode, $number]);
+        }
+
+        return $db;
+    }
+    static function get_dtMaterialList($request){
+        $mode = $request->input('mode');
+        $number = $request->input('number');
+
+        if ($mode == 'ADD'){
+            $db = DB::select('SELECT FORMAT(a.qty,3) AS qty, a.id_material,
+                                     CONCAT(c.code, " :: ", c.description) AS material,
+                                     a.id_balance_temp AS idTail, a.entry_no, ? AS mode
+                                FROM t_balance_temporary a
+                                LEFT JOIN m_material c
+                                  ON a.id_material = c.id_material
+                               WHERE a.entry_no = ?
+                                 AND a.status = 1', [$mode, $number]);
+        } else if ($mode == 'UPDATE'){
+            $db = DB::select('SELECT FORMAT(a.qty,3) AS qty, a.id_material,
+                                     CONCAT(d.code, " :: ", d.description) AS material,
+                                     a.id_balance_tail AS idTail, c.trace_no AS entry_no, ? AS mode
+                                FROM t_balance_detail a
+                                LEFT JOIN t_balance_header c
+                                  ON a.id_balance_head = c.id_balance_head
+                                LEFT JOIN m_material d
+                                  ON a.id_material = d.id_material
+                               WHERE a.id_balance_head = ?
+                                 AND a.status = 1', [$mode, $number]);
+        }
+
+        return $db;
+    }
+    static function get_totalQtySupplier($request){
+        $mode = $request->input('mode');
+        $number = $request->input('number');
+
+        if ($mode == 'ADD'){
+            $db = DB::select('SELECT FORMAT(SUM(a.qty),3) AS total
+                                FROM t_balance_temporary a
+                               WHERE a.entry_no = ?
+                                 AND a.status = 1', [$number]);
+        } else if ($mode == 'UPDATE'){
+            $db = DB::select('SELECT FORMAT(SUM(a.qty),3) AS total
+                                FROM t_balance_detail a
+                               WHERE a.id_balance_head = ?
+                                 AND a.status = 1', [$number]);
+        }
+
+        return $db;
+    }
+    static function get_totalQtyMaterial($request){
+        $mode = $request->input('mode');
+        $number = $request->input('number');
+
+        if ($mode == 'ADD'){
+            $db = DB::select('SELECT FORMAT(SUM(a.qty),3) AS total
+                                FROM t_balance_temporary a
+                               WHERE a.entry_no = ?
+                                 AND a.status = 1', [$number]);
+        } else if ($mode == 'UPDATE'){
+            $db = DB::select('SELECT FORMAT(SUM(a.qty),3) AS total
+                                FROM t_balance_detail a
+                               WHERE a.id_balance_head = ?
+                                 AND a.status = 1', [$number]);
+        }
+
+        return $db;
+    }
+    static function get_totalStockMaterial($request){
+        $idMaterial = $request->input('idMaterial');
+        $idTank = $request->input('idTank');
+
+        $db = DB::select('SELECT IFNULL(SUM(a.qty),0) AS total
+                            FROM t_balance_header a
+                           WHERE a.status = 1
+                             AND a.id_material = ?
+                             AND a.id_tank = ?', [$idMaterial, $idTank]);
+
+        return $db;
+    }
+    static function post_rmEntrySupplier($user, $request){
+        $flag = $request->input('flag');
+        $mode = $request->input('mode');
+        $rmNumber = $request->input('rmNumber');
+        $idSupplier = $request->input('idSupplier');
+        $qty = $request->input('qty');
+        $idHead = $request->input('idHead');
+        $idTail = $request->input('idTail');
+        $batchSap = $request->input('batchSap');
+        $idMaterial = $request->input('idMaterial');
+        $qty = floatval(str_replace(',', '', $qty));
+
+        if ($mode == 'ADD'){
+            $db = DB::insert('INSERT INTO t_balance_temporary
+                                    (entry_no, id_supplier, id_material, qty, batch_sap, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?)',
+                            [$rmNumber, $idSupplier, $idMaterial, $qty, $batchSap, $user]);
+            $db = [ (object)['response' => $db ? 1 : 0 ]];
+
+        } elseif ($mode == 'UPDATE'){
+
+            $id_material = $idMaterial;
+
+            $flag = DB::select('SELECT COUNT(a.id_balance_head) AS dat
+                                  FROM t_balance_detail a
+                                 WHERE a.id_balance_tail = ?
+                                   AND a.status = 1', [$idTail]);
+
+            if ($flag[0]->dat > 0){
+                $dat = DB::select('SELECT id_supplier, qty
+                                     FROM t_balance_detail
+                                    WHERE id_balance_tail = ?', [$idTail]);
+                $idSupplier_old = $dat[0]->id_supplier;
+                $qty_old = $dat[0]->qty;
+
+                /* LOGGING */
+                DB::insert('INSERT INTO log_transactions
+                                (log_module, log_type, log_description, created_by)
+                            VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'UPDATE', 'IDHEAD: ' . $idHead . ' IDTAIL: ' . $idTail . ' | ID_SUPPLIER: ' .
+                                                    $idSupplier_old . ' >>> ' . $idSupplier . ' / QTY: ' . $qty_old . ' >>>' . $qty .
+                                                    ' | Status: 1', $user ]);
+
+                DB::update('UPDATE t_trace_detail
+                               SET id_supplier = ?,
+                                   in_qty = ?,
+                                   batch_sap = ?,
+                                   updated_by = ?
+                             WHERE id_balance_tail = ?', [$idSupplier, $qty, $batchSap, $user, $idTail]);
+
+                $db = DB::update('UPDATE t_balance_detail
+                                     SET id_supplier = ?,
+                                         qty = ?,
+                                         init_qty = ?,
+                                         batch_sap = ?,
+                                         updated_by = ?
+                                   WHERE id_balance_tail = ?', [$idSupplier, $qty, $qty, $batchSap, $user, $idTail]);
+                $db = [ (object)['response' => $db ] ];
+
+            } else {
+                $flag = DB::select('SELECT COUNT(a.id_balance_head) AS dat
+                                      FROM t_balance_detail a
+                                     WHERE a.id_supplier = ?
+                                       AND a.status = 1
+                                       AND a.id_balance_head = ?', [$idSupplier, $idHead]);
+
+                if ($flag[0]->dat > 0){
+                    $dat = DB::select('SELECT id_supplier, qty, id_balance_tail, batch_sap
+                                         FROM t_balance_detail
+                                        WHERE id_supplier = ?
+                                          AND `status` = 1', [$idSupplier]);
+                    $idSupplier_old = $dat[0]->id_supplier;
+                    $qty_old = $dat[0]->qty;
+                    $idTail = $dat[0]->id_balance_tail;
+                    $batchSap_old = $dat[0]->batch_sap;
+
+                    /* LOGGING */
+                    DB::insert('INSERT INTO log_transactions
+                                       (log_module, log_type, log_description, created_by)
+                                VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'UPDATE', 'IDHEAD: ' . $idHead . ' IDTAIL: ' . $idTail . ' | ID_SUPPLIER: ' .
+                                                        $idSupplier_old . ' >>> ' . $idSupplier . ' / QTY: ' . $qty_old . ' >>>' . $qty .
+                                                        ' / BATCH_SAP: ' . $batchSap_old . ' >>> ' . $batchSap .
+                                                        ' | Status: 1', $user ]);
+
+                    DB::update('UPDATE t_trace_detail
+                                   SET in_qty = ?,
+                                       batch_sap = ?,
+                                       updated_by = ?
+                                 WHERE id_balance_tail = ?', [$qty, $batchSap, $user, $idTail]);
+
+                    $db = DB::update('UPDATE t_balance_detail
+                                         SET qty = ?,
+                                             init_qty = ?,
+                                             batch_sap = ?,
+                                             updated_by = ?
+                                       WHERE id_supplier = ?
+                                         AND id_balance_head = ?', [$qty, $qty, $batchSap, $user, $idSupplier, $idHead]);
+                    $db = [ (object)['response' => 1 ]];
+
+                } else {
+                    $idTail = DB::table('t_balance_detail')->insertGetId([
+                                'id_balance_head' => $idHead,
+                                'id_supplier' => $idSupplier,
+                                'id_material' => $id_material,
+                                'qty' => $qty,
+                                'init_qty' => $qty,
+                                'batch_sap' => $batchSap,
+                                'created_by' => $user,
+                                'updated_by' => $user,
+                    ]);
+
+                    $dat = DB::select('SELECT id_trace_head
+                                         FROM t_trace_header
+                                        WHERE id_balance_head = ?', [$idHead]);
+                    $idTraceHead = $dat[0]->id_trace_head;
+
+                    $idTraceTail = DB::table('t_trace_detail')->insertGetId([
+                        'id_trace_head' => $idTraceHead,
+                        'id_balance_tail' => $idTail,
+                        'id_supplier' => $idSupplier,
+                        'id_material' => $id_material,
+                        'in_qty' => $qty,
+                        'batch_sap' => $batchSap,
+                        'created_by' => $user,
+                        'updated_by' => $user,
+                    ]);
+                    $db = [ (object)['response' => 1 ]];
+
+                    /* LOGGING */
+                    DB::insert('INSERT INTO log_transactions
+                                (log_module, log_type, log_description, created_by)
+                            VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'UPDATE', 'IDHEAD: ' . $idHead . ' IDTAIL: ' . $idTail .
+                                                        ' | ID_SUPPLIER: ' . $idSupplier . ' / QTY: ' . $qty . ' / BATCH_SAP: ' . $batchSap .
+                                                        ' | Status: 1', $user ]);
+                }
+            }
+
+            $dat = DB::select('SELECT SUM(a.init_qty) AS qty
+                                 FROM t_balance_detail a
+                                WHERE a.id_balance_head = ?
+                                  AND a.status = 1', [$idHead]);
+            $new_total_qty = $dat[0]->qty;
+            DB::update('UPDATE t_balance_header
+                           SET init_qty = ?,
+                               qty = ?,
+                               updated_by = ?
+                         WHERE id_balance_head = ?', [$new_total_qty, $new_total_qty, $user, $idHead]);
+            DB::update('UPDATE t_trace_header
+                           SET in_qty = ?,
+                               updated_by = ?
+                         WHERE id_balance_head = ?', [$new_total_qty, $user, $idHead]);
+        }
+
+        return $db;
+    }
+    static function post_rmEntryMaterial($user, $request){
+        $flag = $request->input('flag');
+        $mode = $request->input('mode');
+        $entryNo = $request->input('entryNo');
+        $idMaterial = $request->input('idMaterial');
+        $qty = $request->input('qty');
+        $idHead = $request->input('idHead');
+        $idTail = $request->input('idTail');
+        $qty = floatval(str_replace(',', '', $qty));
+
+        if ($mode == 'ADD'){
+            /* CHECK FOR SAME MATERIAL */
+            $dat = DB::select('SELECT COUNT(entry_no) AS flag
+                                 FROM t_balance_temporary
+                                WHERE id_material = ?
+                                  AND entry_no = ?', [$idMaterial, $entryNo]);
+
+            if ($dat[0]->flag > 0){
+                $db = [ (object)['response' => 2 ]];
+                return $db;
+            };
+
+            $db = DB::insert('INSERT INTO t_balance_temporary
+                                    (entry_no, id_material, qty, created_by)
+                            VALUES (?, ?, ?, ?)',
+                            [$entryNo, $idMaterial, $qty, $user]);
+            $db = [ (object)['response' => $db ? 1 : 0 ]];
+
+        } elseif ($mode == 'UPDATE'){
+
+        }
+        return $db;
+    }
+    static function deleteSupplier($id, $user){
+        DB::delete('DELETE FROM t_balance_temporary
+                     WHERE id_balance_temp = ?', [$id]);
+
+        $db = [ (object)['response' => 1 ]];
+        return $db;
+    }
+    static function deleteMaterial($id, $user){
+        DB::delete('DELETE FROM t_balance_temporary
+                     WHERE id_balance_temp = ?', [$id]);
+
+        $db = [ (object)['response' => 1 ]];
+        return $db;
+    }
+    static function post_rmEntry($user, $request){
+        $flag = $request->input('flag');
+        $mode = $request->input('mode');
+        $idHead = $request->input('idHead');
+        $entry_no = $request->input('entry_no');
+        $entry_date = $request->input('entry_date');
+        $id_tank = $request->input('tank');
+        $qty = $request->input('qty');
+        $po = $request->input('po');
+        $id_material = $request->input('idMaterial');
+        $qty = floatval(str_replace(',', '', $qty));
+        $materialDoc = $request->input('material_doc');
+
+        /* CHECK LOCK PERIOD */
+            $lockDateTime = new \DateTime($entry_date);
+            // Mengambil tahun
+            $lockYear = $lockDateTime->format('Y');
+            // Mengambil bulan
+            $lockMonth = $lockDateTime->format('m');
+
+            $datLock = DB::select('SELECT lock_status
+                                    FROM t_report_pspa_head
+                                    WHERE `status` = 1
+                                    AND YEAR(`period`) = ?
+                                    AND MONTH(`period`) = ?
+                                    UNION ALL
+                                SELECT "0" AS lock_status',
+                                    [$lockYear, $lockMonth]);
+            $lockStatus = $datLock[0]->lock_status;
+            if ($lockStatus == 1){
+                $db = [ (object)['response' => 99 ]];
+                return $db;
+            }
+
+        /* MAIN ROUTE */
+            if ($mode == 'ADD'){
+                $idHead = DB::table('t_balance_header')->insertGetId([
+                                'trace_no' => $entry_no,
+                                'id_material' => $id_material,
+                                'id_tank' => $id_tank,
+                                'entry_date' => $entry_date,
+                                'qty' => $qty,
+                                'in_qty' => $qty,
+                                'init_qty' => $qty,
+                                'created_by' => $user,
+                            ]);
+                $idTraceHead = DB::table('t_trace_header')->insertGetId([
+                                    'to_trace_no' => $entry_no,
+                                    'id_balance_head' => $idHead,
+                                    'id_material' => $id_material,
+                                    'entry_date' => $entry_date,
+                                    'id_sloc' => $id_tank,
+                                    'in_qty' => $qty,
+                                    'created_by' => $user,
+                            ]);
+
+                /* LOGGING */
+                DB::insert('INSERT INTO log_transactions
+                                (log_module, log_type, log_description, created_by)
+                            VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'ADD', 'IDHEAD: ' . $idHead . ' | DATE: ' . $entry_date . ' / BATCH: ' .
+                                                    $entry_no . ' / TANK: ' . $id_tank . ' / QTY: ' . $qty . ' / MATERIAL: ' . $id_material .
+                                                    ' | Status: 1', $user ]);
+                DB::insert('INSERT INTO log_transactions
+                                (log_module, log_type, log_description, created_by)
+                            VALUES (?, ?, ?, ?)', [ 'T_TRACE_HEAD', 'ADD', 'IDTRACEHEAD: ' . $idTraceHead . 'IDHEAD: ' . $idHead . ' | DATE: ' . $entry_date . ' / TRACE: ' .
+                                                    $entry_no . ' / IN_QTY: ' . $qty . ' / MATERIAL: ' . $id_material .
+                                                    ' | Status: 1', $user ]);
+
+                /* GET SUPPLIER & INSERT IN BALANCE_TAIL */
+                $dat = DB::select('SELECT id_supplier, qty AS qty_tail, batch_sap
+                                    FROM t_balance_temporary
+                                    WHERE entry_no = ?', [$entry_no]);
+                foreach ($dat as $record) {
+                    $id_supplier = $record->id_supplier;
+                    $qty_tail = $record->qty_tail;
+                    $batchSap = $record->batch_sap;
+                    $idTail = DB::table('t_balance_detail')->insertGetId([
+                                        'id_balance_head' => $idHead,
+                                        'id_supplier' => $id_supplier,
+                                        'id_material' => $id_material,
+                                        'qty' => $qty_tail,
+                                        'in_qty' => $qty_tail,
+                                        'init_qty' => $qty_tail,
+                                        'batch_sap' => $batchSap,
+                                        'created_by' => $user
+                                    ]);
+                    $idTraceTail = DB::table('t_trace_detail')->insertGetId([
+                                        'id_trace_head' => $idTraceHead,
+                                        'id_balance_tail' => $idTail,
+                                        'id_supplier' => $id_supplier,
+                                        'id_material' => $id_material,
+                                        'batch_sap' => $batchSap,
+                                        'in_qty' => $qty_tail,
+                                        'created_by' => $user
+                                    ]);
+
+                    /* LOGGING */
+                    DB::insert('INSERT INTO log_transactions
+                                    (log_module, log_type, log_description, created_by)
+                                VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'ADD', 'IDHEAD: ' . $idHead . ' IDTAIl: ' . $idTail . ' | DATE: ' . $entry_date . ' / BATCH: ' .
+                                                        $entry_no . ' / TANK: ' . $id_tank . ' / SUPPLIER: ' . $id_supplier . ' / QTY_TAIL: ' . $qty_tail . ' / BATCH_SAP: ' . $batchSap .
+                                                        ' | Status: 1', $user ]);
+                    DB::insert('INSERT INTO log_transactions
+                                    (log_module, log_type, log_description, created_by)
+                                VALUES (?, ?, ?, ?)', [ 'T_TRACE_TAIL', 'ADD', 'IDTRACEHEAD: ' . $idTraceHead . ' IDTRACETAIl: ' . $idTraceTail . 'IDHEAD: ' . $idHead . ' IDTAIl: ' . $idTail .
+                                                        ' | DATE: ' . $entry_date . ' / BATCH: ' . $entry_no . ' / SUPPLIER: ' . $id_supplier . ' / IN_QTY: ' . $qty_tail . ' / BATCH_SAP: ' . $batchSap .
+                                                        ' | Status: 1', $user ]);
+                }
+
+                DB::delete('DELETE FROM t_balance_temporary
+                            WHERE entry_no = ?', [$entry_no]);
+
+                DB::insert('INSERT INTO t_material_document
+                                (id_trace_head, material_document, po_so, created_by)
+                            VALUES (?, ?, ?, ?)', [$idTraceHead, $materialDoc, $po, $user]);
+
+            } elseif ($mode == 'UPDATE'){
+                DB::update('UPDATE t_balance_header
+                            SET id_tank = ?,
+                                entry_date = ?,
+                                qty = ?,
+                                in_qty = ?,
+                                init_qty = ?,
+                                updated_by = ?
+                            WHERE id_balance_head = ?',
+                            [$id_tank, $entry_date, $qty, $qty, $qty, $user, $idHead]);
+                DB::update('UPDATE t_trace_header
+                            SET entry_date = ?,
+                                in_qty = ?,
+                                updated_by = ?
+                            WHERE id_balance_head = ?',
+                            [$entry_date, $qty, $user, $idHead]);
+
+                $dat = DB::select('SELECT id_trace_head
+                                    FROM t_trace_header
+                                    WHERE id_balance_head = ?',[$idHead]);
+                $idTraceHead = $dat[0]->id_trace_head;
+                DB::update('UPDATE t_material_document
+                            SET material_document = ?,
+                                po_so = ?,
+                                updated_by = ?
+                            WHERE id_trace_head = ?',
+                            [$materialDoc, $po, $user, $idTraceHead]);
+
+                /* LOGGING */
+                DB::insert('INSERT INTO log_transactions
+                                (log_module, log_type, log_description, created_by)
+                            VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'UPDATE', 'IDHEAD: ' . $idHead . ' | DATE: ' . $entry_date . ' / BATCH: ' .
+                                                    $entry_no . ' / TANK: ' . $id_tank . ' / QTY' . $qty . ' / MATERIAL' . $id_material .
+                                                    ' | Status: 1', $user ]);
+            }
+
+        /* THROW OUTPUT */
+            $db = [ (object)['response' => 1 ]];
+            return $db;
+    }
+    static function post_rmTrfEntry($user, $request){
+        $flag = $request->input('flag');
+        $mode = $request->input('mode');
+        $idHead = $request->input('idHead');
+        $entry_no = $request->input('entry_no');
+        $curr_entryDate = $request->input('entry_date');
+        $id_tankSource = $request->input('sourceTank');
+        $id_tank = $request->input('trfTank');
+        // $qty = $request->input('qty');
+        // $out_qty = floatval(str_replace(',', '', $qty));
+        $materialDoc = $request->input('material_doc');
+
+        DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
+
+        /* CHECK LOCK PERIOD */
+            $lockDateTime = new \DateTime($curr_entryDate);
+            // Mengambil tahun
+            $lockYear = $lockDateTime->format('Y');
+            // Mengambil bulan
+            $lockMonth = $lockDateTime->format('m');
+
+            $datLock = DB::select('SELECT lock_status
+                                    FROM t_report_pspa_head
+                                    WHERE `status` = 1
+                                    AND YEAR(`period`) = ?
+                                    AND MONTH(`period`) = ?
+                                    UNION ALL
+                                SELECT "0" AS lock_status',
+                                    [$lockYear, $lockMonth]);
+            $lockStatus = $datLock[0]->lock_status;
+            if ($lockStatus == 1){
+                $db = [ (object)['response' => 99 ]];
+                return $db;
+            }
+        /* MAIN ROUTE */
+            if ($mode == 'ADD'){
+                /* GET TEMPORARY MATERIAL ENTRY */
+                $datTempMaterial = DB::select('SELECT COUNT(a.entry_no) AS idData
+                                                FROM t_balance_temporary a
+                                                WHERE a.status = 1
+                                                AND a.entry_no = ?', [$entry_no]);
+                if ($datTempMaterial[0]->idData == 0){
+                    if ($totalStock - $qty < 0){
+                        $db = [ (object)['response' => 6 ]];
+                        return $db;
+                    };
+                };
+
+                $datTempMaterial = DB::select('SELECT entry_no, id_tank, id_material, qty
+                                                FROM t_balance_temporary a
+                                                WHERE a.status = 1
+                                                AND a.entry_no = ?', [$entry_no]);
+                $lenTemp = count($datTempMaterial);
+                if ($lenTemp == 0){
+                    $db = [ (object)['response' => 6 ]];
+                    return $db;
+                };
+
+                for ($z = 0; $z < $lenTemp; $z++){
+                    $id_material = $datTempMaterial[$z]->id_material;
+                    $qty = $datTempMaterial[$z]->qty;
+                    $out_qty = floatval(str_replace(',', '', $qty));
+
+                    $last_qtf = 0;
+                    $curr_qtf = $out_qty;
+
+                    $datHead = DB::select('SELECT b.id_balance_head, b.qty, b.in_qty, b.out_qty, b.init_qty, b.trace_no, a.id_material
+                                            FROM m_material a
+                                            LEFT JOIN t_balance_header b
+                                            ON a.id_material = b.id_material AND b.`status` = 1
+                                            LEFT JOIN m_tank d
+                                            ON b.id_tank = d.id_tank AND d.status = 1
+                                            WHERE a.id_material = ?
+                                            AND a.`status` = 1
+                                            AND b.qty <> 0
+                                            AND d.code = ?
+                                            AND d.id_plant = ?
+                                            ORDER BY b.id_balance_head ASC', [$id_material, self::$idTankSrc, self::$idPlantEob1]);
+
+                    $len = count($datHead);
+
+                    /* CREATE ENTRY NO TO FEED TANK */
+                    $batchTrf_id = substr(self::$idTankTrf,1,2);
+                    $batchFeed_id = "00";
+                    $batch_moveType = substr($entry_no, 0, 1);
+                    $batch_entryDate = substr($entry_no, 1, 6);
+                    $batch_sequence = substr($entry_no, -2);
+
+                    $entryTrfNo_in = $batch_moveType . $batch_entryDate . $batchTrf_id . $batch_sequence;
+                    $entryFeedNo_in = $batch_moveType . $batch_entryDate . $batchFeed_id . $batch_sequence;
+
+                    for ($i = 0; $i < $len; $i++) {
+                        $idHead = $datHead[$i]->id_balance_head;
+                        $qty = $datHead[$i]->qty;
+                        $total_in_qty = $datHead[$i]->in_qty;
+                        $total_out_qty = $datHead[$i]->out_qty;
+                        $init_qty = $datHead[$i]->init_qty;
+                        $from_trace_no = $datHead[$i]->trace_no;
+                        $id_material = $datHead[$i]->id_material;
+
+                        $new_total_in_qty = $total_in_qty;
+                        $new_total_out_qty = $total_out_qty + $out_qty;
+
+                        $tail_out_qty = $out_qty;
+
+                        $balanceAfter = $qty - $out_qty;
+                        if ($balanceAfter < 0){
+                            $new_balance = 0;
+                            $new_total_out_qty = $init_qty;
+                            $temp_out_qty = $out_qty - $qty;
+                            $out_qty = $qty;
+                        } else {
+                            $new_balance = $qty - $out_qty;
+                        }
+
+                        /* UPDATE INTO T_BALANCE_HEADER */
+                            DB::update('UPDATE t_balance_header
+                                        SET qty = ?,
+                                            in_qty = ?,
+                                            out_qty = ?,
+                                            updated_by = ?
+                                        WHERE id_balance_head = ?',
+                                        [$new_balance, $new_total_in_qty, $new_total_out_qty, $user, $idHead]);
+
+                        /* INSERT INTO T_TRACE_HEADER */
+                            $idTraceHead = DB::table('t_trace_header')->insertGetId([
+                                    'from_trace_no' => $from_trace_no,
+                                    'to_trace_no' => $entryTrfNo_in,
+                                    'id_balance_head' => $idHead,
+                                    'id_material' => $id_material,
+                                    'entry_date' => $curr_entryDate,
+                                    'id_sloc' => $id_tankSource,
+                                    'out_qty' => $out_qty,
+                                    'last_qtf' => $last_qtf,
+                                    'curr_qtf' => $curr_qtf,
+                                    'created_by' => $user,
+                            ]);
+                        /* AUTO IN TO FEED TANK */
+                            $in_qty = $out_qty;
+                            $idHead_in = DB::table('t_balance_header')->insertGetId([
+                                'entry_date' => $curr_entryDate,
+                                'trace_no' => $entryFeedNo_in,
+                                'id_material' => $id_material,
+                                'id_tank' => $id_tank,
+                                'qty' => $in_qty,
+                                'in_qty' => $in_qty,
+                                'init_qty' => $in_qty,
+                                'created_by' => $user,
+                            ]);
+                            $idTraceHead_in = DB::table('t_trace_header')->insertGetId([
+                                'from_trace_no' => $entryTrfNo_in,
+                                'to_trace_no' => $entryFeedNo_in,
+                                'id_balance_head' => $idHead_in,
+                                'id_material' => $id_material,
+                                'entry_date' => $curr_entryDate,
+                                'id_sloc' => $id_tank,
+                                'in_qty' => $in_qty,
+                                'last_qtf' => $last_qtf,
+                                'curr_qtf' => $curr_qtf,
+                                'created_by' => $user,
+                            ]);
+                            DB::insert('INSERT INTO t_material_document
+                                               (id_trace_head, material_document, created_by)
+                                        VALUES (?, ?, ?)', [$idTraceHead_in, $materialDoc, $user]);
+
+                        /* HEADER LOGGING */
+                            DB::insert('INSERT INTO log_transactions
+                                            (log_module, log_type, log_description, created_by)
+                                        VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'UPDATE BALANCE', 'IDHEAD: ' . $idHead . ' | DATE: ' . $curr_entryDate .
+                                                                ' / TANK: ' . $id_tank . ' / MATERIAL: ' . $id_material . ' / QTY: ' . $qty . ' >>> ' . $new_balance .
+                                                                ' / IN_QTY: ' . $total_in_qty . ' >>> ' . $new_total_in_qty .
+                                                                ' / OUT_QTY: ' . $total_out_qty . ' >>> ' . $new_total_out_qty .
+                                                                ' | Status: 1', $user ]);
+
+                        /* ROUTING FOR DETAIL PER SUPPLIER */
+                            /* GET ID_BALANCE_DETAIL */
+                                $datTail = DB::select('SELECT id_balance_tail, id_supplier, qty, in_qty, out_qty, init_qty, batch_sap
+                                                        FROM t_balance_detail
+                                                        WHERE id_balance_head = ?
+                                                        AND `status` = 1
+                                                        ORDER BY id_balance_tail ASC', [$idHead]);
+                                $lenTail = count($datTail);
+                                for ($k = 0; $k < $lenTail; $k++) {
+                                    $idTail = $datTail[$k]->id_balance_tail;
+                                    $idSupplier = $datTail[$k]->id_supplier;
+                                    $tail_qty = $datTail[$k]->qty;
+                                    $tail_total_in_qty = $datTail[$k]->in_qty;
+                                    $tail_total_out_qty = $datTail[$k]->out_qty;
+                                    $tail_init_qty = $datTail[$k]->init_qty;
+                                    $batch_sap = $datTail[$k]->batch_sap;
+
+                                    $new_tail_total_in_qty = $tail_total_in_qty;
+                                    $new_tail_total_out_qty = $tail_total_out_qty + $tail_out_qty;
+
+                                    $tailBalanceAfter = $tail_qty - $tail_out_qty;
+                                    if ($tailBalanceAfter < 0){
+                                        $new_tail_balance = 0;
+                                        $new_tail_total_out_qty = $tail_init_qty;
+                                        $temp_tail_out_qty = $tail_out_qty - $tail_qty;
+                                        $tail_out_qty = $tail_qty;
+                                    } else {
+                                        $new_tail_balance = $tail_qty - $tail_out_qty;
+                                    }
+
+                                    /* POPULATE NEW BALANCE DETAIL */
+                                        DB::update('UPDATE t_balance_detail
+                                                    SET qty = ?,
+                                                        in_qty = ?,
+                                                        out_qty = ?,
+                                                        updated_by = ?
+                                                    WHERE id_balance_tail = ?',
+                                                    [$new_tail_balance, $new_tail_total_in_qty, $new_tail_total_out_qty, $user, $idTail]);
+
+                                    /* POPULATE TRACE DETAIL */
+                                        $idTraceTail = DB::table('t_trace_detail')->insertGetId([
+                                                'id_trace_head' => $idTraceHead,
+                                                'id_balance_tail' => $idTail,
+                                                'id_supplier' => $idSupplier,
+                                                'id_material' => $id_material,
+                                                'out_qty' => $tail_out_qty,
+                                                'batch_sap' => $batch_sap,
+                                                'created_by' => $user,
+                                        ]);
+
+                                    /* POPULATE TRACE DETAIL FOR FEED IN */
+                                        $idSupplier_in = $idSupplier;
+                                        $idMaterial_in = $id_material;
+                                        $tailQty_in = $tail_out_qty;
+                                        $batchSap_in = $batch_sap;
+
+                                        $idTail_in = DB::table('t_balance_detail')->insertGetId([
+                                        'id_balance_head' => $idHead_in,
+                                        'id_supplier' => $idSupplier_in,
+                                        'id_material' => $idMaterial_in,
+                                        'qty' => $tailQty_in,
+                                        'in_qty' => $tailQty_in,
+                                        'init_qty' => $tailQty_in,
+                                        'batch_sap' => $batchSap_in,
+                                        'created_by' => $user,
+                                        ]);
+                                        $idTraceTail_in = DB::table('t_trace_detail')->insertGetId([
+                                            'id_trace_head' => $idTraceHead_in,
+                                            'id_balance_tail' => $idTail_in,
+                                            'id_supplier' => $idSupplier_in,
+                                            'id_material' => $idMaterial_in,
+                                            'in_qty' => $tailQty_in,
+                                            'batch_sap' => $batchSap_in,
+                                            'created_by' => $user,
+                                        ]);
+
+                                    /* DETAIL LOGGING */
+                                    DB::insert('INSERT INTO log_transactions
+                                                        (log_module, log_type, log_description, created_by)
+                                                VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'UPDATE BALANCE', ' IDTAIL: ' . $idTail .
+                                                                        ' / SUPPLIER: ' . $idSupplier . ' / MATERIAL: ' . $id_material .
+                                                                        ' / QTY: ' . $tail_qty . ' >>> ' . $new_tail_balance .
+                                                                        ' / IN_QTY: ' . $tail_total_in_qty . ' >>> ' . $new_tail_total_in_qty .
+                                                                        ' / OUT_QTY: ' . $tail_total_out_qty . ' >>> ' . $new_tail_total_out_qty .
+                                                                        ' | Status: 1', $user ]);
+
+                                    /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
+                                    if ($tailBalanceAfter >= 0){
+                                        break;
+                                    }
+
+                                    /* ROUTING FOR USING NEXT BATCH BALANCE RESERVE */
+                                        $tail_out_qty = $temp_tail_out_qty;
+
+                                }
+
+                        /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
+                            if ($balanceAfter >= 0){
+                                $db = [ (object)['response' => 1 ]];
+                                break;
+                            }
+
+                        /* ROUTING FOR USING NEXT BATCH BALANCE RESERVE */
+                            $out_qty = $temp_out_qty;
+
+                    }
+                }
+
+                DB::delete('DELETE FROM t_balance_temporary
+                            WHERE entry_no = ?', [$entry_no]);
+
+            } elseif ($mode == 'UPDATE'){
+
+            }
+
+        /* THROW OUTPUT */
+            $db = [ (object)['response' => 1 ]];
+            return $db;
+    }
+    static function deactivateRmEntryTrf($id, $user){
+        $trace_no = $id;
+
+        $dat = DB::select('SELECT COUNT(a.id_trace_head) AS used
+                             FROM t_trace_header a
+                            WHERE a.to_trace_no = ?
+                              AND a.out_qty <> 0', [$trace_no]);
+
+        if ($dat[0]->used > 0){
+            $db = [ (object)['response' => 3 ]];
+            return $db;
+        }
+
+        $datTraceHead = DB::select('SELECT a.id_trace_head, a.in_qty, a.id_material, a.id_balance_head
+                                      FROM t_trace_header a
+                                     WHERE a.`status` = 1
+                                       AND a.to_trace_no = ?', [$trace_no]);
+        $lenTraceHead = count($datTraceHead);
+
+        for ($i = 0; $i < $lenTraceHead; $i++) {
+            $idTraceHead = $datTraceHead[$i]->id_trace_head;    /* 670 */       /* 672 */       /* 671 */       /* 673 */
+            $inQtyHead = $datTraceHead[$i]->in_qty;             /*  50 */       /* 100 */       /* 115.359 */   /* 184.641 */
+            $idMaterial = $datTraceHead[$i]->id_material;       /*  26 */       /*   1 */       /*   1 */       /*   1 */
+            $idBalHead = $datTraceHead[$i]->id_balance_head;    /* 345 */       /* 346 */       /* 358 */       /* 359 */
+
+            $datTraceHead_from = DB::select('SELECT b.from_trace_no, b.out_qty, b.id_trace_head AS from_id_trace_head
+                                               FROM t_trace_header a
+                                               LEFT JOIN t_trace_header b
+                                                 ON a.from_trace_no = b.to_trace_no AND a.in_qty = b.out_qty
+                                              WHERE a.`status` = 1
+                                                AND a.id_trace_head = ?
+                                                AND a.id_material = ?
+                                                AND a.id_balance_head = ?', [$idTraceHead, $idMaterial, $idBalHead]);   /* 671, 1 */           /* 673, 1 */
+            $lenTraceHeadFrom = count($datTraceHead_from);
+
+            for ($n = 0; $n < $lenTraceHeadFrom; $n++) {
+                $fromTraceNo = $datTraceHead_from[$n]->from_trace_no;                 /* 12408160001, 12408190002 */           /* 12408160001, 12408190002 */
+                $fromIdTraceHead = $datTraceHead_from[$n]->from_id_trace_head;        /*         670,         672 */           /*         670,         672 */
+                $fromOutQtyHead = $datTraceHead_from[$n]->out_qty;                    /*         115.359,     184.641*/        /*         115.359,     184.641*/
+
+                DB::update('UPDATE t_trace_header
+                               SET `status` = "0",
+                                   `updated_by` = ?
+                             WHERE from_trace_no = ?', [$user, $fromTraceNo]);
+
+                /* RESTORE STORAGE TANK */
+                $datBalHeadFrom = DB::select('SELECT id_balance_head, qty, out_qty
+                                                FROM t_balance_header
+                                               WHERE `status` = 1
+                                                 AND trace_no = ?', [$fromTraceNo]);    /* 12408150002 */                       /* 12408160001 */
+                $idBalHeadFrom = $datBalHeadFrom[0]->id_balance_head;                   /*         337 */                       /*         344 */
+                $outQtyHeadFrom = $datBalHeadFrom[0]->out_qty;                          /*         100 */                       /*         100 */
+                $qtyHeadFrom = $datBalHeadFrom[0]->qty;                                 /*           0 */                       /*          50 */
+
+                DB::update('UPDATE t_balance_header
+                               SET qty = ?,
+                                   out_qty = ?,
+                                   updated_by = ?
+                             WHERE id_balance_head = ?
+                            ', [$qtyHeadFrom + $inQtyHead, $outQtyHeadFrom - $inQtyHead, $user, $idBalHeadFrom]);
+
+                $datBalTailFrom = DB::select('SELECT a.id_balance_tail, a.qty, a.out_qty, a.id_supplier, b.in_qty, b.out_qty AS qtyTraceTail
+                                                FROM t_balance_detail a
+                                                LEFT JOIN t_trace_detail b
+                                                  ON a.id_balance_tail = b.id_balance_tail AND b.`status` = 1
+                                               WHERE a.`status` = 1
+                                                 AND id_balance_head = ?
+                                                 AND b.id_trace_head = ?
+                                               ORDER BY id_balance_tail DESC
+                                            ', [$idBalHeadFrom, $fromIdTraceHead]);   /*         337 */                       /*         344, 671 */
+                $lenBalTailFrom = count($datBalTailFrom);
+
+                for ($k = 0; $k < $lenBalTailFrom; $k++){
+                    $idBalTailFrom = $datBalTailFrom[0]->id_balance_tail;   /* 605 */  /* 604 */                            /* 612 */
+                    $outQtyTailFrom = $datBalTailFrom[0]->out_qty;          /*  50 */  /*  50 */                            /* 100 */
+                    $qtyTailFrom = $datBalTailFrom[0]->qty;                 /*   0 */  /*   0 */                            /*  50 */
+                    $idSupplierTailFrom = $datBalTailFrom[0]->id_supplier;  /*  49 */  /*  82 */                            /*   4 */
+                    $qtyTraceTail = $datBalTailFrom[0]->qtyTraceTail;
+
+                    DB::update('UPDATE t_balance_detail
+                                   SET qty = ?,
+                                       out_qty = ?,
+                                       updated_by = ?
+                                 WHERE id_balance_tail = ?
+                                ', [$qtyTailFrom + $qtyTraceTail, $outQtyTailFrom - $qtyTraceTail, $user, $idBalTailFrom]);
+
+                    DB::update('UPDATE t_trace_detail
+                                   SET `status` = 0,
+                                       `updated_by` = ?
+                                 WHERE id_trace_head = ?
+                                   AND id_balance_tail = ?', [$user, $fromIdTraceHead, $idBalTailFrom]);
+                };
+            }
+
+            DB::update('UPDATE t_trace_detail
+                           SET `status` = 0,
+                               `updated_by` = ?
+                         WHERE id_trace_head = ?', [$user, $idTraceHead]);
+            DB::update('UPDATE t_balance_detail
+                           SET `status` = 0,
+                               `updated_by` = ?
+                         WHERE id_balance_head = ?', [$user, $idBalHead]);
+
+        }
+
+        DB::update('UPDATE t_trace_header
+                       SET `status` = "0",
+                           `updated_by` = ?
+                     WHERE to_trace_no = ?', [$user, $trace_no]);
+        DB::update('UPDATE t_balance_header
+                       SET `status` = "0",
+                           `updated_by` = ?
+                     WHERE trace_no = ?', [$user, $trace_no]);
+
+        DB::insert('INSERT INTO log_transactions
+                           (log_module, log_type, log_description, created_by)
+                    VALUES (?, ?, ?, ?)', [ 'RMTRF_ENTRY', 'DE-ACTIVATE', 'Trace No: ' . $trace_no . ' | Status: 1 >> 0', $user ]);
+
+        /* THROW OUTPUT */
+        $db = [ (object)['response' => 1 ]];
+        return $db;
+    }
+    static function post_matlDocNumber($user, $request){
+        $mode = $request->input('mode');
+        $idTraceHead = $request->input('id');
+        $materialDoc = $request->input('number');
+
+        if ($mode == 'ADD'){
+            $db = DB::insert('INSERT INTO t_material_document
+                                     (id_trace_head, material_document, created_by)
+                              VALUES (?, ?, ?)', [$idTraceHead, $materialDoc, $user]);
+            $db = [ (object)['response' => $db ? 1 : 0 ]];
+
+            /* LOGGING */
+            $id = DB::select('SELECT id_matdoc FROM t_material_document ORDER BY id_matdoc DESC LIMIT 1');
+            DB::insert('INSERT INTO log_transactions
+                               (log_module, log_type, log_description, created_by)
+                        VALUES (?, ?, ?, ?)', [ 'T_MATERIAL_DOCUMENT', 'ADD', 'ID: ' . $id[0]->id_matdoc . ' | IDTRACEHEAD: ' . $idTraceHead .
+                                                ' / DOC_NO: ' . $materialDoc .
+                                                ' | Status: 1', $user ]);
+        } elseif ($mode == 'UPDATE'){
+            $dat = DB::select('SELECT id_matdoc, material_document
+                                 FROM t_material_document
+                                WHERE id_trace_head = ?', [$idTraceHead]);
+            $id_matdoc = $dat[0]->id_matdoc;
+            $old_materialDoc = $dat[0]->material_document;
+
+            $db = DB::update('UPDATE t_material_document
+                                 SET material_document = ?,
+                                     updated_by = ?
+                               WHERE id_trace_head = ?', [$materialDoc, $user, $idTraceHead]);
+            $db = [ (object)['response' => $db ]];
+
+            /* LOGGING */
+            DB::insert('INSERT INTO log_transactions
+                               (log_module, log_type, log_description, created_by)
+                        VALUES (?, ?, ?, ?)', [ 'T_MATERIAL_DOCUMENT', 'UPDATE', 'ID: ' . $id_matdoc . ' | IDTRACEHEAD: ' . $idTraceHead .
+                                                ' / DOC_NO: ' . $old_materialDoc . ' >>> ' . $materialDoc .
+                                                ' | Status: 1', $user ]);
+        }
+        return $db;
+    }
+
+}
