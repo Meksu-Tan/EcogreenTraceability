@@ -20,7 +20,7 @@ class MaterialFlowSeeder extends Seeder
             'created_by' => 'santo'
         ]);
         \DB::table('m_material_flow')->insert([
-            'description' => 'quantifier',
+            'flow_type' => 'quantifier',
             'created_by' => 'santo'
         ]);
 

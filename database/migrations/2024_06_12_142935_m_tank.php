@@ -14,8 +14,11 @@ return new class extends Migration
         //
         Schema::create('m_tank', function (Blueprint $table) {
             $table->bigIncrements('id_tank');
-            $table->string('code', 10);
-            $table->string('code_2', 10);
+            $table->string('code', 10)->nullable();
+            $table->string('code_2', 10)->nullable();
+            $table->string('code_3', 10)->nullable();
+            $table->string('code_4', 10)->nullable();
+            $table->string('id_plant', 10);
             $table->string('description', 50)->unique();
             $table->integer('status')->default('1');
             $table->string('created_by', 50)->nullable();

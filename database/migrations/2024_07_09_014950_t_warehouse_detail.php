@@ -34,7 +34,7 @@ return new class extends Migration
             // Adding foreign key constraint
             $table->foreign('id_material_feed')->references('id_material')->on('m_material')->onDelete('restrict');
             $table->foreign('id_whx_head')->references('id_whx_head')->on('t_warehouse_header')->onDelete('restrict');
-            $table->foreign('id_trace_tail')->references('id_trace_tail')->on('t_trace_detail')->onDelete('restrict');
+            // $table->foreign('id_trace_tail')->references('id_trace_tail')->on('t_trace_detail')->onDelete('restrict');
 
             // Adding a single column index
             $table->index('status');

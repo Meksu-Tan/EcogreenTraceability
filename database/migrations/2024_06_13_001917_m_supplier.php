@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('m_supplier', function (Blueprint $table) {
             $table->bigIncrements('id_supplier');
             $table->string('code', 13);
-            $table->string('batch_code', 13);
+            $table->string('batch_code', 13)->nullable();
             $table->string('description', 100)->unique();
             $table->string('type', 20)->nullable();
             $table->integer('status')->default('1');

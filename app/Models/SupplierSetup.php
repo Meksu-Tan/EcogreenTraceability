@@ -2,12 +2,29 @@
 
 namespace App\Models;
 
+use Database\Factories\SupplierFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 class SupplierSetup extends Model
 {
+    use HasFactory;
+
     protected $connection = 'eudr_ts';
+    protected $table = 'm_supplier';
+    protected $fillable = [
+        'code',
+        'batch_code',
+        'description',
+        'type',
+        'status',
+    ];
+
+    protected static function newFactory()
+    {
+        return SupplierFactory::new();
+    }
 
     static function get_dtSupplier(){
         $db = DB::select('SELECT a.id_supplier, a.code, a.description, a.status,
