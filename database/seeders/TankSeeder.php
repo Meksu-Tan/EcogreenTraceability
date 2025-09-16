@@ -16,6 +16,7 @@ class TankSeeder extends Seeder
     {
         //
         \DB::table('m_tank')->insert([
+            'id_tank' => 1,
             'code' => 'T01',
             'code_2' => 'RM',
             'description' => '504T02',
@@ -23,6 +24,7 @@ class TankSeeder extends Seeder
             'created_by' => 'santo'
         ]);
         \DB::table('m_tank')->insert([
+            'id_tank' => 2,
             'code' => 'T01',
             'code_2' => 'RM',
             'description' => '504T03',
@@ -30,6 +32,7 @@ class TankSeeder extends Seeder
             'created_by' => 'santo'
         ]);
         \DB::table('m_tank')->insert([
+            'id_tank' => 3,
             'code' => 'T01',
             'code_2' => 'FEED',
             'description' => 'FEED TANK',
@@ -37,6 +40,7 @@ class TankSeeder extends Seeder
             'created_by' => 'santo'
         ]);
         \DB::table('m_tank')->insert([
+            'id_tank' => 4,
             'code' => 'T00',
             'code_2' => 'STORAGE',
             'description' => 'STORAGE TANK',
@@ -44,6 +48,7 @@ class TankSeeder extends Seeder
             'created_by' => 'santo'
         ]);
         \DB::table('m_tank')->insert([
+            'id_tank' => 5,
             'code' => 'T02',
             'code_2' => 'WIP',
             'description' => 'WIP TANK',
@@ -51,6 +56,7 @@ class TankSeeder extends Seeder
             'created_by' => 'santo'
         ]);
         \DB::table('m_tank')->insert([
+            'id_tank' => 6,
             'code' => 'T03',
             'code_2' => 'PRD',
             'description' => 'PRODUCT TANK',
