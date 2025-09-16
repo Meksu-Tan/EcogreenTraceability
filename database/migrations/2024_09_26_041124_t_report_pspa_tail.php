@@ -45,7 +45,6 @@ return new class extends Migration
 
             // Adding a single column index
             $table->index('status');
-            $table->index('period');
             $table->index('id_material');
             $table->index('id_sloc');
         });
