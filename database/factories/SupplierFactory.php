@@ -16,7 +16,9 @@ class SupplierFactory extends Factory
     {
         return [
             'code' => fake()->numerify('########'),
+            'batch_code' => fake()->lexify(),
             'description' => fake()->company(),
+            'type' => fake()->numberBetween(1, 2),
             'created_by' => 'santo'
         ];
     }
