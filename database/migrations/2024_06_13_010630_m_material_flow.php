@@ -14,7 +14,7 @@ return new class extends Migration
         //
         Schema::create('m_material_flow', function (Blueprint $table) {
             $table->bigIncrements('id_flow');
-            $table->string('flow_type', 10);
+            $table->string('flow_type', length: 20);
             $table->integer('status')->default('1');
             $table->string('created_by', 50)->nullable();
             $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'))->nullable();

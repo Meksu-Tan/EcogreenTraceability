@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('m_material', function (Blueprint $table) {
             $table->bigIncrements('id_material');
             $table->string('code', 20);
-            $table->string('code_noneudr', 20);
+            $table->string('code_noneudr', 20)->nullable();
             $table->string('description', 500);
             $table->string('code_matl_supplier', 20)->nullable();
             $table->string('type', 20);
