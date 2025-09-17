@@ -52,21 +52,20 @@
                                 </div>
                                 <hr>
                                 <div class="row">
-                                    <div class="col-md-4">
+                                    <div class="col-md-8">
                                         <div class="form-group">
                                             <label for="name">Container Number</label>
-                                            <input type="text" id="page-shipData-containerNo" style="width: 100%;"
-                                                    class="form-control col-sm-12"  readonly>
+                                            <div id="page-shipData-containerNo"></div>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-2">
                                         <div class="form-group">
                                             <label for="name">Nett Weight (MT)</label>
                                             <input type="text" id="page-shipData-netWeight" style="width: 100%;"
                                                     class="form-control col-sm-12"  readonly>
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-2">
                                         <div class="form-group">
                                             <label for="name">Date Depart</label>
                                             <input type="text" id="page-shipData-dateDepart" style="width: 100%;"
@@ -113,6 +112,21 @@
                                         </div>
                                     </div>
                                 </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-md-5">
+                                        <div class="form-group">
+                                            <label for="name">Shipment Lot No</label>
+                                            <div id="page-shipData-shipmentLotNo"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <div class="form-group">
+                                            <label for="name">Batch Allocation</label>
+                                            <div id="page-shipData-batchAllocation"></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -144,6 +158,9 @@
         const $page_shipData_incoPteo           = '#page-shipData-incoPteo';
         const $page_shipData_incoEos            = '#page-shipData-incoEos';
         const $page_shipData_header             = '#modal-shipData-title';
+        const $page_shipData_shipmentLotNo      = '#page-shipData-shipmentLotNo';
+        const $page_shipData_batchAllocation    = '#page-shipData-batchAllocation';
+
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -179,7 +196,6 @@
                     $($page_shipData_zbatch).val(response['data']['ZBATCH']);
                     $($page_shipData_poNumber).val(response['data']['PO_NUM']);
                     $($page_shipData_proInvoice).val(response['data']['PRO_INVOICE']);
-                    $($page_shipData_containerNo).val(response['data']['CONTAINER_NUMBER']);
                     $($page_shipData_netWeight).val(response['data']['NET_WEIGHT'].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
                     $($page_shipData_dateDepart).val(response['data']['DATE_DEPART']);
                     $($page_shipData_portDischarge).val(response['data']['PORT_DISCHARGE'].toUpperCase());
@@ -187,6 +203,26 @@
                     $($page_shipData_shipToLoc).val(response['data']['SHIP_TO_LOC'].toUpperCase());
                     $($page_shipData_incoPteo).val(response['data']['INCO_PTEO'].toUpperCase());
                     $($page_shipData_incoEos).val(response['data']['INCO_EOS'].toUpperCase());
+
+                    /* populate container no */
+                    let containerNo = response['data']['CONTAINER_NUMBER'].toUpperCase();
+                    let containerNoValues = containerNo.split(";").map(v => v.trim()).filter(v => v);
+                    let containerNoBadgesHtml = containerNoValues.map(v => `<span class="badge bg-primary text-white me-1">${v}</span>`).join("");
+                    $($page_shipData_containerNo).html(containerNoBadgesHtml);
+
+                    /* populate shipment lot no */
+                    let shipLot = response['data']['SHIP_LOT'].toUpperCase();
+                    let shipLotValues = shipLot.split(";").map(v => v.trim()).filter(v => v);
+                    let shipLotBadgesHtml = shipLotValues.map(v => `<span class="badge bg-primary text-white me-1">${v}</span>`).join("");
+                    $($page_shipData_shipmentLotNo).html(shipLotBadgesHtml);
+
+                    /* populate batch allocation */
+                    let batchAlloc = response['data']['BATCH_ALLOC'].toUpperCase();
+                    let batchAllocValues = batchAlloc.split(";").map(v => v.trim()).filter(v => v);
+                    let batchAllocBadgesHtml = batchAllocValues.map(v => `<span class="badge bg-primary text-white me-1">${v}</span>`).join("");
+                    $($page_shipData_batchAllocation).html(batchAllocBadgesHtml);
+
+
                 }
             });
         };
@@ -226,7 +262,7 @@
             $($page_shipData_zbatch).val('');
             $($page_shipData_poNumber).val('');
             $($page_shipData_proInvoice).val('');
-            $($page_shipData_containerNo).val('');
+            $($page_shipData_containerNo).html('');
             $($page_shipData_netWeight).val('');
             $($page_shipData_dateDepart).val('');
             $($page_shipData_portDischarge).val('');
@@ -234,6 +270,9 @@
             $($page_shipData_shipToLoc).val('');
             $($page_shipData_incoPteo).val('');
             $($page_shipData_incoEos).val('');
+            $($page_shipData_shipmentLotNo).html('');
+            $($page_shipData_batchAllocation).html('');
+
         };
 
     /* FUNCTION AUTO-REFRESH */

@@ -118,6 +118,12 @@ class RmreportController extends Controller
             return DataTables::of($db)
                     ->make(true);
 
+        } elseif ($flag == 'get_dtDetailRmPrd_onAdjOut'){
+            $db = RP::get_dtDetailRmPrd_onAdjOut($request);
+
+            return DataTables::of($db)
+                    ->make(true);
+
         } elseif ($flag == 'get_dtDetailRmPrd_onWarehouse'){
             $db = RP::get_dtDetailRmPrd_onWarehouse($request);
 

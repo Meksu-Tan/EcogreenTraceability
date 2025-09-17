@@ -216,9 +216,20 @@ class ShipmentEntryController extends Controller
             // Calculate the volume using the getDataFromSap function
             $jsonResponse = $this->getDataFromSap($flag, $soNo, $soItem, $batchNo);
             $txtData = $jsonResponse->original;
+            echo json_encode($txtData);
+            exit;
+
+        } elseif ($flag == 'get_datSoAllocation'){
+            $batchNo = $request->input('batchNo');
+            $flag = 'ZFM_AD001';
+
+            // Calculate the volume using the getDataFromSap function
+            $jsonResponse = $this->getDataFromSap($flag, $batchNo);
+            $txtData = $jsonResponse->original;
 
             echo json_encode($txtData);
             exit;
+
         };
     }
 
@@ -328,25 +339,32 @@ class ShipmentEntryController extends Controller
     *
     * @return \Illuminate\Http\Response
     */
-    public function getDataFromSAP($flag=null, $soNo=null, $soItem=null, $batchNo=null)
+    public function getDataFromSAP($flag=null, $input1=null, $input2=null, $input3=null)
     {
         if ($flag == 'ZFM_EUDR_SHIPMENT'){
             $sapClient = 'Client=PRD-300';
             $sapReqUrl = 'http://eows.ecogreenoleo.co.id/general.php?';
             $sapFm     = '&FM='.$flag;
-            $input_1   = '&SO_NUM='.$soNo;
-            $input_2   = '&SO_ITEM='.$soItem;
-            $input_3   = '&BATCH='.$batchNo;
+            $input_1   = '&SO_NUM='.$input1;
+            $input_2   = '&SO_ITEM='.$input2;
+            $input_3   = '&BATCH='.$input3;
 
-            if ($batchNo == "FB"){
+            if ($input3 == "FB"){
                 $eobUrl = $sapReqUrl.$sapClient.$sapFm.$input_1.$input_2;
-            } elseif ($batchNo == "IS"){
+            } elseif ($input3 == "IS"){
                 $eobUrl = $sapReqUrl.$sapClient.$sapFm.$input_1.$input_2;
-            } elseif ($batchNo == "VS"){
+            } elseif ($input3 == "VS"){
                 $eobUrl = $sapReqUrl.$sapClient.$sapFm.$input_1.$input_2;
             } else {
                 $eobUrl = $sapReqUrl.$sapClient.$sapFm.$input_1.$input_2.$input_3;
             }
+        } elseif ($flag == 'ZFM_AD001'){
+            $sapClient = 'Client=PRD-300';
+            $sapReqUrl = 'http://eows.ecogreenoleo.co.id/general.php?';
+            $sapFm     = '&FM='.$flag;
+            $input_1   = '&BATCH_NO='.$input1;
+
+            $eobUrl = $sapReqUrl.$sapClient.$sapFm.$input_1;
         }
 
         $ch = curl_init($eobUrl);

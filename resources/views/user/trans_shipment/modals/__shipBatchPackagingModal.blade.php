@@ -30,6 +30,21 @@
                                     <input type="hidden" id="page-prdexecution-urlsplabel-printed" class="form-control text-uppercase" >
                                     <input type="hidden" id="page-prdexecution-urlcsmark-printed" class="form-control text-uppercase" >
                                 </div>
+                                <hr>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="form-group">
+                                        <label>SO Allocation | Allocated Qty</label>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-12" style="padding-left:20px">
+                                        <div class="form-group">
+                                            <div id="page-soData-batchAllocation"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr>
                                 <div class="row">
                                     <div class="col-md-3">
                                         <div class="form-group">
@@ -405,6 +420,8 @@
         const $page_prod_urlsplabel_printed             = '#page-prdexecution-urlsplabel-printed';
         const $page_prod_urlcsmark_printed              = '#page-prdexecution-urlcsmark-printed';
 
+        const $page_batchAllocation                     = '#page-soData-batchAllocation';
+
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
             /* INITIALIZE */
@@ -488,6 +505,33 @@
                     { data: 'created_at', name: 'created_at', className: 'text-center'},
                     { data: 'updated_at', name: 'updated_at', className: 'text-center'},
                 ]
+            });
+        };
+        function ajax_populateSoPage($batchNo){
+            $.ajax({
+                url: batch_show_url,
+                type: 'get',
+                dataType: 'json',
+                data:{
+                    flag: 'get_datSoAllocation',
+                    batchNo: $batchNo
+                },
+                success: function(response){
+                    /* populate container no */
+                    let containerData = response['data']['IT_EXPORT'];
+
+                    let containerNoBadgesHtml = containerData.map(item => {
+                        return `
+                                <span class="badge bg-primary text-white">
+                                    SO: ${item.VBELN}-${parseInt(item.POSNR, 10)} |
+                                    ALLOC QTY: ${item.LFIMG} ${item.MEINS}
+                                </span>
+                        `;
+                    }).join("");
+
+                    $($page_batchAllocation).html(containerNoBadgesHtml);
+
+                }
             });
         };
 
@@ -631,6 +675,7 @@
 
             /* POPULATE PREPARATION RECORDS */
             ajax_populatePreparationRecord($dt_preparation, $($page_prod_batchno).val());
+            ajax_populateSoPage(response['data'][0].batch_no);
         };
         function populate_csmarkPreview($tagId, selectedValue=null){
             $.ajax({

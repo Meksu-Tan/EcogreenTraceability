@@ -101,112 +101,185 @@ class Stock extends Model
 
         if ($type == 'WIP'){
             if ($mode == 'NORMAL'){
-                $db = DB::select('SELECT SUBSTRING(?,1,10) AS entry_date, bgn.`description`, bgn.`in` AS `in`, bgn.`out` AS `out`,
-                                         FORMAT(bgn.`balance`,3) AS balance, bgn.`supplier`, bgn.`sloc`, bgn.`balance` AS balances,
-                                         IF(ABS(bgn.balance_supplier - bgn.`balance`) < 0.0099,
-                                         FORMAT(ROUND(bgn.`balance`,3),3), FORMAT(ROUND(bgn.`balance_supplier`,3),3)
-                                         ) AS balance_supplier
-                                    FROM (SELECT GROUP_CONCAT(DISTINCT b.`description` SEPARATOR "|") AS description,
-                                                 FORMAT(ROUND(SUM(b.in),3),3) AS `in`,
-                                                 FORMAT(ROUND(SUM(b.out),3),3) AS `out`, SUM(b.`balance`) AS `balance`,
-                                                 GROUP_CONCAT(DISTINCT b.sloc SEPARATOR "|") AS sloc, SUM(DISTINCT c.balance_supplier) AS balance_supplier,
-                                                 GROUP_CONCAT(DISTINCT c.supplier SEPARATOR "|") AS supplier
-                                            FROM m_material z
-                                            LEFT JOIN (SELECT a.code, a.id_material
-                                                         FROM m_material a
-                                                        WHERE a.status = 1) a
-                                              ON z.code = a.code
-                                            LEFT JOIN (SELECT bb.id_material, bb.id_trace_head, bb.entry_date, "Beginning Balance" AS `description`,
-                                                              bb.`balance` AS balance, bb.sloc, bb.`in` AS `in`, bb.`out` AS `out`
-                                                         FROM m_tank bbb
-                                                         LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, b.entry_date,
-                                                                           b.id_trace_head, b.balance, b.in, b.out, b.sloc
-                                                                      FROM t_balance_header bb
-                                                                      LEFT JOIN (SELECT b.id_balance_head, b.id_material, b.id_trace_head, b.entry_date,
-                                                                                        SUM(b.in_qty) - SUM(b.out_qty) AS `balance`, SUM(b.in_qty) AS `in`,
-                                                                                        SUM(b.out_qty) AS `out`,
-                                                                                        GROUP_CONCAT(DISTINCT bb.description SEPARATOR "|") AS sloc
-                                                                                   FROM t_trace_header b
-                                                                                   LEFT JOIN m_tank bb
-                                                                                     ON b.id_sloc = bb.id_tank AND bb.id_plant = ?
-                                                                                  WHERE b.`status` = 1
-                                                                                    AND b.entry_date <= ?
-                                                                                  GROUP BY b.id_balance_head, b.id_material, b.entry_date
-                                                                                ) b
-                                                                        ON b.id_balance_head = bb.id_balance_head
-                                                                     WHERE bb.status = 1
-                                                                       AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 2 OR
-                                                                            SUBSTRING(bb.trace_no,1,1) = 3 OR SUBSTRING(bb.trace_no,1,1) = 7 OR
-                                                                            SUBSTRING(bb.trace_no,1,1) = 8 OR SUBSTRING(bb.trace_no,1,1) = 9)
-                                                                       AND bb.id_tank <> 4
-                                                                       AND b.id_trace_head IS NOT NULL
-                                                                   ) bb
-                                                          ON bbb.id_tank = bb.id_tank
-                                                       WHERE bb.id_trace_head IS NOT NULL
-                                                         AND bbb.id_plant = ?
-                                                     ) b
-                                              ON a.id_material = b.id_material
-                                            LEFT JOIN (SELECT d.id_material, d.id_trace_head, d.entry_date, d.balance, SUM(d.`balance`) AS balance_supplier,
-                                                              GROUP_CONCAT(DISTINCT CONCAT(d.id_trace_tail, " / ", d.supplier, " / ", d.`batch_sap`, " / Qty: ",
-                                                              FORMAT(ROUND(d.`balance`,3),3), " MT / ", d.to_trace_no) SEPARATOR " | ") AS supplier
-                                                         FROM (SELECT cc.id_material, cc.id_trace_head, cc.entry_date, cc.id_trace_tail, cc.id_balance_head,
-                                                                      SUM(ROUND(cc.in_qty,5)) - SUM(ROUND(cc.out_qty,5)) AS `balance`, cc.supplier, cc.`batch_sap`,
-                                                                      cc.to_trace_no
-                                                                 FROM m_tank bbb
-                                                                 LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, c.entry_date, c.id_trace_head,
-                                                                                   c.supplier, c.in_qty, c.out_qty, c.batch_sap, c.id_trace_tail, bb.qty,
-                                                                                   c.to_trace_no
-                                                                              FROM t_balance_header bb
-                                                                              LEFT JOIN (SELECT c.id_material, c.id_trace_head, c.id_balance_head, c.entry_date,
-                                                                                                c.in_qty, c.out_qty, c.`batch_sap`, c.supplier, c.id_trace_tail,
-                                                                                                c.to_trace_no
-                                                                                           FROM (SELECT c.id_trace_head, c.id_balance_head, c.entry_date,
-                                                                                                        c.id_material, ccc.`description` AS supplier, cc.batch_sap,
-                                                                                                        cc.in_qty, cc.out_qty,
-                                                                                                        c.to_trace_no, cc.id_trace_tail
-                                                                                                   FROM t_trace_header c
-                                                                                                   LEFT JOIN (SELECT cc.id_trace_head, cc.batch_sap, cc.id_supplier,
-                                                                                                                     ROUND(cc.in_qty,4) AS in_qty,
-                                                                                                                     ROUND(cc.out_qty,4) AS out_qty,
-                                                                                                                     cc.id_material, cc.id_trace_tail
-                                                                                                                FROM t_trace_detail cc
-                                                                                                               WHERE cc.`status` = 1
-                                                                                                                 AND (cc.in_qty > "0.0001" OR cc.out_qty > "0.0001")
-                                                                                                            ) cc
-                                                                                                     ON c.id_trace_head = cc.id_trace_head
-                                                                                                   LEFT JOIN m_supplier ccc
-                                                                                                     ON cc.id_supplier = ccc.id_supplier
-                                                                                                  WHERE c.entry_date <= ?
-                                                                                                    AND c.`status` = 1
-                                                                                                ) c
-                                                                                        ) c
-                                                                                  ON c.id_balance_head = bb.id_balance_head
-                                                                               WHERE bb.status = 1
-                                                                                 AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 2 OR
-                                                                                      SUBSTRING(bb.trace_no,1,1) = 3 OR SUBSTRING(bb.trace_no,1,1) = 7 OR
-                                                                                      SUBSTRING(bb.trace_no,1,1) = 8 OR SUBSTRING(bb.trace_no,1,1) = 9)
-                                                                                 AND bb.id_tank <> 4
-                                                                                 AND c.id_trace_head IS NOT NULL
-                                                                            ) cc
-                                                                   ON bbb.id_tank = cc.id_tank
-                                                                WHERE bbb.id_plant = ?
-                                                                GROUP BY cc.id_material, cc.batch_sap, cc.supplier, cc.id_balance_head
-                                                              ) d
-                                                        WHERE d.balance >= "0.001"
-                                                        GROUP BY d.id_material
-                                                        ) c
-                                              ON a.id_material = c.id_material
-                                           WHERE b.`balance` IS NOT NULL
-                                             AND z.id_material = ?
-                                           GROUP BY a.code
-                                           UNION ALL
-                                          SELECT "Beginning Balance" AS `description`, 0 AS `in`, 0 AS `out`, 0 AS `balance`, "|" AS supplier, "-" AS sloc, 0 AS `balance_supplier`
-                                           LIMIT 1) bgn
-                                  WHERE bgn.`description` IS NOT NULL
-                                ', [$startDate,
-                                    $idSloc, $startDate, $idSloc,
-                                    $startDate, $idSloc,
-                                    $idMaterialFix]);
+                $db = DB::select('WITH requested_material AS (
+                                    SELECT a.id_material
+                                      FROM m_material z
+                                      LEFT JOIN (SELECT a.code, a.id_material
+                                                   FROM m_material a
+                                                  WHERE a.status = 1
+                                                    ) a
+                                        ON z.code = a.code
+                                     WHERE z.id_material = ?
+                                    ),
+
+                                    bh_filtered AS (
+                                        SELECT bb.id_balance_head, bb.id_tank, bb.id_material, bb.trace_no
+                                          FROM t_balance_header bb
+                                          JOIN requested_material rm
+                                            ON bb.id_material = rm.id_material      -- lock to requested id_material
+                                         WHERE bb.status = 1
+                                           AND bb.id_tank <> 4
+                                           AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
+                                    ),
+
+                                    th_grouped AS (
+                                        SELECT
+                                              b.id_balance_head, b.id_material, b.id_trace_head, b.entry_date, SUM(b.in_qty) AS in_qty,
+                                              SUM(b.out_qty) AS out_qty, SUM(b.in_qty) - SUM(b.out_qty) AS balance,
+                                              GROUP_CONCAT(DISTINCT mt.description SEPARATOR "|") AS sloc
+                                         FROM t_trace_header b
+                                         LEFT JOIN m_tank mt
+                                           ON b.id_sloc = mt.id_tank
+                                          AND mt.id_plant = ?                       -- (2) plant
+                                        WHERE b.status = 1
+                                          AND b.entry_date <= ?                    -- (3) cutoff date
+                                        GROUP BY b.id_balance_head, b.id_material, b.entry_date, b.id_trace_head
+                                    ),
+
+                                    begin_rows AS (
+                                        SELECT
+                                            bb.id_material, b.entry_date, b.id_trace_head, "Beginning Balance" AS description,
+                                            b.balance, b.sloc, b.in_qty  AS `in`, b.out_qty AS `out`
+                                        FROM bh_filtered bb
+                                        JOIN th_grouped b
+                                          ON b.id_balance_head = bb.id_balance_head
+                                         AND b.id_material = bb.id_material
+                                    ),
+
+                                    begin_agg AS (
+                                        SELECT rm.id_material, SUM(br.balance) AS balance_raw,
+                                               GROUP_CONCAT(DISTINCT br.description SEPARATOR "|") AS description,
+                                               ROUND(SUM(br.`in`),  3) AS in_raw, ROUND(SUM(br.`out`), 3) AS out_raw,
+                                               br.sloc
+                                          FROM requested_material rm
+                                          LEFT JOIN begin_rows br
+                                            ON rm.id_material = br.id_material
+                                            WHERE br.sloc <> "-"
+                                         GROUP BY rm.id_material
+                                    ),
+
+                                    td_filtered AS (
+                                        SELECT
+                                        	 c.id_balance_head, cc.id_trace_head, c.id_material, cc.id_trace_tail,
+                                             cc.id_supplier, cc.batch_sap, ROUND(cc.in_qty,  4) AS in_qty, ROUND(cc.out_qty, 4) AS out_qty
+                                        FROM t_trace_header c
+										LEFT JOIN t_trace_detail cc
+										  ON cc.id_trace_head = c.id_trace_head
+                                        JOIN requested_material rm
+                                          ON c.id_material = rm.id_material      -- lock to requested id_material
+                                       WHERE cc.status = 1
+                                         AND (cc.in_qty > 0.001 OR cc.out_qty > 0.001)
+                                    ),
+
+                                    th_filtered AS (
+                                        SELECT
+                                            c.id_trace_head, c.id_balance_head, c.entry_date, c.id_material, c.to_trace_no, c.id_sloc
+                                        FROM t_trace_header c
+                                        JOIN requested_material rm
+                                          ON c.id_material = rm.id_material      -- lock to requested id_material
+                                        WHERE c.status = 1
+                                          AND c.entry_date <= ?                    -- (5) cutoff date
+                                    ),
+
+                                    supplier_lines AS (
+                                        SELECT
+                                            th.id_material,
+                                            th.id_trace_head,
+                                            th.entry_date,
+                                            td.id_trace_tail,
+                                            th.id_balance_head,
+                                            (SUM(td.in_qty) - SUM(td.out_qty)) AS balance,
+                                            sup.description AS supplier,
+                                            td.batch_sap,
+                                            th.to_trace_no,
+                                            th.id_sloc
+                                        FROM th_filtered th
+                                        JOIN td_filtered td
+                                          ON td.id_trace_head  = th.id_trace_head
+                                         AND td.id_material     = th.id_material   -- safe material join
+                                        LEFT JOIN m_supplier sup
+                                          ON td.id_supplier = sup.id_supplier
+                                       GROUP BY
+                                            th.id_material, sup.description, td.batch_sap, th.id_sloc
+                                    ),
+
+                                    bh_filtered2 AS (   -- same filter, reused for supplier path
+                                        SELECT
+                                              bb.id_balance_head,
+                                              bb.id_tank,
+                                              bb.id_material
+                                         FROM t_balance_header bb
+                                         JOIN requested_material rm
+                                           ON bb.id_material = rm.id_material
+                                        WHERE bb.status = 1
+                                          AND bb.id_tank <> 4
+                                          AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
+                                    ),
+
+                                    supplier_plant AS (
+                                        SELECT
+                                            sl.*
+                                        FROM supplier_lines sl
+                                        JOIN bh_filtered2 bh
+                                          ON sl.id_balance_head = bh.id_balance_head
+                                         AND sl.id_material     = bh.id_material   -- safe material join
+                                        JOIN m_tank t
+                                          ON t.id_tank = bh.id_tank
+                                       WHERE t.id_plant = ?                      -- (6) plant
+                                    ),
+
+                                    supplier_roll AS (
+                                        SELECT
+                                            sp.id_material, sp.id_trace_tail,
+                                            SUM(sp.balance) AS balance_supplier_raw,
+                                            GROUP_CONCAT(
+                                                DISTINCT CONCAT(
+                                                sp.id_trace_tail, " / ",
+                                                sp.supplier, " / ",
+                                                sp.batch_sap, " / Qty: ",
+                                                FORMAT(ROUND(sp.balance,3),3),
+                                                " MT / ",
+                                                sp.to_trace_no
+                                            ) SEPARATOR " | "
+                                            ) AS supplier
+                                        FROM supplier_plant sp
+                                        WHERE sp.balance > 0.0015
+                                        GROUP BY sp.id_material
+                                    )
+
+                                    SELECT
+                                        SUBSTRING(?,1,10) AS entry_date,          -- (1) for display only
+                                        COALESCE(bgn.description, "Beginning Balance") AS `description`,
+                                        FORMAT(COALESCE(SUM(bgn.in_raw),  0), 3) AS `in`,
+                                        FORMAT(COALESCE(SUM(bgn.out_raw), 0), 3) AS `out`,
+                                        FORMAT(COALESCE(SUM(bgn.balance_raw), 0), 3) AS balance,
+                                        GROUP_CONCAT(COALESCE(sup.supplier, "|") SEPARATOR "|") AS supplier,
+                                        COALESCE(bgn.sloc, "-")     AS sloc,
+                                        COALESCE(SUM(bgn.balance_raw), 0) AS balances,
+                                        IF(
+                                            ABS(COALESCE(SUM(sup.balance_supplier_raw),0) - COALESCE(SUM(bgn.balance_raw),0)) < 0.01,
+                                            FORMAT(ROUND(COALESCE(SUM(bgn.balance_raw),0),3),3),
+                                            FORMAT(ROUND(COALESCE(SUM(sup.balance_supplier_raw),0),3),3)
+                                        ) AS balance_supplier
+                                    FROM requested_material rm
+                                    LEFT JOIN begin_agg     bgn ON bgn.id_material = rm.id_material
+                                    LEFT JOIN supplier_roll  sup ON sup.id_material = rm.id_material
+
+                                    UNION ALL
+
+                                    SELECT
+                                        SUBSTRING(?,1,10) AS entry_date,          -- (1) again for the union row
+                                        "Beginning Balance" AS `description`,
+                                        FORMAT(0,3) AS `in`, FORMAT(0,3) AS `out`, FORMAT(0,3) AS balance,
+                                        "|" AS supplier, "-" AS sloc, 0  AS balances, FORMAT(0,3) AS balance_supplier
+
+
+                                    LIMIT 1
+                                    ;
+                            ', [$idMaterialFix, $idSloc, $startDate, $startDate,
+                                $idSloc, $startDate, $startDate
+                                ]);
+
             } elseif ($mode == 'STORAGE'){
                 $db = DB::select('SELECT SUBSTRING(?,1,10) AS entry_date, bgn.`description`, bgn.`in` AS `in`, bgn.`out` AS `out`,
                                          FORMAT(ROUND(bgn.`balance`, 3), 3) AS balance, bgn.`supplier`, bgn.`sloc`, bgn.`balance` AS balances,
@@ -379,120 +452,177 @@ class Stock extends Model
 
             if ($type == 'WIP'){
                 if ($mode == 'NORMAL'){
-                    $db1 = DB::select('SELECT SUBSTRING(?,1,10) AS entry_date, bgn.`to_trace_no` AS `description`, bgn.`in` AS `in`, bgn.`out` AS `out`,
+                    $db1 = DB::select('WITH requested_material AS (
+                                    SELECT a.id_material
+                                      FROM m_material z
+                                      LEFT JOIN (SELECT a.code, a.id_material
+                                                   FROM m_material a
+                                                  WHERE a.status = 1
+                                                    ) a
+                                        ON z.code = a.code
+                                     WHERE z.id_material = ?
+                                    ),
+
+                                    bh_filtered AS (
+                                        SELECT bb.id_balance_head, bb.id_tank, bb.id_material, bb.trace_no
+                                          FROM t_balance_header bb
+                                          JOIN requested_material rm
+                                            ON bb.id_material = rm.id_material      -- lock to requested id_material
+                                         WHERE bb.status = 1
+                                           AND bb.id_tank <> 4
+                                           AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
+                                    ),
+
+                                    th_grouped AS (
+                                        SELECT
+                                              b.id_balance_head, b.id_material, b.id_trace_head, b.entry_date, SUM(b.in_qty) AS in_qty,
+                                              SUM(b.out_qty) AS out_qty, SUM(b.in_qty) - SUM(b.out_qty) AS balance,
+                                              GROUP_CONCAT(DISTINCT mt.description SEPARATOR "|") AS sloc, b.to_trace_no
+                                         FROM t_trace_header b
+                                         LEFT JOIN m_tank mt
+                                           ON b.id_sloc = mt.id_tank
+                                          AND mt.id_plant = ?                       -- (2) plant
+                                        WHERE b.status = 1
+                                          AND b.entry_date > ?
+                                          AND b.entry_date <= ?                    -- (3) cutoff date
+                                        GROUP BY b.id_balance_head, b.id_material, b.entry_date, b.id_trace_head
+                                    ),
+
+                                    begin_rows AS (
+                                        SELECT
+                                            bb.id_material, b.entry_date, b.id_trace_head, "Beginning Balance" AS description,
+                                            b.balance, b.sloc, b.in_qty  AS `in`, b.out_qty AS `out`, b.to_trace_no
+                                        FROM bh_filtered bb
+                                        JOIN th_grouped b
+                                          ON b.id_balance_head = bb.id_balance_head
+                                         AND b.id_material = bb.id_material
+                                    ),
+
+                                    begin_agg AS (
+                                        SELECT rm.id_material, SUM(br.balance) AS balance_raw,
+                                               GROUP_CONCAT(DISTINCT br.description SEPARATOR "|") AS description,
+                                               ROUND(SUM(br.`in`),  3) AS in_raw, ROUND(SUM(br.`out`), 3) AS out_raw,
+                                               br.sloc, br.to_trace_no
+                                          FROM requested_material rm
+                                          LEFT JOIN begin_rows br
+                                            ON rm.id_material = br.id_material
+                                            WHERE br.sloc <> "-"
+                                         GROUP BY rm.id_material
+                                    ),
+
+                                    td_filtered AS (
+                                        SELECT
+                                        	 c.id_balance_head, cc.id_trace_head, c.id_material, cc.id_trace_tail,
+                                             cc.id_supplier, cc.batch_sap, ROUND(cc.in_qty,  4) AS in_qty, ROUND(cc.out_qty, 4) AS out_qty
+                                        FROM t_trace_header c
+										LEFT JOIN t_trace_detail cc
+										  ON cc.id_trace_head = c.id_trace_head
+                                        JOIN requested_material rm
+                                          ON c.id_material = rm.id_material      -- lock to requested id_material
+                                       WHERE cc.status = 1
+                                         AND (cc.in_qty > 0.001 OR cc.out_qty > 0.001)
+                                    ),
+
+                                    th_filtered AS (
+                                        SELECT
+                                            c.id_trace_head, c.id_balance_head, c.entry_date, c.id_material, c.to_trace_no, c.id_sloc
+                                        FROM t_trace_header c
+                                        JOIN requested_material rm
+                                          ON c.id_material = rm.id_material      -- lock to requested id_material
+                                        WHERE c.status = 1
+                                          AND c.entry_date <= ?                    -- (5) cutoff date
+                                    ),
+
+                                    supplier_lines AS (
+                                        SELECT
+                                            th.id_material,
+                                            th.id_trace_head,
+                                            th.entry_date,
+                                            td.id_trace_tail,
+                                            th.id_balance_head,
+                                            (SUM(td.in_qty) - SUM(td.out_qty)) AS balance,
+                                            sup.description AS supplier,
+                                            td.batch_sap,
+                                            th.to_trace_no,
+                                            th.id_sloc
+                                        FROM th_filtered th
+                                        JOIN td_filtered td
+                                          ON td.id_trace_head  = th.id_trace_head
+                                         AND td.id_material     = th.id_material   -- safe material join
+                                        LEFT JOIN m_supplier sup
+                                          ON td.id_supplier = sup.id_supplier
+                                       GROUP BY
+                                            th.id_material, sup.description, td.batch_sap, th.id_sloc
+                                    ),
+
+                                    bh_filtered2 AS (   -- same filter, reused for supplier path
+                                        SELECT
+                                              bb.id_balance_head,
+                                              bb.id_tank,
+                                              bb.id_material
+                                         FROM t_balance_header bb
+                                         JOIN requested_material rm
+                                           ON bb.id_material = rm.id_material
+                                        WHERE bb.status = 1
+                                          AND bb.id_tank <> 4
+                                          AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
+                                    ),
+
+                                    supplier_plant AS (
+                                        SELECT
+                                            sl.*
+                                        FROM supplier_lines sl
+                                        JOIN bh_filtered2 bh
+                                          ON sl.id_balance_head = bh.id_balance_head
+                                         AND sl.id_material     = bh.id_material   -- safe material join
+                                        JOIN m_tank t
+                                          ON t.id_tank = bh.id_tank
+                                       WHERE t.id_plant = ?                      -- (6) plant
+                                    ),
+
+                                    supplier_roll AS (
+                                        SELECT
+                                            sp.id_material, sp.id_trace_tail,
+                                            SUM(sp.balance) AS balance_supplier_raw,
+                                            GROUP_CONCAT(
+                                                DISTINCT CONCAT(
+                                                sp.id_trace_tail, " / ",
+                                                sp.supplier, " / ",
+                                                sp.batch_sap, " / Qty: ",
+                                                FORMAT(ROUND(sp.balance,3),3),
+                                                " MT / ",
+                                                sp.to_trace_no
+                                            ) SEPARATOR " | "
+                                            ) AS supplier
+                                        FROM supplier_plant sp
+                                        WHERE sp.balance > 0.0015
+                                        GROUP BY sp.id_material
+                                    )
+
+                                    SELECT SUBSTRING(?,1,10) AS entry_date, bgn.`to_trace_no` AS `description`, bgn.`in` AS `in`, bgn.`out` AS `out`,
                                               FORMAT(ROUND(bgn.`balance` + ?, 3),3) AS balance, bgn.`supplier`, bgn.`sloc`, bgn.`balance` + ? AS balances,
                                               IF(ABS(REPLACE(bgn.balance_supplier,",","") - REPLACE(bgn.`balance` + ?,",","")) < 0.0099,
                                               FORMAT(ROUND(bgn.`balance` + ?,3),3), FORMAT(ROUND(bgn.`balance_supplier`,3),3)
                                               ) AS balance_supplier
-                                         FROM (SELECT GROUP_CONCAT(DISTINCT c.to_trace_no SEPARATOR "|") AS to_trace_no,
-                                                      FORMAT(ROUND(SUM(c.in),3),3) AS `in`,
-                                                      FORMAT(ROUND(SUM(c.out),3),3) AS `out`, SUM(c.`balance`) AS `balance`,
+                                         FROM (SELECT GROUP_CONCAT(c.to_trace_no SEPARATOR "|") AS to_trace_no,
+                                                      FORMAT(ROUND(SUM(c.in_raw),3),3) AS `in`,
+                                                      FORMAT(ROUND(SUM(c.out_raw),3),3) AS `out`, SUM(c.`balance_raw`) AS `balance`,
                                                       GROUP_CONCAT(DISTINCT c.sloc SEPARATOR "|") AS sloc,
                                                       GROUP_CONCAT(DISTINCT d.supplier SEPARATOR "|") AS supplier,
-                                                      SUM(DISTINCT d.balance_supplier) AS balance_supplier
-                                                 FROM m_material z
-                                                 LEFT JOIN (SELECT a.code, a.id_material
-                                                              FROM m_material a
-                                                             WHERE a.status = 1) a
-                                                   ON z.code = a.code
-                                                 LEFT JOIN (SELECT cc.id_material, cc.id_trace_head, cc.entry_date,
-                                                                   cc.`to_trace_no`, cc.in, cc.out, cc.balance, cc.sloc
-                                                              FROM m_tank bbb
-                                                              LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, d.entry_date, d.id_trace_head,
-                                                                                d.to_trace_no, d.in, d.out, d.balance, d.sloc
-                                                                           FROM t_balance_header bb
-                                                                           LEFT JOIN (SELECT d.id_balance_head, d.id_material, d.id_trace_head, d.entry_date,
-                                                                                             GROUP_CONCAT(DISTINCT d.to_trace_no SEPARATOR "|") AS to_trace_no,
-                                                                                             SUM(d.in_qty) AS `in`, SUM(d.out_qty) AS `out`,
-                                                                                             SUM(d.in_qty) - SUM(d.out_qty) AS `balance`,
-                                                                                             GROUP_CONCAT(DISTINCT dd.description SEPARATOR "|") AS sloc
-                                                                                        FROM t_trace_header d
-                                                                                        LEFT JOIN m_tank dd
-                                                                                          ON d.id_sloc = dd.id_tank AND dd.id_plant = ?
-                                                                                       WHERE d.entry_date > ?
-                                                                                         AND d.entry_date <= ?
-                                                                                         AND d.`status` = 1
-                                                                                       GROUP BY d.id_balance_head, d.id_material, d.entry_date) d
-                                                                             ON d.id_balance_head = bb.id_balance_head
-                                                                          WHERE bb.status = 1
-                                                                            AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 2 OR
-                                                                                 SUBSTRING(bb.trace_no,1,1) = 3 OR SUBSTRING(bb.trace_no,1,1) = 7 OR
-                                                                                 SUBSTRING(bb.trace_no,1,1) = 8 OR SUBSTRING(bb.trace_no,1,1) = 9)
-                                                                            AND bb.id_tank <> 4
-                                                                            AND d.id_trace_head IS NOT NULL
-                                                                        ) cc
-                                                                ON bbb.id_tank = cc.id_tank
-                                                             WHERE cc.id_trace_head IS NOT NULL
-                                                               AND bbb.id_plant = ?
-                                                            ) c
-                                                   ON a.id_material = c.id_material
-                                                 LEFT JOIN (SELECT a.code, a.id_material, d.balance, SUM(d.balance_supplier) AS balance_supplier,
-                                                                   GROUP_CONCAT(DISTINCT d.supplier SEPARATOR " | ") AS supplier
-                                                              FROM m_material a
-                                                              LEFT JOIN (SELECT d.id_material, d.id_trace_head, d.entry_date, d.balance, d.`batch_sap`, SUM(d.`balance`) AS balance_supplier,
-                                                                                GROUP_CONCAT(DISTINCT CONCAT(d.id_trace_tail, " / ", d.supplier, " / ", d.`batch_sap`, " / Qty: ", FORMAT(d.`balance`,3), " MT / ", d.to_trace_no) SEPARATOR " | ") AS supplier
-                                                                           FROM (SELECT cc.id_material, cc.id_trace_head, cc.entry_date, cc.id_trace_tail,
-                                                                                        SUM(ROUND(cc.in_qty,4)) - SUM(ROUND(cc.out_qty,4)) AS `balance`, cc.supplier, cc.`batch_sap`,
-                                                                                        cc.to_trace_no
-                                                                                   FROM m_tank bbb
-                                                                                   LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, c.entry_date, c.id_trace_head,
-                                                                                                     c.supplier, c.in_qty, c.out_qty, c.batch_sap, c.id_trace_tail, c.to_trace_no
-                                                                                                FROM t_balance_header bb
-                                                                                                LEFT JOIN (SELECT c.id_material, c.id_trace_head, c.id_balance_head, c.entry_date,
-                                                                                                                  c.in_qty, c.out_qty, c.`batch_sap`, c.supplier, c.id_trace_tail,
-                                                                                                                  c.to_trace_no
-                                                                                                                FROM (SELECT c.id_trace_head, c.id_balance_head, c.entry_date,
-                                                                                                                            c.id_material, ccc.`description` AS supplier, cc.batch_sap,
-                                                                                                                            cc.in_qty, cc.out_qty,
-                                                                                                                            c.to_trace_no, cc.id_trace_tail
-                                                                                                                        FROM t_trace_header c
-                                                                                                                        LEFT JOIN (SELECT cc.id_trace_head, cc.batch_sap, cc.id_supplier,
-                                                                                                                                          ROUND(cc.in_qty,4) AS in_qty,
-                                                                                                                                          ROUND(cc.out_qty,4) AS out_qty,
-                                                                                                                                          cc.id_material, cc.id_trace_tail
-                                                                                                                                     FROM t_trace_detail cc
-                                                                                                                                    WHERE cc.`status` = 1
-                                                                                                                                      AND (cc.in_qty > "0.0001" OR cc.out_qty > "0.0001")
-                                                                                                                                    ) cc
-                                                                                                                        ON c.id_trace_head = cc.id_trace_head
-                                                                                                                        LEFT JOIN m_supplier ccc
-                                                                                                                        ON cc.id_supplier = ccc.id_supplier
-                                                                                                                    WHERE c.entry_date <= ?
-                                                                                                                        AND c.`status` = 1
-                                                                                                                    ) c
-                                                                                                            ) c
-                                                                                                    ON c.id_balance_head = bb.id_balance_head
-                                                                                                WHERE bb.status = 1
-                                                                                                    AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 2 OR
-                                                                                                         SUBSTRING(bb.trace_no,1,1) = 3 OR SUBSTRING(bb.trace_no,1,1) = 7 OR
-                                                                                                         SUBSTRING(bb.trace_no,1,1) = 8 OR SUBSTRING(bb.trace_no,1,1) = 9)
-                                                                                                    AND bb.id_tank <> 4
-                                                                                                    AND c.id_trace_head IS NOT NULL
-                                                                                                ) cc
-                                                                                        ON bbb.id_tank = cc.id_tank
-                                                                                    WHERE cc.id_trace_head IS NOT NULL
-                                                                                    AND bbb.id_plant = ?
-                                                                                    GROUP BY cc.id_material, cc.batch_sap, cc.supplier, cc.id_balance_head
-                                                                                ) d
-                                                                           WHERE d.balance >= "0.001"
-                                                                           GROUP BY d.id_material
-                                                                            ) d
-                                                                ON a.id_material = d.id_material
-                                                             GROUP BY a.code
-                                                            ) d
-                                                   ON z.code = d.code
-                                                WHERE c.`entry_date` IS NOT NULL
-                                                  AND z.id_material = ?
-                                                GROUP BY a.code
-                                                UNION ALL
-                                               SELECT "-" AS `description`, 0 AS `in`, 0 AS `out`, 0 AS `balance`, "|" AS supplier, "-" AS sloc, 0 AS `balance_supplier`
-                                                LIMIT 1) bgn
-                                    ', [$nextDate, $stock, $stock, $stock, $stock,
-                                        $idSloc, $currDate, $nextDate, $idSloc,
-                                        $nextDate, $idSloc,
-                                        $idMaterialFix]);
+                                                      SUM(d.balance_supplier_raw) AS balance_supplier
+                                                FROM requested_material rm
+                                                LEFT JOIN begin_agg     c ON c.id_material = rm.id_material
+                                                LEFT JOIN supplier_roll d ON d.id_material = rm.id_material
+                                            ) bgn
+                                    ORDER BY bgn.`supplier` ASC
+                                        ', [$idMaterialFix, $idSloc, $currDate, $nextDate, $nextDate, $idSloc,
+                                            $nextDate, $stock, $stock, $stock, $stock
+                                            ]);
 
-                    $stock = $db1[0]->balances;
+                    if ($db1[0]->balances !== null){
+                        $stock = $db1[0]->balances;
+                    }
+
                 } elseif ($mode == 'STORAGE'){
                     $db1 = DB::select('SELECT SUBSTRING(?,1,10) AS entry_date, bgn.`to_trace_no` AS `description`, bgn.`in` AS `in`, bgn.`out` AS `out`,
                                               FORMAT(ROUND(bgn.`balance` + ?, 3),3) AS balance, bgn.`supplier`, bgn.`sloc`, bgn.`balance` + ? AS balances,
@@ -653,8 +783,6 @@ class Stock extends Model
                 $stock = $db1[0]->balances;
             }
 
-
-
             $filtered_db1 = array_filter($db1, function($item) {
                 return strpos($item->description, '-') === false;
             });
@@ -750,7 +878,7 @@ class Stock extends Model
                                                                       GROUP_CONCAT(DISTINCT CONCAT(d.id_trace_tail, " / ", d.supplier, " / ", d.`batch_sap`, " / Qty: ", FORMAT(d.`balance`,3), " MT / ", d.to_trace_no) SEPARATOR " | ") AS supplier,
                                                                       SUM(d.`balance`) AS balance_supplier
                                                                 FROM (SELECT cc.id_material, cc.id_trace_head, cc.entry_date, cc.id_trace_tail, cc.to_trace_no,
-                                                                            SUM(cc.in_qty) - SUM(cc.out_qty) AS `balance`, cc.supplier, cc.`batch_sap`
+                                                                             SUM(cc.in_qty) - SUM(cc.out_qty) AS `balance`, cc.supplier, cc.`batch_sap`
                                                                         FROM m_tank bbb
                                                                         LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, c.entry_date, c.id_trace_head, c.to_trace_no,
                                                                                           c.supplier, IFNULL(c.in_qty,0) AS in_qty, IFNULL(c.out_qty,0) AS out_qty, c.batch_sap,

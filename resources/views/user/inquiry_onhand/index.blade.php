@@ -410,7 +410,7 @@
                     { data: 'out', name: 'out', className: 'text-right'},
                     { data: 'balance', name: 'balance', className: 'text-right'},
                     { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
-                    { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'}
+                    { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'},
                 ]
             });
         };

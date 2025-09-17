@@ -27,6 +27,9 @@
                                     <li class="nav-item">
                                         <a class="nav-link" id="tab2-tab" data-toggle="tab" href="#tab2" role="tab" aria-controls="tab2" aria-selected="false">On-PRODUCT</a>
                                     </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link" id="tab3-tab" data-toggle="tab" href="#tab3" role="tab" aria-controls="tab3" aria-selected="false">On-ADJUSTMENT</a>
+                                    </li>
                                 </ul>
                                 <!-- Tab panes -->
                                 <div class="tab-content mt-3">
@@ -69,6 +72,25 @@
                                             </table>
                                         </div>
                                     </div>
+                                    <div class="tab-pane fade" id="tab3" role="tabpanel" aria-labelledby="tab3-tab">
+                                        <div class="table-responsive">
+                                            <table class="table table-striped dataTable" id="tableReportDetail3" width="100%">
+                                                <thead>
+                                                    <tr>
+                                                        <th>No</th>
+                                                        <th>Sloc</th>
+                                                        <th>Material</th>
+                                                        <th>IN Qty (MT)</th>
+                                                        <th>OUT Qty (MT)</th>
+                                                        <th>Balance (MT)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <!-- Dynamic content here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div> <!-- end tab-content -->
                             </div>
                         </div>
@@ -91,6 +113,7 @@
         const $modal_entry_batchSap     = '#modal-viewDetail-batchSap';
         const $modal_tableReportDetail1 = '#tableReportDetail1';
         const $modal_tableReportDetail2 = '#tableReportDetail2';
+        const $modal_tableReportDetail3 = '#tableReportDetail3';
         const $modal_header             = '#modal-viewDetail-header';
 
     /* FUNCTION DOCUMENT READY */

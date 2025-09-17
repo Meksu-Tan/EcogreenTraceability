@@ -240,7 +240,7 @@ class Report extends Model
                                  GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
                                  GROUP_CONCAT(DISTINCT CONCAT(e.code, " :: ", e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty, 3), " MT") SEPARATOR " | ") AS supplier,
                                  IF(b.out_qty = 0, "N/A", "") AS traced, f.material_document, f.po_so, f.id_trace_head,
-                                 g.qty_tank, h.qty_warehouse
+                                 g.qty_tank, h.qty_warehouse, i.qty_adjustment
                             FROM t_balance_header a
                             LEFT JOIN t_balance_detail b
                               ON a.id_balance_head = b.id_balance_head AND b.status = 1
@@ -266,6 +266,7 @@ class Report extends Model
                                                          ON b.id_balance_head = bb.id_balance_head
                                                       WHERE b.status = 1
                                                         AND bb.status = 1
+                                                        AND (b.id_tank = 3 OR b.id_tank = 4 OR b.id_tank = 5 OR b.id_tank = 6)
                                                       GROUP BY b.id_tank, bb.id_balance_head, bb.id_material, bb.batch_sap
                                                     ) b
                                             ON a.id_tank = b.id_tank
@@ -274,7 +275,7 @@ class Report extends Model
                                          GROUP BY b.batch_sap
                                  ) g
                               ON g.batch_sap = b.batch_sap
-                            LEFT JOIN ( SELECT b.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b.in_qty),3),3) AS qty_warehouse
+                            LEFT JOIN ( SELECT b.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b.balance),3),3) AS qty_warehouse
                                           FROM m_warehouse a
                                           LEFT JOIN (SELECT b.id_section, b.id_whx_head, bb.batch_sap, b.id_material_fg, b.trace_no,
                                                             SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance,
@@ -292,6 +293,24 @@ class Report extends Model
                                          GROUP BY b.batch_sap
                                  ) h
                               ON h.batch_sap = b.batch_sap
+                            LEFT JOIN ( SELECT b.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b.balance),3),3) AS qty_adjustment
+                                          FROM m_tank a
+                                          LEFT JOIN (SELECT b.id_tank, b.id_balance_head, bb.batch_sap, b.id_material,
+                                                            SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance
+                                                       FROM t_balance_header b
+                                                       LEFT JOIN t_balance_detail bb
+                                                         ON b.id_balance_head = bb.id_balance_head
+                                                      WHERE b.status = 1
+                                                        AND bb.status = 1
+                                                        AND (b.id_tank = 10)
+                                                      GROUP BY b.id_tank, bb.id_balance_head, bb.id_material, bb.batch_sap
+                                                    ) b
+                                            ON a.id_tank = b.id_tank
+                                         WHERE a.status = 1
+                                           AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
+                                         GROUP BY b.batch_sap
+                                 ) i
+                              ON i.batch_sap = b.batch_sap
                            WHERE c.type = ?
                              AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
                              AND SUBSTRING(a.trace_no,8,2) = ?
@@ -308,11 +327,13 @@ class Report extends Model
         $batchSap = $request->input('batchSap');
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
-        $db = DB::select('SELECT "" AS sloc, "BALANCE ON WIP" AS material, "" AS out_qty, "" AS in_qty, FORMAT(ROUND(SUM(a.balance),3),3) AS balance
+        $db = DB::select('SELECT "" AS sloc, "BALANCE ON WIP" AS material,
+                                 "" AS out_qty, "" AS in_qty,
+                                 FORMAT(ROUND(SUM(a.balance),3),3) AS balance
                             FROM (
                                   SELECT a.description AS sloc, CONCAT("(", c.code, ") ", c.description) AS material,
-                                        FORMAT(ROUND(SUM(b.in_qty),3),3) AS in_qty, FORMAT(ROUND(SUM(b.out_qty),3),3) AS out_qty,
-                                        FORMAT(ROUND(SUM(b.balance),3),3) AS balance
+                                        SUM(b.in_qty) AS in_qty, SUM(b.out_qty) AS out_qty,
+                                        SUM(b.balance) AS balance
                                     FROM m_tank a
                                     LEFT JOIN (SELECT b.id_tank, b.id_balance_head, bb.batch_sap, b.id_material,
                                                     SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance
@@ -322,6 +343,7 @@ class Report extends Model
                                                 WHERE b.status = 1
                                                 AND bb.status = 1
                                                 AND bb.batch_sap = ?
+                                                AND (b.id_tank = 3 OR b.id_tank = 4 OR b.id_tank = 5 OR b.id_tank = 6)
                                                 GROUP BY b.id_tank, bb.id_balance_head, bb.id_material, bb.batch_sap
                                          ) b
                                       ON a.id_tank = b.id_tank
@@ -348,6 +370,71 @@ class Report extends Model
                                                 WHERE b.status = 1
                                                 AND bb.status = 1
                                                 AND bb.batch_sap = ?
+                                                AND (b.id_tank = 3 OR b.id_tank = 4 OR b.id_tank = 5 OR b.id_tank = 6)
+                                                GROUP BY b.id_tank, bb.id_balance_head, bb.id_material, bb.batch_sap
+                                         ) b
+                                      ON a.id_tank = b.id_tank
+                                    LEFT JOIN m_material c
+                                      ON c.id_material = b.id_material
+                                   WHERE a.status = 1
+                                     AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
+                                   GROUP BY a.id_tank, b.id_material
+                                   ORDER BY FIELD(a.description, "STORAGE TANK", "FEED TANK", "WIP TANK", "PRODUCT TANK",
+                                            "EOB2", "EOB3", "EOMB", "MPR", "UFA", "ADJUSTMENT IN", "ADJUSTMENT OUT"), b.id_material ASC
+                                ) a
+                        ', [$batchSap, $batchSap]);
+
+        return $db;
+    }
+
+    static function get_dtDetailRmPrd_onAdjOut($request){
+        $batchSap = $request->input('batchSap');
+
+        DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
+        $db = DB::select('SELECT "" AS sloc, "BALANCE ON WIP" AS material,
+                                 "" AS out_qty, "" AS in_qty,
+                                 FORMAT(ROUND(SUM(a.balance),3),3) AS balance
+                            FROM (
+                                  SELECT a.description AS sloc, CONCAT("(", c.code, ") ", c.description) AS material,
+                                        SUM(b.in_qty) AS in_qty, SUM(b.out_qty) AS out_qty,
+                                        SUM(b.balance) AS balance
+                                    FROM m_tank a
+                                    LEFT JOIN (SELECT b.id_tank, b.id_balance_head, bb.batch_sap, b.id_material,
+                                                    SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance
+                                                FROM t_balance_header b
+                                                LEFT JOIN t_balance_detail bb
+                                                ON b.id_balance_head = bb.id_balance_head
+                                                WHERE b.status = 1
+                                                AND bb.status = 1
+                                                AND bb.batch_sap = ?
+                                                AND (b.id_tank = 10)
+                                                GROUP BY b.id_tank, bb.id_balance_head, bb.id_material, bb.batch_sap
+                                         ) b
+                                      ON a.id_tank = b.id_tank
+                                    LEFT JOIN m_material c
+                                      ON c.id_material = b.id_material
+                                   WHERE a.status = 1
+                                     AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
+                                   GROUP BY a.id_tank, b.id_material
+                                   ORDER BY FIELD(a.description, "STORAGE TANK", "FEED TANK", "WIP TANK", "PRODUCT TANK",
+                                            "EOB2", "EOB3", "EOMB", "MPR", "UFA", "ADJUSTMENT IN", "ADJUSTMENT OUT"), b.id_material ASC
+                                ) a
+                           UNION ALL
+                          SELECT a.sloc, a.material, a.out_qty, a.in_qty, a.balance
+                            FROM (
+                                  SELECT a.description AS sloc, CONCAT("(", c.code, ") ", c.description) AS material,
+                                        FORMAT(ROUND(SUM(b.in_qty),3),3) AS in_qty, FORMAT(ROUND(SUM(b.out_qty),3),3) AS out_qty,
+                                        FORMAT(ROUND(SUM(b.balance),3),3) AS balance
+                                    FROM m_tank a
+                                    LEFT JOIN (SELECT b.id_tank, b.id_balance_head, bb.batch_sap, b.id_material,
+                                                    SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance
+                                                FROM t_balance_header b
+                                                LEFT JOIN t_balance_detail bb
+                                                ON b.id_balance_head = bb.id_balance_head
+                                                WHERE b.status = 1
+                                                AND bb.status = 1
+                                                AND bb.batch_sap = ?
+                                                AND (b.id_tank = 10)
                                                 GROUP BY b.id_tank, bb.id_balance_head, bb.id_material, bb.batch_sap
                                          ) b
                                       ON a.id_tank = b.id_tank

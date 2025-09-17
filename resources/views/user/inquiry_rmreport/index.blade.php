@@ -40,6 +40,7 @@
                                             <th>Supplier / Batch SAP / Init Qty (MT)</th>
                                             <th>On-WIP (MT)</th>
                                             <th>On-PRD (MT)</th>
+                                            <th>On-ADJOUT (MT)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -96,6 +97,7 @@
                     $($modal_header).html("Detail RM Traceability ( Batch SAP : " + $batchSap + " || QTY RM : " + $initQty + " MT )" );
                     populate_tableReportDetail_onTank($modal_tableReportDetail1, 'get_dtDetailRmPrd_onTank', $batchSap);
                     populate_tableReportDetail_onWarehouse($modal_tableReportDetail2, 'get_dtDetailRmPrd_onWarehouse', $batchSap);
+                    populate_tableReportDetail_onAdjOut($modal_tableReportDetail3, 'get_dtDetailRmPrd_onAdjOut', $batchSap);
                 });
             /* LISTENER ON MODAL STACK */
                 $($modal_shipDataShipment).on('show.bs.modal', function () {
@@ -152,7 +154,8 @@
                     { data: 'qty', name: 'qty', className: 'text-right'},
                     { data: 'supplier', name: 'supplier', className: 'text-left', width:'25%'},
                     { data: 'qty_tank', name: 'qty_tank', className: 'text-right'},
-                    { data: 'qty_warehouse', name: 'qty_warehouse', className: 'text-right'}
+                    { data: 'qty_warehouse', name: 'qty_warehouse', className: 'text-right'},
+                    { data: 'qty_adjustment', name: 'qty_adjustment', className: 'text-right'},
                 ]
             });
         };
@@ -224,6 +227,41 @@
                     { data: 'out_qty', name: 'out_qty', className: 'text-right', width:"12%"},
                     { data: 'balance', name: 'balance', className: 'text-right', width:"12%"},
                     { data: 'shipment', name: 'shipment', className: 'text-left'},
+                ]
+            });
+        };
+        function populate_tableReportDetail_onAdjOut($id, $flag, $batchSap){
+            $($id).DataTable().destroy();
+
+            $($id).DataTable({
+                processing: true,
+                serverSide: true,
+                deferRender: true,
+                paging: false,
+                ajax: {
+                    url: show_url,
+                    data: {
+                        flag: $flag,
+                        batchSap: $batchSap
+                    }
+                },
+                order: [[ 0, 'asc']],
+                responsive: true,
+                columnDefs: [{
+                    "searchable": false,
+                    "orderable": false,
+                    "targets": 0,
+                    render: function(data, type, row, meta) {
+                        return meta.row + meta.settings._iDisplayStart + 1;
+                    },
+                }],
+                columns: [
+                    { data: null, name: null, orderable: false, searchable: false, className: 'text-center', width:"3%" },
+                    { data: 'sloc', name: 'sloc', className: 'text-left', width:"15%"},
+                    { data: 'material', name: 'material', className: 'text-left'},
+                    { data: 'in_qty', name: 'in_qty', className: 'text-right', width:"12%"},
+                    { data: 'out_qty', name: 'out_qty', className: 'text-right', width:"12%"},
+                    { data: 'balance', name: 'balance', className: 'text-right', width:"12%"}
                 ]
             });
         };
