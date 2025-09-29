@@ -56,6 +56,6 @@ return new class extends Migration
     public function down(): void
     {
         //
-        Schema::dropIfExists('t_report_pspa');
+        Schema::dropIfExists('t_report_pspa_tail');
     }
 };
