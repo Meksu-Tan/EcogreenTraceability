@@ -11,12 +11,16 @@ class UserMgmt extends Model
     protected $connection = 'oee_756';
 
     static function getUserData(){
-        $db = DB::select('SELECT a.id, a.`name`, a.email, c.`name` AS `role`
+        $db = DB::select('SELECT a.id, a.`name`, a.email, c.`name` AS `role`, p.`description` AS plant
                             FROM users a
                             LEFT JOIN role_user b
                               ON a.id = b.user_id
                             LEFT JOIN roles c
                               ON b.role_id = c.id
+                            LEFT JOIN m_plant_user pu
+                              ON a.id = pu.user_id
+                            LEFT JOIN m_plant p
+                              ON pu.id_plant = p.id_plant
                            WHERE a.name <> "Santo Wijaya"
                              AND a.isActive = 1
                            ORDER BY a.`name` ASC');

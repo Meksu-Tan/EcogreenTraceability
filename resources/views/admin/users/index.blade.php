@@ -22,6 +22,7 @@
                                         <th>Name</th>
 										<th>Email</th>
                                         <th>Role</th>
+                                        <th>Plant</th>
                                         <th>Action</th>
 									</tr>
 								</thead>
@@ -158,6 +159,7 @@
                     { data: 'name', name: 'name', className: 'text-left'  },
                     { data: 'email', name: 'email', className: 'text-left' },
                     { data: 'role', name: 'role', className: 'text-left'},
+                    { data: 'plant', name: 'plant', className: 'text-left'},
                     { data: 'action', name: 'action', orderable: false, searchable: false },
                 ]
             });
