@@ -13,6 +13,8 @@
 <li class="{{ route('qtfsetup.index') == request()->url() ? 'active' : '' }}">
     <a href="{{ route('qtfsetup.index') }}" class="nav-link"><i class="fab fa-slack"></i><span>Quantifier</span></a>
 </li>
-
+<li class="{{ route('plantsetup.index') == request()->url() ? 'active' : '' }}">
+    <a href="{{ route('plantsetup.index') }}" class="nav-link"><i class="fas fa-balance-scale"></i><span>Plant</span></a>
+</li>
 
 

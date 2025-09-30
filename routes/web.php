@@ -24,6 +24,7 @@ use App\Http\Controllers\GuidanceController;
 use App\Http\Controllers\StorageSetupController;
 use App\Http\Controllers\EmailController;
 use App\Http\Controllers\RmreportController;
+use App\Http\Controllers\PlantSetupController;
 
 
 /*
@@ -75,6 +76,7 @@ Route::group(['middleware' => ['auth']], function() {
 
     Route::resource('guidance', GuidanceController::class);
     Route::resource('storagesetup', StorageSetupController::class);
+    Route::resource('plantsetup', PlantSetupController::class);
 
     Route::resource('rmreport', RmreportController::class);
 

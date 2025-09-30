@@ -12,13 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         //
-        Schema::create('m_plant', function (Blueprint $table) {
-            $table->bigIncrements('id_plant');
-            $table->string('code', 10)->nullable();
-            $table->string('code_2', 10)->nullable();
-            $table->string('code_3', 10)->nullable();
-            $table->string('id_tank', 10);
-            $table->string('description', 50)->unique();
+        Schema::create('m_plant_detail', function (Blueprint $table) {
+            $table->bigIncrements('id_plant_tail');
+            $table->unsignedBigInteger('id_plant');
+            $table->string('tf_number', 100);
             $table->integer('status')->default('1');
             $table->string('created_by', 50)->nullable();
             $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'))->nullable();
@@ -27,11 +24,12 @@ return new class extends Migration
             $table->charset = 'utf8mb4';
             $table->collation = 'utf8mb4_general_ci';
 
-            // Adding a single column index
-            $table->index('code');
-            $table->index('description');
-            $table->index('status');
+            $table->foreign('id_plant')->references('id_plant')->on('m_plant')->onDelete('restrict');
 
+            // Adding indexes
+            $table->index('status');
+            $table->index('id_plant');
+            $table->index('tf_number');
         });
     }
 
@@ -41,6 +39,6 @@ return new class extends Migration
     public function down(): void
     {
         //
-        Schema::dropIfExists('m_plant');
+        Schema::dropIfExists('m_plant_detail');
     }
 };
