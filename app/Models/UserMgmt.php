@@ -11,7 +11,12 @@ class UserMgmt extends Model
     protected $connection = 'oee_756';
 
     static function getUserData(){
-        $db = DB::select('SELECT a.id, a.`name`, a.email, c.`name` AS `role`, p.`description` AS plant
+        $db = DB::select('SELECT a.id, a.`name`, a.email, c.`name` AS `role`,
+                            CASE 
+                              WHEN c.`name` IN ("admin", "super-admin") 
+                              THEN (SELECT GROUP_CONCAT(description SEPARATOR ", ") FROM m_plant)
+                              ELSE GROUP_CONCAT(p.description SEPARATOR ", ")
+                            END AS plant
                             FROM users a
                             LEFT JOIN role_user b
                               ON a.id = b.user_id
@@ -21,8 +26,8 @@ class UserMgmt extends Model
                               ON a.id = pu.user_id
                             LEFT JOIN m_plant p
                               ON pu.id_plant = p.id_plant
-                           WHERE a.name <> "Santo Wijaya"
-                             AND a.isActive = 1
+                           WHERE a.isActive = 1
+                           GROUP BY a.id, a.name, a.email, c.name
                            ORDER BY a.`name` ASC');
         return $db;
     }

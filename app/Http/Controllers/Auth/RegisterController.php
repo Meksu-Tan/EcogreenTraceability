@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules;
+use Illuminate\Support\Facades\DB;
 
 class RegisterController extends Controller
 {
@@ -56,6 +57,7 @@ class RegisterController extends Controller
         return Validator::make($data, [
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required'],
+            'plant' => ['required'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
@@ -73,6 +75,11 @@ class RegisterController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
+        ]);
+
+        DB::insert('INSERT INTO m_plant_user (user_id, id_plant) VALUES (?, ?)', [
+            $user->id,
+            $data['plant'],
         ]);
 
         event(new Registered($user));
@@ -127,5 +134,11 @@ class RegisterController extends Controller
         }
 
         return $user;
+    }
+
+    public function showRegistrationForm()
+    {
+        $plants = DB::select('SELECT id_plant, description FROM m_plant WHERE status = 1 ORDER BY description ASC');
+        return view('auth.register', compact('plants'));
     }
 }

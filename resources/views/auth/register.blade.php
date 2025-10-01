@@ -67,6 +67,19 @@
                             </div>
                         </div>
 
+                        <!-- Plant -->
+                        <div class="row mb-3">
+                            <label for="plant" class="col-md-4 col-form-label text-md-end">{{ __('Plant') }}</label>
+
+                            <div class="col-md-6">
+                                <select name="plant" id="plant" style="width: 100%;" class="form-control" required>
+                                    @foreach($plants as $plant)
+                                        <option value="{{ $plant->id_plant }}">{{ $plant->description }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
                         <!-- Password -->
                         <div class="row mb-3">
                             <label for="password" class="col-md-4 col-form-label text-md-end">{{ __('Password') }}</label>
