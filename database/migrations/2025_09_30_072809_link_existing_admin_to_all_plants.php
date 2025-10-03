@@ -13,7 +13,7 @@ return new class extends Migration
     public function up(): void
     {
         // Get all Plants
-        $plants = DB::table('m_plant')->pluck('id_plant');
+        $plants = DB::table('m_plant')->pluck('code_3');
 
         // Get all Admin & Super Admin users
         $admins = DB::table('users as u')

@@ -74,7 +74,7 @@
                             <div class="col-md-6">
                                 <select name="plant" id="plant" style="width: 100%;" class="form-control" required>
                                     @foreach($plants as $plant)
-                                        <option value="{{ $plant->id_plant }}">{{ $plant->description }}</option>
+                                        <option value="{{ $plant->code_3 }}">{{ $plant->description }}</option>
                                     @endforeach
                                 </select>
                             </div>

@@ -17,7 +17,7 @@ return new class extends Migration
 
         foreach ($users as $userId) {
             DB::table('m_plant_user')->updateOrInsert(
-                ['id_plant' => 1, 'user_id' => $userId],
+                ['id_plant' => "1002", 'user_id' => $userId],
                 []
             );
         }
@@ -29,6 +29,6 @@ return new class extends Migration
     public function down(): void
     {
         //
-        DB::table('m_plant_user')->where('id_plant', 1)->delete();
+        DB::table('m_plant_user')->where('id_plant', "1002")->delete();
     }
 };

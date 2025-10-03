@@ -138,7 +138,7 @@ class RegisterController extends Controller
 
     public function showRegistrationForm()
     {
-        $plants = DB::select('SELECT id_plant, description FROM m_plant WHERE status = 1 ORDER BY description ASC');
+        $plants = DB::select('SELECT code_3, description FROM m_plant WHERE status = 1 ORDER BY description ASC');
         return view('auth.register', compact('plants'));
     }
 }

@@ -25,7 +25,7 @@ class UserMgmt extends Model
                             LEFT JOIN m_plant_user pu
                               ON a.id = pu.user_id
                             LEFT JOIN m_plant p
-                              ON pu.id_plant = p.id_plant
+                              ON pu.id_plant = p.code_3
                            WHERE a.isActive = 1
                            GROUP BY a.id, a.name, a.email, c.name
                            ORDER BY a.`name` ASC');
