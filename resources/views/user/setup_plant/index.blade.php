@@ -23,7 +23,6 @@
                                             <th>Tank</th>
                                             <th>Code</th>
                                             <th>Plant Description</th>
-                                            <th>Total Plant</th>
                                             <th>Status</th>
                                             <th>Created at</th>
                                             <th>Updated at</th>
@@ -172,7 +171,7 @@
                         return meta.row + meta.settings._iDisplayStart + 1;
                     },
                 },{
-                    "targets": [6],
+                    "targets": [5],
                     "render": function ( data, type, row ) {
                         if ( data == "1" ){
                             return '<i class="fa fa-check" style="color: green" title="Active"></i>';
@@ -187,7 +186,6 @@
                     { data: 'id_tank', name: 'id_tank', className: 'text-center'},
                     { data: 'code', name: 'code', className: 'text-left'},
                     { data: 'description', name: 'description', className: 'text-left', width:'20%'},
-                    { data: 'total_plant', name: 'total_plant', className: 'text-right'},
                     { data: 'status', name: 'status', className: 'text-center'},
                     { data: 'created_at', name: 'created_at', className: 'text-left'},
                     { data: 'updated_at', name: 'updated_at', className: 'text-left'},

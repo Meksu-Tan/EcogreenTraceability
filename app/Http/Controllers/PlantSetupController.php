@@ -105,22 +105,24 @@ class PlantSetupController extends Controller
                         ->rawColumns(['action'])
                         ->make(true);
     
-            } elseif ($flag == 'get_plantDetail_dt'){
-                $db = SS::get_plantDetail_dt($request);
-    
-                return DataTables::of($db)
-                        ->addColumn('action', function($data){
-                            return view('user.setup_plant.datatables.__actionPlantDetail', [
-                                'model'=> $data,
-                                'destroy_url'=> route('plantsetup.destroy', $data->id_plant_tail . ',plantDetail_deactivate'),
-                                'activate_url'=> route('plantsetup.destroy', $data->id_plant_tail . ',plantDetail_activate'),
-                                'update_url'=>route('plantsetup.store')
-                            ]);
-                        })
-                        ->rawColumns(['action'])
-                        ->make(true);
-    
             }
+    
+            // } elseif ($flag == 'get_plantDetail_dt'){
+            //     $db = SS::get_plantDetail_dt($request);
+    
+            //     return DataTables::of($db)
+            //             ->addColumn('action', function($data){
+            //                 return view('user.setup_plant.datatables.__actionPlantDetail', [
+            //                     'model'=> $data,
+            //                     'destroy_url'=> route('plantsetup.destroy', $data->id_plant_tail . ',plantDetail_deactivate'),
+            //                     'activate_url'=> route('plantsetup.destroy', $data->id_plant_tail . ',plantDetail_activate'),
+            //                     'update_url'=>route('plantsetup.store')
+            //                 ]);
+            //             })
+            //             ->rawColumns(['action'])
+            //             ->make(true);
+    
+            // }
         }
     
         /**
@@ -201,15 +203,16 @@ class PlantSetupController extends Controller
                     $return = SS::post_plant_activate($id, $user);
                     $data = $this->returnResponse($return, 'PLANT', 'activate');
                     return response()->json($data);
-                } elseif ($flag == 'storageDetail_activate'){
-                    $return = SS::post_plantDetail_activate($id, $user);
-                    $data = $this->returnResponse($return, 'TANK', 'activate');
-                    return response()->json($data);
-                } elseif ($flag == 'storageDetail_deactivate'){
-                    $return = SS::post_plantDetail_destroy($id, $user);
-                    $data = $this->returnResponse($return, 'TANK', 'de-activate');
-                    return response()->json($data);
                 }
+                // } elseif ($flag == 'storageDetail_activate'){
+                //     $return = SS::post_plantDetail_activate($id, $user);
+                //     $data = $this->returnResponse($return, 'TANK', 'activate');
+                //     return response()->json($data);
+                // } elseif ($flag == 'storageDetail_deactivate'){
+                //     $return = SS::post_plantDetail_destroy($id, $user);
+                //     $data = $this->returnResponse($return, 'TANK', 'de-activate');
+                //     return response()->json($data);
+                // }
     
             } else {
                 return view('error.403');
