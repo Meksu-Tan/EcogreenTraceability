@@ -9,14 +9,14 @@ class RawMaterial extends Model
 {
     protected $connection = 'eudr_ts';
 
-    protected static $idTankSrc = "T00"; // STORAGE TANK
-    protected static $idTankTrf = "T02"; // TRF TANK
-    protected static $idTankFeed = "3"; // FEED TANK
+    // protected static $idTankSrc = "T00"; // STORAGE TANK
+    // protected static $idTankTrf = "T02"; // TRF TANK
+    // protected static $idTankFeed = "3"; // FEED TANK
     protected static $movSeq = "00";
     protected static $typeMaterial = "RM";
     protected static $movType1 = "1";
     protected static $movType2 = "9";
-    protected static $idPlantEob1 = "1002";
+    // protected static $idPlantEob1 = "1002";
 
     static function get_batchCode_bySupplier($request){
         $idSupplier = $request->input('idSupplier');
@@ -46,6 +46,7 @@ class RawMaterial extends Model
         return $db;
     }
     static function get_dtRmList($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.status,
                                  CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(SUM(DISTINCT a.qty),3) AS qty, a.created_by, a.created_at,
@@ -61,7 +62,7 @@ class RawMaterial extends Model
                             LEFT JOIN m_material c
                               ON a.id_material = c.id_material
                             LEFT JOIN m_tank d
-                              ON a.id_tank = d.id_tank AND d.status = 1 AND d.id_plant = ?
+                              ON a.id_tank = d.id_tank AND d.status = 1 AND (d.id_plant = ? OR ? = 0)
                             LEFT JOIN m_supplier e
                               ON e.id_supplier = b.id_supplier
                             LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head
@@ -74,14 +75,20 @@ class RawMaterial extends Model
                            WHERE c.type = ?
                              AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
                              AND SUBSTRING(a.trace_no,8,2) = ?
-                             AND a.id_tank = 4
                              AND a.status = 1
+                             AND (a.id_plant = ? OR ? = 0)
                            GROUP BY a.trace_no
                            ORDER BY a.id_balance_head DESC
-                           ', [self::$idPlantEob1, self::$typeMaterial, self::$movType1, self::$movType2, self::$movSeq]);
+                           ', [$idPlant, $idPlant, self::$typeMaterial, self::$movType1, self::$movType2, self::$movSeq, $idPlant, $idPlant]);
         return $db;
     }
     static function get_dtRmListTrf($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $idTankFeed = DB::table('m_tank')
+            ->where('id_plant', $idPlant)
+            ->where('status', 1)
+            ->where('code_3', 'FEED')
+            ->value('id_tank');
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.status,
                                  aa.qty, aa.init_qty, a.created_by, a.created_at, CAST(a.trace_no AS CHAR) AS trace_nos,
@@ -106,7 +113,7 @@ class RawMaterial extends Model
                             LEFT JOIN m_material c
                               ON a.id_material = c.id_material
                             LEFT JOIN m_tank d
-                              ON a.id_tank = d.id_tank AND d.status = 1 AND d.id_plant = ?
+                              ON a.id_tank = d.id_tank AND d.status = 1 AND (d.id_plant = ? OR ? = 0)
                             LEFT JOIN m_supplier e
                               ON e.id_supplier = b.id_supplier
                             LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head,
@@ -126,8 +133,8 @@ class RawMaterial extends Model
                              AND a.status = 1
                            GROUP BY a.trace_no
                            ORDER BY a.id_balance_head DESC
-                           ', [self::$movType1, self::$movType2, self::$idTankFeed, self::$idPlantEob1,
-                               self::$movType1, self::$movType2, self::$typeMaterial, self::$movType1, self::$movType2, self::$idTankFeed]);
+                           ', [self::$movType1, self::$movType2, $idTankFeed, $idPlant, $idPlant,
+                               self::$movType1, self::$movType2, self::$typeMaterial, self::$movType1, self::$movType2, $idTankFeed]);
         return $db;
     }
 
@@ -290,7 +297,13 @@ class RawMaterial extends Model
                             LIMIT 1', [self::$movSeq, self::$movSeq]);
         return $db;
     }
-    static function get_rmNewEntryNumberTrf(){
+    static function get_rmNewEntryNumberTrf($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $idTankSrc = DB::table('m_tank')
+            ->where('id_plant', $idPlant)
+            ->where('status', 1)
+            ->where('code_3', 'STORAGE')
+            ->value('id_tank');
         $db = DB::select('SELECT CONCAT(SUBSTRING(a.rm_number,1,7), ?, SUBSTRING(a.rm_number,10,2)) + 1 AS rm_number
                             FROM (SELECT a.trace_no AS rm_number
                                     FROM t_balance_header a
@@ -301,27 +314,29 @@ class RawMaterial extends Model
                                     LIMIT 1 ) a
                             UNION ALL
                             SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, "01") AS rm_number
-                            LIMIT 1', [substr(self::$idTankSrc,1,2), "00", substr(self::$idTankSrc,1,2)]);
+                            LIMIT 1', [substr($idTankSrc,1,2), "00", substr($idTankSrc,1,2)]);
         return $db;
     }
-    static function get_cmbActiveTank(){
+    static function get_cmbActiveTank($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
         $db = DB::select('SELECT a.id_tank, a.description AS tank
                             FROM m_tank a
                            WHERE a.status = 1
                              AND a.code_3 = "STORAGE"
                              AND a.id_plant = ?
-                           ORDER BY a.code ASC', [self::$idPlantEob1]);
+                           ORDER BY a.code ASC', [$idPlant]);
         return $db;
     }
     static function get_cmbActiveTank_trf($request){
         $sloc = $request->input('sloc');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         $db = DB::select('SELECT a.id_tank, a.description AS tank
                             FROM m_tank a
                            WHERE a.status = 1
                              AND a.code_3 = ?
                              AND a.id_plant = ?
-                           ORDER BY a.code ASC', [$sloc, self::$idPlantEob1]);
+                           ORDER BY a.code ASC', [$sloc, $idPlant]);
 
         return $db;
     }
@@ -668,6 +683,7 @@ class RawMaterial extends Model
         $id_material = $request->input('idMaterial');
         $qty = floatval(str_replace(',', '', $qty));
         $materialDoc = $request->input('material_doc');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         /* CHECK LOCK PERIOD */
             $lockDateTime = new \DateTime($entry_date);
@@ -700,6 +716,7 @@ class RawMaterial extends Model
                                 'qty' => $qty,
                                 'in_qty' => $qty,
                                 'init_qty' => $qty,
+                                'id_plant' => $idPlant,
                                 'created_by' => $user,
                             ]);
                 $idTraceHead = DB::table('t_trace_header')->insertGetId([
@@ -709,6 +726,7 @@ class RawMaterial extends Model
                                     'entry_date' => $entry_date,
                                     'id_sloc' => $id_tank,
                                     'in_qty' => $qty,
+                                    'id_plant' => $idPlant,
                                     'created_by' => $user,
                             ]);
 
@@ -740,6 +758,7 @@ class RawMaterial extends Model
                                         'in_qty' => $qty_tail,
                                         'init_qty' => $qty_tail,
                                         'batch_sap' => $batchSap,
+                                        'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
                     $idTraceTail = DB::table('t_trace_detail')->insertGetId([
@@ -749,6 +768,7 @@ class RawMaterial extends Model
                                         'id_material' => $id_material,
                                         'batch_sap' => $batchSap,
                                         'in_qty' => $qty_tail,
+                                        'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
 
@@ -823,8 +843,20 @@ class RawMaterial extends Model
         // $qty = $request->input('qty');
         // $out_qty = floatval(str_replace(',', '', $qty));
         $materialDoc = $request->input('material_doc');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
+
+        $srcTankRec = DB::select('SELECT code FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tankSource]);
+        $tgtTankRec = DB::select('SELECT code FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tank]);
+
+        $sourceTankCode = !empty($srcTankRec) ? $srcTankRec[0]->code : null;
+        $targetTankCode = !empty($tgtTankRec) ? $tgtTankRec[0]->code : null;
+
+        if (!$sourceTankCode || !$targetTankCode) {
+            // invalid tanks
+            return [ (object)['response' => 6 ] ];
+        }
 
         /* CHECK LOCK PERIOD */
             $lockDateTime = new \DateTime($curr_entryDate);
@@ -887,14 +919,14 @@ class RawMaterial extends Model
                                             WHERE a.id_material = ?
                                             AND a.`status` = 1
                                             AND b.qty <> 0
-                                            AND d.code = ?
+                                            AND d.id_tank = ?
                                             AND d.id_plant = ?
-                                            ORDER BY b.id_balance_head ASC', [$id_material, self::$idTankSrc, self::$idPlantEob1]);
+                                            ORDER BY b.id_balance_head ASC', [$id_material, $id_tankSource, $idPlant]);
 
                     $len = count($datHead);
 
                     /* CREATE ENTRY NO TO FEED TANK */
-                    $batchTrf_id = substr(self::$idTankTrf,1,2);
+                    $batchTrf_id = substr($targetTankCode,1,2);
                     $batchFeed_id = "00";
                     $batch_moveType = substr($entry_no, 0, 1);
                     $batch_entryDate = substr($entry_no, 1, 6);

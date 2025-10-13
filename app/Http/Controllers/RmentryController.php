@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Response;
 use Laratrust;
 use File;
 use PDF;
+use Illuminate\Support\Facades\DB;
 
 class RmentryController extends Controller
 {
@@ -20,29 +21,64 @@ class RmentryController extends Controller
     public function __construct()
     {
         $this->middleware('auth');
+
+        $this->middleware(function ($request, $next) {
+            \App\Models\BaseModel::setPlantContext();
+            return $next($request);
+        });
     }
 
     // Show Dashboard Page
-    public function index()
+    public function index(Request $request)
     {
-        $data = [];
         $n_users = User::all()->count();
         $n_roles = Role::all()->count();
         $n_perms = Permission::all()->count();
 
-        if (Laratrust::hasRole(['admin', 'super-admin', 'manager', 'superintendent', 'senior-supervisor', 'supervisor', 'senior-staff', 'staff'])) {
-            $data = [
-                'user' => $n_users,
-                'role' => $n_roles,
-                'permission' => $n_perms,
-                'user' => Auth::user(),
-                'role' => implode(array_map('ucfirst', Auth::user()->roles->pluck('name')->toArray())),
-            ];
+        $user = Auth::user();
 
-            return view('user.trans_rm.index',$data);
-        } else {
+        $data = [
+            'user' => $user,
+            'role' => implode(', ', array_map('ucfirst', $user->roles->pluck('name')->toArray())),
+            'n_users' => $n_users,
+            'n_roles' => $n_roles,
+            'n_perms' => $n_perms,
+        ];
+
+        if (!Laratrust::hasRole([
+            'admin', 'super-admin', 'manager', 'superintendent', 
+            'senior-supervisor', 'supervisor', 'senior-staff', 'staff'
+        ])) {
             return view('error.403');
         }
+
+        if ($user->hasRole(['admin', 'super-admin'])) {
+            $plants = DB::table('m_plant')->select('code_3', 'code_2')->get();
+
+            $selectedPlant = $request->query('plant');
+
+            if ($selectedPlant) {
+                session(['selected_plant' => $selectedPlant]);
+            } else {
+                $selectedPlant = session('selected_plant');
+            }
+
+            $data['plants'] = $plants;
+            $data['selectedPlant'] = $selectedPlant;
+
+            return view('user.trans_rm.index', $data);
+        }
+
+        $userPlant = DB::table('m_plant_user')
+            ->join('m_plant', 'm_plant_user.id_plant', '=', 'm_plant.code_3')
+            ->where('m_plant_user.user_id', $user->id)
+            ->select('m_plant.code_3', 'm_plant.code_2')
+            ->first();
+
+        $data['plants'] = $userPlant ? [$userPlant] : [];
+        $data['selectedPlant'] = $userPlant ? $userPlant->code_3 : null;
+        
+        return view('user.trans_rm.index', $data);
     }
 
     /**
@@ -210,11 +246,11 @@ class RmentryController extends Controller
                     ->make(true);
 
         } elseif ($flag == 'get_rmNewEntryNumber'){
-            $txtData['data'] = RM::get_rmNewEntryNumber();
+            $txtData['data'] = RM::get_rmNewEntryNumber($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_cmbActiveTank'){
-            $txtData['data'] = RM::get_cmbActiveTank();
+            $txtData['data'] = RM::get_cmbActiveTank($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_cmbActiveTank_trf'){
@@ -264,7 +300,7 @@ class RmentryController extends Controller
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_rmNewEntryNumberTrf'){
-            $txtData['data'] = RM::get_rmNewEntryNumberTrf();
+            $txtData['data'] = RM::get_rmNewEntryNumberTrf($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_totalQtyMaterial'){

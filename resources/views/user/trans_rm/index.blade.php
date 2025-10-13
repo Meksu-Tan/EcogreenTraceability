@@ -97,6 +97,7 @@
     @include('user.trans_rm.modals.__rmEntryTransfer')
     @include('user.trans_rm.modals.__rmEntryTransferDetail')
     @include('user.trans_rm.modals.__addMaterialDocModal')
+    @include('modals.__selectPlant')
 
 <!-- SCRIPT -->
 <script>
@@ -134,6 +135,23 @@
             /* INITIALIZE */
                 $('.modal').css('overflow-y', 'auto');
                 initialize_page();
+
+            // If admin/super-admin and no plant selected, show the modal
+            @if(Auth::user()->hasRole(['admin', 'super-admin']) && empty($selectedPlant))
+                $('#modal-selectPlant').modal('show');
+            @endif
+
+            $('#confirmPlantSelect').on('click', function() {
+                var selectedPlant = $('#plantSelect').val();
+                if (selectedPlant) {
+                    window.location.href = "{{ route('rmentry.index') }}" + "?plant=" + selectedPlant;
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Please select a plant before continuing',
+                    });
+                }
+            });
 
             /* EVENT LISTENER ON CHANGE */
 
@@ -292,7 +310,8 @@
                 ajax: {
                     url: show_url,
                     data: {
-                        flag: 'get_dtRmList'
+                        flag: 'get_dtRmList',
+                        plant: "{{ $selectedPlant ?? '' }}"
                     }
                 },
                 order: [[ 0, 'desc']],
