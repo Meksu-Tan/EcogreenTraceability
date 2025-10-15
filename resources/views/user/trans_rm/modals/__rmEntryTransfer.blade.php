@@ -267,7 +267,7 @@
                 }
             });
         };
-        function ajax_populateTankTrf(id, $sloc=null, selectedValue=null){
+        function ajax_populateTankTrf(id, $sloc=null, selectedValue=null, $fixedPlant=null){
             // Empty the dropdown
             // $(id).find('option').not(':first').remove();
             $(id).find('option').remove();
@@ -279,6 +279,7 @@
                 data:{
                     flag: 'get_cmbActiveTank_trf',
                     sloc: $sloc,
+                    id_plant: $fixedPlant ?? null,
                 },
                 success: function(response){
                     var len = 0;
@@ -436,7 +437,7 @@
             $($txt_rmTrfEntry_idHead).val($idHead);
             $($txt_rmTrfEntry_materialDoc).val($materialDoc);
 
-            ajax_populateTankTrf($cmb_rmTrfEntry_sourceTank, 'STORAGE', $idTankSource);
+            ajax_populateTankTrf($cmb_rmTrfEntry_sourceTank, 'STORAGE', $idTankSource, 1002);
             ajax_populateTankTrf($cmb_rmTrfEntry_trfTank, 'FEED', $idTankTrf);
             ajax_getTotalQtyMaterial($txt_rmTrfEntry_qty, $trf_number, $mode);
 

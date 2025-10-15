@@ -9,14 +9,14 @@ class RawMaterial extends Model
 {
     protected $connection = 'eudr_ts';
 
-    // protected static $idTankSrc = "T00"; // STORAGE TANK
+    protected static $idTankSrc = "T00"; // STORAGE TANK
     // protected static $idTankTrf = "T02"; // TRF TANK
     // protected static $idTankFeed = "3"; // FEED TANK
     protected static $movSeq = "00";
     protected static $typeMaterial = "RM";
     protected static $movType1 = "1";
     protected static $movType2 = "9";
-    // protected static $idPlantEob1 = "1002";
+    protected static $idPlantEob1 = "1002";
 
     static function get_batchCode_bySupplier($request){
         $idSupplier = $request->input('idSupplier');
@@ -297,13 +297,7 @@ class RawMaterial extends Model
                             LIMIT 1', [self::$movSeq, self::$movSeq]);
         return $db;
     }
-    static function get_rmNewEntryNumberTrf($request){
-        $idPlant = \App\Models\BaseModel::resolvePlant($request);
-        $idTankSrc = DB::table('m_tank')
-            ->where('id_plant', $idPlant)
-            ->where('status', 1)
-            ->where('code_3', 'STORAGE')
-            ->value('id_tank');
+    static function get_rmNewEntryNumberTrf(){
         $db = DB::select('SELECT CONCAT(SUBSTRING(a.rm_number,1,7), ?, SUBSTRING(a.rm_number,10,2)) + 1 AS rm_number
                             FROM (SELECT a.trace_no AS rm_number
                                     FROM t_balance_header a
@@ -314,22 +308,21 @@ class RawMaterial extends Model
                                     LIMIT 1 ) a
                             UNION ALL
                             SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, "01") AS rm_number
-                            LIMIT 1', [substr($idTankSrc,1,2), "00", substr($idTankSrc,1,2)]);
+                            LIMIT 1', [substr(self::$idTankSrc,1,2), "00", substr(self::$idTankSrc,1,2)]);
         return $db;
     }
-    static function get_cmbActiveTank($request){
-        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+    static function get_cmbActiveTank(){
         $db = DB::select('SELECT a.id_tank, a.description AS tank
                             FROM m_tank a
                            WHERE a.status = 1
                              AND a.code_3 = "STORAGE"
                              AND a.id_plant = ?
-                           ORDER BY a.code ASC', [$idPlant]);
+                           ORDER BY a.code ASC', [self::$idPlantEob1]);
         return $db;
     }
     static function get_cmbActiveTank_trf($request){
         $sloc = $request->input('sloc');
-        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $idPlant = $request->input('id_plant') ?? \App\Models\BaseModel::resolvePlant($request);
 
         $db = DB::select('SELECT a.id_tank, a.description AS tank
                             FROM m_tank a
@@ -758,6 +751,7 @@ class RawMaterial extends Model
                                         'in_qty' => $qty_tail,
                                         'init_qty' => $qty_tail,
                                         'batch_sap' => $batchSap,
+                                        'id_tank' => $id_tank,
                                         'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
@@ -768,6 +762,7 @@ class RawMaterial extends Model
                                         'id_material' => $id_material,
                                         'batch_sap' => $batchSap,
                                         'in_qty' => $qty_tail,
+                                        'id_sloc' => $id_tank,
                                         'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
@@ -847,10 +842,10 @@ class RawMaterial extends Model
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
-        $srcTankRec = DB::select('SELECT code FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tankSource]);
-        $tgtTankRec = DB::select('SELECT code FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tank]);
-
+        $srcTankRec = DB::select('SELECT code, id_plant FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tankSource]);
         $sourceTankCode = !empty($srcTankRec) ? $srcTankRec[0]->code : null;
+        $sourceTankPlant = !empty($srcTankRec) ? $srcTankRec[0]->id_plant : null;
+        $tgtTankRec = DB::select('SELECT code FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tank]);
         $targetTankCode = !empty($tgtTankRec) ? $tgtTankRec[0]->code : null;
 
         if (!$sourceTankCode || !$targetTankCode) {
@@ -919,9 +914,9 @@ class RawMaterial extends Model
                                             WHERE a.id_material = ?
                                             AND a.`status` = 1
                                             AND b.qty <> 0
-                                            AND d.id_tank = ?
+                                            AND d.code = ?
                                             AND d.id_plant = ?
-                                            ORDER BY b.id_balance_head ASC', [$id_material, $id_tankSource, $idPlant]);
+                                            ORDER BY b.id_balance_head ASC', [$id_material, self::$idTankSrc, $sourceTankPlant]);
 
                     $len = count($datHead);
 
@@ -976,6 +971,7 @@ class RawMaterial extends Model
                                     'id_material' => $id_material,
                                     'entry_date' => $curr_entryDate,
                                     'id_sloc' => $id_tankSource,
+                                    'id_plant' => $idPlant,
                                     'out_qty' => $out_qty,
                                     'last_qtf' => $last_qtf,
                                     'curr_qtf' => $curr_qtf,
@@ -988,6 +984,7 @@ class RawMaterial extends Model
                                 'trace_no' => $entryFeedNo_in,
                                 'id_material' => $id_material,
                                 'id_tank' => $id_tank,
+                                'id_plant' => $idPlant,
                                 'qty' => $in_qty,
                                 'in_qty' => $in_qty,
                                 'init_qty' => $in_qty,
@@ -998,6 +995,7 @@ class RawMaterial extends Model
                                 'to_trace_no' => $entryFeedNo_in,
                                 'id_balance_head' => $idHead_in,
                                 'id_material' => $id_material,
+                                'id_plant' => $idPlant,
                                 'entry_date' => $curr_entryDate,
                                 'id_sloc' => $id_tank,
                                 'in_qty' => $in_qty,
@@ -1063,6 +1061,8 @@ class RawMaterial extends Model
                                                 'id_balance_tail' => $idTail,
                                                 'id_supplier' => $idSupplier,
                                                 'id_material' => $id_material,
+                                                'id_sloc' => $id_tank,
+                                                'id_plant' => $idPlant,
                                                 'out_qty' => $tail_out_qty,
                                                 'batch_sap' => $batch_sap,
                                                 'created_by' => $user,
@@ -1078,6 +1078,8 @@ class RawMaterial extends Model
                                         'id_balance_head' => $idHead_in,
                                         'id_supplier' => $idSupplier_in,
                                         'id_material' => $idMaterial_in,
+                                        'id_tank' => $id_tank,
+                                        'id_plant' => $idPlant,
                                         'qty' => $tailQty_in,
                                         'in_qty' => $tailQty_in,
                                         'init_qty' => $tailQty_in,
@@ -1089,6 +1091,8 @@ class RawMaterial extends Model
                                             'id_balance_tail' => $idTail_in,
                                             'id_supplier' => $idSupplier_in,
                                             'id_material' => $idMaterial_in,
+                                            'id_sloc' => $id_tank,
+                                            'id_plant' => $idPlant,
                                             'in_qty' => $tailQty_in,
                                             'batch_sap' => $batchSap_in,
                                             'created_by' => $user,
