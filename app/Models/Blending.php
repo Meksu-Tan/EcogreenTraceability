@@ -29,7 +29,7 @@ class Blending extends Model
                             FROM (SELECT b.trace_no + 1 AS entryNo
                                     FROM m_material a
                                     LEFT JOIN t_balance_header b
-                                      ON a.id_rundown = SUBSTRING(b.trace_no, 8,2) AND b.status = 1
+                                      ON a.id_rundown = SUBSTRING(b.trace_no, 10,2) AND b.status = 1
                                    WHERE a.id_material = ?
                                      AND SUBSTRING(b.trace_no, 1, 7) = CONCAT(8, DATE_FORMAT(CURDATE(), "%y%m%d"))
                                      AND a.status = 1
@@ -145,7 +145,7 @@ class Blending extends Model
                                                 WHEN b.to_trace_no = (SELECT to_trace_no
                                                                         FROM t_trace_header
                                                                        WHERE SUBSTRING(to_trace_no, 1, 1) = 8
-                                                                         AND SUBSTRING(to_trace_no, 8, 1) <> 0
+                                                                         AND SUBSTRING(to_trace_no, 10, 1) <> 0
                                                                          AND `status` = 1
                                                                        ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                                 ELSE NULL
@@ -166,7 +166,7 @@ class Blending extends Model
                                                         ON c.id_material = cc.id_material
                                                      WHERE c.`status` = 1
                                                        AND SUBSTRING(c.to_trace_no,1,1) = 8
-                                                       AND SUBSTRING(c.to_trace_no,8,1) = 0
+                                                       AND SUBSTRING(c.to_trace_no,10,1) = 0
                                                      GROUP BY c.to_trace_no ) c
                                            ON b.from_trace_no = c.to_trace_no
                                          LEFT JOIN t_material_document d
@@ -511,15 +511,15 @@ class Blending extends Model
         $curr_qtf = $totalQty;
 
         /* GET FEED TRACE RELATED TO RUNDOWN */
-        $batch_seq = substr($feed_entryNo, 9, 2);
-        $feed_id = substr($feed_entryNo, 7, 2);
+        $batch_seq = substr($feed_entryNo, 11, 2);
+        $feed_id = substr($feed_entryNo, 9, 2);
 
         $datTraceHead = DB::select('SELECT to_trace_no, id_trace_head, SUM(out_qty) AS out_qty, id_material
                                   FROM t_trace_header
                                  WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
                                    AND SUBSTRING(to_trace_no,1,1) = 8
-                                   AND SUBSTRING(to_trace_no,8,2) = ?
                                    AND SUBSTRING(to_trace_no,10,2) = ?
+                                   AND SUBSTRING(to_trace_no,12,2) = ?
                                    AND `status` = 1
                                    AND out_qty > "0.0001"
                                    AND (id_plant = ? OR ? = 0)
@@ -601,8 +601,8 @@ class Blending extends Model
                                   FROM t_trace_header
                                  WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
                                    AND SUBSTRING(to_trace_no,1,1) = 8
-                                   AND SUBSTRING(to_trace_no,8,2) = ?
                                    AND SUBSTRING(to_trace_no,10,2) = ?
+                                   AND SUBSTRING(to_trace_no,12,2) = ?
                                    AND `status` = 1
                                    AND out_qty > "0.0001"
                                    AND (id_plant = ? OR ? = 0)
