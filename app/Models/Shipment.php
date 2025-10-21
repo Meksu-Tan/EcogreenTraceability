@@ -34,6 +34,7 @@ class Shipment extends Model
         $parts = explode('|', $idMaterialPck);
         $type = $parts[0];
         $idMaterial = $parts[1];
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
@@ -47,7 +48,8 @@ class Shipment extends Model
                            WHERE a.id_material_fg = ?
                              AND a.`status` = 1
                              AND a.qty > "0.000001"
-                           GROUP BY a.batch_no', [$idMaterial]);
+                             AND a.id_plant = ?
+                           GROUP BY a.batch_no', [$idMaterial, $idPlant]);
 
         return $db;
     }
@@ -56,6 +58,7 @@ class Shipment extends Model
         $parts = explode('|', $dat);
         $type = $parts[0]; // "WIP"
         $idMaterial = $parts[1]; // "16"
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         if ($type == 'WIP'){
@@ -66,7 +69,8 @@ class Shipment extends Model
                                   ON a.id_material = b.id_material
                                WHERE a.id_material = ?
                                  AND a.status = 1
-                             ', [$idMaterial]);
+                                 AND a.id_plant = ?
+                             ', [$idMaterial, $idPlant]);
 
         } elseif ($type == 'PCK'){
             $db = DB::select('SELECT FORMAT(IFNULL(SUM(a.qty),0), 3) AS balance,
@@ -76,7 +80,8 @@ class Shipment extends Model
                                   ON a.id_material_fg = b.id_materialpck
                                WHERE a.id_material_fg = ?
                                  AND a.status = 1
-                             ', [$idMaterial]);
+                                 AND a.id_plant = ?
+                             ', [$idMaterial, $idPlant]);
 
         }
 
@@ -362,6 +367,7 @@ class Shipment extends Model
         $out_qty = $request->input('qty');
         $batchNo = $request->input('batch_no');
         $fileName = $request->input('filename');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         $parts = explode('|', $idMaterialPck);
         $type = $parts[0]; // "WIP"
@@ -394,7 +400,8 @@ class Shipment extends Model
                                           AND a.qty > "0.0001"
                                           AND a.id_material_fg = ?
                                           AND a.batch_no = ?
-                                        ORDER BY a.id_whx_head ASC', [$idMaterial, $batchNo]);
+                                          AND a.id_plant = ?
+                                        ORDER BY a.id_whx_head ASC', [$idMaterial, $batchNo, $idPlant]);
                 $lenHead = count($datHead);
 
                 if ($lenHead == 0){
@@ -455,6 +462,7 @@ class Shipment extends Model
                                 'id_sloc' => $idWarehouse,
                                 'out_qty' => $out_qty,
                                 'curr_qtf' => $out_qty,
+                                'id_plant' => $idPlant,
                                 'created_by' => $user,
                             ]);
 
@@ -466,6 +474,7 @@ class Shipment extends Model
                                 'so_no' => $soNo,
                                 'id_material_fg' => $idMaterial,
                                 'qty' => $out_qty,
+                                'id_plant' => $idPlant,
                                 'doc_url' => $fileName,
                                 'created_by' => $user,
                             ]);
@@ -521,6 +530,8 @@ class Shipment extends Model
                                         'id_material' => $idMaterial,
                                         'out_qty' => $qtyWhTail,
                                         'batch_sap' => $batchSap,
+                                        'id_plant' => $idPlant,
+                                        'id_sloc' => $idWarehouse,
                                         'created_by' => $user,
                                     ]);
                             /* INSERT SHIPMENT DETAIL */
@@ -530,6 +541,7 @@ class Shipment extends Model
                                         'id_supplier' => $idSupplier,
                                         'batch_sap' => $batchSap,
                                         'qty' => $qtyWhTail,
+                                        'id_plant' => $idPlant,
                                         'created_by' => $user,
                                     ]);
 
