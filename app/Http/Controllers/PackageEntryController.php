@@ -21,6 +21,11 @@ class PackageEntryController extends Controller
     public function __construct()
     {
         $this->middleware('auth');
+
+        $this->middleware(function ($request, $next) {
+            \App\Models\BaseModel::setPlantContext();
+            return $next($request);
+        });
     }
 
     // Show Dashboard Page
@@ -31,13 +36,20 @@ class PackageEntryController extends Controller
         $n_roles = Role::all()->count();
         $n_perms = Permission::all()->count();
 
+        $user = Auth::user();
+        $idPlant = \App\Models\BaseModel::getPlantId();
+
+        if ($idPlant !== '1002') {
+            return view('error.403');
+        }
+
         if (Laratrust::hasRole(['admin', 'super-admin', 'manager', 'superintendent', 'senior-supervisor', 'supervisor', 'senior-staff', 'staff'])) {
             $data = [
                 'user' => $n_users,
                 'role' => $n_roles,
                 'permission' => $n_perms,
-                'user' => Auth::user(),
-                'role' => implode(array_map('ucfirst', Auth::user()->roles->pluck('name')->toArray())),
+                'user' => $user,
+                'role' => implode(array_map('ucfirst', $user->roles->pluck('name')->toArray())),
             ];
 
             return view('user.trans_package.index',$data);

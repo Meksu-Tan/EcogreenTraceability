@@ -207,6 +207,14 @@
                         $($form_pckEntry_bom).html("Product : N/A");
                     };
                 });
+                $(document).on('change', $form_pckEntry_idTank, function() {
+                    var $idTank = $(this).val();
+                    var $idMaterialPck = $($form_pckEntry_fgProduct).val();
+
+                    if ($idTank && $idMaterialPck) {
+                        ajax_updateBalanceByTank($idMaterialPck, $idTank);
+                    }
+                });
                 $(document).on('change', $form_pckEntry_batchNo, function(e){
                     e.preventDefault();
 
@@ -285,6 +293,39 @@
                 }
             });
         };
+        function ajax_updateBalanceByTank($idMaterialPck, $idTank) {
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_wipMaterialByFgProduct',
+                    idMaterialPck: $idMaterialPck,
+                    tank: $idTank
+                },
+                success: function(response) {
+                    if (response['data'] && response['data'].length > 0) {
+                        var data = response['data'][0];
+                        var balance = data.balance;
+                        var wip_material = response['data'][0].wip_material;
+
+                        $($form_pckEntry_balance).val(balance);
+
+                        $($form_pckEntry_bom).html(
+                            "Product : " + wip_material
+                        );
+
+                        Swal.fire({
+                            position: 'top-end',
+                            icon: 'info',
+                            title: 'Balance updated: ' + balance + ' MT',
+                            showConfirmButton: false,
+                            timer: 1000
+                        });
+                    }
+                }
+            });
+        }
         function ajax_populateTankPackaging(id, $rundownID, selectedValue=null){
             // Empty the dropdown
             // $(id).find('option').not(':first').remove();

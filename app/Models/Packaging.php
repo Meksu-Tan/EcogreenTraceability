@@ -20,6 +20,15 @@ class Packaging extends Model
     }
     static function get_wipMaterialByFgProduct($request){
         $idMaterialPck = $request->input('idMaterialPck');
+        $idTank = $request->input('tank');
+        $idPlant = DB::table('m_tank')
+          ->where('id_tank', $idTank)
+          ->value('id_plant');
+
+        if (!$idPlant) {
+          $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        }
+
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $db = DB::select('SELECT IFNULL(CONCAT(a.description, " (", a.code, ") || Balance : ", IFNULL(a.balance,0), " MT" ), CONCAT(a.description, " (", a.code, ") || Balance : 0.0 MT" )) AS wip_material,
                                  IFNULL(a.balance,0) AS balance, a.id_rundown
@@ -45,13 +54,13 @@ class Packaging extends Model
                                   LEFT JOIN (
                                         SELECT c.id_tank, c.id_material, SUM(c.qty) AS balance
                                           FROM t_balance_header c
-                                         WHERE c.`status` = 1
+                                         WHERE c.`status` = 1 and c.id_plant = ?
                                          GROUP BY c.id_material, c.id_tank
                                         ) c
                                     ON b.id_material = c.id_material AND b.id_tank = c.id_tank
                                  GROUP BY b.code
                             ) a
-                            ', [$idMaterialPck]);
+                            ', [$idMaterialPck, $idPlant]);
 
         return $db;
     }
@@ -132,27 +141,32 @@ class Packaging extends Model
                                   AND a.id_rundown = ?', [$rundownID]);
         $sloc = $datType[0]->type;
 
-        if ($sloc == 'RM'){
-            $db = DB::select('SELECT a.id_tank, a.description AS tank
-                                FROM m_tank a
-                               WHERE a.status = 1
-                                 AND a.description = "FEED TANK"
-                               ORDER BY a.code ASC');
+        if (!$sloc) return [];
 
-        } elseif ($sloc == 'PRD'){
-            $db = DB::select('SELECT a.id_tank, a.description AS tank
-                                FROM m_tank a
-                               WHERE a.status = 1
-                                 AND a.description = "PRODUCT TANK"
-                               ORDER BY a.code ASC');
-        } elseif ($sloc == 'WIP'){
-            $db = DB::select('SELECT a.id_tank, a.description AS tank
-                                FROM m_tank a
-                               WHERE a.status = 1
-                                 AND a.description = "WIP TANK"
-                               ORDER BY a.code ASC');
-        }
-        return $db;
+        $allowedPlants = ['1002', '1007'];
+
+        $item = match ($sloc) {
+          'RM'  => 'FEED TANK',
+          'PRD' => 'PRODUCT TANK',
+          'WIP' => 'WIP TANK',
+          default => null,
+        };
+  
+        if (!$item) return [];
+  
+        $placeholders = implode(',', array_fill(0, count($allowedPlants), '?'));
+  
+        $query = "
+            SELECT a.id_tank, a.description AS tank
+            FROM m_tank a
+            WHERE a.status = 1
+              AND a.description LIKE ?
+              AND a.id_plant IN ($placeholders)
+            ORDER BY a.code ASC
+          ";
+  
+        $params = array_merge(['%' . $item], $allowedPlants);
+        return DB::select($query, $params);
     }
     static function get_cmbActiveWarehouse_pck($request){
         $batchNo_tmp = $request->input('batchNo');
@@ -351,6 +365,10 @@ class Packaging extends Model
         $poNo = $request->input('poNo');
         $idTank = $request->input('tank');
         $idWarehouse = $request->input('warehouse');
+        $idPlant = DB::table('m_tank')
+          ->where('id_tank', $idTank)
+          ->value('id_plant')
+          ?? \App\Models\BaseModel::resolvePlant($request);
 
         $whID = str_pad($idWarehouse, 2, "0", STR_PAD_LEFT);;
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
@@ -409,7 +427,8 @@ class Packaging extends Model
                                         AND b.status = 1
                                         AND b.qty > "0.0001"
                                         AND b.id_tank = ?
-                                      ORDER BY b.id_balance_head ASC', [$codeMaterial, $idTank]);
+                                        AND b.id_plant = ?
+                                      ORDER BY b.id_balance_head ASC', [$codeMaterial, $idTank, $idPlant]);
             $leftOver = $datBalQty[0]->total - $qtyPck;
 
             if ($leftOver < 0){
@@ -427,7 +446,8 @@ class Packaging extends Model
                                          AND b.status = 1
                                          AND b.qty > "0.0001"
                                          AND b.id_tank = ?
-                                       ORDER BY b.id_balance_head ASC', [$codeMaterial, $idTank]);
+                                         AND b.id_plant = ?
+                                       ORDER BY b.id_balance_head ASC', [$codeMaterial, $idTank, $idPlant]);
 
             $lenBalHead = count($datBalHead);
             $qtyWh = $qtyPck;
@@ -491,6 +511,7 @@ class Packaging extends Model
                             'id_sloc' => $idTank,
                             'out_qty' => $qtyWh,
                             'curr_qtf' => $qtyPck,
+                            'id_plant' => $idPlant,
                             'created_by' => $user,
                         ]);
 
@@ -507,6 +528,7 @@ class Packaging extends Model
                             'qty' => $qtyWh,
                             'in_qty' => $qtyWh,
                             'init_qty' => $qtyWh,
+                            'id_plant' => $idPlant,
                             'created_by' => $user
                         ]);
 
@@ -520,6 +542,7 @@ class Packaging extends Model
                         'id_sloc' => $idWarehouse,
                         'in_qty' => $qtyWh,
                         'curr_qtf' => $qtyWh,
+                        'id_plant' => $idPlant,
                         'created_by' => $user,
                     ]);
 
@@ -579,6 +602,8 @@ class Packaging extends Model
                                     'id_material' => $idMaterialFeed,
                                     'out_qty' => $qtyWhTail,
                                     'batch_sap' => $batchSap,
+                                    'id_sloc' => $idTank,
+                                    'id_plant' => $idPlant,
                                     'created_by' => $user,
                             ]);
                         /* INSERT WAREHOUSE DETAIL */
@@ -591,6 +616,7 @@ class Packaging extends Model
                                 'qty' => $qtyWhTail,
                                 'in_qty' => $qtyWhTail,
                                 'init_qty' => $qtyWhTail,
+                                'id_plant' => $idPlant,
                                 'created_by' => $user
                             ]);
                         /* POPULATE TRACE DETAIL RUNDOWN TO WAREHOUSE */
@@ -601,6 +627,8 @@ class Packaging extends Model
                                     'id_material' => $idMaterialPck,
                                     'in_qty' => $qtyWhTail,
                                     'batch_sap' => $batchSap,
+                                    'id_sloc' => $idWarehouse,
+                                    'id_plant' => $idPlant,
                                     'created_by' => $user,
                             ]);
                         /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
