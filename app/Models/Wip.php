@@ -18,6 +18,7 @@ class Wip extends Model
     protected static $idPlantEob1 = "1002";
 
     static function get_dtBalance($request, $rundownId){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $db = DB::select('SELECT aa.id_balance_head, aa.id_material, aa.id_tank, aa.status,
@@ -84,11 +85,12 @@ class Wip extends Model
                                           AND c.id_rundown = ?
                                 ) aa
                             ORDER BY entry_date DESC
-                           ', [self::$idPlantEob1, $rundownId]);
+                           ', [$idPlant, $rundownId]);
         return $db;
     }
     static function get_dtRundown($request, $rundownId){
         $mode = $request->input('mode');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         if ($mode == 'LATEST'){
@@ -118,9 +120,10 @@ class Wip extends Model
                                  AND b.in_qty > 0
                                  AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                  AND a.status = 1
+                                 AND a.id_plant = ?
                                GROUP BY a.to_trace_no
                                ORDER BY a.to_trace_no DESC
-                               LIMIT 1', [$rundownId, self::$movType1]);
+                               LIMIT 1', [$rundownId, self::$movType1, $idPlant]);
         } elseif ($mode == 'LOG'){
                 $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material,
                                         FORMAT(ROUND(h.in_qty,3),3) AS in_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
@@ -134,6 +137,7 @@ class Wip extends Model
                                                                 WHERE (SUBSTRING(to_trace_no, 1, 1) = ? OR SUBSTRING(to_trace_no, 1, 1) = ?)
                                                                     AND SUBSTRING(to_trace_no, 8, 2) = ?
                                                                     AND `status` = 1
+                                                                    AND id_plant = ?
                                                                 ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                             ELSE NULL
                                         END AS is_last_row,
@@ -142,6 +146,7 @@ class Wip extends Model
                                                                     FROM t_trace_header
                                                                 WHERE from_trace_no = a.to_trace_no
                                                                     AND `status` = 1
+                                                                    AND id_plant = ?
                                                                 ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                                             ELSE NULL
                                         END AS next_process
@@ -165,10 +170,11 @@ class Wip extends Model
                                     AND b.in_qty > 0
                                     AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                     AND a.status = 1
+                                    AND a.id_plant = ?
                                 GROUP BY a.to_trace_no
                                 ORDER BY a.to_trace_no DESC
                                 ', [self::$movType1, self::$movType2, $rundownId,
-                                    $rundownId, self::$movType1]);
+                                    $idPlant, $idPlant, $rundownId, self::$movType1, $idPlant]);
 
         }
         return $db;
@@ -176,6 +182,7 @@ class Wip extends Model
     static function get_dtFeed($request, $feedID){
         $mode = $request->input('mode');
         $feedId = substr($feedID, 0, 2);
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
@@ -213,7 +220,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 and a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                         ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -223,9 +230,10 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND (a.id_material = ? OR a.id_material = ?)
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.to_trace_no DESC
-                                        LIMIT 1', [$feedId, self::$movType2, $idMaterial1, $idMaterial2]);
+                                        LIMIT 1', [$idPlant, $feedId, self::$movType2, $idMaterial1, $idMaterial2, $idPlant]);
 
                     } elseif ($mode == 'LOG'){
                         $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material,
@@ -242,6 +250,7 @@ class Wip extends Model
                                                                             AND SUBSTRING(to_trace_no, 1, 1) = ?
                                                                             AND (a.id_material = ? OR a.id_material = ?)
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS is_last_row,
@@ -251,6 +260,7 @@ class Wip extends Model
                                                                         WHERE from_trace_no = a.to_trace_no
                                                                             AND (a.id_material = ? OR a.id_material = ?)
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS next_process
@@ -265,7 +275,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 AND a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -275,11 +285,12 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND (a.id_material = ? OR a.id_material = ?)
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.id_trace_head DESC
-                                        ', [$feedId, self::$movType2, $idMaterial1, $idMaterial2,
-                                            $idMaterial1, $idMaterial2,
-                                            $feedId, self::$movType2, $idMaterial1, $idMaterial2]);
+                                        ', [$feedId, self::$movType2, $idMaterial1, $idMaterial2, $idPlant,
+                                            $idMaterial1, $idMaterial2, $idPlant,$idPlant,
+                                            $feedId, self::$movType2, $idMaterial1, $idMaterial2, $idPlant]);
 
                     }
                 } else {
@@ -302,7 +313,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 AND a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -312,9 +323,10 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND a.id_material = ?
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.to_trace_no DESC
-                                        LIMIT 1', [$feedId, self::$movType2, $idMaterial]);
+                                        LIMIT 1', [$idPlant, $feedId, self::$movType2, $idMaterial, $idPlant]);
 
                     } elseif ($mode == 'LOG'){
                         $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material,
@@ -331,6 +343,7 @@ class Wip extends Model
                                                                             AND SUBSTRING(to_trace_no, 1, 1) = ?
                                                                             AND a.id_material = ?
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS is_last_row,
@@ -341,6 +354,7 @@ class Wip extends Model
                                                                             AND SUBSTRING(from_trace_no, 9, 1) = ?
                                                                             AND a.id_material = ?
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS next_process
@@ -355,7 +369,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 AND a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -365,11 +379,12 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND a.id_material = ?
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.id_trace_head DESC
-                                        ', [$feedId, self::$movType2, $idMaterial,
-                                            self::$movType2, substr($feedId, 1, 1), $idMaterial,
-                                            $feedId, self::$movType2, $idMaterial]);
+                                        ', [$feedId, self::$movType2, $idMaterial, $idPlant,
+                                            self::$movType2, substr($feedId, 1, 1), $idMaterial, $idPlant, $idPlant,
+                                            $feedId, self::$movType2, $idMaterial, $idPlant]);
                     }
                 }
 
@@ -400,7 +415,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 AND a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                         ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -410,9 +425,10 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND (a.id_material = ? OR a.id_material = ?)
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.to_trace_no DESC
-                                        LIMIT 1', [$feedId, self::$movType2, $idMaterial1, $idMaterial2]);
+                                        LIMIT 1', [$idPlant, $feedId, self::$movType2, $idMaterial1, $idMaterial2, $idPlant]);
 
                     } elseif ($mode == 'LOG'){
                         $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material,
@@ -429,6 +445,7 @@ class Wip extends Model
                                                                             AND SUBSTRING(to_trace_no, 1, 1) = ?
                                                                             AND (a.id_material = ? OR a.id_material = ?)
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS is_last_row,
@@ -438,6 +455,7 @@ class Wip extends Model
                                                                         WHERE from_trace_no = a.to_trace_no
                                                                             AND (a.id_material = ? OR a.id_material = ?)
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS next_process
@@ -452,7 +470,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 AND a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -462,11 +480,12 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND (a.id_material = ? OR a.id_material = ?)
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.id_trace_head DESC
-                                        ', [$feedId, self::$movType2, $idMaterial1, $idMaterial2,
-                                            $idMaterial1, $idMaterial2,
-                                            $feedId, self::$movType2, $idMaterial1, $idMaterial2]);
+                                        ', [$feedId, self::$movType2, $idMaterial1, $idMaterial2, $idPlant,
+                                            $idMaterial1, $idMaterial2, $idPlant, $idPlant,
+                                            $feedId, self::$movType2, $idMaterial1, $idMaterial2, $idPlant]);
 
                     }
                 } else {
@@ -489,7 +508,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 AND a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -499,9 +518,10 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND a.id_material = ?
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.to_trace_no DESC
-                                        LIMIT 1', [$feedId, self::$movType2, $idMaterial]);
+                                        LIMIT 1', [$idPlant, $feedId, self::$movType2, $idMaterial, $idPlant]);
 
                     } elseif ($mode == 'LOG'){
                         $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material,
@@ -518,6 +538,7 @@ class Wip extends Model
                                                                             AND SUBSTRING(to_trace_no, 1, 1) = ?
                                                                             AND a.id_material = ?
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS is_last_row,
@@ -528,6 +549,7 @@ class Wip extends Model
                                                                             AND SUBSTRING(from_trace_no, 9, 1) = ?
                                                                             AND a.id_material = ?
                                                                             AND `status` = 1
+                                                                            AND id_plant = ?
                                                                         ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                                                     ELSE NULL
                                                 END AS next_process
@@ -542,7 +564,7 @@ class Wip extends Model
                                             ON a.id_trace_head = g.id_trace_head
                                             LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                                             FROM t_trace_header a
-                                                            WHERE a.`status` = 1
+                                                            WHERE a.`status` = 1 AND a.id_plant = ?
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
@@ -552,11 +574,12 @@ class Wip extends Model
                                             AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                             AND a.id_material = ?
                                             AND a.status = 1
+                                            AND a.id_plant = ?
                                         GROUP BY a.to_trace_no
                                         ORDER BY a.id_trace_head DESC
-                                        ', [$feedId, self::$movType2, $idMaterial,
-                                            self::$movType2, substr($feedId, 1, 1), $idMaterial,
-                                            $feedId, self::$movType2, $idMaterial]);
+                                        ', [$feedId, self::$movType2, $idMaterial, $idPlant,
+                                            self::$movType2, substr($feedId, 1, 1), $idMaterial, $idPlant, $idPlant,
+                                            $feedId, self::$movType2, $idMaterial, $idPlant]);
                     }
                 }
             }
@@ -580,7 +603,7 @@ class Wip extends Model
                                       ON a.id_trace_head = g.id_trace_head
                                     LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                         				  FROM t_trace_header a
-                                        				 WHERE a.`status` = 1
+                                        				 WHERE a.`status` = 1 AND a.id_plant = ?
                                         				 GROUP BY a.to_trace_no
                                         				) h
                                          ON a.to_trace_no = h.to_trace_no
@@ -589,9 +612,10 @@ class Wip extends Model
                                      AND b.out_qty > 0
                                      AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                      AND a.status = 1
+                                     AND a.id_plant = ?
                                    GROUP BY a.to_trace_no
                                    ORDER BY a.to_trace_no DESC
-                                   LIMIT 1', [$feedId, self::$movType2]);
+                                   LIMIT 1', [$idPlant, $feedId, self::$movType2, $idPlant]);
 
             } elseif ($mode == 'LOG'){
                 $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material,
@@ -607,6 +631,7 @@ class Wip extends Model
                                                                    WHERE SUBSTRING(to_trace_no, 8, 2) = ?
                                                                      AND SUBSTRING(to_trace_no, 1, 1) = ?
                                                                      AND `status` = 1
+                                                                     AND id_plant = ?
                                                                    ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                             ELSE NULL
                                         END AS is_last_row,
@@ -616,6 +641,7 @@ class Wip extends Model
                                                                    WHERE SUBSTRING(from_trace_no, 1, 1) = ?
                                                                      AND SUBSTRING(from_trace_no, 9, 1) = ?
                                                                      AND `status` = 1
+                                                                     AND id_plant = ?
                                                                    ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                                             ELSE NULL
                                         END AS next_process
@@ -630,7 +656,7 @@ class Wip extends Model
                                       ON a.id_trace_head = g.id_trace_head
                                     LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                         				  FROM t_trace_header a
-                                        				 WHERE a.`status` = 1
+                                        				 WHERE a.`status` = 1 AND a.id_plant = ?
                                         				 GROUP BY a.to_trace_no
                                         				) h
                                          ON a.to_trace_no = h.to_trace_no
@@ -639,10 +665,11 @@ class Wip extends Model
                                      AND b.out_qty > 0
                                      AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                                      AND a.status = 1
+                                     AND a.id_plant = ?
                                    GROUP BY a.to_trace_no
                                    ORDER BY a.id_trace_head DESC
-                                ', [$feedId, self::$movType2, self::$movType2, substr($feedId, 1, 1),
-                                    $feedId, self::$movType2]);
+                                ', [$feedId, self::$movType2, $idPlant, self::$movType2, substr($feedId, 1, 1),
+                                    $idPlant, $idPlant, $feedId, self::$movType2, $idPlant]);
 
             }
         }
@@ -691,6 +718,7 @@ class Wip extends Model
     }
     static function get_feedNewBatchNumber($request){
         $feedID = $request->input('feedID');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         $feedID = substr($feedID, 0, 2);
         $db = DB::select('SELECT a.feed_number
@@ -698,16 +726,18 @@ class Wip extends Model
                                     FROM t_trace_header a
                                    WHERE SUBSTRING(a.to_trace_no,1,9) = CONCAT(3, DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
                                      AND a.status = 1
+                                     AND a.id_plant = ?
                                    ORDER BY a.id_trace_head DESC
                                    LIMIT 1 ) a
                             UNION ALL
                             SELECT CONCAT(3, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , "01") AS feed_number
-                            LIMIT 1', [$feedID, $feedID]);
+                            LIMIT 1', [$feedID, $idPlant, $feedID]);
         return $db;
     }
     static function get_rundownNewBatchNumber($request){
         $rundownID = $request->input('rundownID');
         $section = substr($rundownID, 1, 1);
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         if ($section == 9){
           /* GET LATEST FEED TRACE NO */
@@ -715,23 +745,25 @@ class Wip extends Model
                               FROM (SELECT to_trace_no + 1 AS to_trace_no
                                       FROM t_trace_header a
                                      WHERE a.status = 1
+                                       AND a.id_plant = ?
                                        AND SUBSTRING(a.to_trace_no,1,9) = CONCAT(2, DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
                                      ORDER BY to_trace_no DESC
                                      LIMIT 1) a
                                      UNION ALL
                                     SELECT CONCAT(2, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , "01") AS rundown_number
-                                     LIMIT 1', [$rundownID, $rundownID, $rundownID]);
+                                     LIMIT 1', [$rundownID, $idPlant, $rundownID, $rundownID]);
         } elseif ($section == 8){
             $db = DB::select('SELECT CONCAT(2, SUBSTRING(a.to_trace_no,2,6), ?, SUBSTRING(a.to_trace_no,10,2)) AS rundown_number
                               FROM (SELECT to_trace_no + 1 AS to_trace_no
                                       FROM t_trace_header a
                                      WHERE a.status = 1
+                                       AND a.id_plant = ?
                                        AND SUBSTRING(a.to_trace_no,1,9) = CONCAT(2, DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
                                      ORDER BY to_trace_no DESC
                                      LIMIT 1) a
                                      UNION ALL
                                     SELECT CONCAT(2, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , "01") AS rundown_number
-                                     LIMIT 1', [$rundownID, $rundownID, $rundownID]);
+                                     LIMIT 1', [$rundownID, $idPlant, $rundownID, $rundownID]);
 
         } else {
           $db = DB::select('SELECT a.rundown_number
@@ -739,17 +771,19 @@ class Wip extends Model
                                       FROM t_trace_header a
                                      WHERE SUBSTRING(a.to_trace_no,1,9) = CONCAT(2, DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
                                        AND a.status = 1
+                                       AND a.id_plant = ?
                                      ORDER BY a.id_trace_head DESC
                                      LIMIT 1 ) a
                              UNION ALL
                             SELECT CONCAT(2, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , "01") AS rundown_number
-                             LIMIT 1', [$rundownID, $rundownID]);
+                             LIMIT 1', [$rundownID, $idPlant, $rundownID]);
         }
 
         return $db;
     }
     static function get_feedLastBatch($request){
         $feedID = $request->input('feedID');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         $dat = DB::select('SELECT flow_type
                              FROM m_material_flow
@@ -763,11 +797,12 @@ class Wip extends Model
                                         WHERE SUBSTRING(a.to_trace_no,1,1) = 2
                                           AND SUBSTRING(a.to_trace_no,8,2) = ?
                                           AND a.status = 1
+                                          AND a.id_plant = ?
                                         ORDER BY a.id_trace_head DESC
                                         LIMIT 1 ) a
                                UNION ALL
                               SELECT 0 AS curr_qtf, DATE_FORMAT(CURDATE(), "%Y-%m-%d") AS entry_date, "-INIT-" AS status
-                               LIMIT 1', [$feedID]);
+                               LIMIT 1', [$feedID, $idPlant]);
 
             if ($db[0]->curr_qtf <> 0){
                 $db1 = DB::select('SELECT IFNULL(b.curr_qtf, 0) AS curr_qtf,
@@ -801,6 +836,7 @@ class Wip extends Model
     }
     static function get_rundownLastBatch($request){
         $rundownID = $request->input('rundownID');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         $dat = DB::select('SELECT flow_type
                              FROM m_material_flow
@@ -814,11 +850,12 @@ class Wip extends Model
                                         WHERE SUBSTRING(a.to_trace_no,1,1) = 1
                                         AND SUBSTRING(a.to_trace_no,8,2) = ?
                                         AND a.status = 1
+                                        AND a.id_plant = ?
                                         ORDER BY a.id_trace_head DESC
                                         LIMIT 1 ) a
                                 UNION ALL
                                 SELECT 0 AS curr_qtf, DATE_FORMAT(CURDATE(), "%Y-%m-%d") AS entry_date, "-INIT-" AS status, "" AS created_at
-                                LIMIT 1', [$rundownID]);
+                                LIMIT 1', [$rundownID, $idPlant]);
 
             if ($db[0]->curr_qtf <> 0){
                 $db1 = DB::select('SELECT IFNULL(b.curr_qtf, 0) AS curr_qtf, b.created_at,
@@ -856,6 +893,7 @@ class Wip extends Model
     static function get_cmbActiveTank_trf($request){
         $sloc = $request->input('sloc');
         $feedId = $request->input('feedID');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $db = DB::select('SELECT b.id_tank, b.description AS tank
@@ -864,11 +902,12 @@ class Wip extends Model
                               ON a.type = b.code_2 AND b.status = 1 AND b.id_plant = ?
                            WHERE a.status = 1
                              AND a.id_feed = ?
-                           GROUP BY b.id_tank', [self::$idPlantEob1, $feedId]);
+                           GROUP BY b.id_tank', [$idPlant, $feedId]);
         return $db;
     }
     static function get_cmbActiveTank_rundown($request){
         $rundownID = $request->input('rundownID');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $db = DB::select('SELECT b.id_tank, b.description AS tank
@@ -877,7 +916,7 @@ class Wip extends Model
                               ON a.type = b.code_2 AND b.status = 1 AND b.id_plant = ?
                            WHERE a.status = 1
                              AND a.id_rundown = ?
-                           GROUP BY b.id_tank', [self::$idPlantEob1, $rundownID]);
+                           GROUP BY b.id_tank', [$idPlant, $rundownID]);
 
         return $db;
     }
@@ -890,6 +929,7 @@ class Wip extends Model
         $curr_qtf = $request->input('curr_feed');
         $curr_entryDate = $request->input('curr_entryDate');
         $entry_no = $request->input('batch_no');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         //$feed_id = substr($feedID, 0, 2);
         $feed_id = $feedID;
@@ -929,7 +969,8 @@ class Wip extends Model
                                       AND a.`status` = 1
                                       AND b.qty > "0.0001"
                                       AND b.id_tank = ?
-                                    ORDER BY b.id_balance_head ASC', [$feed_id, $id_tank]);
+                                      AND b.id_plant = ?
+                                    ORDER BY b.id_balance_head ASC', [$feed_id, $id_tank, $idPlant]);
 
             $total_reserve = $datHead[0]->qty;
             if (($total_reserve - $out_qty) < -0.000001){
@@ -949,7 +990,8 @@ class Wip extends Model
                                         AND a.`status` = 1
                                         AND b.qty > "0.0001"
                                         AND b.id_tank = ?
-                                        ORDER BY b.id_balance_head ASC', [$feed_id, $id_tank]);
+                                        AND b.id_plant = ?
+                                        ORDER BY b.id_balance_head ASC', [$feed_id, $id_tank, $idPlant]);
 
                 $len = count($datHead);
                 if ($len == 0){
@@ -966,7 +1008,8 @@ class Wip extends Model
                                                 AND id_material = ?
                                                 AND in_qty = 0
                                                 AND SUBSTRING(to_trace_no,1,1) = 3
-                                            ', [$curr_entryDate, $id_tank, $datHead[0]->id_material]);
+                                                AND id_plant = ?
+                                            ', [$curr_entryDate, $id_tank, $datHead[0]->id_material, $idPlant]);
 
 
                     if ($datDouble[0]->flag > 0){
@@ -1009,7 +1052,8 @@ class Wip extends Model
                                                 WHERE id_balance_head = ?
                                                   AND `status` = 1
                                                   AND qty > "0.0001"
-                                                ORDER BY id_balance_tail ASC', [$idHead]);
+                                                  AND id_plant = ?
+                                                ORDER BY id_balance_tail ASC', [$idHead, $idPlant]);
                         $lenTail = count($datTail);
 
                         if ($lenTail == 0){
@@ -1038,6 +1082,7 @@ class Wip extends Model
                                 'last_qtf' => $last_qtf,
                                 'curr_qtf' => $curr_qtf,
                                 'created_by' => $user,
+                                'id_plant' => $idPlant,
                         ]);
 
                     /* HEADER LOGGING */
@@ -1099,6 +1144,7 @@ class Wip extends Model
                                             'out_qty' => $tail_out_qty,
                                             'batch_sap' => $batch_sap,
                                             'created_by' => $user,
+                                            'id_plant' => $idPlant,
                                     ]);
 
                                 /* DETAIL LOGGING */
@@ -1149,6 +1195,7 @@ class Wip extends Model
         $curr_entryDate = $request->input('curr_entryDate');
         $entry_no = $request->input('batch_no');
         $id_tank = $request->input('tank');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         /* CHECK LOCK PERIOD */
             $lockDateTime = new \DateTime($curr_entryDate);
@@ -1186,8 +1233,9 @@ class Wip extends Model
                         'SELECT COUNT(to_trace_no) AS flag
                            FROM t_trace_header
                           WHERE to_trace_no = ?
-                            AND `status` = 1',
-                        [$entry_no]
+                            AND `status` = 1
+                            AND id_plant = ?',
+                        [$entry_no, $idPlant]
                     );
 
                     if ($datTraceNo[0]->flag == 0) {
@@ -1200,7 +1248,8 @@ class Wip extends Model
                 $datTraceNo = DB::select('SELECT count(to_trace_no) AS flag
                                             FROM t_trace_header
                                            WHERE to_trace_no = ?
-                                             AND `status` = 1', [$entry_no]);
+                                             AND id_plant = ?
+                                             AND `status` = 1', [$entry_no, $idPlant]);
                 if ($datTraceNo[0]->flag > 0){
                     $db = [ (object)['response' => 7 ]];
                     return $db;
@@ -1217,10 +1266,11 @@ class Wip extends Model
                                              WHERE SUBSTRING(to_trace_no,1,1) = ?
                                                AND SUBSTRING(to_trace_no,8,2) = ?
                                                AND entry_date = ?
+                                               AND id_plant = ?
                                                AND `status` = 1
                                                AND out_qty > "0.0001"
                                              ORDER BY id_trace_head DESC
-                                             LIMIT 1', [self::$movType2, $feed_id, $curr_entryDate]);
+                                             LIMIT 1', [self::$movType2, $feed_id, $curr_entryDate, $idPlant]);
 
                 if ($datTraceHead[0]->out_qty == null){
                     $db = [ (object)['response' => 4 ]];
@@ -1245,8 +1295,9 @@ class Wip extends Model
                                             AND id_sloc = ?
                                             AND id_material = ?
                                             AND out_qty = 0
+                                            AND id_plant = ?
                                             AND SUBSTRING(to_trace_no,1,1) = 2
-                                        ', [$curr_entryDate, $id_tank, $id_material]);
+                                        ', [$curr_entryDate, $id_tank, $id_material, $idPlant]);
 
                 if ($datDouble[0]->flag > 0){
                     $db = [ (object)['response' => 2 ]];
@@ -1272,6 +1323,7 @@ class Wip extends Model
                     'qty' => $in_qty,
                     'in_qty' => $in_qty,
                     'init_qty' => $in_qty,
+                    'id_plant' => $idPlant,
                     'created_by' => $user,
                 ]);
             /* INSERT INTO T_TRACE_HEADER */
@@ -1285,6 +1337,7 @@ class Wip extends Model
                     'in_qty' => $in_qty,
                     'last_qtf' => $last_qtf,
                     'curr_qtf' => $curr_qtf,
+                    'id_plant' => $idPlant,
                     'created_by' => $user,
                 ]);
 
@@ -1305,8 +1358,9 @@ class Wip extends Model
                                            AND entry_date = ?
                                            AND `status` = 1
                                            AND out_qty > "0.0001"
+                                           AND id_plant = ?
                                          ORDER BY id_trace_head DESC',
-                                         [self::$movType2, $feed_id, $curr_entryDate]);
+                                         [self::$movType2, $feed_id, $curr_entryDate, $idPlant]);
             $len = count($datTraceHead);
 
             $dataPerHead = [];
@@ -1319,7 +1373,8 @@ class Wip extends Model
                                             FROM t_trace_detail
                                             WHERE id_trace_head = ?
                                             AND `status` = 1
-                                            ORDER BY id_trace_tail ASC', [$feed_idTraceHead]);
+                                            AND id_plant = ?
+                                            ORDER BY id_trace_tail ASC', [$feed_idTraceHead, $idPlant]);
 
                 if (count($datTraceTail) === 0) {
                     return [(object)['response' => 6]];
@@ -1361,10 +1416,12 @@ class Wip extends Model
                             'id_balance_head' => $idHead,
                             'id_supplier' => $idSupplier,
                             'id_material' => $id_material,
+                            'id_tank' => $id_tank,
                             'qty' => $rundownSupplier,
                             'in_qty' => $rundownSupplier,
                             'init_qty' => $rundownSupplier,
                             'batch_sap' => $batchSap,
+                            'id_plant' => $idPlant,
                             'created_by' => $user,
                         ]);
 
@@ -1373,8 +1430,10 @@ class Wip extends Model
                             'id_balance_tail' => $idTail,
                             'id_supplier' => $idSupplier,
                             'id_material' => $id_material,
+                            'id_sloc' => $id_tank,
                             'in_qty' => $rundownSupplier,
                             'batch_sap' => $batchSap,
+                            'id_plant' => $idPlant,
                             'created_by' => $user,
                         ]);
 
