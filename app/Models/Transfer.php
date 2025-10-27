@@ -27,24 +27,24 @@ class Transfer extends Model
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         $getLatestTransfer = DB::select('SELECT LPAD(a.seq_no + 1,2,0) AS seq_no
-                                           FROM (SELECT SUBSTRING(a.to_trace_no, 10,2) AS seq_no
+                                           FROM (SELECT SUBSTRING(a.to_trace_no, 13,2) AS seq_no
                                                    FROM t_trace_header a
                                                   WHERE SUBSTRING(a.to_trace_no, 1, 1) = 7
                                                     AND SUBSTRING(a.to_trace_no, 2, 6) = DATE_FORMAT(CURDATE(), "%y%m%d")
                                                     AND a.status = 1 AND a.id_plant = ?
-                                                  ORDER BY SUBSTRING(a.to_trace_no,10,2) DESC
+                                                  ORDER BY SUBSTRING(a.to_trace_no,13,2) DESC
                                                   LIMIT 1) a
                                           UNION ALL
                                          SELECT "01" AS seq_no
                                           LIMIT 1', [$idPlant]);
         $seq_no = $getLatestTransfer[0]->seq_no;
 
-        $db = DB::select('SELECT CONCAT("7", DATE_FORMAT(CURDATE(), "%y%m%d"), IF(a.id_rundown <> "-", a.id_rundown, "00"), ?) AS entryNo
+        $db = DB::select('SELECT CONCAT("7", DATE_FORMAT(CURDATE(), "%y%m%d"), IF(a.id_rundown <> "-", a.id_rundown, "000"), LPAD(RIGHT(?, 2), 2, "0"), ?) AS entryNo
                             FROM m_material a
                            WHERE a.status = 1
                              AND a.id_material = ?
                            LIMIT 1
-                         ', [$seq_no, $idMaterial]);
+                         ', [$idPlant, $seq_no, $idMaterial]);
 
         return $db;
     }
@@ -113,7 +113,7 @@ class Transfer extends Model
                                                 WHEN b.to_trace_no = (SELECT to_trace_no
                                                                         FROM t_trace_header
                                                                        WHERE SUBSTRING(to_trace_no, 1, 1) = 7
-                                                                         AND SUBSTRING(to_trace_no, 8, 1) <> 0
+                                                                         AND SUBSTRING(to_trace_no, 9, 1) <> 0
                                                                          AND `status` = 1
                                                                        ORDER BY to_trace_no DESC LIMIT 1) THEN 1
                                                 ELSE NULL
@@ -332,10 +332,10 @@ class Transfer extends Model
 
                     /* VARIABLE ADJUSTMENT */
                     $out_qty = $trfQty;
-                    if (substr($entryNo,7,2) == '00'){
-                        $entry_no = substr_replace($entryNo, '1', 8, 1); /* REPLACE RUNDOWN_ID TO FEED_ID FOR RAW MATERIAL */
+                    if (substr($entryNo,7,3) == '000'){
+                        $entry_no = substr_replace($entryNo, '1', 9, 1); /* REPLACE RUNDOWN_ID TO FEED_ID FOR RAW MATERIAL */
                     } else {
-                        $entry_no = substr_replace($entryNo, '0', 7, 1); /* REPLACE RUNDOWN_ID TO FEED_ID FOR WIP*/
+                        $entry_no = substr_replace($entryNo, '0', 8, 1); /* REPLACE RUNDOWN_ID TO FEED_ID FOR WIP*/
                     }
                     $curr_entryDate = $entryDate;
                     $curr_qtf = $trfQty;
@@ -511,16 +511,16 @@ class Transfer extends Model
                         $curr_qtf = $trfQty;
 
                     /* GET FEED TRACE RELATED TO RUNDOWN */
-                        $batch_seq = substr($feed_entryNo, 9, 2);
-                        $feed_id = substr($feed_entryNo, 7, 2);
+                        $batch_seq = substr($feed_entryNo, 12, 2);
+                        $feed_id = substr($feed_entryNo, 7, 3);
                         $batch_date = substr($feed_entryNo, 1, 6);
 
                         $datTraceHead = DB::select('SELECT to_trace_no, id_trace_head, SUM(out_qty) AS out_qty, id_material
                                                       FROM t_trace_header
                                                      WHERE SUBSTRING(to_trace_no,2,6) = ?
                                                        AND SUBSTRING(to_trace_no,1,1) = 7
-                                                       AND SUBSTRING(to_trace_no,8,2) = ?
-                                                       AND SUBSTRING(to_trace_no,10,2) = ?
+                                                       AND SUBSTRING(to_trace_no,8,3) = ?
+                                                       AND SUBSTRING(to_trace_no,13,2) = ?
                                                        AND `status` = 1
                                                        AND out_qty > "0.0001"
                                                      ORDER BY id_trace_head DESC
@@ -540,8 +540,8 @@ class Transfer extends Model
                                                       FROM t_trace_header
                                                      WHERE SUBSTRING(to_trace_no,2,6) = ?
                                                        AND SUBSTRING(to_trace_no,1,1) = 7
-                                                       AND SUBSTRING(to_trace_no,8,2) = ?
-                                                       AND SUBSTRING(to_trace_no,10,2) = ?
+                                                       AND SUBSTRING(to_trace_no,8,3) = ?
+                                                       AND SUBSTRING(to_trace_no,13,2) = ?
                                                        AND `status` = 1
                                                        AND out_qty > "0.0001"
                                                      ORDER BY id_trace_head DESC',

@@ -137,9 +137,9 @@ class TransferController extends Controller
                                 $entryAdjNo_dat = AD::get_adjNewEntryNumber();
                                 $entryAdjNo = $entryAdjNo_dat[0]->adj_number;
                                 /* ENTRY TO t_balance_temporary */
-                                TRF::post_adjEntrySupplier($user, $entryAdjNo, $idSupplier, $idMaterial, $trfQty, $supplierCode);
+                                TRF::post_adjEntrySupplier($user, $entryAdjNo, $idSupplier, $idMaterial, $trfQty, $supplierCode, $request);
                                 /* ENTRY TO t_adjustment */
-                                AD::post_adjustmentInit($user, $mode, $idHead, $entryAdjNo, $entryDate, $trfSource, $trfQty, $idMaterial, $materialDoc);
+                                AD::post_adjustmentInit($user, $mode, $idHead, $entryAdjNo, $entryDate, $trfSource, $trfQty, $idMaterial, $materialDoc, $request);
                             }
                         }
 
