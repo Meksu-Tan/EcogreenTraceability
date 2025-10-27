@@ -75,7 +75,7 @@ class Packaging extends Model
                                  CASE
                                     WHEN a.trace_no = (SELECT to_trace_no
                                                          FROM t_trace_header
-                                                        WHERE SUBSTRING(to_trace_no, 8, 2) <> "00"
+                                                        WHERE SUBSTRING(to_trace_no, 8, 3) <> "000"
                                                           AND SUBSTRING(to_trace_no, 1, 1) = 4
                                                           AND `status` = 1
                                                         ORDER BY id_trace_head DESC LIMIT 1) THEN 1
@@ -370,7 +370,7 @@ class Packaging extends Model
           ->value('id_plant')
           ?? \App\Models\BaseModel::resolvePlant($request);
 
-        $whID = str_pad($idWarehouse, 2, "0", STR_PAD_LEFT);;
+        $whID = str_pad($idWarehouse, 3, "0", STR_PAD_LEFT);;
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         /* CHECK LOCK PERIOD */
@@ -395,18 +395,18 @@ class Packaging extends Model
             }
         /* CREATE BATCH NUMBER */
             $datPckBatch = DB::select('SELECT a.pck_batch
-                                         FROM (SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(SUBSTRING(a.to_trace_no,10,2) + 1,2,0)) AS pck_batch
+                                         FROM (SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(SUBSTRING(a.to_trace_no,13,2) + 1,2,0)) AS pck_batch
                                                  FROM t_trace_header a
                                                 WHERE SUBSTRING(a.to_trace_no,1,7) = CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"))
                                                   AND a.status = 1
                                                 ORDER BY a.id_trace_head DESC
                                                 LIMIT 1 ) a
                                         UNION ALL
-                                       SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , "01") AS pck_batch
-                                        LIMIT 1', [self::$movType1, $whID, self::$movType1, self::$movType1, $whID]);
+                                       SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS pck_batch
+                                        LIMIT 1', [self::$movType1, $whID, self::$movType1, self::$movType1, $whID, $idPlant]);
             $traceNoWhx = $datPckBatch[0]->pck_batch;
             // Problem with Trace Loop
-            $traceNoTrf = substr_replace($traceNoWhx, '00', 7, 2); /* REPLACE WHX_ID WITH TRANSFER_ID */
+            $traceNoTrf = substr_replace($traceNoWhx, '000', 7, 3); /* REPLACE WHX_ID WITH TRANSFER_ID */
 
         /* GET PRODUCT */
             $datMaterial = DB::select('SELECT a.id_material, b.code
