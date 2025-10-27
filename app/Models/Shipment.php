@@ -106,7 +106,7 @@ class Shipment extends Model
                                  CASE
                                     WHEN a.trace_no = (SELECT from_trace_no
                                                          FROM t_trace_header
-                                                        WHERE SUBSTRING(from_trace_no, 8, 2) = "01"
+                                                        WHERE SUBSTRING(from_trace_no, 8, 3) = "001"
                                                           AND SUBSTRING(from_trace_no, 1, 1) = 4
                                                           AND `status` = 1
                                                         ORDER BY from_trace_no DESC LIMIT 1) THEN 1
@@ -378,19 +378,19 @@ class Shipment extends Model
 
 
             } elseif ($type == 'PCK'){
-                $shID = '01';
+                $shID = '001';
 
                 /* CREATE SHIPMENT BATCH NUMBER */
                 $datPckBatch = DB::select('SELECT a.pck_batch
                                              FROM (SELECT a.to_trace_no + 1 AS pck_batch
                                                      FROM t_trace_header a
-                                                    WHERE SUBSTRING(a.to_trace_no,1,9) = CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
+                                                    WHERE SUBSTRING(a.to_trace_no,1,10) = CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
                                                       AND a.status = 1
                                                     ORDER BY a.id_trace_head DESC
                                                     LIMIT 1 ) a
                                              UNION ALL
-                                            SELECT CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , "01") AS pck_batch
-                                             LIMIT 1', [$shID, $shID]);
+                                            SELECT CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS pck_batch
+                                             LIMIT 1', [$shID, $shID, $idPlant]);
                 $traceNo = $datPckBatch[0]->pck_batch;
 
                 /* FIND BALANCE STOCK */
