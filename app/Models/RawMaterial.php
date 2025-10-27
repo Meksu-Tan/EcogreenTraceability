@@ -9,10 +9,10 @@ class RawMaterial extends Model
 {
     protected $connection = 'eudr_ts';
 
-    protected static $idTankSrc = "T00"; // STORAGE TANK
-    // protected static $idTankTrf = "T02"; // TRF TANK
+    protected static $idTankSrc = "T000"; // STORAGE TANK
+    // protected static $idTankTrf = "T002"; // TRF TANK
     // protected static $idTankFeed = "3"; // FEED TANK
-    protected static $movSeq = "00";
+    protected static $movSeq = "000";
     protected static $typeMaterial = "RM";
     protected static $movType1 = "1";
     protected static $movType2 = "9";
@@ -74,7 +74,7 @@ class RawMaterial extends Model
                               ON f.id_balance_head = a.id_balance_head
                            WHERE c.type = ?
                              AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
-                             AND SUBSTRING(a.trace_no,8,2) = ?
+                             AND SUBSTRING(a.trace_no,8,3) = ?
                              AND a.status = 1
                              AND (a.id_plant = ? OR ? = 0)
                            GROUP BY a.trace_no
@@ -283,32 +283,34 @@ class RawMaterial extends Model
             $db = [ (object)['response' => 1 ]];
             return $db;
     }
-    static function get_rmNewEntryNumber(){
+    static function get_rmNewEntryNumber($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
         $db = DB::select('SELECT a.rm_number
                             FROM (SELECT a.trace_no+1 AS rm_number
                                     FROM t_balance_header a
                                     WHERE SUBSTRING(a.trace_no,1,7) = CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"))
-                                      AND SUBSTRING(a.trace_no,8,2) = ?
-                                      AND a.status = 1
+                                      AND SUBSTRING(a.trace_no,8,3) = ?
+                                      AND a.status = 1 AND a.id_plant = ?
                                     ORDER BY a.id_balance_head DESC
                                     LIMIT 1 ) a
                             UNION ALL
-                            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, "01") AS rm_number
-                            LIMIT 1', [self::$movSeq, self::$movSeq]);
+                            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(RIGHT(?, 2), 2, "0"), "01") AS rm_number
+                            LIMIT 1', [self::$movSeq, $idPlant, self::$movSeq, $idPlant]);
         return $db;
     }
-    static function get_rmNewEntryNumberTrf(){
-        $db = DB::select('SELECT CONCAT(SUBSTRING(a.rm_number,1,7), ?, SUBSTRING(a.rm_number,10,2)) + 1 AS rm_number
+    static function get_rmNewEntryNumberTrf($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $db = DB::select('SELECT CONCAT(SUBSTRING(a.rm_number,1,7), ?, SUBSTRING(a.rm_number,11,4)) + 1 AS rm_number
                             FROM (SELECT a.trace_no AS rm_number
                                     FROM t_balance_header a
                                     WHERE SUBSTRING(a.trace_no,1,7) = CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"))
-                                      AND SUBSTRING(a.trace_no,2,8) = CONCAT(DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
-                                      AND a.status = 1
+                                      AND SUBSTRING(a.trace_no,2,9) = CONCAT(DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
+                                      AND a.status = 1 AND a.id_plant = ?
                                     ORDER BY a.id_balance_head DESC
                                     LIMIT 1 ) a
                             UNION ALL
-                            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, "01") AS rm_number
-                            LIMIT 1', [substr(self::$idTankSrc,1,2), "00", substr(self::$idTankSrc,1,2)]);
+                            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(RIGHT(?, 2), 2, "0"), "01") AS rm_number
+                            LIMIT 1', [substr(self::$idTankSrc,1,3), "000", $idPlant, substr(self::$idTankSrc,1,3), $idPlant]);
         return $db;
     }
     static function get_cmbActiveTank(){
@@ -921,14 +923,15 @@ class RawMaterial extends Model
                     $len = count($datHead);
 
                     /* CREATE ENTRY NO TO FEED TANK */
-                    $batchTrf_id = substr($targetTankCode,1,2);
-                    $batchFeed_id = "00";
+                    $batchTrf_id = substr($targetTankCode,1,3);
+                    $batchFeed_id = "000";
                     $batch_moveType = substr($entry_no, 0, 1);
                     $batch_entryDate = substr($entry_no, 1, 6);
+                    $batch_idPlant = substr($entry_no, 10, 2);
                     $batch_sequence = substr($entry_no, -2);
 
-                    $entryTrfNo_in = $batch_moveType . $batch_entryDate . $batchTrf_id . $batch_sequence;
-                    $entryFeedNo_in = $batch_moveType . $batch_entryDate . $batchFeed_id . $batch_sequence;
+                    $entryTrfNo_in = $batch_moveType . $batch_entryDate . $batchTrf_id . $batch_idPlant . $batch_sequence;
+                    $entryFeedNo_in = $batch_moveType . $batch_entryDate . $batchFeed_id . $batch_idPlant . $batch_sequence;
 
                     for ($i = 0; $i < $len; $i++) {
                         $idHead = $datHead[$i]->id_balance_head;

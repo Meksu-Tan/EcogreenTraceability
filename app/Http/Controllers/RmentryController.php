@@ -246,7 +246,7 @@ class RmentryController extends Controller
                     ->make(true);
 
         } elseif ($flag == 'get_rmNewEntryNumber'){
-            $txtData['data'] = RM::get_rmNewEntryNumber();
+            $txtData['data'] = RM::get_rmNewEntryNumber($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_cmbActiveTank'){
@@ -300,7 +300,7 @@ class RmentryController extends Controller
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_rmNewEntryNumberTrf'){
-            $txtData['data'] = RM::get_rmNewEntryNumberTrf();
+            $txtData['data'] = RM::get_rmNewEntryNumberTrf($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_totalQtyMaterial'){
