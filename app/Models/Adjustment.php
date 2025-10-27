@@ -10,7 +10,8 @@ class Adjustment extends Model
 {
     protected $connection = 'eudr_ts';
 
-    static function get_adjNewEntryNumber($entryDate=null){
+    static function get_adjNewEntryNumber($entryDate=null, $request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
         if ($entryDate == null){
             $db = DB::select('SELECT a.adj_number
                                 FROM (SELECT a.trace_no+1 AS adj_number
@@ -20,8 +21,8 @@ class Adjustment extends Model
                                        ORDER BY a.id_balance_head DESC
                                        LIMIT 1 ) a
                                UNION ALL
-                              SELECT CONCAT("9", DATE_FORMAT(CURDATE(), "%y%m%d"),"0001") AS adj_number
-                               LIMIT 1');
+                              SELECT CONCAT("9", DATE_FORMAT(CURDATE(), "%y%m%d"), LPAD(RIGHT(?, 2), 2, "0"),"0001") AS adj_number
+                               LIMIT 1', [$idPlant]);
         } else {
             $db = DB::select('SELECT a.adj_number
                                 FROM (
@@ -33,8 +34,8 @@ class Adjustment extends Model
                                     LIMIT 1
                                 ) a
                               UNION ALL
-                             SELECT CONCAT("9", DATE_FORMAT(LAST_DAY(?),"%y%m%d"), "0001") AS adj_number
-                              LIMIT 1;', [$entryDate, $entryDate]);
+                             SELECT CONCAT("9", DATE_FORMAT(LAST_DAY(?),"%y%m%d"), LPAD(RIGHT(?, 2), 2, "0"), "0001") AS adj_number
+                              LIMIT 1;', [$entryDate, $entryDate, $idPlant]);
         }
         return $db;
     }
@@ -222,6 +223,7 @@ class Adjustment extends Model
 
     static function post_storeAdjustment($user, $id_material, $adjustQty, $entryDate, $id_tank, $request){
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $lastTwoDigitIdPlant = substr($idPlant, 2, 2);
 
         /* CREATE ADJUSTMENT NUMBER */
             $batch_moveType = 9;
@@ -230,14 +232,14 @@ class Adjustment extends Model
                                      FROM m_material a
                                     WHERE a.id_material = ?', [$id_material]);
             $batch_id = $datMatl[0]->id_rundown;
-            $batchMapping = $batch_moveType . $batch_entryDate . $batch_id;
+            $batchMapping = $batch_moveType . $batch_entryDate . $batch_id . $lastTwoDigitIdPlant;
 
         /* SEARCH FOR EXISTING BATCH SEQUENCE */
             DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
             $datBatch = DB::select('SELECT a.adjust_no, COUNT(a.adjust_no) AS flag
                                       FROM (SELECT a.adjust_no
                                               FROM t_adjustment_header a
-                                             WHERE SUBSTRING(a.adjust_no,1,9) = ?
+                                             WHERE SUBSTRING(a.adjust_no,1,12) = ?
                                              ORDER BY a.adjust_no DESC
                                              LIMIT 1) a', [$batchMapping]);
             $flagBatch = $datBatch[0]->flag;
@@ -1306,6 +1308,7 @@ class Adjustment extends Model
     static function post_adjustmentInit($user, $mode, $idHead, $entry_no, $entry_date, $id_tank, $qty,
                                         $id_material, $materialDoc, $request){
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $lastTwoDigitIdPlant = substr($idPlant, 2, 2);
 
         /* CEK SUPPLIER ENTRY */
             $dat = DB::select('SELECT id_supplier, qty AS qty_tail, batch_sap
@@ -1327,9 +1330,9 @@ class Adjustment extends Model
             $type = $datMatl[0]->type;
 
             if ($type == "RM"){
-                $new_entry_no = $batch_moveType . $batch_entryDate . $batch_id . $batch_sequence;
+                $new_entry_no = $batch_moveType . $batch_entryDate . $batch_id . $lastTwoDigitIdPlant . $batch_sequence;
             } else {
-                $new_entry_no = $batch_moveType . $batch_entryDate . $batch_id . $batch_sequence;
+                $new_entry_no = $batch_moveType . $batch_entryDate . $batch_id . $lastTwoDigitIdPlant . $batch_sequence;
             }
 
         if ($mode == 'ADD'){

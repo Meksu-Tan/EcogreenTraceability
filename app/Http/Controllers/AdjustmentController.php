@@ -335,7 +335,8 @@ class AdjustmentController extends Controller
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_adjNewEntryNumber'){
-            $txtData['data'] = AD::get_adjNewEntryNumber();
+            $entryDate = $request->input('entryDate');
+            $txtData['data'] = AD::get_adjNewEntryNumber($entryDate, $request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_dtSupplierList'){
