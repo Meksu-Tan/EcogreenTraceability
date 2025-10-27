@@ -30,7 +30,7 @@ class WipentryController extends Controller
     }
 
     // Show Dashboard Page
-    public function index()
+    public function index(Request $request)
     {
         $n_users = User::all()->count();
         $n_roles = Role::all()->count();

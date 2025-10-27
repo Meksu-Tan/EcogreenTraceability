@@ -2360,6 +2360,8 @@
 
     @include('user.trans_wip.modals.__addMaterialDocModal')
 
+    @include('modals.__selectPlant')
+
 <!-- SCRIPT -->
 <script>
     /* VAR TOKEN + URL */
@@ -2406,65 +2408,65 @@
             const $card_section112              = '#card-section112';
 
         /* DATASET MATERIAL */
-            const $rundownId_cpko               = '00'; /* GET RUNDOWN TO FEED TANK  */
-            const $feedId_cpko                  = '01'; /* FEED ID FROM TANK TO WIP */
-            const $rundownId_daoil              = '11';
-            const $feedId_daoil                 = '02';
-            const $rundownId_pkfad              = '21';
+            const $rundownId_cpko               = '000'; /* GET RUNDOWN TO FEED TANK  */
+            const $feedId_cpko                  = '001'; /* FEED ID FROM TANK TO WIP */
+            const $rundownId_daoil              = '011';
+            const $feedId_daoil                 = '002';
+            const $rundownId_pkfad              = '021';
             const $feedId_pkfad                 = '-';
-            const $rundownId_crudeme            = '12';
-            const $feedId_crudeme               = '03';
-            const $rundownId_treatedgly         = '22';
-            const $feedId_treatedgly            = '04';
-            const $rundownId_crudegly           = '14';
-            const $feedId_crudegly              = '07';
-            const $rundownId_glycerine          = '17';
+            const $rundownId_crudeme            = '012';
+            const $feedId_crudeme               = '003';
+            const $rundownId_treatedgly         = '022';
+            const $feedId_treatedgly            = '004';
+            const $rundownId_crudegly           = '014';
+            const $feedId_crudegly              = '007';
+            const $rundownId_glycerine          = '017';
             const $feedId_glycerine             = '-';
-            const $rundownId_me60               = '13';
+            const $rundownId_me60               = '013';
             const $feedId_me60                  = '-';
-            const $rundownId_bdme               = '23';
+            const $rundownId_bdme               = '023';
             const $feedId_bdme                  = '-';
-            const $rundownId_ume                = '33';
-            const $feedId_ume                   = '05';
-            const $rundownId_me28               = '43';
-            const $feedId_me28                  = '06-01';
-            const $rundownId_wme                = '15';
-            const $rundownId_me28_302           = '25';
+            const $rundownId_ume                = '033';
+            const $feedId_ume                   = '005';
+            const $rundownId_me28               = '043';
+            const $feedId_me28                  = '006-01';
+            const $rundownId_wme                = '015';
+            const $rundownId_me28_302           = '025';
             const $feedId_wme                   = '-';
-            const $rundownId_cfa28              = '16';
-            const $feedId_cfa28                 = '08';
-            const $rundownId_ecorolwax          = '18';
-            const $feedId_ecorolwax             = '09';
-            const $rundownId_lefa               = '28';
+            const $rundownId_cfa28              = '016';
+            const $feedId_cfa28                 = '008';
+            const $rundownId_ecorolwax          = '018';
+            const $feedId_ecorolwax             = '009';
+            const $rundownId_lefa               = '028';
             const $feedId_lefa                  = '-';
-            const $rundownId_fa24               = '38';
-            const $feedId_fa24                  = '09';
-            const $rundownId_fa16               = '48';
-            const $feedId_fa16                  = '09';
-            const $rundownId_fa18lrr            = '58';
-            const $feedId_fa18lrr               = '09';
-            const $rundownId_fa26               = '68';
+            const $rundownId_fa24               = '038';
+            const $feedId_fa24                  = '009';
+            const $rundownId_fa16               = '048';
+            const $feedId_fa16                  = '009';
+            const $rundownId_fa18lrr            = '058';
+            const $feedId_fa18lrr               = '009';
+            const $rundownId_fa26               = '068';
             const $feedId_fa26                  = '-';
-            const $feedId_112_fa24              = '09-01';
-            const $feedId_112_fa14lrr           = '09-02';
-            const $feedId_112_fa18lrr           = '09-03';
-            const $feedId_112_ecowax            = '09-04';
-            const $rundownId_112_ecowax         = '19';
-            const $rundownId_112_fa18           = '29';
-            const $rundownId_112_fa12           = '39';
-            const $rundownId_112_fa18lrr        = '49';
-            const $rundownId_112_fa14           = '59';
-            const $rundownId_112_cfa28          = '69';
-            const $rundownId_112_fa14lrr        = '79';
-            const $rundownId_104_me80           = '63';
-            const $feedId_105_me80              = '06-02';
-            const $rundownId_105_cfa80          = '26';
+            const $feedId_112_fa24              = '009-01';
+            const $feedId_112_fa14lrr           = '009-02';
+            const $feedId_112_fa18lrr           = '009-03';
+            const $feedId_112_ecowax            = '009-04';
+            const $rundownId_112_ecowax         = '019';
+            const $rundownId_112_fa18           = '029';
+            const $rundownId_112_fa12           = '039';
+            const $rundownId_112_fa18lrr        = '049';
+            const $rundownId_112_fa14           = '059';
+            const $rundownId_112_cfa28          = '069';
+            const $rundownId_112_fa14lrr        = '079';
+            const $rundownId_104_me80           = '063';
+            const $feedId_105_me80              = '006-02';
+            const $rundownId_105_cfa80          = '026';
 
 
-            const $rundownId_106_fa1299         = '78';
-            const $rundownId_106_fa1499         = '88';
+            const $rundownId_106_fa1299         = '078';
+            const $rundownId_106_fa1499         = '088';
 
-            const $rundownId_econoate665        = '53';
+            const $rundownId_econoate665        = '053';
             const $feedId_econoate665           = '-';
 
 
@@ -2725,6 +2727,23 @@
             /* INITIALIZE */
                 $('.modal').css('overflow-y', 'auto');
                 initialize_page();
+
+            // If admin/super-admin and no plant selected, show the modal
+            @if(Auth::user()->hasRole(['admin', 'super-admin']) && empty($selectedPlant))
+                $('#modal-selectPlant').modal('show');
+            @endif
+
+            $('#confirmPlantSelect').on('click', function() {
+                var selectedPlant = $('#plantSelect').val();
+                if (selectedPlant) {
+                    window.location.href = "{{ route('wipentry.index') }}" + "?plant=" + selectedPlant;
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Please select a plant before continuing',
+                    });
+                }
+            });
 
             /* EVENT LISTENER ON CHANGE */
                 $(document).on('change', $cmb_filterSection, function(){
@@ -3648,7 +3667,8 @@
                     data: {
                         flag: 'get_dtFeed',
                         mode: 'LATEST',
-                        feedId: $feedId
+                        feedId: $feedId,
+                        plant: "{{ $selectedPlant ?? '' }}"
                     }
                 },
                 order: [[ 0, 'asc']],
@@ -3690,7 +3710,8 @@
                     data: {
                         flag: 'get_dtFeed',
                         mode: 'LATEST',
-                        feedId: $feedId
+                        feedId: $feedId,
+                        plant: "{{ $selectedPlant ?? '' }}"
                     }
                 },
                 order: [[ 0, 'asc']],
@@ -3732,7 +3753,8 @@
                     data: {
                         flag: 'get_dtRundown',
                         mode: 'LATEST',
-                        rundownId: $rundownId
+                        rundownId: $rundownId,
+                        plant: "{{ $selectedPlant ?? '' }}"
                     }
                 },
                 order: [[ 0, 'asc']],
