@@ -66,6 +66,7 @@
 
 
     @include('user.setup_adjustment.modals.__adjustmentPeriodUploadExcelModal')
+    @include('modals.__selectPlant')
 
 <!-- SCRIPT -->
 <script>
@@ -101,6 +102,23 @@
             /* INITIALIZE */
                 $('.modal').css('overflow-y', 'auto');
                 initialize_page();
+
+            // If admin/super-admin and no plant selected, show the modal
+            @if(Auth::user()->hasRole(['admin', 'super-admin']) && empty($selectedPlant))
+                $('#modal-selectPlant').modal('show');
+            @endif
+
+            $('#confirmPlantSelect').on('click', function() {
+                var selectedPlant = $('#plantSelect').val();
+                if (selectedPlant) {
+                    window.location.href = "{{ route('adjustment.index') }}" + "?plant=" + selectedPlant;
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Please select a plant before continuing',
+                    });
+                }
+            });
 
             /* EVENT LISTENER ON CLICK */
                 $(document).on('click', $btn_adjustmentAddMatlDoc, function(){
@@ -208,7 +226,8 @@
                 ajax: {
                     url: show_url,
                     data: {
-                        flag: 'get_dtAdjustment'
+                        flag: 'get_dtAdjustment',
+                        plant: "{{ $selectedPlant ?? '' }}"
                     }
                 },
                 order: [[ 0, 'desc']],

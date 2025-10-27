@@ -115,6 +115,7 @@ class Adjustment extends Model
         return $db;
     }
     static function get_dtAdjustment($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $db = DB::select('SELECT a.entry_date, CAST(a.adjust_no AS CHAR) AS adjust_no, CONCAT(b.code, " :: ", b.description) AS material,
@@ -142,12 +143,14 @@ class Adjustment extends Model
                               ON g.id_tank = a.id_tank
                            WHERE a.`status` = 1
                              AND SUBSTRING(a.adjust_no, 1, 1) = 9
+                             AND a.id_plant = ?
                            GROUP BY a.adjust_no
-                           ORDER BY a.entry_date DESC');
+                           ORDER BY a.entry_date DESC', [$idPlant]);
 
         return $db;
     }
     static function get_dtAdjustmentWhx($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $db = DB::select('SELECT a.entry_date, CAST(a.adjust_no AS CHAR) AS adjust_no, CONCAT(b.code, " :: ", b.description) AS material, c.batch_no, c.po_no,
@@ -175,8 +178,9 @@ class Adjustment extends Model
                               ON g.id_warehouse = a.id_tank
                            WHERE a.`status` = 1
                              AND SUBSTRING(a.adjust_no, 1, 1) = 6
+                             AND a.id_plant = ?
                            GROUP BY a.adjust_no
-                           ORDER BY a.entry_date DESC');
+                           ORDER BY a.entry_date DESC', [$idPlant]);
 
         return $db;
     }
@@ -197,11 +201,13 @@ class Adjustment extends Model
 
         return $db;
     }
-    static function get_cmbActiveTank(){
+    static function get_cmbActiveTank($request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
         $db = DB::select('SELECT a.id_tank, a.description AS tank
                             FROM m_tank a
                            WHERE a.status = 1
-                           ORDER BY a.description ASC');
+                           AND a.id_plant = ?
+                           ORDER BY a.description ASC', [$idPlant]);
 
         return $db;
     }
@@ -214,7 +220,8 @@ class Adjustment extends Model
         return $db;
     }
 
-    static function post_storeAdjustment($user, $id_material, $adjustQty, $entryDate, $id_tank){
+    static function post_storeAdjustment($user, $id_material, $adjustQty, $entryDate, $id_tank, $request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         /* CREATE ADJUSTMENT NUMBER */
             $batch_moveType = 9;
@@ -382,6 +389,7 @@ class Adjustment extends Model
                 'id_balance_head' => $idHead,
                 'id_material' => $id_material,
                 'id_tank' => $id_tank,
+                'id_plant' => $idPlant,
                 'in_qty' => $inQty,
                 'out_qty' => 0,
                 'before_adjust' => $beforeAdjust,
@@ -502,6 +510,8 @@ class Adjustment extends Model
                                     'out_qty' => 0,
                                     'before_adjust' => $beforeAdjustDet,
                                     'after_adjust' => $afterAdjustDet,
+                                    'id_tank' => $id_tank,
+                                    'id_plant' => $idPlant,
                                     'created_by' => $user
                                 ]);
                 /* UPDATE BALANCE DETAIL */
@@ -1294,7 +1304,8 @@ class Adjustment extends Model
     }
 
     static function post_adjustmentInit($user, $mode, $idHead, $entry_no, $entry_date, $id_tank, $qty,
-                                        $id_material, $materialDoc){
+                                        $id_material, $materialDoc, $request){
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         /* CEK SUPPLIER ENTRY */
             $dat = DB::select('SELECT id_supplier, qty AS qty_tail, batch_sap
@@ -1330,6 +1341,7 @@ class Adjustment extends Model
                             'qty' => $qty,
                             'in_qty' => $qty,
                             'init_qty' => $qty,
+                            'id_plant' => $idPlant,
                             'created_by' => $user,
                         ]);
             $idTraceHead = DB::table('t_trace_header')->insertGetId([
@@ -1339,6 +1351,7 @@ class Adjustment extends Model
                                 'entry_date' => $entry_date,
                                 'id_sloc' => $id_tank,
                                 'in_qty' => $qty,
+                                'id_plant' => $idPlant,
                                 'created_by' => $user,
                         ]);
 
@@ -1352,6 +1365,7 @@ class Adjustment extends Model
                     'in_qty' => $qty,
                     'before_adjust' => 0,
                     'after_adjust' => $qty,
+                    'id_plant' => $idPlant,
                     'created_by' => $user
                 ]);
 
@@ -1379,6 +1393,8 @@ class Adjustment extends Model
                                         'in_qty' => $qty_tail,
                                         'init_qty' => $qty_tail,
                                         'batch_sap' => $batchSap,
+                                        'id_tank' => $id_tank,
+                                        'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
                     $idTraceTail = DB::table('t_trace_detail')->insertGetId([
@@ -1388,6 +1404,8 @@ class Adjustment extends Model
                                         'id_material' => $id_material,
                                         'batch_sap' => $batchSap,
                                         'in_qty' => $qty_tail,
+                                        'id_sloc' => $id_tank,
+                                        'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
                     $idAdjustTail = DB::table('t_adjustment_detail')->insertGetId([
@@ -1400,6 +1418,8 @@ class Adjustment extends Model
                                         'out_qty' => 0,
                                         'before_adjust' => 0,
                                         'after_adjust' => $qty_tail,
+                                        'id_tank' => $id_tank,
+                                        'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
 
@@ -1925,7 +1945,7 @@ class Adjustment extends Model
                 $adjNo = $datAdjustNo[0]->adj_number;
                 $out = static::initSupplier_periodAdjustment($adjNo, $trfQty, $idMaterial, $user);
                 if ($out[0]->response == 1){
-                    static::post_adjustmentInit($user, 'ADD', $idHead, $adjNo, $entryDate, $trfSource, $trfQty, $idMaterial, null);
+                    static::post_adjustmentInit($user, $request, 'ADD', $idHead, $adjNo, $entryDate, $trfSource, $trfQty, $idMaterial, null);
 
                     /* DO TRANSFER ADJUSTMENT */
                     $out = Transfer::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination);
