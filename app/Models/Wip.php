@@ -741,7 +741,7 @@ class Wip extends Model
 
         if ($section == 9){
           /* GET LATEST FEED TRACE NO */
-          $db = DB::select('SELECT CONCAT(2, SUBSTRING(a.to_trace_no,2,6), ?, LPAD(RIGHT(?, 2), 2, "0"), "01"), SUBSTRING(a.to_trace_no,13,2)) AS rundown_number
+          $db = DB::select('SELECT CONCAT(2, SUBSTRING(a.to_trace_no,2,6), ?, LPAD(RIGHT(?, 2), 2, "0"), SUBSTRING(a.to_trace_no,13,2)) AS rundown_number
                               FROM (SELECT to_trace_no + 1 AS to_trace_no
                                       FROM t_trace_header a
                                      WHERE a.status = 1
@@ -753,7 +753,7 @@ class Wip extends Model
                                     SELECT CONCAT(2, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS rundown_number
                                      LIMIT 1', [$rundownID, $idPlant, $idPlant, $rundownID, $rundownID, $idPlant]);
         } elseif ($section == 8){
-            $db = DB::select('SELECT CONCAT(2, SUBSTRING(a.to_trace_no,2,6), ?, LPAD(RIGHT(?, 2), 2, "0"), "01"), SUBSTRING(a.to_trace_no,13,2)) AS rundown_number
+            $db = DB::select('SELECT CONCAT(2, SUBSTRING(a.to_trace_no,2,6), ?, LPAD(RIGHT(?, 2), 2, "0"), SUBSTRING(a.to_trace_no,13,2)) AS rundown_number
                               FROM (SELECT to_trace_no + 1 AS to_trace_no
                                       FROM t_trace_header a
                                      WHERE a.status = 1
