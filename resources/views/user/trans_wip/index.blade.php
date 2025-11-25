@@ -3656,133 +3656,142 @@
             });
         };
         function ajax_dtCpkoFeed($id, $feedId){
-            $($id).DataTable().destroy();
+            return new Promise((resolve) => {
+                $($id).DataTable().destroy();
 
-            $($id).DataTable({
-                processing: true,
-                serverSide: true,
-                deferRender:true,
-                ajax: {
-                    url: show_url,
-                    data: {
-                        flag: 'get_dtFeed',
-                        mode: 'LATEST',
-                        feedId: $feedId,
-                        plant: "{{ $selectedPlant ?? '' }}"
-                    }
-                },
-                order: [[ 0, 'asc']],
-                responsive: true,
-                searching: false,
-                paging: false,
-                info: false,
-                columnDefs: [{
-                    targets: [3,4], // index of 'balance_supplier' column
-                    createdCell: function(td, cellData, rowData) {
-                        if (rowData.out_qty === rowData.balance_supplier) {
-                            $(td).css('color', 'green');
-                        } else {
-                            $(td).css('color', 'red');
+                $($id).DataTable({
+                    processing: true,
+                    serverSide: true,
+                    deferRender:true,
+                    ajax: {
+                        url: show_url,
+                        data: {
+                            flag: 'get_dtFeed',
+                            mode: 'LATEST',
+                            feedId: $feedId,
+                            plant: "{{ $selectedPlant ?? '' }}"
+                        },
+                        complete: resolve
+                    },
+                    order: [[ 0, 'asc']],
+                    responsive: true,
+                    searching: false,
+                    paging: false,
+                    info: false,
+                    columnDefs: [{
+                        targets: [3,4], // index of 'balance_supplier' column
+                        createdCell: function(td, cellData, rowData) {
+                            if (rowData.out_qty === rowData.balance_supplier) {
+                                $(td).css('color', 'green');
+                            } else {
+                                $(td).css('color', 'red');
+                            }
                         }
-                    }
-                }],
-                columns: [
-                    { data: 'to_trace_no', name: 'to_trace_no', className: 'text-center'},
-                    { data: 'entry_date', name: 'entry_date', className: 'text-center'},
-                    { data: 'material_document', name: 'material_document', className: 'text-center'},
-                    // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
-                    // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
-                    { data: 'out_qty', name: 'out_qty', className: 'text-right'},
-                    { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
-                    { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'}
-                ]
-            });
+                    }],
+                    columns: [
+                        { data: 'to_trace_no', name: 'to_trace_no', className: 'text-center'},
+                        { data: 'entry_date', name: 'entry_date', className: 'text-center'},
+                        { data: 'material_document', name: 'material_document', className: 'text-center'},
+                        // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
+                        // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
+                        { data: 'out_qty', name: 'out_qty', className: 'text-right'},
+                        { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
+                        { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'}
+                    ]
+                });
+            })
         };
         function ajax_dtFeed($id, $feedId){
-            $($id).DataTable().destroy();
+            return new Promise((resolve) => {
+                $($id).DataTable().destroy();
 
-            $($id).DataTable({
-                processing: true,
-                serverSide: true,
-                deferRender:true,
-                ajax: {
-                    url: show_url,
-                    data: {
-                        flag: 'get_dtFeed',
-                        mode: 'LATEST',
-                        feedId: $feedId,
-                        plant: "{{ $selectedPlant ?? '' }}"
-                    }
-                },
-                order: [[ 0, 'asc']],
-                responsive: true,
-                searching: false,
-                paging: false,
-                info: false,
-                columnDefs: [{
-                    targets: [3,4], // index of 'balance_supplier' column
-                    createdCell: function(td, cellData, rowData) {
-                        if (rowData.out_qty === rowData.balance_supplier) {
-                            $(td).css('color', 'green');
-                        } else {
-                            $(td).css('color', 'red');
+                $($id).DataTable({
+                    processing: true,
+                    serverSide: true,
+                    deferRender:true,
+                    ajax: {
+                        url: show_url,
+                        data: {
+                            flag: 'get_dtFeed',
+                            mode: 'LATEST',
+                            feedId: $feedId,
+                            plant: "{{ $selectedPlant ?? '' }}"
+                        },
+                        complete: resolve
+                    },
+                    order: [[ 0, 'asc']],
+                    responsive: true,
+                    searching: false,
+                    paging: false,
+                    info: false,
+                    columnDefs: [{
+                        targets: [3,4], // index of 'balance_supplier' column
+                        createdCell: function(td, cellData, rowData) {
+                            if (rowData.out_qty === rowData.balance_supplier) {
+                                $(td).css('color', 'green');
+                            } else {
+                                $(td).css('color', 'red');
+                            }
                         }
-                    }
-                }],
-                columns: [
-                    { data: 'to_trace_no', name: 'to_trace_no', className: 'text-center'},
-                    { data: 'entry_date', name: 'entry_date', className: 'text-center'},
-                    { data: 'material_document', name: 'material_document', className: 'text-center'},
-                    // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
-                    // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
-                    { data: 'out_qty', name: 'out_qty', className: 'text-right'},
-                    { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
-                    { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'}
-                ]
-            });
+                    }],
+                    columns: [
+                        { data: 'to_trace_no', name: 'to_trace_no', className: 'text-center'},
+                        { data: 'entry_date', name: 'entry_date', className: 'text-center'},
+                        { data: 'material_document', name: 'material_document', className: 'text-center'},
+                        // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
+                        // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
+                        { data: 'out_qty', name: 'out_qty', className: 'text-right'},
+                        { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
+                        { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'}
+                    ]
+                });
+            })
         };
         function ajax_dtRundown($id, $rundownId){
-            $($id).DataTable().destroy();
+            return new Promise((resolve) => {
+                $($id).DataTable().destroy();
 
-            $($id).DataTable({
-                processing: true,
-                serverSide: true,
-                deferRender:true,
-                ajax: {
-                    url: show_url,
-                    data: {
-                        flag: 'get_dtRundown',
-                        mode: 'LATEST',
-                        rundownId: $rundownId,
-                        plant: "{{ $selectedPlant ?? '' }}"
-                    }
-                },
-                order: [[ 0, 'asc']],
-                responsive: true,
-                searching: false,
-                paging: false,
-                info: false,
-                columnDefs: [{
-                    targets: [3,4], // index of 'balance_supplier' column
-                    createdCell: function(td, cellData, rowData) {
-                        if (rowData.in_qty === rowData.balance_supplier) {
-                            $(td).css('color', 'green');
-                        } else {
-                            $(td).css('color', 'red');
+                $($id).DataTable({
+                    processing: true,
+                    serverSide: true,
+                    deferRender:true,
+                    ajax: {
+                        url: show_url,
+                        data: {
+                            flag: 'get_dtRundown',
+                            mode: 'LATEST',
+                            rundownId: $rundownId,
+                            plant: "{{ $selectedPlant ?? '' }}"
+                        },
+                        complete: resolve
+                    },
+                    order: [[ 0, 'asc']],
+                    responsive: true,
+                    searching: false,
+                    paging: false,
+                    info: false,
+                    columnDefs: [{
+                        targets: [3,4], // index of 'balance_supplier' column
+                        createdCell: function(td, cellData, rowData) {
+                            if (rowData.in_qty === rowData.balance_supplier) {
+                                $(td).css('color', 'green');
+                            } else {
+                                $(td).css('color', 'red');
+                            }
                         }
-                    }
-                }],
-                columns: [
-                    { data: 'rundown_trace_no', name: 'rundown_trace_no', className: 'text-center'},
-                    { data: 'entry_date', name: 'entry_date', className: 'text-center'},
-                    { data: 'material_document', name: 'material_document', className: 'text-center'},
-                    // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
-                    // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
-                    { data: 'in_qty', name: 'in_qty', className: 'text-right'},
-                    { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
-                    { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'}
-                ]
-            });
+                    }],
+                    columns: [
+                        { data: 'rundown_trace_no', name: 'rundown_trace_no', className: 'text-center'},
+                        { data: 'entry_date', name: 'entry_date', className: 'text-center'},
+                        { data: 'material_document', name: 'material_document', className: 'text-center'},
+                        // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
+                        // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
+                        { data: 'in_qty', name: 'in_qty', className: 'text-right'},
+                        { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
+                        { data: 'supplier', name: 'supplier', className: 'text-left', width:'35%'}
+                    ]
+                });
+            })
         };
 
 
@@ -3823,61 +3832,61 @@
         }
 
     /* FUNCTION INITIALIZATION */
-        function initialize_page(){
-            ajax_dtRundown($dt_daoilRundown, $rundownId_daoil);
-            ajax_dtRundown($dt_pkfadRundown, $rundownId_pkfad);
-            ajax_dtRundown($dt_crudemeRundown, $rundownId_crudeme);
-            ajax_dtRundown($dt_treatedglyRundown, $rundownId_treatedgly);
-            ajax_dtRundown($dt_crudeglyRundown, $rundownId_crudegly);
-            ajax_dtRundown($dt_glycerineRundown, $rundownId_glycerine);
-            // ajax_dtRundown($dt_me60Rundown, $rundownId_me60);
-            ajax_dtRundown($dt_bdmeRundown, $rundownId_bdme);
-            ajax_dtRundown($dt_umeRundown, $rundownId_ume);
-            ajax_dtRundown($dt_me28Rundown, $rundownId_me28);
-            ajax_dtRundown($dt_wmeRundown, $rundownId_wme);
-            ajax_dtRundown($dt_me28_302Rundown, $rundownId_me28_302);
-            ajax_dtRundown($dt_cfa28Rundown, $rundownId_cfa28);
-            ajax_dtRundown($dt_ecorolwaxRundown, $rundownId_ecorolwax);
-            ajax_dtRundown($dt_lefaRundown, $rundownId_lefa);
-            ajax_dtRundown($dt_fa24Rundown, $rundownId_fa24);
-            ajax_dtRundown($dt_fa16Rundown, $rundownId_fa16);
-            ajax_dtRundown($dt_fa18lrrRundown, $rundownId_fa18lrr);
-            ajax_dtRundown($dt_econoate665_Rundown, $rundownId_econoate665);
-            ajax_dtRundown($dt_me80_104Rundown, $rundownId_104_me80);
+        async function initialize_page(){
+            await ajax_dtCpkoFeed($dt_cpkoFeed, $feedId_cpko);
+            await ajax_dtRundown($dt_daoilRundown, $rundownId_daoil);
+            await ajax_dtRundown($dt_pkfadRundown, $rundownId_pkfad);
+            await ajax_dtFeed($dt_daoilFeed, $feedId_daoil);
+            await ajax_dtRundown($dt_crudemeRundown, $rundownId_crudeme);
+            await ajax_dtRundown($dt_treatedglyRundown, $rundownId_treatedgly);
+            // await ajax_dtRundown($dt_me60Rundown, $rundownId_me60);
+            await ajax_dtFeed($dt_crudemeFeed, $feedId_crudeme);
+            await ajax_dtRundown($dt_bdmeRundown, $rundownId_bdme);
+            await ajax_dtRundown($dt_umeRundown, $rundownId_ume);
+            await ajax_dtRundown($dt_me28Rundown, $rundownId_me28);
+            await ajax_dtRundown($dt_econoate665_Rundown, $rundownId_econoate665);
+            await ajax_dtRundown($dt_me80_104Rundown, $rundownId_104_me80);
+            await ajax_dtRundown($dt_crudeglyRundown, $rundownId_crudegly);
+            await ajax_dtRundown($dt_glycerineRundown, $rundownId_glycerine);
+            await ajax_dtFeed($dt_umeFeed, $feedId_ume);
+            await ajax_dtRundown($dt_wmeRundown, $rundownId_wme);
+            await ajax_dtRundown($dt_me28_302Rundown, $rundownId_me28_302);
+            await ajax_dtRundown($dt_cfa28Rundown, $rundownId_cfa28);
+            await ajax_dtRundown($dt_ecorolwaxRundown, $rundownId_ecorolwax);
+            await ajax_dtRundown($dt_lefaRundown, $rundownId_lefa);
+            await ajax_dtRundown($dt_fa24Rundown, $rundownId_fa24);
+            await ajax_dtRundown($dt_fa16Rundown, $rundownId_fa16);
+            await ajax_dtRundown($dt_fa18lrrRundown, $rundownId_fa18lrr);
 
-            ajax_dtCpkoFeed($dt_cpkoFeed, $feedId_cpko);
-            ajax_dtFeed($dt_daoilFeed, $feedId_daoil);
-            ajax_dtFeed($dt_treatedglyFeed, $feedId_treatedgly);
-            ajax_dtFeed($dt_crudeglyFeed, $feedId_crudegly);
-            ajax_dtFeed($dt_crudemeFeed, $feedId_crudeme);
-            ajax_dtFeed($dt_umeFeed, $feedId_ume);
-            ajax_dtFeed($dt_me28Feed, $feedId_me28);
-            ajax_dtFeed($dt_cfa28Feed, $feedId_cfa28);
+            await ajax_dtFeed($dt_treatedglyFeed, $feedId_treatedgly);
+            await ajax_dtFeed($dt_crudeglyFeed, $feedId_crudegly);
+            await ajax_dtFeed($dt_me28Feed, $feedId_me28);
+            await ajax_dtFeed($dt_cfa28Feed, $feedId_cfa28);
 
-            ajax_dtFeed($dt_112fa24_Feed, $feedId_112_fa24);
-            ajax_dtRundown($dt_112cfa28_Rundown, $rundownId_112_cfa28);
-            ajax_dtRundown($dt_112fa1299_Rundown, $rundownId_112_fa12);
-            ajax_dtRundown($dt_112fa14lrr_Rundown, $rundownId_112_fa14lrr);
+            await ajax_dtFeed($dt_112fa24_Feed, $feedId_112_fa24);
+            await ajax_dtRundown($dt_112cfa28_Rundown, $rundownId_112_cfa28);
+            await ajax_dtRundown($dt_112fa1299_Rundown, $rundownId_112_fa12);
+            await ajax_dtRundown($dt_112fa14lrr_Rundown, $rundownId_112_fa14lrr);
 
-            ajax_dtFeed($dt_112fa14lrr_m2_Feed, $feedId_112_fa14lrr);
-            ajax_dtRundown($dt_112cfa28_m2_Rundown, $rundownId_112_cfa28);
-            ajax_dtRundown($dt_112fa1499_m2_Rundown, $rundownId_112_fa14);
+            await ajax_dtFeed($dt_112fa14lrr_m2_Feed, $feedId_112_fa14lrr);
+            await ajax_dtRundown($dt_112cfa28_m2_Rundown, $rundownId_112_cfa28);
+            await ajax_dtRundown($dt_112fa1499_m2_Rundown, $rundownId_112_fa14);
 
-            ajax_dtFeed($dt_112fa18lrr_m4_Feed, $feedId_112_fa18lrr);
-            ajax_dtRundown($dt_112cfa28_m4_Rundown, $rundownId_112_cfa28);
-            ajax_dtRundown($dt_112fa1899_m4_Rundown, $rundownId_112_fa18);
-            ajax_dtRundown($dt_112ecowax_m4_Rundown, $rundownId_112_ecowax);
+            await ajax_dtFeed($dt_112fa18lrr_m4_Feed, $feedId_112_fa18lrr);
+            await ajax_dtRundown($dt_112cfa28_m4_Rundown, $rundownId_112_cfa28);
+            await ajax_dtRundown($dt_112fa1899_m4_Rundown, $rundownId_112_fa18);
+            await ajax_dtRundown($dt_112ecowax_m4_Rundown, $rundownId_112_ecowax);
 
-            ajax_dtFeed($dt_112ecowax_m3_Feed, $feedId_112_ecowax);
-            ajax_dtRundown($dt_112cfa28_m3_Rundown, $rundownId_112_cfa28);
-            ajax_dtRundown($dt_112fa18lrr_m3_Rundown, $rundownId_112_fa18lrr);
-            ajax_dtRundown($dt_112ecowax_m3_Rundown, $rundownId_112_ecowax);
+            await ajax_dtFeed($dt_112ecowax_m3_Feed, $feedId_112_ecowax);
+            await ajax_dtRundown($dt_112cfa28_m3_Rundown, $rundownId_112_cfa28);
+            await ajax_dtRundown($dt_112fa18lrr_m3_Rundown, $rundownId_112_fa18lrr);
+            await ajax_dtRundown($dt_112ecowax_m3_Rundown, $rundownId_112_ecowax);
 
-            ajax_dtRundown($dt_106_fa1299_m2_Rundown, $rundownId_106_fa1299);
-            ajax_dtRundown($dt_106_fa1499_m2_Rundown, $rundownId_106_fa1499);
+            await ajax_dtRundown($dt_106_fa1299_m2_Rundown, $rundownId_106_fa1299);
+            await ajax_dtRundown($dt_106_fa1499_m2_Rundown, $rundownId_106_fa1499);
 
-            ajax_dtFeed($dt_me80Feed, $feedId_105_me80);
-            ajax_dtRundown($dt_cfa80_105Rundown, $rundownId_105_cfa80);
+            await ajax_dtFeed($dt_me80Feed, $feedId_105_me80);
+            await ajax_dtRundown($dt_cfa80_105Rundown, $rundownId_105_cfa80);
 
             //populate_hideAllSectionCard();
             //$($card_section106).show();
