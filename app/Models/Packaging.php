@@ -567,12 +567,6 @@ class Packaging extends Model
 
                         $new_tail_total_out_qty = $outQtyTail + $qtyWhTail;
 
-                        // Rounding
-                        $outQtyTail = round($outQtyTail, 4);
-                        $initQtyTail = round($initQtyTail, 4);
-                        $qtyTail = round($qtyTail, 4);
-                        $new_tail_total_out_qty = round($new_tail_total_out_qty, 4);
-
                         $tailBalanceAfter = $qtyTail - $qtyWhTail;
 
                         if ($tailBalanceAfter < 0){
@@ -585,6 +579,12 @@ class Packaging extends Model
 
                             $new_tail_balance = $qtyTail - $qtyWhTail;
                         }
+
+                        $outQtyTail = round($outQtyTail, 4);
+                        $initQtyTail = round($initQtyTail, 4);
+                        $qtyTail = round($qtyTail, 4);
+                        $new_tail_total_out_qty = round($new_tail_total_out_qty, 4);
+                        $new_tail_balance = round($new_tail_balance, 4);
 
                         /* POPULATE NEW BALANCE DETAIL */
                             DB::update('UPDATE t_balance_detail
@@ -639,6 +639,40 @@ class Packaging extends Model
                             $qtyWhTail = $leftOver_qtyWhTail;
                     }
 
+                    //  ADJUST SUPPLIER FEED QTY TOTAL
+                    $details = DB::select('SELECT d.id_balance_tail, t.id_trace_tail, d.qty, d.out_qty, d.init_qty
+                                            FROM t_balance_detail d
+                                            JOIN t_trace_detail t ON t.id_balance_tail = d.id_balance_tail
+                                            WHERE d.id_balance_head = ?
+                                            ORDER BY d.id_balance_tail ASC', [$idHead]);
+
+                    if (!empty($details)) {
+                        // Prepare array for adjustQtyToTotal
+                        $dataPerHead = [array_map(function ($d) {
+                            return ['qty' => (string)$d->out_qty];
+                        }, $details)];
+
+                        // Total outgoing qty must match the packaging qtyWh (the consumed qty)
+                        $targetTotal = $qtyWh;
+
+                        adjustQtyToTotal($dataPerHead, $targetTotal);
+
+                        // Write adjusted values back
+                        foreach ($details as $i => $d) {
+                            $newQty = $dataPerHead[0][$i]['qty'];
+
+                          // Update new proportional OUT for supplier batch
+                          DB::update('UPDATE t_balance_detail
+                                      SET out_qty = ?
+                                      WHERE id_balance_tail = ?', [$newQty, $d->id_balance_tail]);
+
+                          // Update trace detail
+                          DB::update('UPDATE t_trace_detail
+                                      SET out_qty = ?
+                                      WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
+                        }
+                    }
+
                 /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
                     if ($balanceAfter >= 0){
                         break;
@@ -685,4 +719,37 @@ class Packaging extends Model
 
     }
 
+}
+
+function adjustQtyToTotal(&$dataPerHead, $targetTotal) {
+  // Step 1: Calculate the initial total
+  $total = '0';
+  foreach ($dataPerHead as $head) {
+      foreach ($head as $item) {
+          $total = bcadd($total, (string)$item['qty'], 10);
+      }
+  }
+
+  if (bccomp($total, '0', 10) == 0) {
+      return; // No need to adjust if the total is 0
+  }
+
+  // Step 2: Calculate factor
+  $factor = bcdiv((string)$targetTotal, $total, 10);
+
+  // Step 3: Multiply everything and save the delta
+  $newTotal = '0';
+  $lastHeadKey = array_key_last($dataPerHead);
+  $lastItemKey = array_key_last($dataPerHead[$lastHeadKey]);
+
+  foreach ($dataPerHead as $headKey => &$headItems) {
+      foreach ($headItems as $itemKey => &$item) {
+          $item['qty'] = round(bcmul((string)$item['qty'], $factor, 10), 4);
+          $newTotal = bcadd($newTotal, (string)$item['qty'], 10);
+      }
+  }
+
+  // Step 4: Adjust the difference to the last item
+  $delta = round((float)bcsub((string)$targetTotal, $newTotal, 10), 4);
+  $dataPerHead[$lastHeadKey][$lastItemKey]['qty'] += $delta;
 }
