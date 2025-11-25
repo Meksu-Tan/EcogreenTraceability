@@ -432,14 +432,6 @@ class Transfer extends Model
                                     $new_tail_total_in_qty = $tail_total_in_qty;
                                     $new_tail_total_out_qty = $tail_total_out_qty + $tail_out_qty;
 
-                                    // Rounding
-                                    $tail_out_qty = round($tail_out_qty, 4);
-                                    $tail_total_in_qty = round($tail_total_in_qty, 4);
-                                    $tail_total_out_qty = round($tail_total_out_qty, 4);
-                                    $tail_qty = round($tail_qty, 4);
-                                    $new_tail_total_in_qty = round($new_tail_total_in_qty, 4);
-                                    $new_tail_total_out_qty = round($new_tail_total_out_qty, 4);
-
                                     $tailBalanceAfter = $tail_qty - $tail_out_qty;
                                     if ($tailBalanceAfter < 0){
                                         $new_tail_balance = 0;
@@ -449,6 +441,14 @@ class Transfer extends Model
                                     } else {
                                         $new_tail_balance = $tail_qty - $tail_out_qty;
                                     }
+
+                                    $tail_out_qty = round($tail_out_qty, 4);
+                                    $tail_total_in_qty = round($tail_total_in_qty, 4);
+                                    $tail_total_out_qty = round($tail_total_out_qty, 4);
+                                    $tail_qty = round($tail_qty, 4);
+                                    $new_tail_balance = round($new_tail_balance, 4);
+                                    $new_tail_total_in_qty = round($new_tail_total_in_qty, 4);
+                                    $new_tail_total_out_qty = round($new_tail_total_out_qty, 4);
 
                                     /* POPULATE NEW BALANCE DETAIL */
                                         DB::update('UPDATE t_balance_detail
@@ -660,6 +660,7 @@ class Transfer extends Model
 
                                             } else {
                                                 $newInQtyTail = $inQtyTail + $rundownSupplier;
+                                                $newInQtyTail = round($newInQtyTail, 4); 
                                                 DB::update('UPDATE t_balance_detail
                                                                SET qty = ?,
                                                                    in_qty = ?,
@@ -686,6 +687,35 @@ class Transfer extends Model
                                     }
 
                         }
+
+        // Fetch all supplier quantities
+        $details = DB::select('SELECT d.id_balance_tail, t.id_trace_tail, d.qty, d.in_qty, d.init_qty 
+                               FROM t_balance_detail d
+                               JOIN t_trace_detail t ON t.id_balance_tail = d.id_balance_tail
+                               WHERE d.id_balance_head = ? 
+                               ORDER BY d.id_balance_tail ASC', [$idHead]);
+
+        if (!empty($details)) {
+            // Convert to a nested array
+            $dataPerHead = [array_map(function ($d) {
+                return ['qty' => $d->qty];
+            }, $details)];
+
+            // Adjust supplier quantities proportionally so total matches header
+            adjustQtyToTotal($dataPerHead, $in_qty);
+
+            // Update DB with adjusted values
+            foreach ($details as $i => $d) {
+                $newQty = $dataPerHead[0][$i]['qty'];
+                DB::update('UPDATE t_balance_detail
+                            SET qty = ?, in_qty = ?, init_qty = ?
+                            WHERE id_balance_tail = ?', [$newQty, $newQty, $newQty, $d->id_balance_tail]);
+
+                DB::update('UPDATE t_trace_detail
+                            SET in_qty = ?
+                            WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
+            }
+        }
 
         /* THROW OUTPUT */
         $db = [ (object)['response' => 1 ]];
@@ -938,3 +968,36 @@ class Transfer extends Model
         return $db;
     }
 }
+
+function adjustQtyToTotal(&$dataPerHead, $targetTotal) {
+    // Step 1: Calculate the initial total
+    $total = '0';
+    foreach ($dataPerHead as $head) {
+        foreach ($head as $item) {
+            $total = bcadd($total, (string)$item['qty'], 10);
+        }
+    }
+  
+    if (bccomp($total, '0', 10) == 0) {
+        return; // No need to adjust if the total is 0
+    }
+  
+    // Step 2: Calculate factor
+    $factor = bcdiv((string)$targetTotal, $total, 10);
+  
+    // Step 3: Multiply everything and save the delta
+    $newTotal = '0';
+    $lastHeadKey = array_key_last($dataPerHead);
+    $lastItemKey = array_key_last($dataPerHead[$lastHeadKey]);
+  
+    foreach ($dataPerHead as $headKey => &$headItems) {
+        foreach ($headItems as $itemKey => &$item) {
+            $item['qty'] = round(bcmul((string)$item['qty'], $factor, 10), 4);
+            $newTotal = bcadd($newTotal, (string)$item['qty'], 10);
+        }
+    }
+  
+    // Step 4: Adjust the difference to the last item
+    $delta = round((float)bcsub((string)$targetTotal, $newTotal, 10), 4);
+    $dataPerHead[$lastHeadKey][$lastItemKey]['qty'] += $delta;
+  }
