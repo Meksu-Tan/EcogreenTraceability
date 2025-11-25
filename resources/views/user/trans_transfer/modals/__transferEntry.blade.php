@@ -60,8 +60,21 @@
                                                 <label for="name">Trf Type (-Trf ALL- only for TRF non-EOB1 to Adjust OUT)</label>
                                                 <select name="trf_type" id="form-transferEntry-trfType" style="width: 100%;" class="form-control" required>
                                                     <option value="-">- Select Trf -</option>
-                                                    <option value="in">- Trf IN to EOB1 -</option>
-                                                    <option value="out">- Trf OUT from EOB1 -</option>
+                                                 
+                                                    @if($idPlant == "1002")
+                                                        <option value="in">- Trf IN to EOB1 -</option>
+                                                        <option value="out">- Trf OUT from EOB1 -</option>
+                                                    @elseif($idPlant == "1003")
+                                                        <option value="in">- Trf IN to EOB2 -</option>
+                                                        <option value="out">- Trf OUT from EOB2 -</option>
+                                                    @elseif($idPlant == "1007")
+                                                        <option value="in">- Trf IN to EOB3 -</option>
+                                                        <option value="out">- Trf OUT from EOB3 -</option>
+                                                    @else
+                                                        <option value="in">- Trf IN to EOMB -</option>
+                                                        <option value="out">- Trf OUT from EOMB -</option>
+                                                    @endif
+
                                                     <option value="all">- Trf ALL -</option>
                                                 </select>
                                             </div>
@@ -158,41 +171,39 @@
                     $idSupplier = $($form_transferEntry_idSupplier).val();
                     $trfType = $($form_transferEntry_transferType).val();
 
-                    if ($idSupplier == 0){
-                        if ($trfType == 'in'){
-                            Swal.fire({
-                                position: 'top-end',
-                                icon: 'warning',
-                                title: 'Supplier Code!',
-                                showConfirmButton: false,
-                                timer: 1000
-                            });
-                            return;
-                        } else if ($trf_type == 'out'){
-                            if ($($form_transferEntry_stockQtyDest).val() != 0){
-                                if ($($form_transferEntry_destination).val() != 10){
-                                    Swal.fire({
-                                        position: 'top-end',
-                                        icon: 'warning',
-                                        title: 'Stock Sloc Destination not zero!',
-                                        showConfirmButton: false,
-                                        timer: 1000
-                                    });
-                                    return;
-                                }
+                    if ($trfType == 'in' && $idSupplier != 0){
+                        Swal.fire({
+                            position: 'top-end',
+                            icon: 'warning',
+                            title: 'Supplier Code!',
+                            showConfirmButton: false,
+                            timer: 1000
+                        });
+                        return;
+                    } else if ($trf_type == 'out'){
+                        if ($($form_transferEntry_stockQtyDest).val() != 0){
+                            if ($($form_transferEntry_destination).val() != 10){
+                                Swal.fire({
+                                    position: 'top-end',
+                                    icon: 'warning',
+                                    title: 'Stock Sloc Destination not zero!',
+                                    showConfirmButton: false,
+                                    timer: 1000
+                                });
+                                return;
                             }
-                        } else if ($trf_type == 'all'){
-                            if ($($form_transferEntry_stockQtyDest).val() != 0){
-                                if ($($form_transferEntry_destination).val() != 10){
-                                    Swal.fire({
-                                        position: 'top-end',
-                                        icon: 'warning',
-                                        title: 'Stock Sloc Destination not zero!',
-                                        showConfirmButton: false,
-                                        timer: 1000
-                                    });
-                                    return;
-                                }
+                        }
+                    } else if ($trf_type == 'all'){
+                        if ($($form_transferEntry_stockQtyDest).val() != 0){
+                            if ($($form_transferEntry_destination).val() != 10){
+                                Swal.fire({
+                                    position: 'top-end',
+                                    icon: 'warning',
+                                    title: 'Stock Sloc Destination not zero!',
+                                    showConfirmButton: false,
+                                    timer: 1000
+                                });
+                                return;
                             }
                         }
                     }

@@ -66,6 +66,7 @@ class TransferController extends Controller
 
             $data['plants'] = $plants;
             $data['selectedPlant'] = $selectedPlant;
+            $data['idPlant'] = $selectedPlant;
 
             return view('user.trans_transfer.index', $data);
         }
@@ -78,6 +79,7 @@ class TransferController extends Controller
 
         $data['plants'] = $userPlant ? [$userPlant] : [];
         $data['selectedPlant'] = $userPlant ? $userPlant->code_3 : null;
+        $data['idPlant'] = $data['selectedPlant'];
         
         return view('user.trans_transfer.index', $data);
     }
@@ -134,7 +136,7 @@ class TransferController extends Controller
                             if (in_array($trfSource, [7, 8, 9, 12, 13])) {
                                 /* AUTO STOCK IN SOURCE SLOC */
                                 $idHead = null;
-                                $entryAdjNo_dat = AD::get_adjNewEntryNumber();
+                                $entryAdjNo_dat = AD::get_adjNewEntryNumber($entryDate, $request);
                                 $entryAdjNo = $entryAdjNo_dat[0]->adj_number;
                                 /* ENTRY TO t_balance_temporary */
                                 TRF::post_adjEntrySupplier($user, $entryAdjNo, $idSupplier, $idMaterial, $trfQty, $supplierCode, $request);
