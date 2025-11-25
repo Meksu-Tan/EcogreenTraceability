@@ -1094,80 +1094,50 @@ class Wip extends Model
                                                             ' / OUT_QTY: ' . $total_out_qty . ' >>> ' . $new_total_out_qty .
                                                             ' | Status: 1', $user ]);
 
-                    /* ROUTING FOR DETAIL PER SUPPLIER */
-                        /* GET ID_BALANCE_DETAIL */
-                            for ($k = 0; $k < $lenTail; $k++) {
-                                $idTail = $datTail[$k]->id_balance_tail;
-                                $idSupplier = $datTail[$k]->id_supplier;
-                                $tail_qty = $datTail[$k]->qty;
-                                $tail_total_in_qty = $datTail[$k]->in_qty;
-                                $tail_total_out_qty = $datTail[$k]->out_qty;
-                                $tail_init_qty = $datTail[$k]->init_qty;
-                                $batch_sap = $datTail[$k]->batch_sap;
 
-                                $new_tail_total_in_qty = $tail_total_in_qty;
-                                $new_tail_total_out_qty = $tail_total_out_qty + $tail_out_qty;
+                        $dataPerHead = [];
 
-                                // Rounding
-                                $tail_out_qty = round($tail_out_qty, 4);
-                                $tail_total_in_qty = round($tail_total_in_qty, 4);
-                                $tail_total_out_qty = round($tail_total_out_qty, 4);
-                                $tail_qty = round($tail_qty, 4);
-                                $new_tail_total_in_qty = round($new_tail_total_in_qty,4);
-                                $new_tail_total_out_qty = round($new_tail_total_out_qty, 4);
-                                $tailBalanceAfter = $tail_qty - $tail_out_qty;
+                        foreach ($datTail as $k => $tail) {
+                            $dataPerHead[$i][$k] = [
+                                'idTail'          => $tail->id_balance_tail,
+                                'qty'             => $tail->qty,
+                                'out'             => $tail_out_qty,   // original requested out
+                                'rundownSupplier' => $tail_out_qty    // will be adjusted
+                            ];
+                        }
 
-                                if ($tailBalanceAfter < 0){
-                                    $new_tail_balance = 0;
-                                    $new_tail_total_out_qty = $tail_init_qty;
-                                    $temp_tail_out_qty = $tail_out_qty - $tail_qty;
-                                    $tail_out_qty = $tail_qty;
-                                } else {
-                                    $new_tail_balance = $tail_qty - $tail_out_qty;
-                                }
+                        adjustRundownToTotal($dataPerHead, $out_qty);
 
-                                /* POPULATE NEW BALANCE DETAIL */
-                                    DB::update('UPDATE t_balance_detail
-                                                SET qty = ?,
-                                                    in_qty = ?,
-                                                    out_qty = ?,
-                                                    updated_by = ?
-                                                WHERE id_balance_tail = ?',
-                                                [$new_tail_balance, $new_tail_total_in_qty, $new_tail_total_out_qty, $user, $idTail]);
+                        foreach ($dataPerHead[$i] as $k => $item) {
+                            $tail               = $datTail[$k];
+                            $idTail             = $item['idTail'];
+                            $supplierRundown    = $item['rundownSupplier'];
+                            $new_tail_balance   = $tail->qty - $supplierRundown;
+                            $new_tail_total_out = $tail->out_qty + $supplierRundown;
 
-                                /* POPULATE TRACE DETAIL */
-                                    $idTraceTail = DB::table('t_trace_detail')->insertGetId([
-                                            'id_trace_head' => $idTraceHead,
-                                            'id_balance_tail' => $idTail,
-                                            'id_supplier' => $idSupplier,
-                                            'id_material' => $id_material,
-                                            'out_qty' => $tail_out_qty,
-                                            'batch_sap' => $batch_sap,
-                                            'created_by' => $user,
-                                            'id_sloc' => $id_tank,
-                                            'id_plant' => $idPlant,
-                                    ]);
+                            /* UPDATE T_BALANCE_DETAIL */
+                            DB::update('UPDATE t_balance_detail
+                                        SET qty = ?, out_qty = ?, updated_by = ?
+                                        WHERE id_balance_tail = ?', [round($new_tail_balance, 4), round($new_tail_total_out, 4), $user, $idTail]);
 
-                                /* DETAIL LOGGING */
-                                    DB::insert('INSERT INTO log_transactions
-                                                    (log_module, log_type, log_description, created_by)
-                                            VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'UPDATE BALANCE', ' IDTAIL: ' . $idTail .
-                                                                    ' / SUPPLIER: ' . $idSupplier . ' / MATERIAL: ' . $id_material .
-                                                                    ' / QTY: ' . $tail_qty . ' >>> ' . $new_tail_balance .
-                                                                    ' / IN_QTY: ' . $tail_total_in_qty . ' >>> ' . $new_tail_total_in_qty .
-                                                                    ' / OUT_QTY: ' . $tail_total_out_qty . ' >>> ' . $new_tail_total_out_qty .
-                                                                    ' | Status: 1', $user ]);
+                            /* INSERT TRACE DETAIL */
+                            DB::table('t_trace_detail')->insert([
+                                'id_trace_head'  => $idTraceHead,
+                                'id_balance_tail'=> $idTail,
+                                'id_supplier'    => $tail->id_supplier,
+                                'id_material'    => $id_material,
+                                'out_qty'        => round($supplierRundown, 4),
+                                'batch_sap'      => $tail->batch_sap,
+                                'created_by'     => $user,
+                                'id_sloc'        => $id_tank,
+                                'id_plant'       => $idPlant,
+                            ]);
 
-                                /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
-                                    if ($tailBalanceAfter >= 0){
-                                        break;
-                                    }
-
-                                /* ROUTING FOR USING NEXT BATCH BALANCE RESERVE */
-                                    $tail_out_qty = $temp_tail_out_qty;
-
-
-                            }
+                        /* IF THIS SUPPLIER CAN COVER FEED → STOP */
+                        if ($new_tail_balance > 0) {
+                            break;
+                        }
+                    }
 
                     /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
                         if ($balanceAfter >= 0){
@@ -1444,6 +1414,7 @@ class Wip extends Model
                         $inQtyTail = $existing[0]->in_qty;
 
                         $newInQtyTail = $inQtyTail + $rundownSupplier;
+                        $newInQtyTail = round($newInQtyTail, 4); 
 
                         DB::update('UPDATE t_balance_detail SET qty = ?, in_qty = ?, init_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
                             [$newInQtyTail, $newInQtyTail, $newInQtyTail, $user, $idTail]);
@@ -1910,36 +1881,54 @@ class Wip extends Model
 
 }
 
+    function normalizeNumber($num) {
+        if ($num === null) return "0";
+
+        $numStr = (string)$num;
+
+        if (stripos($numStr, 'e') !== false) {
+            $numStr = sprintf('%.14F', (float)$numStr);
+        }
+
+        return $numStr;
+    }
+
     function adjustRundownToTotal(&$dataPerHead, $targetTotal) {
-        // Step 1: Hitung total awal
-        $total = 0;
+        $targetTotal = normalizeNumber($targetTotal);
+        // Step 1: Hitung total awal/Calculate the initial total
+        $total = '0';
         foreach ($dataPerHead as $head) {
             foreach ($head as $item) {
-                $total += $item['rundownSupplier'];
+                $value = normalizeNumber($item['rundownSupplier']);
+                $total = bcadd($total, $value, 10);
             }
         }
 
-        if ($total == 0) {
-            return; // Tidak perlu adjust kalau total 0
+        if (bccomp($total, '0', 10) == 0) {
+            return; // Tidak perlu adjust kalau total 0/No need to adjust if the total is 0
         }
 
-        // Step 2: Hitung faktor
-        $factor = $targetTotal / $total;
+        // Step 2: Hitung faktor/Calculate factor
+        $factor = bcdiv($targetTotal, $total, 10);
 
-        // Step 3: Kalikan semua dan simpan delta
-        $newTotal = 0;
+        // Step 3: Kalikan semua dan simpan delta/Multiply everything and save the delta
+        $newTotal = '0';
         $lastHeadKey = array_key_last($dataPerHead);
         $lastItemKey = array_key_last($dataPerHead[$lastHeadKey]);
 
         foreach ($dataPerHead as $headKey => &$headItems) {
             foreach ($headItems as $itemKey => &$item) {
-                $item['rundownSupplier'] = round($item['rundownSupplier'] * $factor, 4);
-                $newTotal += $item['rundownSupplier'];
+                $current = normalizeNumber($item['rundownSupplier']);
+                $adjusted = bcmul($current, $factor, 10);
+                $adjusted = round($adjusted, 4);
+                $item['rundownSupplier'] = $adjusted;
+                $newTotal = bcadd($newTotal, normalizeNumber($adjusted), 10);
             }
         }
 
-        // Step 4: Koreksi selisih ke item terakhir
-        $delta = round($targetTotal - $newTotal, 4);
+        // Step 4: Koreksi selisih ke item terakhir/Adjust the difference to the last item
+        $delta = bcsub($targetTotal, $newTotal, 10);
+        $delta = round((float)$delta, 4);
         $dataPerHead[$lastHeadKey][$lastItemKey]['rundownSupplier'] += $delta;
     }
 
