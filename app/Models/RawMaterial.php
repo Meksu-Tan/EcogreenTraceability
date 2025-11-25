@@ -782,6 +782,35 @@ class RawMaterial extends Model
                                                         ' | Status: 1', $user ]);
                 }
 
+                // Adjust supplier qty to match header total
+                $details = DB::select('SELECT d.id_balance_tail, t.id_trace_tail, d.qty, d.in_qty, d.init_qty 
+                                        FROM t_balance_detail d
+                                        JOIN t_trace_detail t ON t.id_balance_tail = d.id_balance_tail
+                                        WHERE d.id_balance_head = ? 
+                                        ORDER BY d.id_balance_tail ASC', [$idHead]);
+
+                if (!empty($details)) {
+                    // Convert to a nested array
+                    $dataPerHead = [array_map(function ($d) {
+                        return ['qty' => $d->qty];
+                    }, $details)];
+
+                    // Adjust supplier quantities proportionally so total matches header
+                    adjustQtyToTotal($dataPerHead, $qty);
+
+                    // Update DB with adjusted values
+                    foreach ($details as $i => $d) {
+                        $newQty = $dataPerHead[0][$i]['qty'];
+                        DB::update('UPDATE t_balance_detail
+                                    SET qty = ?, in_qty = ?, init_qty = ?
+                                    WHERE id_balance_tail = ?', [$newQty, $newQty, $newQty, $d->id_balance_tail]);
+
+                        DB::update('UPDATE t_trace_detail
+                                    SET in_qty = ?
+                                    WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
+                    }
+                }
+
                 DB::delete('DELETE FROM t_balance_temporary
                             WHERE entry_no = ?', [$entry_no]);
 
@@ -1121,6 +1150,36 @@ class RawMaterial extends Model
 
                                 }
 
+                                $details = DB::select('SELECT d.id_balance_tail, t.id_trace_tail, d.qty, d.in_qty, d.init_qty 
+                                                        FROM t_balance_detail d
+                                                        JOIN t_trace_detail t ON t.id_balance_tail = d.id_balance_tail
+                                                        WHERE d.id_balance_head = ? 
+                                                        ORDER BY d.id_balance_tail ASC', [$idHead]);
+
+                                if (!empty($details)) {
+                                    $dataPerHead = [array_map(function ($d) {
+                                        return ['qty' => (string)$d->qty];
+                                    }, $details)];
+                                    
+                                    $targetTotal = $new_balance;
+
+                                    // Adjust detail qty so total equals header qty
+                                    adjustQtyToTotal($dataPerHead, $targetTotal);
+                                    
+                                    foreach ($details as $i => $d) {
+                                        $newQty = $dataPerHead[0][$i]['qty'];
+
+                                        DB::update('UPDATE t_balance_detail
+                                                    SET qty = ?
+                                                    WHERE id_balance_tail = ?', [$newQty, $d->id_balance_tail]);
+
+                                        DB::update('UPDATE t_trace_detail
+                                                    SET out_qty = ?
+                                                    WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
+                                    }
+                                }
+
+
                         /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
                             if ($balanceAfter >= 0){
                                 $db = [ (object)['response' => 1 ]];
@@ -1307,4 +1366,37 @@ class RawMaterial extends Model
         return $db;
     }
 
+}
+
+function adjustQtyToTotal(&$dataPerHead, $targetTotal) {
+    // Step 1: Calculate the initial total
+    $total = '0';
+    foreach ($dataPerHead as $head) {
+        foreach ($head as $item) {
+            $total = bcadd($total, (string)$item['qty'], 10);
+        }
+    }
+
+    if (bccomp($total, '0', 10) == 0) {
+        return; // No need to adjust if the total is 0
+    }
+
+    // Step 2: Calculate factor
+    $factor = bcdiv((string)$targetTotal, $total, 10);
+
+    // Step 3: Multiply everything and save the delta
+    $newTotal = '0';
+    $lastHeadKey = array_key_last($dataPerHead);
+    $lastItemKey = array_key_last($dataPerHead[$lastHeadKey]);
+
+    foreach ($dataPerHead as $headKey => &$headItems) {
+        foreach ($headItems as $itemKey => &$item) {
+            $item['qty'] = round(bcmul((string)$item['qty'], $factor, 10), 4);
+            $newTotal = bcadd($newTotal, (string)$item['qty'], 10);
+        }
+    }
+
+    // Step 4: Adjust the difference to the last item
+    $delta = round((float)bcsub((string)$targetTotal, $newTotal, 10), 4);
+    $dataPerHead[$lastHeadKey][$lastItemKey]['qty'] += $delta;
 }
