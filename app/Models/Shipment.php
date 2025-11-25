@@ -554,6 +554,60 @@ class Shipment extends Model
                                 $qtyWhTail = $leftOver_qtyWhTail;
                         }
 
+                        $supplierAdjustList = [];
+
+                        foreach ($datTail as $k => $tl) {
+                            // Get what was consumed from this tail
+                            $consumed = DB::select('SELECT out_qty FROM t_trace_detail
+                                                    WHERE id_trace_head = ?
+                                                    AND id_balance_tail = ?
+                                                    ORDER BY id_trace_tail DESC
+                                                    LIMIT 1', [$idTraceHead, $tl->id_whx_tail]);
+
+                            if (!empty($consumed) && (float)$consumed[0]->out_qty > 0) {
+                                $supplierAdjustList[] = [
+                                    'id_tail'        => $tl->id_whx_tail,
+                                    'id_supplier'    => $tl->id_supplier,
+                                    'batch_sap'      => $tl->batch_sap,
+                                    'id_trace_tail'  => null,
+                                    'qty'            => (float)$consumed[0]->out_qty,
+                                ];
+                            }
+                        }
+
+                        if (count($supplierAdjustList) > 1) {
+                            $tempData = [ array_map(function ($x) {
+                                return ['qty' => $x['qty']];
+                            }, $supplierAdjustList) ];
+
+                            // Make total equal the requested $out_qty
+                            adjustQtyToTotal($tempData, $out_qty);
+
+                            // Apply corrected values
+                            foreach ($supplierAdjustList as $i => $row) {
+                                $newQty = $tempData[0][$i]['qty'];
+
+                                /* Update warehouse tail */
+                                DB::update('UPDATE t_warehouse_detail
+                                            SET qty = init_qty - ?, out_qty = ?
+                                            WHERE id_whx_tail = ?', [$newQty, $newQty, $row['id_tail']]);
+
+                                /* Update trace detail */
+                                DB::update('UPDATE t_trace_detail
+                                            SET out_qty = ?
+                                            WHERE id_trace_head = ?
+                                            AND id_balance_tail = ?', [$newQty, $idTraceHead, $row['id_tail']]);
+
+                                /* Update shipment detail */
+                                DB::update('UPDATE t_shipment_detail
+                                            SET qty = ?
+                                            WHERE id_ship_head = ?
+                                            AND id_material_fg = ?
+                                            AND id_supplier = ?
+                                            AND batch_sap = ?', [$newQty, $idShipHead, $idMaterial, $row['id_supplier'], $row['batch_sap']]);
+                            }
+                        }
+
                     /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
                         if ($balanceAfter >= 0){
                             $db = [ (object)['response' => 1 ]];
@@ -664,3 +718,36 @@ class Shipment extends Model
         return $db;
     }
 }
+
+function adjustQtyToTotal(&$dataPerHead, $targetTotal) {
+    // Step 1: Calculate the initial total
+    $total = '0';
+    foreach ($dataPerHead as $head) {
+        foreach ($head as $item) {
+            $total = bcadd($total, (string)$item['qty'], 10);
+        }
+    }
+  
+    if (bccomp($total, '0', 10) == 0) {
+        return; // No need to adjust if the total is 0
+    }
+  
+    // Step 2: Calculate factor
+    $factor = bcdiv((string)$targetTotal, $total, 10);
+  
+    // Step 3: Multiply everything and save the delta
+    $newTotal = '0';
+    $lastHeadKey = array_key_last($dataPerHead);
+    $lastItemKey = array_key_last($dataPerHead[$lastHeadKey]);
+  
+    foreach ($dataPerHead as $headKey => &$headItems) {
+        foreach ($headItems as $itemKey => &$item) {
+            $item['qty'] = round(bcmul((string)$item['qty'], $factor, 10), 4);
+            $newTotal = bcadd($newTotal, (string)$item['qty'], 10);
+        }
+    }
+  
+    // Step 4: Adjust the difference to the last item
+    $delta = round((float)bcsub((string)$targetTotal, $newTotal, 10), 4);
+    $dataPerHead[$lastHeadKey][$lastItemKey]['qty'] += $delta;
+  }
