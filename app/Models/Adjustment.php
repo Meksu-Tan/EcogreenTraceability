@@ -476,16 +476,32 @@ class Adjustment extends Model
             /* RE-COUNT LENGTH */
             $lenDet = count($balQty);
 
-            $totalQty = array_sum($balQty);
-            foreach ($balQty as $qty) {
-                $compositionRate[] = ($totalQty > 0) ? ($qty / $totalQty) : 0;
-            }
-            for ($i = 0; $i < $lenDet; $i++) {
-                $diffDetQty[] = $diffQty * $compositionRate[$i];
+            // Check If there are supplier rows to distribute the header diff to
+            if ($lenDet > 0) {
+                $dataPerHead = ["det" => []];
+                for ($i = 0; $i < $lenDet; $i++) {
+                    // use current balQty as amount to share
+                    $dataPerHead["det"][] = ["qty" => $balQty[$i]];
+                }
+
+                // CALL adjustQtyToTotal using the header-level diffQty as target
+                // This will produce per-supplier values that sum exactly to diffQty
+                adjustAmtToTotal($dataPerHead, $diffQty);
+
+                // $dataPerHead["det"] now contains the per-supplier diff values
+                $diffDetQty = [];
+                foreach ($dataPerHead["det"] as $row) {
+                    // row["qty"] is the allocated piece of diffQty for that supplier
+                    $diffDetQty[] = $row["qty"];
+                }
+            } else {
+                $diffDetQty = [];
             }
 
 
             for ($i = 0; $i < $lenDet; $i++){
+                if (!isset($diffDetQty[$i])) $diffDetQty[$i] = 0;
+
                 if ($diffDetQty[$i] >= 0){
                     /* OUT ADJUSTMENT */
                         $beforeAdjustDet = $balQty[$i];
@@ -583,14 +599,27 @@ class Adjustment extends Model
             /* RE-COUNT LENGTH */
             $lenDet = count($balQty);
 
-            $totalQty = array_sum($balQty);
-            foreach ($balQty as $qty) {
-                $compositionRate[] = ($totalQty > 0) ? ($qty / $totalQty) : 0;
+            if ($lenDet > 0) {
+                $dataPerHead = ["det" => []];
+                for ($i = 0; $i < $lenDet; $i++) {
+                    $dataPerHead["det"][] = ["qty" => $balQty[$i]];
+                }
+    
+                // CALL adjustQtyToTotal using the header-level diffQty as target
+                adjustAmtToTotal($dataPerHead, $diffQty);
+    
+                // $dataPerHead["det"] now contains the per-supplier diff values
+                $diffDetQty = [];
+                foreach ($dataPerHead["det"] as $row) {
+                    $diffDetQty[] = $row["qty"];
+                }
+            } else {
+                $diffDetQty = [];
             }
-            for ($i = 0; $i < $lenDet; $i++) {
-                $diffDetQty[] = $diffQty * $compositionRate[$i];
-            }
+
             for ($i = 0; $i < $lenDet; $i++){
+                if (!isset($diffDetQty[$i])) $diffDetQty[$i] = 0;
+
                 if ($diffDetQty[$i] > 0){
                     /* OUT ADJUSTMENT */
                     $new_prevTraceOutQty = $traceOutQty[$i] - $diffDetQty[$i] ;
@@ -598,6 +627,8 @@ class Adjustment extends Model
                 } elseif ($diffDetQty[$i] < 0){
                     /* IN ADJUSTMENT */
                     $new_prevTraceOutQty = $traceOutQty[$i] + (-1 * $diffDetQty[$i]);
+                } else {
+                    $new_prevTraceOutQty = $traceOutQty[$i];
                 }
                 $new_prevDetBalOutQty = $balOutQty[$i] - $traceOutQty[$i] + $new_prevTraceOutQty;
                 $new_prevDetBalQty = $balQty[$i] + $traceOutQty[$i] - $new_prevTraceOutQty;
@@ -1146,12 +1177,13 @@ class Adjustment extends Model
         $batchSap = $request->input('batchSap');
         $idMaterial = $request->input('idMaterial');
         $qty = floatval(str_replace(',', '', $qty));
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         if ($mode == 'ADD'){
             $db = DB::insert('INSERT INTO t_balance_temporary
-                                    (entry_no, id_supplier, id_material, qty, batch_sap, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?)',
-                            [$adjNumber, $idSupplier, $idMaterial, $qty, $batchSap, $user]);
+                                    (entry_no, id_supplier, id_material, qty, batch_sap, id_plant, created_by)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)',
+                            [$adjNumber, $idSupplier, $idMaterial, $qty, $batchSap, $idPlant, $user]);
             $db = [ (object)['response' => $db ? 1 : 0 ]];
 
         } elseif ($mode == 'UPDATE'){
@@ -1249,6 +1281,7 @@ class Adjustment extends Model
                                 'qty' => $qty,
                                 'init_qty' => $qty,
                                 'batch_sap' => $batchSap,
+                                'id_plant' => $idPlant,
                                 'created_by' => $user,
                                 'updated_by' => $user,
                     ]);
@@ -1265,6 +1298,7 @@ class Adjustment extends Model
                         'id_material' => $idMaterial,
                         'in_qty' => $qty,
                         'batch_sap' => $batchSap,
+                        'id_plant' => $idPlant,
                         'created_by' => $user,
                         'updated_by' => $user,
                     ]);
@@ -1944,7 +1978,7 @@ class Adjustment extends Model
                 $trfSource = 11;
                 $trfDestination = $idSloc;
 
-                $datAdjustNo = static::get_adjNewEntryNumber($entryDate);
+                $datAdjustNo = static::get_adjNewEntryNumber($entryDate, $request);
                 $adjNo = $datAdjustNo[0]->adj_number;
                 $out = static::initSupplier_periodAdjustment($adjNo, $trfQty, $idMaterial, $user);
                 if ($out[0]->response == 1){
@@ -2108,3 +2142,36 @@ class Adjustment extends Model
             return $db;
     }
 }
+
+function adjustAmtToTotal(&$dataPerHead, $targetTotal) {
+    // Step 1: Calculate the initial total
+    $total = '0';
+    foreach ($dataPerHead as $head) {
+        foreach ($head as $item) {
+            $total = bcadd($total, (string)$item['qty'], 10);
+        }
+    }
+  
+    if (bccomp($total, '0', 10) == 0) {
+        return; // No need to adjust if the total is 0
+    }
+  
+    // Step 2: Calculate factor
+    $factor = bcdiv((string)$targetTotal, $total, 10);
+  
+    // Step 3: Multiply everything and save the delta
+    $newTotal = '0';
+    $lastHeadKey = array_key_last($dataPerHead);
+    $lastItemKey = array_key_last($dataPerHead[$lastHeadKey]);
+  
+    foreach ($dataPerHead as $headKey => &$headItems) {
+        foreach ($headItems as $itemKey => &$item) {
+            $item['qty'] = round(bcmul((string)$item['qty'], $factor, 10), 4);
+            $newTotal = bcadd($newTotal, (string)$item['qty'], 10);
+        }
+    }
+  
+    // Step 4: Adjust the difference to the last item
+    $delta = round((float)bcsub((string)$targetTotal, $newTotal, 10), 4);
+    $dataPerHead[$lastHeadKey][$lastItemKey]['qty'] += $delta;
+  }

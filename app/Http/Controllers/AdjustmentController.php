@@ -68,6 +68,7 @@ class AdjustmentController extends Controller
 
             $data['plants'] = $plants;
             $data['selectedPlant'] = $selectedPlant;
+            $data['idPlant'] = $selectedPlant;
 
             return view('user.setup_adjustment.index', $data);
         }
@@ -80,6 +81,7 @@ class AdjustmentController extends Controller
 
         $data['plants'] = $userPlant ? [$userPlant] : [];
         $data['selectedPlant'] = $userPlant ? $userPlant->code_3 : null;
+        $data['idPlant'] = $data['selectedPlant'];
         
         return view('user.setup_adjustment.index', $data);
     }
