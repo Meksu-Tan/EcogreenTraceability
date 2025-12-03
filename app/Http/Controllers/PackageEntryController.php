@@ -29,33 +29,71 @@ class PackageEntryController extends Controller
     }
 
     // Show Dashboard Page
-    public function index()
+    public function index(Request $request)
     {
-        $data = [];
         $n_users = User::all()->count();
         $n_roles = Role::all()->count();
         $n_perms = Permission::all()->count();
 
         $user = Auth::user();
-        $idPlant = \App\Models\BaseModel::getPlantId();
 
-        if ($idPlant !== '1002') {
+        \App\Models\BaseModel::setPlantContext();
+
+        $data = [
+            'user' => $user,
+            'role' => implode(', ', array_map('ucfirst', $user->roles->pluck('name')->toArray())),
+            'n_users' => $n_users,
+            'n_roles' => $n_roles,
+            'n_perms' => $n_perms
+        ];
+
+        if (!Laratrust::hasRole([
+            'admin', 'super-admin', 'manager', 'superintendent', 
+            'senior-supervisor', 'supervisor', 'senior-staff', 'staff'
+        ])) {
             return view('error.403');
         }
 
-        if (Laratrust::hasRole(['admin', 'super-admin', 'manager', 'superintendent', 'senior-supervisor', 'supervisor', 'senior-staff', 'staff'])) {
-            $data = [
-                'user' => $n_users,
-                'role' => $n_roles,
-                'permission' => $n_perms,
-                'user' => $user,
-                'role' => implode(array_map('ucfirst', $user->roles->pluck('name')->toArray())),
-            ];
+        if ($user->hasRole(['admin', 'super-admin'])) {
+            $selectedPlant = $request->query('plant') ?? session('selected_plant');
 
-            return view('user.trans_package.index',$data);
-        } else {
-            return view('error.403');
+            if ($selectedPlant) {
+                session(['selected_plant' => $selectedPlant]);
+            }
+
+            $data['plants'] = DB::table('m_plant')->select('code_3', 'code_2')->get();
+            $data['selectedPlant'] = $selectedPlant;
+    
+            if (empty($selectedPlant)) {
+                return view('user.trans_package.index', $data);
+            }
+    
+            if ((string)$selectedPlant !== '1002') {
+                return response()->view('error.403', [], 403);
+            }
+    
+            return view('user.trans_package.index', $data);
         }
+
+        $plantData = DB::table('m_plant_user')
+            ->join('m_plant', 'm_plant_user.id_plant', '=', 'm_plant.code_3')
+            ->where('m_plant_user.user_id', $user->id)
+            ->select('m_plant.code_3', 'm_plant.code_2')
+            ->first();
+
+        if (!$plantData) {
+            return response()->view('error.403', [], 403);
+        }
+
+        $userPlant = (string)$plantData->code_3;
+        $data['plants'] = [$plantData];
+        $data['selectedPlant'] = $userPlant;
+
+        if ($userPlant !== '1002') {
+            return response()->view('error.403', [], 403);
+        }
+
+        return view('user.trans_package.index', $data);
     }
 
     /**

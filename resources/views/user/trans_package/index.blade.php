@@ -58,6 +58,7 @@
     @include('user.trans_package.modals.__pckEntryPoModal')
     @include('user.trans_package.modals.__pckEntryBatchModal')
     @include('user.trans_shipment.modals.__shipBatchPackagingModal')
+    @include('modals.__selectPlant')
 
 <!-- SCRIPT -->
 <script>
@@ -90,6 +91,23 @@
             /* INITIALIZE */
                 $('.modal').css('overflow-y', 'auto');
                 initialize_page();
+
+            // If admin/super-admin and no plant selected, show the modal
+            @if(Auth::user()->hasRole(['admin', 'super-admin']) && empty($selectedPlant))
+                $('#modal-selectPlant').modal('show');
+            @endif
+
+            $('#confirmPlantSelect').on('click', function() {
+                var selectedPlant = $('#plantSelect').val();
+                if (selectedPlant) {
+                    window.location.href = "{{ route('packageentry.index') }}" + "?plant=" + selectedPlant;
+                } else {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Please select a plant before continuing',
+                    });
+                }
+            });
 
             /* EVENT LISTENER ON CHANGE */
 
@@ -175,7 +193,8 @@
                 ajax: {
                     url: show_url,
                     data: {
-                        flag: 'get_dtPckEntry'
+                        flag: 'get_dtPckEntry',
+                        plant: "{{ $selectedPlant ?? '' }}"
                     }
                 },
                 order: [[ 0, 'asc']],
