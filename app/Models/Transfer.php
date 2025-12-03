@@ -692,8 +692,10 @@ class Transfer extends Model
         $details = DB::select('SELECT d.id_balance_tail, t.id_trace_tail, d.qty, d.in_qty, d.init_qty 
                                FROM t_balance_detail d
                                JOIN t_trace_detail t ON t.id_balance_tail = d.id_balance_tail
+                               AND t.id_trace_head = ?
+                               AND t.status = 1
                                WHERE d.id_balance_head = ? 
-                               ORDER BY d.id_balance_tail ASC', [$idHead]);
+                               ORDER BY d.id_balance_tail ASC', [$idTraceHead, $idHead]);
 
         if (!empty($details)) {
             // Convert to a nested array
@@ -711,9 +713,11 @@ class Transfer extends Model
                             SET qty = ?, in_qty = ?, init_qty = ?
                             WHERE id_balance_tail = ?', [$newQty, $newQty, $newQty, $d->id_balance_tail]);
 
-                DB::update('UPDATE t_trace_detail
-                            SET in_qty = ?
-                            WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
+                if(!empty($d->id_trace_tail)) {
+                    DB::update('UPDATE t_trace_detail
+                                SET in_qty = ?
+                                WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
+                }
             }
         }
 
@@ -961,7 +965,7 @@ class Transfer extends Model
 
         $db = DB::insert('INSERT INTO t_balance_temporary
                                 (entry_no, id_supplier, id_material, qty, batch_sap, created_by, id_plant)
-                          VALUES (?, ?, ?, ?, ?, ?)',
+                          VALUES (?, ?, ?, ?, ?, ?, ?)',
                         [$adjNumber, $idSupplier, $idMaterial, $qty, $batchSap, $user, $idPlant]);
         $db = [ (object)['response' => $db ? 1 : 0 ]];
 

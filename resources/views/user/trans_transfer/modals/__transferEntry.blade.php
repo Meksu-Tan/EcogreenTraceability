@@ -171,39 +171,41 @@
                     $idSupplier = $($form_transferEntry_idSupplier).val();
                     $trfType = $($form_transferEntry_transferType).val();
 
-                    if ($trfType == 'in' && $idSupplier != 0){
-                        Swal.fire({
-                            position: 'top-end',
-                            icon: 'warning',
-                            title: 'Supplier Code!',
-                            showConfirmButton: false,
-                            timer: 1000
-                        });
-                        return;
-                    } else if ($trf_type == 'out'){
-                        if ($($form_transferEntry_stockQtyDest).val() != 0){
-                            if ($($form_transferEntry_destination).val() != 10){
-                                Swal.fire({
-                                    position: 'top-end',
-                                    icon: 'warning',
-                                    title: 'Stock Sloc Destination not zero!',
-                                    showConfirmButton: false,
-                                    timer: 1000
-                                });
-                                return;
+                    if ($idSupplier == 0){
+                        if ($trfType == 'in'){
+                            Swal.fire({
+                                position: 'top-end',
+                                icon: 'warning',
+                                title: 'Supplier Code!',
+                                showConfirmButton: false,
+                                timer: 1000
+                            });
+                            return;
+                        } else if ($trf_type == 'out'){
+                            if ($($form_transferEntry_stockQtyDest).val() != 0){
+                                if ($($form_transferEntry_destination).val() != 10){
+                                    Swal.fire({
+                                        position: 'top-end',
+                                        icon: 'warning',
+                                        title: 'Stock Sloc Destination not zero!',
+                                        showConfirmButton: false,
+                                        timer: 1000
+                                    });
+                                    return;
+                                }
                             }
-                        }
-                    } else if ($trf_type == 'all'){
-                        if ($($form_transferEntry_stockQtyDest).val() != 0){
-                            if ($($form_transferEntry_destination).val() != 10){
-                                Swal.fire({
-                                    position: 'top-end',
-                                    icon: 'warning',
-                                    title: 'Stock Sloc Destination not zero!',
-                                    showConfirmButton: false,
-                                    timer: 1000
-                                });
-                                return;
+                        } else if ($trf_type == 'all'){
+                            if ($($form_transferEntry_stockQtyDest).val() != 0){
+                                if ($($form_transferEntry_destination).val() != 10){
+                                    Swal.fire({
+                                        position: 'top-end',
+                                        icon: 'warning',
+                                        title: 'Stock Sloc Destination not zero!',
+                                        showConfirmButton: false,
+                                        timer: 1000
+                                    });
+                                    return;
+                                }
                             }
                         }
                     }

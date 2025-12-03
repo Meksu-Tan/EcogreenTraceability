@@ -133,7 +133,7 @@ class TransferController extends Controller
 
                     } else {
                         if ($trfType !== 'all'){
-                            if (in_array($trfSource, [7, 8, 9, 12, 13])) {
+                            if (in_array($trfSource, [5, 6, 12, 13, 24, 25, 28, 29, 32, 33])) {
                                 /* AUTO STOCK IN SOURCE SLOC */
                                 $idHead = null;
                                 $entryAdjNo_dat = AD::get_adjNewEntryNumber($entryDate, $request);
@@ -149,7 +149,7 @@ class TransferController extends Controller
                         $data = $this->returnResponse($return, 'TRANSFER', $mode);
 
                         if ($trfType !== 'all'){
-                            if (in_array($trfDestination, [7, 8, 9, 12, 13])) {
+                            if (in_array($trfDestination, [5, 6, 12, 13, 24, 25, 28, 29, 32, 33])) {
                                 /* AUTOMATE TRF TO ADJUSTMENT OUT */
                                 $trfSource = $trfDestination;
                                 $trfDestination = 10;
