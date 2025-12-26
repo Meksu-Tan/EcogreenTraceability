@@ -32,6 +32,7 @@
                                             <th>PPH Batch No</th>
                                             <th>WIP Product</th>
                                             <th>FG Product</th>
+                                            <th>Sloc</th>
                                             <th>FG Sloc</th>
                                             <th>Init Material (MT)</th>
                                             <th>Init Supplier (MT)</th>
@@ -58,6 +59,7 @@
     @include('user.trans_package.modals.__pckEntryPoModal')
     @include('user.trans_package.modals.__pckEntryBatchModal')
     @include('user.trans_shipment.modals.__shipBatchPackagingModal')
+    @include('user.trans_package.modals.__selectSubTankModal')
     @include('modals.__selectPlant')
 
 <!-- SCRIPT -->
@@ -85,6 +87,16 @@
         const $btn_pckEntry_editBatch       = '#pck-editBatchNo';
 
         const $btn_shipEntry_batchDetail    = '#view-shipment-batch';
+
+        const $modal_editSubTank = '#modal-pck-editSubTank';
+        const $form_editSubTank = '#form-pckEntryEditSubtank';
+        const $txt_editSubTank_flag = '#form-pckEntryEditSubtank-flag';
+        const $txt_editSubTank_mode = '#form-pckEntryEditSubtank-mode';
+        const $txt_editSubTank_idHead = '#form-pckEntryEditSubtank-idHead';
+        const $txt_editSubTank_idTank = '#form-pckEntryEditSubtank-idTank';
+        const $txt_editSubTank_mainSloc = '#form-pckEntryEditSubtank-mainSloc';
+        const $cmb_editSubTank_tankNo = '#form-pckEntryEditSubtank-tankNo';
+        const $btn_editSubTank_save = '#save-pckEntryEditSubtank';
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -176,10 +188,89 @@
                     $($modal_shipEntryBatch).modal('show');
                     initialize_shipEntryBatch_modal($batchNo);
                 });
+
+                $(document).on('click', '.sloc-edit', function(e){
+                    e.preventDefault();
+                    
+                    const idHead = $(this).data('id');
+                    const mainSlocLabel = $(this).data('mainsloc');
+                    const idTank = $(this).data('idtank');
+
+                    let encoded = $(this).attr('data-idTankTail');
+                    let selectedTail = [];
+
+                    if (encoded) {
+                        try {
+                            selectedTail = JSON.parse(atob(encoded)).map(String);
+                        } catch (e) {
+                            selectedTail = [];
+                        }
+                    }
+
+                    // set hidden form values
+                    $($txt_editSubTank_idHead).val(idHead);
+                    $($txt_editSubTank_mainSloc).val(mainSlocLabel);
+                    $($txt_editSubTank_idTank).val(idTank);
+
+                    ajax_populateTankNo($cmb_editSubTank_tankNo, idTank, selectedTail);
+
+                    // show modal   
+                    $($modal_editSubTank).modal('show');
+                });
+
+                /* submit update */
+                $($form_editSubTank).on('submit', function(e){
+                    e.preventDefault();
+                    var formData = new FormData(this);
+
+                    formData.append("flag", "post_updateEntrySubTank");
+
+                    Swal.fire({
+                        title: 'Confirm',
+                        text: 'Save specific sloc for this entry?',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Yes, save'
+                    }).then((result) => {
+                        if (result.value) {
+                            $.ajax({
+                                url: post_url,
+                                method: "POST",
+                                data: formData,
+                                contentType: false,
+                                cache: false,
+                                processData: false,
+                                dataType: "JSON",
+                                success: function(data) {
+                                    if (data.status == 1) {
+                                        Swal.fire({
+                                            position: 'top-end',
+                                            icon: 'success',
+                                            title: data.message,
+                                            showConfirmButton: false,
+                                            timer: 700
+                                        });
+                                        $($modal_editSubTank).modal('hide');
+                                        // reload the datatable so Sloc column shows updated value
+                                        $($dt_pckEntry).DataTable().ajax.reload(null, false);
+                                    } else {
+                                        Swal.fire(data.message, "", "error");
+                                    }
+                                },
+                                error: function(xhr, status, err) {
+                                    Swal.fire('Error', 'Something went wrong', 'error');
+                                }
+                            });
+                        }
+                    });
+                });
         });
 
     /* FUNCTION SELECT2 / DROPDOWN */
-
+    function htmlDecode(input){
+        var doc = new DOMParser().parseFromString(input, "text/html");
+        return doc.documentElement.textContent;
+    }
 
 
     /* FUNCTION AJAX */
@@ -208,7 +299,7 @@
                     },
                 },
                 {
-                    targets: [9,10], // index of 'balance_supplier' column
+                    targets: [10,11], // index of 'balance_supplier' column
                     createdCell: function(td, cellData, rowData) {
                         if (rowData.init_qty === rowData.balance_supplier) {
                             $(td).css('color', 'green');
@@ -216,7 +307,34 @@
                             $(td).css('color', 'red');
                         }
                     }
-                }],
+                },
+                {
+                    "targets": [8],
+                    "render": function(data, type, row) {
+                        const idHead      = row.id_whx_head;
+                        const idTank      = row.id_tank;
+                        const mainSloc    = row.sloc || '';
+                        let tankTails   = row.id_tank_tail;
+
+                        if (typeof tankTails === "string") {
+                            tankTails = htmlDecode(tankTails);
+                            try {
+                                tankTails = JSON.parse(tankTails); 
+                            } catch {
+                                tankTails = []; 
+                            }
+                        }
+
+                        let display = mainSloc;
+
+                        // If no sub tank -> return CLICKABLE LINK
+                        return `<a href="#" class="sloc-edit" data-id="${idHead}" data-idTank="${idTank}" data-mainSloc="${mainSloc}" data-idTankTail="${btoa(JSON.stringify(tankTails))}" style="color: #7c7c7d;">
+                                    ${display}
+                                </a>`;
+                    },
+                    "className": 'text-center'
+                }
+            ],
                 columns: [
                     { data: null, name: null, orderable: false, searchable: false, className: 'text-center' },
                     { data: 'action', name: 'action', orderable: false, searchable: false },
@@ -226,6 +344,7 @@
                     { data: 'batch_no', name: 'batch_no', className: 'text-center'},
                     { data: 'feed', name: 'feed', className: 'text-left'},
                     { data: 'fg', name: 'fg', className: 'text-left'},
+                    { data: 'sloc', name: 'sloc', className: 'text-center'},
                     { data: 'whx', name: 'whx', className: 'text-center'},
                     { data: 'init_qty', name: 'init_qty', className: 'text-right'},
                     { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},

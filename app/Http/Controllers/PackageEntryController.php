@@ -163,6 +163,10 @@ class PackageEntryController extends Controller
                 $return = PCK::post_pckEntry_batchNo($user, $request);
                 $data = $this->returnResponse($return, 'BATCH ENTRY', $mode);
                 return response()->json($data);
+            } elseif ($flag == 'post_updateEntrySubTank'){
+                $return = PCK::post_updateEntrySubTank($user, $request);
+                $data = $this->returnResponse($return, 'SUBTANK', $mode);
+                return response()->json($data);
             }
 
         } else {
@@ -223,6 +227,10 @@ class PackageEntryController extends Controller
             exit;
         } elseif ($flag == 'get_cmbActiveWarehouse_pck'){
             $txtData['data'] = PCK::get_cmbActiveWarehouse_pck($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_cmbActiveSpecificTank'){
+            $txtData['data'] = PCK::get_cmbActiveSpecificTank($request);
             echo json_encode($txtData);
             exit;
         };

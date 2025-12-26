@@ -55,6 +55,15 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="row" id="">
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label for="name">Specific Source Sloc</label>
+                                                <select name="tankNo[]" id="form-pckEntry-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="row">
                                         <div class="col-md-12">
                                             <div class="form-group">
@@ -131,7 +140,10 @@
         const $form_pckEntry_balance        = '#form-pckEntry-balance';
         const $form_pckEntry_poNo           = '#form-pckEntry-poNo';
         const $form_pckEntry_idTank         = '#form-pckEntry-tank';
+        const $form_pckEntry_idTankNo       = '#form-pckEntry-tankNo';
         const $form_pckEntry_idWarehouse    = '#form-pckEntry-warehouse';
+
+        let pckEntry_selectedTankTails = [];
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -220,6 +232,13 @@
 
                     $batchNo = $($form_pckEntry_batchNo).val();
                     ajax_populateWarehouse($form_pckEntry_idWarehouse, $batchNo);
+                });
+                $(document).on('change', $form_pckEntry_idTankNo, function () {
+                    pckEntry_selectedTankTails = $(this).val() || [];
+                });
+                $(document).on('change', $form_pckEntry_idTank, function () {
+                    let sloc = $(this).val();
+                    ajax_populateTankNo($form_pckEntry_idTankNo, sloc, pckEntry_selectedTankTails);
                 });
 
 
@@ -360,10 +379,66 @@
                             }
                             $(id).append(option);
                         }
+                        // auto-select correct tank value
+                        let valueToSelect = selectedValue ?? response.data[0]?.id_tank;
+                        $(id).val(valueToSelect).trigger("change"); // this triggers the SLoc update
                     }
                 }
             });
         };
+        function ajax_populateTankNo(id, $sloc=null, selectedValues=null, options={}) {
+            const $select = $(id);
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificTank',
+                    sloc: $sloc,
+            },
+            success: function(response) {
+                $select.empty();
+
+                if (response.data && response.data.length) {
+                    response.data.forEach(row => {
+                        const isSelected = selected.includes(String(row.id_tank_tail));
+
+                        const option = new Option(
+                            row.tankNo,
+                            row.id_tank_tail,
+                            isSelected,
+                            isSelected
+                        );
+
+                        $select.append(option);
+                    });
+                }
+                if (!$select.hasClass("select2-hidden-accessible")) {
+                    $select.select2({
+                        placeholder: ' - Select Specific Sloc No -',
+                        closeOnSelect: false,
+                        allowClear: true,
+                        width: '100%',
+                        dropdownParent: options.dropdownParent || $select.closest(".modal"),
+                    });
+                }
+                
+                $select.trigger('change');
+            }
+        });
+    }
         function ajax_populateWarehouse(id, $batchNo=null, selectedValue=null){
             // Empty the dropdown
             // $(id).find('option').not(':first').remove();
@@ -407,7 +482,7 @@
 
 
     /* FUNCTION INITIALIZATION */
-        function initialize_pkcEntry($flag=null, $mode=null, $id=null, $batchNo=null, $qty=null, $idFgProduct=null, $poNo=null){
+        function initialize_pkcEntry($flag=null, $mode=null, $id=null, $batchNo=null, $qty=null, $idFgProduct=null, $poNo=null, $idTank=null, $idTankTail=null){
             $($form_pckEntry_flag).val($flag);
             $($form_pckEntry_mode).val($mode);
             $($form_pckEntry_id).val($id);
@@ -418,6 +493,10 @@
 
             render_time_related_entry();
             ajax_populateFgProduct($form_pckEntry_fgProduct);
+
+            if ($mode == 'ADD' && pckEntry_selectedTankTails.length === 0) {
+                ajax_populateTankNo($form_pckEntry_idTankNo, $idTank, $idTankTail);
+            }
         };
         function render_time_related_entry(){
             var options = { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' };

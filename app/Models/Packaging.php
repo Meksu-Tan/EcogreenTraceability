@@ -66,8 +66,14 @@ class Packaging extends Model
     }
     static function get_dtPckEntry(){
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
-        $db = DB::select('SELECT a.id_whx_head, a.entry_date, CONCAT(CAST(g.from_trace_no AS CHAR) , " >>> ", CAST(a.trace_no AS CHAR) ) AS fromto_trace_no,
+        $db = DB::select('SELECT a.id_whx_head, a.entry_date, a.id_tank, a.id_tank_tail, CONCAT(CAST(g.from_trace_no AS CHAR) , " >>> ", CAST(a.trace_no AS CHAR) ) AS fromto_trace_no,
                                  a.id_material_feed, a.id_material_fg, a.batch_no, f.id_trace_head, f.id_balance_head,
+                                 CONCAT(h.description, 
+                                    IF(GROUP_CONCAT(DISTINCT i.tf_number ORDER BY i.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                        "", 
+                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT i.tf_number ORDER BY i.tf_number ASC SEPARATOR ", "))
+                                    )
+                                 ) AS sloc,
                                  FORMAT(g.init_qty,3) AS init_qty, FORMAT(g.qty,3) AS balance, a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
                                  UPPER(b.description) AS feed, UPPER(c.description) AS fg, a.trace_no, a.po_no, g.code AS whx, a.id_section,
                                  GROUP_CONCAT(DISTINCT CONCAT(d.description, " / ", d.batch_sap, " / Init: ", FORMAT(d.init_qty,3), " MT / Balance: ", FORMAT(d.qty,3), " MT") SEPARATOR " | ") AS supplier,
@@ -124,6 +130,10 @@ class Packaging extends Model
                               ON a.id_whx_head = g.id_whx_head
                             LEFT JOIN m_warehouse g
                               ON g.id_warehouse = a.id_section
+                            LEFT JOIN m_tank h
+                              ON h.id_tank = a.id_tank
+                            LEFT JOIN  m_tank_detail i
+                              ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(i.id_tank_tail AS CHAR)))
                            WHERE a.`status` = 1
                              AND g.from_trace_no IS NOT NULL
                            GROUP BY a.trace_no
@@ -188,6 +198,18 @@ class Packaging extends Model
                              AND a.id_batch = ?', [$batchNo]);
         return $db;
     }
+
+    static function get_cmbActiveSpecificTank($request) {
+      $sloc = $request->input('sloc');
+
+      $db = DB::select('SELECT a.id_tank_tail, a.tf_number AS tankNo
+                          FROM m_tank_detail a
+                         WHERE a.status = 1
+                           AND a.id_tank = ?
+                         ORDER BY a.tf_number ASC', [$sloc]);
+
+      return $db;
+  }
 
     static function post_cancelPck($user, $request){
         $traceNo = $request->input('traceNo');
@@ -364,6 +386,8 @@ class Packaging extends Model
         $qtyPck = $request->input('qty');
         $poNo = $request->input('poNo');
         $idTank = $request->input('tank');
+        $idTankTail = $request->input('tankNo');
+        $idTankTailJson = json_encode($idTankTail);
         $idWarehouse = $request->input('warehouse');
         $idPlant = DB::table('m_tank')
           ->where('id_tank', $idTank)
@@ -509,6 +533,7 @@ class Packaging extends Model
                             'id_material' => $idMaterialFeed,
                             'entry_date' => $entryDate,
                             'id_sloc' => $idTank,
+                            'id_tank_tail' => $idTankTailJson,
                             'out_qty' => $qtyWh,
                             'curr_qtf' => $qtyPck,
                             'id_plant' => $idPlant,
@@ -523,6 +548,8 @@ class Packaging extends Model
                             'id_material_feed' => $idMaterialFeed,
                             'id_material_fg' => $idMaterialPck,
                             'id_section' => $idWarehouse,
+                            'id_tank' => $idTank,
+                            'id_tank_tail' => $idTankTailJson,
                             'batch_no' => $batchNo,
                             'po_no' => $poNo,
                             'qty' => $qtyWh,
@@ -540,6 +567,7 @@ class Packaging extends Model
                         'id_material' => $idMaterialPck,
                         'entry_date' => $entryDate,
                         'id_sloc' => $idWarehouse,
+                        'id_tank_tail' => $idTankTailJson,
                         'in_qty' => $qtyWh,
                         'curr_qtf' => $qtyWh,
                         'id_plant' => $idPlant,
@@ -603,6 +631,7 @@ class Packaging extends Model
                                     'out_qty' => $qtyWhTail,
                                     'batch_sap' => $batchSap,
                                     'id_sloc' => $idTank,
+                                    'id_tank_tail' => $idTankTailJson,
                                     'id_plant' => $idPlant,
                                     'created_by' => $user,
                             ]);
@@ -617,6 +646,8 @@ class Packaging extends Model
                                 'in_qty' => $qtyWhTail,
                                 'init_qty' => $qtyWhTail,
                                 'id_plant' => $idPlant,
+                                'id_tank' => $idTank,
+                                'id_tank_tail' => $idTankTailJson,
                                 'created_by' => $user
                             ]);
                         /* POPULATE TRACE DETAIL RUNDOWN TO WAREHOUSE */
@@ -629,6 +660,7 @@ class Packaging extends Model
                                     'batch_sap' => $batchSap,
                                     'id_sloc' => $idWarehouse,
                                     'id_plant' => $idPlant,
+                                    'id_tank_tail' => $idTankTailJson,
                                     'created_by' => $user,
                             ]);
                         /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
@@ -718,6 +750,61 @@ class Packaging extends Model
         return $db;
 
     }
+
+    static function post_updateEntrySubTank($user, $request){
+      $idHead = $request->input('id');
+      $tails = $request->input('idTankTail');
+      $idPlant = \App\Models\BaseModel::resolvePlant($request);
+
+      if (!is_array($tails)) {
+          return [(object)['response' => 0, 'message' => 'INVALID SUBTANK DATA']];
+      }
+
+      $jsonTails = json_encode(array_values(array_unique($tails)));
+
+      $row = DB::selectOne('SELECT id_tank_tail, trace_no 
+                            FROM t_warehouse_header 
+                            WHERE id_whx_head = ? AND status = 1', [$idHead]);
+
+      // Update warehouse header
+      DB::update('UPDATE t_warehouse_header
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_whx_head = ?', [$jsonTails, $user, $idHead]);
+
+      // Update trace header
+      DB::update('UPDATE t_trace_header
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_balance_head = ?', [$jsonTails, $user, $idHead]);
+
+      // Update ALL warehouse details
+      DB::update('UPDATE t_warehouse_detail
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_whx_head = ?',
+                  [$jsonTails, $user, $idHead]);
+
+      // Update ALL trace details
+      DB::update('UPDATE t_trace_detail
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_trace_head IN (
+                      SELECT id_trace_head 
+                      FROM t_trace_header 
+                      WHERE id_balance_head = ?
+                  )', [$jsonTails, $user, $idHead]);
+
+      // Logging
+      DB::insert('INSERT INTO log_transactions
+                    (log_module, log_type, log_description, created_by)
+                  VALUES (?, ?, ?, ?)',
+                  [
+                    'T_WAREHOUSE_HEAD', 'UPDATE_SUBTANK',
+                    'IDHEAD: '.$idHead.' | TRACE: '.$row->trace_no.
+                    ' | SUBTANKS: '.implode(',', $tails),
+                    $user
+                  ]
+                );
+
+      return [ (object)['response' => 1] ];
+  }
 
 }
 
