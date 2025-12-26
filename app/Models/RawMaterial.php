@@ -47,15 +47,25 @@ class RawMaterial extends Model
     }
     static function get_dtRmList($request){
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $idTankStorage = DB::table('m_tank')
+        ->where('id_plant', $idPlant)
+        ->where('status', 1)
+        ->where('code_3', 'STORAGE')
+        ->value('id_tank');
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
-        $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.status,
+        $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.id_tank_tail, a.status,
                                  CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(SUM(DISTINCT a.qty),3) AS qty, a.created_by, a.created_at,
                                  CONCAT(c.code, " :: ", c.description) AS material, FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
-                                 d.description AS tf_number, a.entry_date, b.batch_sap,
+                                 CONCAT(d.description, 
+                                    IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                        "", 
+                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", "))
+                                    )
+                                 ) AS tf_number, a.entry_date, b.batch_sap,
                                  GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
                                  GROUP_CONCAT(DISTINCT CONCAT(e.code, " :: ", e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty, 3), " MT / ", IF(b.out_qty = 0, "-", "BATCH TRANSFERRED")) SEPARATOR " | ") AS supplier,
                                  IF(b.out_qty = 0, "N/A", "") AS traced, f.material_document, f.po_so, f.id_trace_head,
-                                 FORMAT(SUM(b.init_qty),3) AS balance_supplier
+                                 FORMAT(bs.supplier_qty,3) AS balance_supplier
                             FROM t_balance_header a
                             LEFT JOIN t_balance_detail b
                               ON a.id_balance_head = b.id_balance_head AND b.status = 1
@@ -72,14 +82,23 @@ class RawMaterial extends Model
                                         WHERE f.status = 1
 										GROUP BY f.id_balance_head) f
                               ON f.id_balance_head = a.id_balance_head
+                            LEFT JOIN m_tank_detail h
+                              ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
+                            LEFT JOIN (
+                                SELECT id_balance_head, SUM(init_qty) AS supplier_qty
+                                FROM t_balance_detail
+                                WHERE status = 1
+                                GROUP BY id_balance_head
+                            ) bs ON bs.id_balance_head = a.id_balance_head
                            WHERE c.type = ?
                              AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
                              AND SUBSTRING(a.trace_no,8,3) = ?
                              AND a.status = 1
                              AND (a.id_plant = ? OR ? = 0)
+                             AND a.id_tank = ?
                            GROUP BY a.trace_no
                            ORDER BY a.id_balance_head DESC
-                           ', [$idPlant, $idPlant, self::$typeMaterial, self::$movType1, self::$movType2, self::$movSeq, $idPlant, $idPlant]);
+                           ', [$idPlant, $idPlant, self::$typeMaterial, self::$movType1, self::$movType2, self::$movSeq, $idPlant, $idPlant, $idTankStorage]);
         return $db;
     }
     static function get_dtRmListTrf($request){
@@ -90,15 +109,20 @@ class RawMaterial extends Model
             ->where('code_3', 'FEED')
             ->value('id_tank');
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
-        $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.status,
+        $db = DB::select('SELECT a.id_balance_head, a.id_material, a.id_tank, a.id_tank_tail, a.status,
                                  aa.qty, aa.init_qty, a.created_by, a.created_at, CAST(a.trace_no AS CHAR) AS trace_nos,
                                  GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
-                                 d.description AS tf_number, a.entry_date, b.batch_sap,
+                                 CONCAT(d.description, 
+                                    IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                        "", 
+                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", "))
+                                    )
+                                 ) AS tf_number, a.entry_date, b.batch_sap,
                                  GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
                                  GROUP_CONCAT(DISTINCT CONCAT(e.code, " :: ", e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty, 3), " MT / ", IF(b.out_qty = 0, "-", "BATCH USED IN WIP")) SEPARATOR " | ") AS supplier,
                                  IF(b.out_qty = 0, "N/A", "") AS traced, f.material_document, f.po_so, f.id_trace_head,
                                  IFNULL(f.trace_no, CONCAT(a.trace_no, "|")) AS trace_no,
-                                 FORMAT(SUM(b.init_qty),3) AS balance_supplier
+                                 FORMAT(bs.supplier_qty,3) AS balance_supplier
                             FROM t_balance_header a
                             LEFT JOIN (SELECT trace_no, FORMAT(SUM(qty),3) AS qty, FORMAT(SUM(init_qty),3) AS init_qty
                                          FROM t_balance_header
@@ -127,6 +151,16 @@ class RawMaterial extends Model
                                           AND (SUBSTRING(f.to_trace_no,1,1) = ? OR SUBSTRING(f.to_trace_no,1,1) = ?)
 										GROUP BY f.id_balance_head) f
                               ON f.id_balance_head = a.id_balance_head
+                            LEFT JOIN m_tank_detail h
+                              ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
+                            LEFT JOIN (
+                                SELECT h.trace_no, SUM(d.init_qty) AS supplier_qty
+                                FROM t_balance_header h
+                                JOIN t_balance_detail d
+                                    ON h.id_balance_head = d.id_balance_head
+                                WHERE d.status = 1
+                                GROUP BY h.trace_no
+                            ) bs ON bs.trace_no = a.trace_no
                            WHERE c.type = ?
                              AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
                              AND a.id_tank = ?
@@ -320,6 +354,28 @@ class RawMaterial extends Model
                              AND a.code_3 = "STORAGE"
                              AND a.id_plant = ?
                            ORDER BY a.code ASC', [self::$idPlantEob1]);
+        return $db;
+    }
+    static function get_cmbActiveSpecificSourceTank($request) {
+        $sloc = $request->input('sloc');
+
+        $db = DB::select('SELECT a.id_tank_tail, a.tf_number AS tankNo
+                            FROM m_tank_detail a
+                           WHERE a.status = 1
+                             AND a.id_tank = ?
+                           ORDER BY a.tf_number ASC', [$sloc]);
+
+        return $db;
+    }
+    static function get_cmbActiveSpecificTrfTank($request) {
+        $sloc = $request->input('sloc');
+
+        $db = DB::select('SELECT a.id_tank_tail, a.tf_number AS trfTankNo
+                            FROM m_tank_detail a
+                           WHERE a.status = 1
+                             AND a.id_tank = ?
+                           ORDER BY a.tf_number ASC', [$sloc]);
+
         return $db;
     }
     static function get_cmbActiveTank_trf($request){
@@ -627,6 +683,7 @@ class RawMaterial extends Model
         $qty = $request->input('qty');
         $idHead = $request->input('idHead');
         $idTail = $request->input('idTail');
+        $idTank = $request->input('idTankFeed');
         $qty = floatval(str_replace(',', '', $qty));
 
         if ($mode == 'ADD'){
@@ -642,9 +699,9 @@ class RawMaterial extends Model
             };
 
             $db = DB::insert('INSERT INTO t_balance_temporary
-                                    (entry_no, id_material, qty, created_by)
-                            VALUES (?, ?, ?, ?)',
-                            [$entryNo, $idMaterial, $qty, $user]);
+                                    (entry_no, id_material, qty, id_tank, created_by)
+                            VALUES (?, ?, ?, ?, ?)',
+                            [$entryNo, $idMaterial, $qty, $idTank, $user]);
             $db = [ (object)['response' => $db ? 1 : 0 ]];
 
         } elseif ($mode == 'UPDATE'){
@@ -673,6 +730,8 @@ class RawMaterial extends Model
         $entry_no = $request->input('entry_no');
         $entry_date = $request->input('entry_date');
         $id_tank = $request->input('tank');
+        $id_tank_tail = $request->input('tankNo');
+        $id_tank_tail_json = json_encode($id_tank_tail); 
         $qty = $request->input('qty');
         $po = $request->input('po');
         $id_material = $request->input('idMaterial');
@@ -707,6 +766,7 @@ class RawMaterial extends Model
                                 'trace_no' => $entry_no,
                                 'id_material' => $id_material,
                                 'id_tank' => $id_tank,
+                                'id_tank_tail' => $id_tank_tail_json,
                                 'entry_date' => $entry_date,
                                 'qty' => $qty,
                                 'in_qty' => $qty,
@@ -720,6 +780,7 @@ class RawMaterial extends Model
                                     'id_material' => $id_material,
                                     'entry_date' => $entry_date,
                                     'id_sloc' => $id_tank,
+                                    'id_tank_tail' => $id_tank_tail_json,
                                     'in_qty' => $qty,
                                     'id_plant' => $idPlant,
                                     'created_by' => $user,
@@ -754,6 +815,7 @@ class RawMaterial extends Model
                                         'init_qty' => $qty_tail,
                                         'batch_sap' => $batchSap,
                                         'id_tank' => $id_tank,
+                                        'id_tank_tail' => $id_tank_tail_json,
                                         'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
@@ -765,6 +827,7 @@ class RawMaterial extends Model
                                         'batch_sap' => $batchSap,
                                         'in_qty' => $qty_tail,
                                         'id_sloc' => $id_tank,
+                                        'id_tank_tail' => $id_tank_tail_json,
                                         'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
@@ -821,19 +884,22 @@ class RawMaterial extends Model
             } elseif ($mode == 'UPDATE'){
                 DB::update('UPDATE t_balance_header
                             SET id_tank = ?,
+                                id_tank_tail = ?,
                                 entry_date = ?,
                                 qty = ?,
                                 in_qty = ?,
                                 init_qty = ?,
                                 updated_by = ?
                             WHERE id_balance_head = ?',
-                            [$id_tank, $entry_date, $qty, $qty, $qty, $user, $idHead]);
+                            [$id_tank, $id_tank_tail_json, $entry_date, $qty, $qty, $qty, $user, $idHead]);
                 DB::update('UPDATE t_trace_header
-                            SET entry_date = ?,
+                            SET id_sloc = ?,
+                                id_tank_tail = ?,
+                                entry_date = ?,
                                 in_qty = ?,
                                 updated_by = ?
                             WHERE id_balance_head = ?',
-                            [$entry_date, $qty, $user, $idHead]);
+                            [$id_tank, $id_tank_tail_json, $entry_date, $qty, $user, $idHead]);
 
                 $dat = DB::select('SELECT id_trace_head
                                     FROM t_trace_header
@@ -850,7 +916,7 @@ class RawMaterial extends Model
                 DB::insert('INSERT INTO log_transactions
                                 (log_module, log_type, log_description, created_by)
                             VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'UPDATE', 'IDHEAD: ' . $idHead . ' | DATE: ' . $entry_date . ' / BATCH: ' .
-                                                    $entry_no . ' / TANK: ' . $id_tank . ' / QTY' . $qty . ' / MATERIAL' . $id_material .
+                                                    $entry_no . ' / TANK: ' . $id_tank. ' / QTY' . $qty . ' / MATERIAL' . $id_material .
                                                     ' | Status: 1', $user ]);
             }
 
@@ -869,6 +935,10 @@ class RawMaterial extends Model
         // $qty = $request->input('qty');
         // $out_qty = floatval(str_replace(',', '', $qty));
         $materialDoc = $request->input('material_doc');
+        $id_tankSourceNo = $request->input('tankNo');
+        $id_tankNo = $request->input('trfTankNo');
+        $id_tankSourceNo_json = json_encode($id_tankSourceNo);
+        $id_tankNo_json = json_encode($id_tankNo);
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
@@ -1004,6 +1074,7 @@ class RawMaterial extends Model
                                     'entry_date' => $curr_entryDate,
                                     'id_sloc' => $id_tankSource,
                                     'id_plant' => $idPlant,
+                                    'id_tank_tail' => $id_tankSourceNo_json,
                                     'out_qty' => $out_qty,
                                     'last_qtf' => $last_qtf,
                                     'curr_qtf' => $curr_qtf,
@@ -1017,6 +1088,7 @@ class RawMaterial extends Model
                                 'id_material' => $id_material,
                                 'id_tank' => $id_tank,
                                 'id_plant' => $idPlant,
+                                'id_tank_tail' => $id_tankNo_json,
                                 'qty' => $in_qty,
                                 'in_qty' => $in_qty,
                                 'init_qty' => $in_qty,
@@ -1030,6 +1102,7 @@ class RawMaterial extends Model
                                 'id_plant' => $idPlant,
                                 'entry_date' => $curr_entryDate,
                                 'id_sloc' => $id_tank,
+                                'id_tank_tail' => $id_tankNo_json,
                                 'in_qty' => $in_qty,
                                 'last_qtf' => $last_qtf,
                                 'curr_qtf' => $curr_qtf,
@@ -1095,6 +1168,7 @@ class RawMaterial extends Model
                                                 'id_material' => $id_material,
                                                 'id_sloc' => $id_tank,
                                                 'id_plant' => $idPlant,
+                                                'id_tank_tail' => $id_tankNo_json,
                                                 'out_qty' => $tail_out_qty,
                                                 'batch_sap' => $batch_sap,
                                                 'created_by' => $user,
@@ -1112,6 +1186,7 @@ class RawMaterial extends Model
                                         'id_material' => $idMaterial_in,
                                         'id_tank' => $id_tank,
                                         'id_plant' => $idPlant,
+                                        'id_tank_tail' => $id_tankNo_json,
                                         'qty' => $tailQty_in,
                                         'in_qty' => $tailQty_in,
                                         'init_qty' => $tailQty_in,
@@ -1125,6 +1200,7 @@ class RawMaterial extends Model
                                             'id_material' => $idMaterial_in,
                                             'id_sloc' => $id_tank,
                                             'id_plant' => $idPlant,
+                                            'id_tank_tail' => $id_tankNo_json,
                                             'in_qty' => $tailQty_in,
                                             'batch_sap' => $batchSap_in,
                                             'created_by' => $user,
@@ -1365,6 +1441,66 @@ class RawMaterial extends Model
         }
         return $db;
     }
+
+    static function post_updateEntrySubTank($user, $request){
+        $idHead   = $request->input('idHead');
+        $tails  = $request->input('idTankTail');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+    
+        if (!is_array($tails)) {
+            return [(object)['response' => 0, 'message' => 'INVALID SUBTANK DATA']];
+        }
+    
+        $jsonTails = json_encode(array_values(array_unique($tails)));
+    
+        // Fetch existing header
+        $row = DB::selectOne('SELECT id_tank_tail, trace_no 
+                              FROM t_balance_header 
+                              WHERE id_balance_head = ? AND status = 1', [$idHead]);
+    
+        // Update header
+        DB::update('UPDATE t_balance_header
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update trace header
+        DB::update('UPDATE t_trace_header
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update ALL balance details
+        DB::update('UPDATE t_balance_detail
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update ALL trace details
+        DB::update('UPDATE t_trace_detail
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_trace_head IN (
+                        SELECT id_trace_head 
+                        FROM t_trace_header 
+                        WHERE id_balance_head = ?
+                    )', [$jsonTails, $user, $idHead]);
+    
+        // Log change
+        DB::insert(
+            'INSERT INTO log_transactions
+                (log_module, log_type, log_description, created_by)
+            VALUES (?, ?, ?, ?)',
+            [
+                'T_BALANCE_HEAD', 'UPDATE_SUBTANK',
+                'IDHEAD: '.$idHead.' | TRACE: '.$row->trace_no.
+                ' | SUBTANKS: '.implode(',', $tails),
+                $user
+            ]
+        );
+    
+        return [(object)['response' => 1]];
+    }
+
 
 }
 

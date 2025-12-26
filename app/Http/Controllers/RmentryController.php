@@ -143,6 +143,11 @@ class RmentryController extends Controller
                 $return = RM::post_matlDocNumber($user, $request);
                 $data = $this->returnResponse($return, 'MATL DOC NO', $mode);
                 return response()->json($data);
+
+            } elseif ($flag == 'post_updateEntrySubTank'){
+                $return = RM::post_updateEntrySubTank($user, $request);
+                $data = $this->returnResponse($return, 'SUBTANK', $mode);
+                return response()->json($data);
             }
 
         } else {
@@ -251,6 +256,14 @@ class RmentryController extends Controller
             exit;
         } elseif ($flag == 'get_cmbActiveTank'){
             $txtData['data'] = RM::get_cmbActiveTank();
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_cmbActiveSpecificSourceTank'){
+            $txtData['data'] = RM::get_cmbActiveSpecificSourceTank($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_cmbActiveSpecificTrfTank'){
+            $txtData['data'] = RM::get_cmbActiveSpecificTrfTank($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_cmbActiveTank_trf'){

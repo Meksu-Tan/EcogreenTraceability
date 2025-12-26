@@ -60,11 +60,18 @@
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-12">
+                                        <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="name">Material ( Do not change material selection after input supplier! )</label>
                                                 <select name="idMaterial" id="form-rmentry-material" style="width: 100%;" class="form-control" required>
                                                     <option value="">- Select Material -</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="name">Specific Sloc No</label>
+                                                <select name="tankNo[]" id="form-rmentry-tankNo" class="form-control" style="width: 100%;" multiple="multiple" required>
                                                 </select>
                                             </div>
                                         </div>
@@ -137,12 +144,15 @@
         const $cmb_rmEntry_tank             = '#form-rmentry-tank';
         const $txt_rmEntry_materialDoc      = '#form-rmentry-materialDoc';
         const $txt_rmEntry_po               = '#form-rmentry-po';
+        const $cmb_rmEntry_tankNo           = '#form-rmentry-tankNo';
 
         const $btn_rmEntry_addSupplier      = '#add-rmentry-supplier';
         const $btn_rmEntry_save             = '#save-rmentry';
 
         const $btn_rmEntry_deleteSupplier   = '#destroy-rmentry-supplier';
         const $btn_rmEntry_updateSupplier   = '#update-rmentry-supplier';
+
+        let rmEntry_selectedTankTails = [];
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -272,6 +282,16 @@
                     if ( $($modal_rmEntry).hasClass('show') ) {
                         $($modal_rmEntry).css('opacity', 1);
                     }
+                    if (rmEntry_selectedTankTails.length > 0) {
+                        $($cmb_rmEntry_tankNo).val(rmEntry_selectedTankTails).trigger('change');
+                    }
+                });
+                $($modal_rmEntry).on('hidden.bs.modal', function () {
+                    rmEntry_selectedTankTails = [];
+                    $($cmb_rmEntry_tankNo).val(null).trigger('change');
+                });
+                $(document).on('change', $cmb_rmEntry_tankNo, function () {
+                    rmEntry_selectedTankTails = $(this).val() || [];
                 });
 
         });
@@ -332,6 +352,63 @@
                             $(id).append(option);
                         }
                     }
+                }
+            });
+        };
+        function ajax_populateTankNo(id, sloc=null, selectedValues=null, options={}) {
+            const $select = $(id);
+
+            // Normalize selected values to always array of strings
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificSourceTank',
+                    sloc: sloc
+                },
+                success: function (response) {
+                    $select.empty();
+
+                    if (response.data && response.data.length) {
+                        response.data.forEach(row => {
+                            const isSelected = selected.includes(String(row.id_tank_tail));
+
+                            const option = new Option(
+                                row.tankNo,
+                                row.id_tank_tail,
+                                isSelected,
+                                isSelected
+                            );
+                            
+                            $select.append(option);
+                        });
+                    }
+            
+                    // Init Select2 only once
+                    if (!$select.hasClass('select2-hidden-accessible')) {
+                        $select.select2({
+                            placeholder: ' - Select Specific Sloc No -',
+                            closeOnSelect: false,
+                            allowClear: true,
+                            width: '100%',
+                            dropdownParent: options.dropdownParent || $select.closest('.modal')
+                        });
+                    }
+
+                    $select.trigger('change');
                 }
             });
         };
@@ -457,7 +534,7 @@
 
     /* FUNCTION INIT */
         function initialize_modalRmEntry($mode, $rm_number=null, $idHead=null, $entryDate=null,
-                                         $idTank=null, $materialDoc=null, $idMaterial=null, $po=null){
+                                         $idTank=null, $materialDoc=null, $idMaterial=null, $idTankTail=null, $po=null){
 
             var options = { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' };
             var currentDate = new Date().toLocaleDateString('fr-CA', options).split('/').join('');
@@ -484,6 +561,10 @@
 
                 ajax_dtSupplierList($tbl_rmEntry_detail, $idHead, $mode);
                 ajax_getTotalQtySupplier($txt_rmEntry_qty, $idHead, $mode);
+            }
+
+            if ($mode === 'ADD' && rmEntry_selectedTankTails.length === 0) {
+                ajax_populateTankNo($cmb_rmEntry_tankNo, 4, $idTankTail);
             }
         };
 

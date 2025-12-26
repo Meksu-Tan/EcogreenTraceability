@@ -62,6 +62,22 @@
                                         </div>
                                     </div>
                                     <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="name">Specific Source Sloc No</label>
+                                                <select name="tankNo[]" id="form-rmTrfEntry-fromTankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="name">Specific Trf Sloc No</label>
+                                                <select name="trfTankNo[]" id="form-rmTrfEntry-toTankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
                                         <div class="col-md-4">
                                             <div class="form-group">
                                                 <label for="name" style="display: block;">&nbsp;</label>
@@ -126,6 +142,8 @@
         const $txt_rmTrfEntry_date             = '#form-rmTrfEntry-entryDate';
         const $cmb_rmTrfEntry_sourceTank       = '#form-rmTrfEntry-fromTank';
         const $cmb_rmTrfEntry_trfTank          = '#form-rmTrfEntry-toTank';
+        const $cmb_rmTrfEntry_sourceTankNo     = '#form-rmTrfEntry-fromTankNo';
+        const $cmb_rmTrfEntry_trfTankNo        = '#form-rmTrfEntry-toTankNo';
         const $txt_rmTrfEntry_materialDoc      = '#form-rmTrfEntry-materialDoc';
 
         const $btn_rmTrfEntry_save             = '#save-rmTrfEntry';
@@ -134,6 +152,10 @@
         const $txt_rmTrfEntry_detail           = '#form-rmTrfEntry-detail';
 
         const $btn_deactivateRmTrfMaterial     = '#destroy-rmentrytrf-material';
+
+        let rmTrfEntry_selectedSourceTankTails = [];
+        let rmTrfEntry_selectedTrfTankTails    = [];
+        let rmTrfEntry_isReturningFromMaterial = false;
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -200,6 +222,8 @@
                     $materialDoc = $($txt_rmTrfEntry_materialDoc).val();
                     $idMaterial = null;
 
+                    rmTrfEntry_isReturningFromMaterial = true;
+
                     initialize_modalRmEntryMaterial($mode, $idHead, $idTail, $entryNo, $qty, $idTankFeed,
                                                     $idTankStorage, $entryDate, $materialDoc, $idMaterial);
                     $($modal_rmEntryTrf_addMaterial).modal('show');
@@ -241,6 +265,28 @@
                     if ( $($modal_rmEntryTrf).hasClass('show') ) {
                         $($modal_rmEntryTrf).css('opacity', 1);
                     }
+
+                    if (rmTrfEntry_selectedSourceTankTails.length > 0) {
+                        $($cmb_rmTrfEntry_sourceTankNo).val(rmTrfEntry_selectedSourceTankTails).trigger('change');
+                    }
+
+                    if (rmTrfEntry_selectedTrfTankTails.length > 0) {
+                        $($cmb_rmTrfEntry_trfTankNo).val(rmTrfEntry_selectedTrfTankTails).trigger('change');
+                    }
+
+                    rmTrfEntry_isReturningFromMaterial = false;
+                });
+                $($modal_rmEntryTrf).on('hidden.bs.modal', function () {
+                    rmTrfEntry_selectedSourceTankTails = [];
+                    rmTrfEntry_selectedTrfTankTails = [];
+                    $($cmb_rmTrfEntry_sourceTankNo).val(null).trigger('change');
+                    $($cmb_rmTrfEntry_trfTankNo).val(null).trigger('change');
+                });
+                $(document).on('change', $cmb_rmTrfEntry_sourceTankNo, function () {
+                    rmTrfEntry_selectedSourceTankTails = $(this).val() || [];
+                });
+                $(document).on('change', $cmb_rmTrfEntry_trfTankNo, function () {
+                    rmTrfEntry_selectedTrfTankTails = $(this).val() || [];
                 });
 
         });
@@ -267,10 +313,11 @@
                 }
             });
         };
-        function ajax_populateTankTrf(id, $sloc=null, selectedValue=null, $fixedPlant=null){
+        function ajax_populateTankTrf(id, $sloc=null, selectedValue=null, $fixedPlant=null, selectedSpecific=null){
             // Empty the dropdown
             // $(id).find('option').not(':first').remove();
             $(id).find('option').remove();
+            const prevValue = $(id).val();
             // AJAX request
             $.ajax({
                 url: show_url,
@@ -282,6 +329,9 @@
                     id_plant: $fixedPlant ?? null,
                 },
                 success: function(response){
+                    if (prevValue && prevValue === selectedValue) {
+                        return;
+                    }
                     var len = 0;
                     if(response['data'] != null){
                         len = response['data'].length;
@@ -303,9 +353,126 @@
                             $(id).append(option);
                         }
                     }
+                    if ($sloc === 'FEED') {
+                        let selectedFeedTank = $(id).val();
+
+                        ajax_populateSpecificTankTrf($cmb_rmTrfEntry_trfTankNo, selectedFeedTank, selectedSpecific);
+                    } else if ($sloc === 'STORAGE') {
+                        ajax_populateSpecificTankSource($cmb_rmTrfEntry_sourceTankNo, 4, selectedSpecific);
+                    }
                 }
             });
         };
+        function ajax_populateSpecificTankSource(id, $sloc=null, selectedValues=null, options={}) {
+            const $select = $(id);
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificSourceTank',
+                    sloc: $sloc
+                },
+                success: function(response) {
+                    const wasInitialized = $select.hasClass("select2-hidden-accessible");
+
+                    $select.empty();
+
+                    if (response.data && response.data.length) {
+                        response.data.forEach(row => {
+                            const option = new Option(
+                                row.tankNo,
+                                row.id_tank_tail,
+                                false,
+                                false
+                            );
+
+                            $select.append(option);
+                        });
+                    }
+                    if (!wasInitialized) {
+                        $select.select2({
+                            placeholder: ' - Select Specific Source Sloc No -',
+                            closeOnSelect: false,
+                            allowClear: true,
+                            width: '100%',
+                            dropdownParent: options.dropdownParent || $select.closest(".modal"),
+                        });
+                    }
+                    
+                    if (selected.length) {
+                        $select.val(selected).trigger('change');
+                    }
+                }
+            });
+        }
+        function ajax_populateSpecificTankTrf(id, $sloc=null, selectedValues=null, options={}) {
+            const $select = $(id);
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificTrfTank',
+                    sloc: $sloc,
+                },
+                success: function(response) {
+                    const wasInitialized = $select.hasClass("select2-hidden-accessible");
+
+                    $select.empty();
+
+                    if (response.data && response.data.length) {
+                        response.data.forEach(row => {
+                            const option = new Option(
+                                row.trfTankNo,
+                                row.id_tank_tail,
+                                false,
+                                false
+                            );
+
+                            $select.append(option);
+                        });
+                    }
+                    if (!wasInitialized) {
+                        $select.select2({
+                            placeholder: ' - Select Specific Trf Sloc No -',
+                            closeOnSelect: false,
+                            allowClear: true,
+                            width: '100%',
+                            dropdownParent: options.dropdownParent || $select.closest(".modal"),
+                        });
+                    }
+
+                    if (selected.length) {
+                        $select.val(selected).trigger('change');
+                    }
+                }
+            });
+        }
         function ajax_populateMaterialTrf(id, selectedValue=null){
             // Empty the dropdown
             $(id).find('option').not(':first').remove();
@@ -426,7 +593,8 @@
 
     /* FUNCTION INIT */
         function initialize_modalRmTrfEntry($mode, $trf_number=null, $idHead=null, $entryDate=null,
-                                            $idTankSource=null, $idTankTrf=null, $materialDoc=null,
+                                            $idTankSource=null, $idTankTrf=null, $sourceTankTails=null, 
+                                            $trfTankTails=null, $materialDoc=null,
                                             $idMaterial=null){
 
             var options = { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' };
@@ -437,8 +605,10 @@
             $($txt_rmTrfEntry_idHead).val($idHead);
             $($txt_rmTrfEntry_materialDoc).val($materialDoc);
 
-            ajax_populateTankTrf($cmb_rmTrfEntry_sourceTank, 'STORAGE', $idTankSource, 1002);
-            ajax_populateTankTrf($cmb_rmTrfEntry_trfTank, 'FEED', $idTankTrf);
+            if (!rmTrfEntry_isReturningFromMaterial) {
+                ajax_populateTankTrf($cmb_rmTrfEntry_sourceTank, 'STORAGE', $idTankSource, 1002, $sourceTankTails);
+                ajax_populateTankTrf($cmb_rmTrfEntry_trfTank, 'FEED', $idTankTrf, null, $trfTankTails);
+            }
             ajax_getTotalQtyMaterial($txt_rmTrfEntry_qty, $trf_number, $mode);
 
             if ($mode == 'ADD'){
