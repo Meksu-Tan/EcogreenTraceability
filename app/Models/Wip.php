@@ -94,12 +94,18 @@ class Wip extends Model
 
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         if ($mode == 'LATEST'){
-            $db = DB::select('SELECT a.id_trace_head, a.entry_date, a.to_trace_no AS rundown_trace_no, a.id_balance_head, a.id_material,
+            $db = DB::select('SELECT a.id_trace_head, a.entry_date, a.to_trace_no AS rundown_trace_no, a.id_balance_head, a.id_material, a.id_sloc, a.id_tank_tail,
                                      FORMAT(ROUND(h.in_qty,3),3) AS in_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                                      CONCAT(c.code, " :: ", c.description) AS material, g.material_document,
                                      FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf, b.batch_sap,
                                      GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(b.in_qty,3), " MT") SEPARATOR " | ") AS supplier,
-                                     FORMAT(ROUND(SUM(b.in_qty),3),3) AS balance_supplier
+                                     FORMAT(ROUND(bs.supplier_qty,3),3) AS balance_supplier,
+                                     CONCAT(i.description, 
+                                        IF(GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                            "", 
+                                            CONCAT(" | ", GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", "))
+                                        )
+                                    ) AS sloc
                                 FROM t_trace_header a
                                 LEFT JOIN t_trace_detail b
                                   ON a.id_trace_head = b.id_trace_head
@@ -115,6 +121,16 @@ class Wip extends Model
                                         	GROUP BY a.to_trace_no
                                         ) h
                                   ON a.to_trace_no = h.to_trace_no
+                                LEFT JOIN m_tank i
+                                    ON a.id_sloc = i.id_tank
+                                LEFT JOIN m_tank_detail j
+                                    ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(j.id_tank_tail AS CHAR)))
+                                LEFT JOIN (
+                                    SELECT id_trace_head, SUM(in_qty) AS supplier_qty
+                                    FROM t_trace_detail
+                                    WHERE in_qty > 0
+                                    GROUP BY id_trace_head
+                                ) bs ON bs.id_trace_head = a.id_trace_head
                                WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                                  AND a.in_qty > 0
                                  AND b.in_qty > 0
@@ -203,12 +219,18 @@ class Wip extends Model
 
                 if ($idMatlSign == '03'){
                     if ($mode == 'LATEST'){
-                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document,
+                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_tank_tail,
                                                 FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                                                 GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
                                                 b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
                                                 GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
-                                                IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier
+                                                IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
+                                                CONCAT(i.description, 
+                                                    IF(GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                                        "", 
+                                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", "))
+                                                    )
+                                                ) AS sloc
                                             FROM t_trace_header a
                                             LEFT JOIN t_trace_detail b
                                             ON a.id_trace_head = b.id_trace_head
@@ -224,6 +246,19 @@ class Wip extends Model
                                                             GROUP BY a.to_trace_no
                                                         ) h
                                             ON a.to_trace_no = h.to_trace_no
+                                            LEFT JOIN m_tank i
+                                            ON a.id_sloc = i.id_tank
+                                            LEFT JOIN m_tank_detail j
+                                            ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(j.id_tank_tail AS CHAR)))
+                                            LEFT JOIN (
+                                                SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
+                                                FROM t_trace_header h
+                                                JOIN t_trace_detail d
+                                                    ON h.id_trace_head = d.id_trace_head
+                                                WHERE d.out_qty > 0
+                                                    AND h.status = 1
+                                                GROUP BY h.to_trace_no
+                                            ) bs ON bs.to_trace_no = a.to_trace_no
                                         WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                                             AND a.out_qty > 0
                                             AND b.out_qty > 0
@@ -296,12 +331,18 @@ class Wip extends Model
                 } else {
                     if ($mode == 'LATEST'){
                         //dd($feedId . ' ' . $idMaterial . ' ' . self::$movType2);
-                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document,
+                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_tank_tail,
                                                 FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                                                 GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
                                                 b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
                                                 GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(b.out_qty,3), " MT") SEPARATOR " | ") AS supplier,
-                                                IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier
+                                                IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
+                                                CONCAT(i.description, 
+                                                    IF(GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                                        "", 
+                                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", "))
+                                                    )
+                                                ) AS sloc
                                             FROM t_trace_header a
                                             LEFT JOIN t_trace_detail b
                                             ON a.id_trace_head = b.id_trace_head
@@ -317,6 +358,19 @@ class Wip extends Model
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
+                                            LEFT JOIN m_tank i
+                                            ON a.id_sloc = i.id_tank
+                                            LEFT JOIN m_tank_detail j
+                                            ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(j.id_tank_tail AS CHAR)))
+                                            LEFT JOIN (
+                                                SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
+                                                FROM t_trace_header h
+                                                JOIN t_trace_detail d
+                                                    ON h.id_trace_head = d.id_trace_head
+                                                WHERE d.out_qty > 0
+                                                    AND h.status = 1
+                                                GROUP BY h.to_trace_no
+                                            ) bs ON bs.to_trace_no = a.to_trace_no
                                         WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                                             AND a.out_qty > 0
                                             AND b.out_qty > 0
@@ -398,12 +452,18 @@ class Wip extends Model
 
                 if ($idMatlSign == '01'){
                     if ($mode == 'LATEST'){
-                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document,
+                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_tank_tail,
                                                 FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                                                 GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
                                                 b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
                                                 GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
-                                                IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier
+                                                IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
+                                                CONCAT(i.description, 
+                                                    IF(GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                                        "", 
+                                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", "))
+                                                    )
+                                                ) AS sloc
                                             FROM t_trace_header a
                                             LEFT JOIN t_trace_detail b
                                             ON a.id_trace_head = b.id_trace_head
@@ -419,6 +479,19 @@ class Wip extends Model
                                                             GROUP BY a.to_trace_no
                                                         ) h
                                             ON a.to_trace_no = h.to_trace_no
+                                            LEFT JOIN m_tank i
+                                            ON a.id_sloc = i.id_tank
+                                            LEFT JOIN m_tank_detail j
+                                            ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(j.id_tank_tail AS CHAR)))
+                                            LEFT JOIN (
+                                                SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
+                                                FROM t_trace_header h
+                                                JOIN t_trace_detail d
+                                                    ON h.id_trace_head = d.id_trace_head
+                                                WHERE d.out_qty > 0
+                                                    AND h.status = 1
+                                                GROUP BY h.to_trace_no
+                                            ) bs ON bs.to_trace_no = a.to_trace_no
                                         WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                                             AND a.out_qty > 0
                                             AND b.out_qty > 0
@@ -491,12 +564,18 @@ class Wip extends Model
                 } else {
                     if ($mode == 'LATEST'){
                         //dd($feedId . ' ' . $idMaterial . ' ' . self::$movType2);
-                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document,
+                        $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_tank_tail,
                                                 FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                                                 GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
                                                 b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
                                                 GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(b.out_qty,3), " MT") SEPARATOR " | ") AS supplier,
-                                                IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier
+                                                IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
+                                                CONCAT(i.description, 
+                                                    IF(GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                                        "", 
+                                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", "))
+                                                    )
+                                                ) AS sloc
                                             FROM t_trace_header a
                                             LEFT JOIN t_trace_detail b
                                             ON a.id_trace_head = b.id_trace_head
@@ -512,6 +591,19 @@ class Wip extends Model
                                                             GROUP BY a.to_trace_no
                                                             ) h
                                             ON a.to_trace_no = h.to_trace_no
+                                            LEFT JOIN m_tank i
+                                            ON a.id_sloc = i.id_tank
+                                            LEFT JOIN m_tank_detail j
+                                            ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(j.id_tank_tail AS CHAR)))
+                                            LEFT JOIN (
+                                                SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
+                                                FROM t_trace_header h
+                                                JOIN t_trace_detail d
+                                                    ON h.id_trace_head = d.id_trace_head
+                                                WHERE d.out_qty > 0
+                                                    AND h.status = 1
+                                                GROUP BY h.to_trace_no
+                                            ) bs ON bs.to_trace_no = a.to_trace_no
                                         WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                                             AND a.out_qty > 0
                                             AND b.out_qty > 0
@@ -586,12 +678,18 @@ class Wip extends Model
 
         } else {
             if ($mode == 'LATEST'){
-                $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document,
+                $db = DB::select('SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no, a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_tank_tail,
                                          FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                                          GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
                                          b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
                                          GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
-                                         IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier
+                                         IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
+                                        CONCAT(i.description, 
+                                            IF(GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                                "", 
+                                                CONCAT(" | ", GROUP_CONCAT(DISTINCT j.tf_number ORDER BY j.tf_number ASC SEPARATOR ", "))
+                                            )
+                                        ) AS sloc
                                     FROM t_trace_header a
                                     LEFT JOIN t_trace_detail b
                                       ON a.id_trace_head = b.id_trace_head
@@ -607,6 +705,19 @@ class Wip extends Model
                                         				 GROUP BY a.to_trace_no
                                         				) h
                                          ON a.to_trace_no = h.to_trace_no
+                                         LEFT JOIN m_tank i
+                                         ON a.id_sloc = i.id_tank
+                                         LEFT JOIN m_tank_detail j
+                                         ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(j.id_tank_tail AS CHAR)))
+                                         LEFT JOIN (
+                                                SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
+                                                FROM t_trace_header h
+                                                JOIN t_trace_detail d
+                                                    ON h.id_trace_head = d.id_trace_head
+                                                WHERE d.out_qty > 0
+                                                    AND h.status = 1
+                                                GROUP BY h.to_trace_no
+                                            ) bs ON bs.to_trace_no = a.to_trace_no
                                    WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                                      AND a.out_qty > 0
                                      AND b.out_qty > 0
@@ -920,12 +1031,25 @@ class Wip extends Model
 
         return $db;
     }
+    static function get_cmbActiveSpecificTank_trf($request){
+        $sloc = $request->input('sloc');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+
+        $db = DB::select('SELECT a.id_tank_tail, a.tf_number AS tankNo
+                            FROM m_tank_detail a
+                           WHERE a.status = 1
+                             AND a.id_tank = ?
+                           ORDER BY a.tf_number ASC', [$sloc]);
+        return $db;
+    }
     static function post_materialFeed($user, $request){
         $feedID = $request->input('feed_id');
         $id = $request->input('id');
         $mode = $request->input('mode');
         $last_qtf = $request->input('last_feed');
         $id_tank = $request->input('tank');
+        $id_tank_tail = $request->input('tankNo');
+        $id_tank_tail_json = json_encode($id_tank_tail);
         $curr_qtf = $request->input('curr_feed');
         $curr_entryDate = $request->input('curr_entryDate');
         $entry_no = $request->input('batch_no');
@@ -1078,6 +1202,7 @@ class Wip extends Model
                                 'id_material' => $id_material,
                                 'entry_date' => $curr_entryDate,
                                 'id_sloc' => $id_tank,
+                                'id_tank_tail' => $id_tank_tail_json,
                                 'out_qty' => $out_qty,
                                 'last_qtf' => $last_qtf,
                                 'curr_qtf' => $curr_qtf,
@@ -1130,6 +1255,7 @@ class Wip extends Model
                                 'batch_sap'      => $tail->batch_sap,
                                 'created_by'     => $user,
                                 'id_sloc'        => $id_tank,
+                                'id_tank_tail'   => $id_tank_tail_json,
                                 'id_plant'       => $idPlant,
                             ]);
 
@@ -1166,6 +1292,8 @@ class Wip extends Model
         $curr_entryDate = $request->input('curr_entryDate');
         $entry_no = $request->input('batch_no');
         $id_tank = $request->input('tank');
+        $id_tank_tail = $request->input('tankNo');
+        $id_tank_tail_json = json_encode($id_tank_tail);
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         /* CHECK LOCK PERIOD */
@@ -1291,6 +1419,7 @@ class Wip extends Model
                     'trace_no' => $entry_no,
                     'id_material' => $id_material,
                     'id_tank' => $id_tank,
+                    'id_tank_tail' => $id_tank_tail_json,
                     'qty' => $in_qty,
                     'in_qty' => $in_qty,
                     'init_qty' => $in_qty,
@@ -1305,6 +1434,7 @@ class Wip extends Model
                     'id_material' => $id_material,
                     'entry_date' => $curr_entryDate,
                     'id_sloc' => $id_tank,
+                    'id_tank_tail' => $id_tank_tail_json,
                     'in_qty' => $in_qty,
                     'last_qtf' => $last_qtf,
                     'curr_qtf' => $curr_qtf,
@@ -1388,6 +1518,7 @@ class Wip extends Model
                             'id_supplier' => $idSupplier,
                             'id_material' => $id_material,
                             'id_tank' => $id_tank,
+                            'id_tank_tail' => $id_tank_tail_json,
                             'qty' => $rundownSupplier,
                             'in_qty' => $rundownSupplier,
                             'init_qty' => $rundownSupplier,
@@ -1402,6 +1533,7 @@ class Wip extends Model
                             'id_supplier' => $idSupplier,
                             'id_material' => $id_material,
                             'id_sloc' => $id_tank,
+                            'id_tank_tail' => $id_tank_tail_json,
                             'in_qty' => $rundownSupplier,
                             'batch_sap' => $batchSap,
                             'id_plant' => $idPlant,
@@ -1876,6 +2008,65 @@ class Wip extends Model
                                                 LIMIT 1
                                             ", [$nextDate, $nextDate, $nextDate]);
         return $db;
+    }
+
+    static function post_updateEntrySubTank($user, $request){
+        $idHead   = $request->input('idHead');
+        $tails  = $request->input('idTankTail');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+    
+        if (!is_array($tails)) {
+            return [(object)['response' => 0, 'message' => 'INVALID SUBTANK DATA']];
+        }
+    
+        $jsonTails = json_encode(array_values(array_unique($tails)));
+    
+        // Fetch existing header
+        $row = DB::selectOne('SELECT id_tank_tail, trace_no 
+                              FROM t_balance_header 
+                              WHERE id_balance_head = ? AND status = 1', [$idHead]);
+    
+        // Update header
+        DB::update('UPDATE t_balance_header
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update trace header
+        DB::update('UPDATE t_trace_header
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update ALL balance details
+        DB::update('UPDATE t_balance_detail
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update ALL trace details
+        DB::update('UPDATE t_trace_detail
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_trace_head IN (
+                        SELECT id_trace_head 
+                        FROM t_trace_header 
+                        WHERE id_balance_head = ?
+                    )', [$jsonTails, $user, $idHead]);
+    
+        // Log change
+        DB::insert(
+            'INSERT INTO log_transactions
+                (log_module, log_type, log_description, created_by)
+            VALUES (?, ?, ?, ?)',
+            [
+                'T_BALANCE_HEAD', 'UPDATE_SUBTANK',
+                'IDHEAD: '.$idHead.' | TRACE: '.$row->trace_no.
+                ' | SUBTANKS: '.implode(',', $tails),
+                $user
+            ]
+        );
+    
+        return [(object)['response' => 1]];
     }
 
 

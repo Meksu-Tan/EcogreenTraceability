@@ -182,6 +182,10 @@ class WipentryController extends Controller
                     $data = $this->returnResponse(null, $e->getMessage(), 500);
                     return response()->json($data);
                 }
+            } elseif ($flag == 'post_updateEntrySubTank'){
+                $return = WP::post_updateEntrySubTank($user, $request);
+                $data = $this->returnResponse($return, 'SUBTANK', $mode);
+                return response()->json($data);
             }
 
 
@@ -362,6 +366,10 @@ class WipentryController extends Controller
             exit;
         } elseif ($flag == 'get_quantifierData'){
             $txtData['data'] = WP::get_quantifierData($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_cmbActiveSpecificTank_trf'){
+            $txtData['data'] = WP::get_cmbActiveSpecificTank_trf($request);
             echo json_encode($txtData);
             exit;
         }

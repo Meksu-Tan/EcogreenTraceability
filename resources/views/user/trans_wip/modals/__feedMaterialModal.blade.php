@@ -64,6 +64,15 @@
                                         </div>
                                     </div>
                                     <div class="row">
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label for="name">Specific Sloc</label>
+                                                <select name="tankNo[]" id="form-feed-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="name">Current Feed (MT) </label>
@@ -119,9 +128,12 @@
         const $form_feed_feature        = '#form-feed-feature';
         const $form_feed_tagNumber      = '#form-feed-tagNumber';
         const $label_feed_curr          = '#label-feed-current';
+        const $form_feed_tankNo         = '#form-feed-tankNo';
 
         const $div_tank                 = '#div-tanks';
         const $div_lastFeed             = '#div-lastFeed';
+
+        let feedEntry_selectedTankTails = [];
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -196,6 +208,13 @@
                         ajax_getQuantifierDataFeed($($form_feed_tagNumber).val(), $($form_feed_currEntryDate).val());
                     }
                 });
+                $(document).on('change', $form_feed_tankNo, function () {
+                    feedEntry_selectedTankTails = $(this).val() || [];
+                });
+                $(document).on('change', $form_feed_tank, function () {
+                    let sloc = $(this).val();
+                    ajax_populateSpecificTankFeed($form_feed_tankNo, sloc, feedEntry_selectedTankTails);
+                });
 
             /* EVENT LISTENER ON CLICK */
 
@@ -248,10 +267,68 @@
                             }
                             $(id).append(option);
                         }
+
+                        let valueToSelect = selectedValue ?? response.data[0]?.id_tank;
+                        $(id).val(valueToSelect).trigger("change"); // this triggers the SLoc update
                     }
                 }
             });
         };
+        function ajax_populateSpecificTankFeed(id, sloc=null, selectedValues=null, options={}) {
+            const $select = $(id);
+
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificTank_trf',
+                    sloc: sloc,
+            },
+            success: function(response) {
+                $select.empty();
+
+                if (response.data && response.data.length) {
+                    response.data.forEach(row => {
+                        const isSelected = selected.includes(String(row.id_tank_tail));
+
+                        const option = new Option(
+                            row.tankNo,
+                            row.id_tank_tail,
+                            isSelected,
+                            isSelected
+                        );
+
+                        $select.append(option);
+                    });
+                }
+                
+                if (!$select.hasClass("select2-hidden-accessible")) {
+                    $select.select2({
+                        placeholder: ' - Select Specific Sloc No -',
+                        closeOnSelect: false,
+                        allowClear: true,
+                        width: '100%',
+                        dropdownParent: options.dropdownParent || $select.closest(".modal"),
+                    });
+                }
+
+                $select.trigger('change');
+            }
+        });
+    }
         function ajax_populateFeedBatchNo($id, $feedID=null){
             $.ajax({
                 url: show_url,
@@ -328,7 +405,7 @@
 
 
     /* FUNCTION INITIALIZATION */
-        function initialize_feedMaterial($title=null, $mode=null, $flag=null, $feedID=null, $id=null, $quantifierDCS=null){
+        function initialize_feedMaterial($title=null, $mode=null, $flag=null, $feedID=null, $id=null, $quantifierDCS=null, $idTank=null, $idTankTail=null){
             $($form_feed_flag).val($flag);
             $($form_feed_id).val($id);
             $($form_feed_mode).val($mode);
@@ -346,6 +423,7 @@
             ajax_populateTankFeed($form_feed_tank, $feedID);
             ajax_populateFeedBatchNo($form_feed_batchNo, $feedID);
             ajax_populateLastFeed($form_feed_last, $form_feed_lastEntryDate, $feedID);
+            ajax_populateSpecificTankFeed($form_feed_tankNo, $idTank, $idTankTail);
 
             if ($id == 'NON-CPKO'){
                 $($div_tank).hide();

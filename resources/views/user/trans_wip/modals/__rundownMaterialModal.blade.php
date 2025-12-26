@@ -71,6 +71,15 @@
                                         </div>
                                     </div>
                                     <div class="row">
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label for="name">Sloc</label>
+                                                <select name="tankNo[]" id="form-rundown-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="name">Current Rundown (MT)</label>
@@ -126,8 +135,11 @@
         const $form_rundown_idTank         = '#form-rundown-tank';
         const $form_rundown_tagNumber      = '#form-rundown-tagNumber';
         const $label_rundown_curr          = '#label-rundown-current';
+        const $form_rundown_idTankNo       = '#form-rundown-tankNo';
 
         const $div_lastRundown             = '#div-lastRundown';
+
+        let runddownEntry_selectedTankTails = [];
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -201,6 +213,13 @@
                     if ($($form_rundown_tagNumber).val() !== null){
                         ajax_getQuantifierDataRundown($($form_rundown_tagNumber).val(), $($form_rundown_currEntryDate).val());
                     }
+                });
+                $(document).on('change', $form_rundown_idTankNo, function () {
+                    rundownEntry_selectedTankTails = $(this).val() || [];
+                });
+                $(document).on('change', $form_rundown_idTank, function () {
+                    let sloc = $(this).val();
+                    ajax_populateSpecificTankFeed($form_rundown_idTankNo, sloc, rundownEntry_selectedTankTails);
                 });
 
             /* EVENT LISTENER ON CLICK */
@@ -295,10 +314,68 @@
                             }
                             $(id).append(option);
                         }
+
+                        let valueToSelect = selectedValue ?? response.data[0]?.id_tank;
+                        $(id).val(valueToSelect).trigger("change"); // this triggers the SLoc update
                     }
                 }
             });
         };
+        function ajax_populateSpecificTankRundown(id, sloc=null, selectedValues=null, options={}) {
+            const $select = $(id);
+
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificTank_trf',
+                    sloc: sloc,
+            },
+            success: function(response) {
+                $select.empty();
+
+                if (response.data && response.data.length) {
+                    response.data.forEach(row => {
+                        const isSelected = selected.includes(String(row.id_tank_tail));
+
+                        const option = new Option(
+                            row.tankNo,
+                            row.id_tank_tail,
+                            isSelected,
+                            isSelected
+                        );
+
+                        $select.append(option);
+                    });
+                }
+                
+                if (!$select.hasClass("select2-hidden-accessible")) {
+                    $select.select2({
+                        placeholder: ' - Select Specific Sloc No -',
+                        closeOnSelect: false,
+                        allowClear: true,
+                        width: '100%',
+                        dropdownParent: options.dropdownParent || $select.closest(".modal"),
+                    });
+                }
+
+                $select.trigger('change');
+            }
+        });
+    }
         function ajax_getQuantifierDataRundown($tagNumber, $date){
 
             $.ajax({
@@ -327,7 +404,7 @@
 
 
     /* FUNCTION INITIALIZATION */
-        function initialize_rundownMaterial($title=null, $mode=null, $flag=null, $rundownID=null, $id=null, $quantifierDCS=null){
+        function initialize_rundownMaterial($title=null, $mode=null, $flag=null, $rundownID=null, $id=null, $quantifierDCS=null, $idTank=null, $idTankTail=null){
             $($form_rundown_flag).val($flag);
             $($form_rundown_id).val($id);
             $($form_rundown_mode).val($mode);
@@ -344,6 +421,7 @@
             ajax_populateRundownBatchNo($form_rundown_batchNo, $rundownID);
             ajax_populateLastRundown($form_rundown_last, $form_rundown_lastEntryDate, $rundownID);
             ajax_populateTankRundown($form_rundown_idTank, $rundownID);
+            ajax_populateSpecificTankRundown($form_rundown_idTankNo, $idTank, $idTankTail);
 
             if ($quantifierDCS != null){
                 $($form_rundown_tagNumber).val($quantifierDCS);

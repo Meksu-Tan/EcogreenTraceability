@@ -61,6 +61,7 @@
                                                                 <th>Feed Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Feed (MT)</th> -->
                                                                 <!-- <th>Curr Feed (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -113,6 +114,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -155,6 +157,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -213,6 +216,7 @@
                                                                 <th>Feed Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Feed (MT)</th> -->
                                                                 <!-- <th>Curr Feed (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -265,6 +269,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -307,7 +312,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
-
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -366,6 +371,7 @@
                                                                 <th>Feed Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Feed (MT)</th> -->
                                                                 <!-- <th>Curr Feed (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -418,6 +424,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -500,6 +507,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -542,6 +550,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -584,6 +593,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -626,6 +636,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -693,6 +704,7 @@
                                                                     <th>Feed Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Feed (MT)</th> -->
                                                                     <!-- <th>Curr Feed (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -745,6 +757,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -794,6 +807,7 @@
                                                                     <th>Feed Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Feed (MT)</th> -->
                                                                     <!-- <th>Curr Feed (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -846,6 +860,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -914,6 +929,7 @@
                                                                     <th>Feed Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Feed (MT)</th> -->
                                                                     <!-- <th>Curr Feed (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -967,6 +983,7 @@
                                                                         <th>WIP Trace No</th>
                                                                         <th>Entry Date</th>
                                                                         <th>Matl Doc</th>
+                                                                        <th>Sloc</th>
                                                                         <!-- <th>Last Rundown (MT)</th> -->
                                                                         <!-- <th>Curr Rundown (MT)</th> -->
                                                                         <th>Total Material (MT)</th>
@@ -1009,6 +1026,7 @@
                                                                         <th>WIP Trace No</th>
                                                                         <th>Entry Date</th>
                                                                         <th>Matl Doc</th>
+                                                                        <th>Sloc</th>
                                                                         <!-- <th>Last Rundown (MT)</th> -->
                                                                         <!-- <th>Curr Rundown (MT)</th> -->
                                                                         <th>Total Material (MT)</th>
@@ -1053,6 +1071,7 @@
                                                                             <th>WIP Trace No</th>
                                                                             <th>Entry Date</th>
                                                                             <th>Matl Doc</th>
+                                                                            <th>Sloc</th>
                                                                             <!-- <th>Last Rundown (MT)</th> -->
                                                                             <!-- <th>Curr Rundown (MT)</th> -->
                                                                             <th>Total Material (MT)</th>
@@ -1095,6 +1114,7 @@
                                                                             <th>WIP Trace No</th>
                                                                             <th>Entry Date</th>
                                                                             <th>Matl Doc</th>
+                                                                            <th>Sloc</th>
                                                                             <!-- <th>Last Rundown (MT)</th> -->
                                                                             <!-- <th>Curr Rundown (MT)</th> -->
                                                                             <th>Total Material (MT)</th>
@@ -1140,6 +1160,7 @@
                                                                             <th>WIP Trace No</th>
                                                                             <th>Entry Date</th>
                                                                             <th>Matl Doc</th>
+                                                                            <th>Sloc</th>
                                                                             <!-- <th>Last Rundown (MT)</th> -->
                                                                             <!-- <th>Curr Rundown (MT)</th> -->
                                                                             <th>Total Material (MT)</th>
@@ -1182,6 +1203,7 @@
                                                                             <th>WIP Trace No</th>
                                                                             <th>Entry Date</th>
                                                                             <th>Matl Doc</th>
+                                                                            <th>Sloc</th>
                                                                             <!-- <th>Last Rundown (MT)</th> -->
                                                                             <!-- <th>Curr Rundown (MT)</th> -->
                                                                             <th>Total Material (MT)</th>
@@ -1225,6 +1247,7 @@
                                                                         <th>WIP Trace No</th>
                                                                         <th>Entry Date</th>
                                                                         <th>Matl Doc</th>
+                                                                        <th>Sloc</th>
                                                                         <!-- <th>Last Rundown (MT)</th> -->
                                                                         <!-- <th>Curr Rundown (MT)</th> -->
                                                                         <th>Total Material (MT)</th>
@@ -1284,6 +1307,7 @@
                                                                 <th>Feed Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Feed (MT)</th> -->
                                                                 <!-- <th>Curr Feed (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -1336,6 +1360,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -1394,6 +1419,7 @@
                                                                 <th>Feed Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Feed (MT)</th> -->
                                                                 <!-- <th>Curr Feed (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -1446,6 +1472,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -1515,6 +1542,7 @@
                                                                     <th>Feed Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Feed (MT)</th> -->
                                                                     <!-- <th>Curr Feed (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1567,6 +1595,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1609,6 +1638,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1651,6 +1681,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1700,6 +1731,7 @@
                                                                     <th>Feed Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Feed (MT)</th> -->
                                                                     <!-- <th>Curr Feed (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1752,6 +1784,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1794,6 +1827,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1843,6 +1877,7 @@
                                                                     <th>Feed Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Feed (MT)</th> -->
                                                                     <!-- <th>Curr Feed (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1895,6 +1930,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1937,6 +1973,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -1979,6 +2016,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -2028,6 +2066,7 @@
                                                                     <th>Feed Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Feed (MT)</th> -->
                                                                     <!-- <th>Curr Feed (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -2080,6 +2119,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -2122,6 +2162,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -2164,6 +2205,7 @@
                                                                     <th>WIP Trace No</th>
                                                                     <th>Entry Date</th>
                                                                     <th>Matl Doc</th>
+                                                                    <th>Sloc</th>
                                                                     <!-- <th>Last Rundown (MT)</th> -->
                                                                     <!-- <th>Curr Rundown (MT)</th> -->
                                                                     <th>Total Material (MT)</th>
@@ -2224,6 +2266,7 @@
                                                                 <th>Feed Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Feed (MT)</th> -->
                                                                 <!-- <th>Curr Feed (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -2276,6 +2319,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -2318,6 +2362,7 @@
                                                                 <th>WIP Trace No</th>
                                                                 <th>Entry Date</th>
                                                                 <th>Matl Doc</th>
+                                                                <th>Sloc</th>
                                                                 <!-- <th>Last Rundown (MT)</th> -->
                                                                 <!-- <th>Curr Rundown (MT)</th> -->
                                                                 <th>Total Material (MT)</th>
@@ -2361,6 +2406,8 @@
     @include('user.trans_wip.modals.__addMaterialDocModal')
 
     @include('modals.__selectPlant')
+
+    @include('user.trans_wip.modals.__selectSubTankModal')
 
 <!-- SCRIPT -->
 <script>
@@ -2722,6 +2769,18 @@
             const $btn_cfa80_105Rundown_log         = '#cfa80-105-rundown-log';
             const $dt_cfa80_105Rundown              = '#table-cfa80-105-rundown';
 
+        const $modal_editSubTank = '#modal-wip-editSubTank';
+        const $form_editSubTank = '#form-wipEntryEditSubtank';
+        const $txt_editSubTank_flag = '#form-wipEntryEditSubtank-flag';
+        const $txt_editSubTank_mode = '#form-wipEntryEditSubtank-mode';
+        const $txt_editSubTank_idHead = '#form-wipEntryEditSubtank-idHead';
+        const $txt_editSubTank_idTank = '#form-wipEntryEditSubtank-idTank';
+        const $txt_editSubTank_mainSloc = '#form-wipEntryEditSubtank-mainSloc';
+        const $cmb_editSubTank_tankNo = '#form-wipEntryEditSubtank-tankNo';
+        const $btn_editSubTank_save = '#save-wipEntryEditSubtank';
+
+        let activeDataTable = null;
+
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
             /* INITIALIZE */
@@ -2851,6 +2910,86 @@
                             console.log(`data was dismissed by ${willDeleted.dismiss}`);
                         };
                     })
+                });
+                $(document).on('click', '.sloc-edit', function(e){
+                    e.preventDefault();
+
+                    const table = $(this).closest('table').attr('id');
+                    activeDataTable = '#' + table;
+                    
+                    const idHead = $(this).data('idhead');
+                    const mainSlocLabel = $(this).data('mainsloc');
+                    const idTank = $(this).data('idtank');
+
+                    let encoded = $(this).attr('data-idTankTail');
+                    let selectedTail = [];
+
+                    if (encoded) {
+                        try {
+                            selectedTail = JSON.parse(atob(encoded)).map(String);
+                        } catch (e) {
+                            selectedTail = [];
+                        }
+                    }
+
+                    // set hidden form values
+                    $($txt_editSubTank_idHead).val(idHead);
+                    $($txt_editSubTank_mainSloc).val(mainSlocLabel);
+                    $($txt_editSubTank_idTank).val(idTank);
+
+                    ajax_populateSpecificTankFeed($cmb_editSubTank_tankNo, idTank, selectedTail);
+
+                    // show modal   
+                    $($modal_editSubTank).modal('show');
+                });
+
+                /* submit update */
+                $($form_editSubTank).on('submit', function(e){
+                    e.preventDefault();
+                    var formData = new FormData(this);
+
+                    formData.append("flag", "post_updateEntrySubTank");
+
+                    Swal.fire({
+                        title: 'Confirm',
+                        text: 'Save specific sloc for this entry?',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Yes, save'
+                    }).then((result) => {
+                        if (result.value) {
+                            $.ajax({
+                                url: post_url,
+                                method: "POST",
+                                data: formData,
+                                contentType: false,
+                                cache: false,
+                                processData: false,
+                                dataType: "JSON",
+                                success: function(data) {
+                                    if (data.status == 1) {
+                                        Swal.fire({
+                                            position: 'top-end',
+                                            icon: 'success',
+                                            title: data.message,
+                                            showConfirmButton: false,
+                                            timer: 700
+                                        });
+                                        $($modal_editSubTank).modal('hide');
+                                        // reload only the datatable that was edited so Sloc column shows updated value
+                                        if (activeDataTable) {
+                                            $(activeDataTable).DataTable().ajax.reload(null, false);
+                                        }
+                                    } else {
+                                        Swal.fire(data.message, "", "error");
+                                    }
+                                },
+                                error: function(xhr, status, err) {
+                                    Swal.fire('Error', 'Something went wrong', 'error');
+                                }
+                            });
+                        }
+                    });
                 });
                 /* SECTION 101/102 */
                     /* FEED CPKO */
@@ -3591,6 +3730,10 @@
         });
 
     /* FUNCTION SELECT2 / DROPDOWN */
+    function htmlDecode(input){
+        var doc = new DOMParser().parseFromString(input, "text/html");
+        return doc.documentElement.textContent;
+    }
 
 
     /* FUNCTION AJAX */
@@ -3679,7 +3822,7 @@
                     paging: false,
                     info: false,
                     columnDefs: [{
-                        targets: [3,4], // index of 'balance_supplier' column
+                        targets: [4,5], // index of 'balance_supplier' column
                         createdCell: function(td, cellData, rowData) {
                             if (rowData.out_qty === rowData.balance_supplier) {
                                 $(td).css('color', 'green');
@@ -3687,11 +3830,38 @@
                                 $(td).css('color', 'red');
                             }
                         }
-                    }],
+                    },
+                    {
+                        targets: [3],
+                        render: function(data, type, row) {
+                            const idHead     = row.id_balance_head;
+                            const idTank     = row.id_sloc;
+                            const mainSloc   = row.sloc;
+                            let tankTails    = row.id_tank_tail;
+
+                            if (typeof tankTails === "string") {
+                                tankTails = htmlDecode(tankTails);
+                                try { 
+                                    tankTails = JSON.parse(tankTails); 
+                                } catch { 
+                                    tankTails = []; 
+                                }
+                            }
+
+                            let display = mainSloc;
+
+                            return `<a href="#" class="sloc-edit" data-idHead="${idHead}" data-idTank="${idTank}" data-mainSloc="${mainSloc}" data-idTankTail='${btoa(JSON.stringify(tankTails))}' style="color:#7c7c7d;">
+                                        ${display}
+                                    </a>`;
+                        },
+                        "className": 'text-center'
+                    }
+                ],
                     columns: [
                         { data: 'to_trace_no', name: 'to_trace_no', className: 'text-center'},
                         { data: 'entry_date', name: 'entry_date', className: 'text-center'},
                         { data: 'material_document', name: 'material_document', className: 'text-center'},
+                        { data: 'sloc', name: 'sloc', className: 'text-center'},
                         // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
                         // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
                         { data: 'out_qty', name: 'out_qty', className: 'text-right'},
@@ -3725,7 +3895,7 @@
                     paging: false,
                     info: false,
                     columnDefs: [{
-                        targets: [3,4], // index of 'balance_supplier' column
+                        targets: [4,5], // index of 'balance_supplier' column
                         createdCell: function(td, cellData, rowData) {
                             if (rowData.out_qty === rowData.balance_supplier) {
                                 $(td).css('color', 'green');
@@ -3733,11 +3903,38 @@
                                 $(td).css('color', 'red');
                             }
                         }
-                    }],
+                    },
+                    {
+                        targets: [3],
+                        render: function(data, type, row) {
+                            const idHead     = row.id_balance_head;
+                            const idTank     = row.id_sloc;
+                            const mainSloc   = row.sloc;
+                            let tankTails    = row.id_tank_tail;
+
+                            if (typeof tankTails === "string") {
+                                tankTails = htmlDecode(tankTails);
+                                try { 
+                                    tankTails = JSON.parse(tankTails); 
+                                } catch { 
+                                    tankTails = []; 
+                                }
+                            }
+
+                            let display = mainSloc;
+
+                            return `<a href="#" class="sloc-edit" data-idHead="${idHead}" data-idTank="${idTank}" data-mainSloc="${mainSloc}" data-idTankTail='${btoa(JSON.stringify(tankTails))}' style="color:#7c7c7d;">
+                                        ${display}
+                                    </a>`;
+                        },
+                        "className": 'text-center'
+                    }
+                ],
                     columns: [
                         { data: 'to_trace_no', name: 'to_trace_no', className: 'text-center'},
                         { data: 'entry_date', name: 'entry_date', className: 'text-center'},
                         { data: 'material_document', name: 'material_document', className: 'text-center'},
+                        { data: 'sloc', name: 'sloc', className: 'text-center'},
                         // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
                         // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
                         { data: 'out_qty', name: 'out_qty', className: 'text-right'},
@@ -3771,7 +3968,7 @@
                     paging: false,
                     info: false,
                     columnDefs: [{
-                        targets: [3,4], // index of 'balance_supplier' column
+                        targets: [4,5], // index of 'balance_supplier' column
                         createdCell: function(td, cellData, rowData) {
                             if (rowData.in_qty === rowData.balance_supplier) {
                                 $(td).css('color', 'green');
@@ -3779,11 +3976,38 @@
                                 $(td).css('color', 'red');
                             }
                         }
-                    }],
+                    },
+                    {
+                        targets: [3],
+                        render: function(data, type, row) {
+                            const idHead     = row.id_balance_head;
+                            const idTank     = row.id_sloc;
+                            const mainSloc   = row.sloc;
+                            let tankTails    = row.id_tank_tail;
+
+                            if (typeof tankTails === "string") {
+                                tankTails = htmlDecode(tankTails);
+                                try { 
+                                    tankTails = JSON.parse(tankTails); 
+                                } catch { 
+                                    tankTails = []; 
+                                }
+                            }
+
+                            let display = mainSloc;
+
+                            return `<a href="#" class="sloc-edit" data-idHead="${idHead}" data-idTank="${idTank}" data-mainSloc="${mainSloc}" data-idTankTail='${btoa(JSON.stringify(tankTails))}' style="color:#7c7c7d;">
+                                        ${display}
+                                    </a>`;
+                        },
+                        "className": 'text-center'
+                    }
+                ],
                     columns: [
                         { data: 'rundown_trace_no', name: 'rundown_trace_no', className: 'text-center'},
                         { data: 'entry_date', name: 'entry_date', className: 'text-center'},
                         { data: 'material_document', name: 'material_document', className: 'text-center'},
+                        { data: 'sloc', name: 'sloc', className: 'text-center'},
                         // { data: 'last_qtf', name: 'last_qtf', className: 'text-right'},
                         // { data: 'curr_qtf', name: 'curr_qtf', className: 'text-right'},
                         { data: 'in_qty', name: 'in_qty', className: 'text-right'},
