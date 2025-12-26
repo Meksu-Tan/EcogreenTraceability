@@ -466,9 +466,9 @@
                         len = response['data'].length;
                     }
                     if(len > 0){
-                        if ($trfType == 'in' && $trfType !== 'all'){
+                        if (($trfType == 'in' || $trfType == 'out') && $trfType !== 'all'){
                             if (response['data'][0].total !== 'undefined'){
-                                if ($idTank !== 5){
+                                if ($idTank !== 5 && $idTank !== 24 && $idTank !== 28 && $idTank !== 32){
                                     if ($id == '#form-transferEntry-stock2'){
                                         $($id).html("AUTO IN/OUT");
                                     } else {

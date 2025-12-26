@@ -369,6 +369,11 @@ class TransferController extends Controller
                 $data = [
                     'status'  => 0,
                     'message' => 'Entry data not found!' ];
+            } elseif ($return[0]->response == '9') {
+                $data = [
+                    'status'  => 0,
+                    'message' => 'Source or Destination Tank is inactive'
+                ];
             };
         }
         return $data;

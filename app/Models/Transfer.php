@@ -373,12 +373,14 @@ class Transfer extends Model
                         }
 
                         /* GET ID_BALANCE_DETAIL 2025-01-03 */
-                            $datTail = DB::select('SELECT id_balance_tail, id_supplier, qty, in_qty, out_qty, init_qty, batch_sap
-                                                     FROM t_balance_detail
+                            $datTail = DB::select('SELECT a.id_balance_tail, a.id_supplier, a.qty, a.in_qty, a.out_qty, a.init_qty, a.batch_sap
+                                                     FROM t_balance_detail a
+                                                     JOIN m_supplier b ON a.id_supplier = b.id_supplier
                                                     WHERE id_balance_head = ?
-                                                      AND `status` = 1
+                                                      AND a.`status` = 1
                                                       AND qty > "0.0001"
-                                                    ORDER BY id_balance_tail ASC', [$idHead]);
+                                                      and b.`status` = 1
+                                                    ORDER BY a.id_balance_tail ASC', [$idHead]);
                             $lenTail = count($datTail);
 
                             if ($lenTail == 0){
@@ -600,11 +602,13 @@ class Transfer extends Model
 
                             /* ROUTING FOR DETAIL PER SUPPLIER */
                                 /* GET FEED ID_TRACE_DETAIL */
-                                    $datTraceTail = DB::select('SELECT id_trace_tail, id_balance_tail, id_supplier, out_qty, batch_sap
-                                                                  FROM t_trace_detail
+                                    $datTraceTail = DB::select('SELECT a.id_trace_tail, a.id_balance_tail, a.id_supplier, a.out_qty, a.batch_sap
+                                                                  FROM t_trace_detail a
+                                                                  JOIN m_supplier b ON a.id_supplier = b.id_supplier
                                                                  WHERE id_trace_head = ?
-                                                                   AND `status` = 1
-                                                                 ORDER BY id_trace_tail ASC', [$feed_idTraceHead]);
+                                                                   AND a.`status` = 1
+                                                                   and b.`status` = 1
+                                                                 ORDER BY a.id_trace_tail ASC', [$feed_idTraceHead]);
                                     $lenTraceTail = count($datTraceTail);
                                     if ($lenTraceTail == 0){
                                         $db = [ (object)['response' => 6 ]];
@@ -687,39 +691,6 @@ class Transfer extends Model
                                     }
 
                         }
-
-        // Fetch all supplier quantities
-        $details = DB::select('SELECT d.id_balance_tail, t.id_trace_tail, d.qty, d.in_qty, d.init_qty 
-                               FROM t_balance_detail d
-                               JOIN t_trace_detail t ON t.id_balance_tail = d.id_balance_tail
-                               AND t.id_trace_head = ?
-                               AND t.status = 1
-                               WHERE d.id_balance_head = ? 
-                               ORDER BY d.id_balance_tail ASC', [$idTraceHead, $idHead]);
-
-        if (!empty($details)) {
-            // Convert to a nested array
-            $dataPerHead = [array_map(function ($d) {
-                return ['qty' => $d->qty];
-            }, $details)];
-
-            // Adjust supplier quantities proportionally so total matches header
-            adjustQtyToTotal($dataPerHead, $in_qty);
-
-            // Update DB with adjusted values
-            foreach ($details as $i => $d) {
-                $newQty = $dataPerHead[0][$i]['qty'];
-                DB::update('UPDATE t_balance_detail
-                            SET qty = ?, in_qty = ?, init_qty = ?
-                            WHERE id_balance_tail = ?', [$newQty, $newQty, $newQty, $d->id_balance_tail]);
-
-                if(!empty($d->id_trace_tail)) {
-                    DB::update('UPDATE t_trace_detail
-                                SET in_qty = ?
-                                WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
-                }
-            }
-        }
 
         /* THROW OUTPUT */
         $db = [ (object)['response' => 1 ]];
@@ -964,9 +935,9 @@ class Transfer extends Model
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
         $db = DB::insert('INSERT INTO t_balance_temporary
-                                (entry_no, id_supplier, id_material, qty, batch_sap, created_by, id_plant)
+                                (entry_no, id_supplier, id_material, qty, batch_sap, id_plant, created_by)
                           VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        [$adjNumber, $idSupplier, $idMaterial, $qty, $batchSap, $user, $idPlant]);
+                        [$adjNumber, $idSupplier, $idMaterial, $qty, $batchSap, $idPlant, $user]);
         $db = [ (object)['response' => $db ? 1 : 0 ]];
 
         return $db;
