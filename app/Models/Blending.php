@@ -131,12 +131,18 @@ class Blending extends Model
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
-        $db = DB::select('SELECT a.entry_date, d.`description` AS sloc, b.material_document,
+        $db = DB::select('SELECT a.entry_date, b.material_document, a.id_tank, a.id_tank_tail,
                                  CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(a.qty,3) AS qty, FORMAT(a.init_qty,3) AS init_qty, a.entry_date, a.id_balance_head AS idHead,
                                  CONCAT(c.`description`, " (", c.`code`, ")") AS material,
                                  GROUP_CONCAT(DISTINCT CONCAT(f.`description`, " / ", e.batch_sap, " / Qty : ", FORMAT(e.init_qty,3), " MT / Qty : ", FORMAT(e.qty,3), " MT") SEPARATOR " | ") AS supplier,
                                  CAST(b.from_trace_no AS CHAR) AS from_trace_no, b.id_trace_head AS idTraceHead, b.id_trace_head,
                                  b.is_last_row, b.next_process,
+                                 CONCAT(d.description, 
+                                    IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                        "", 
+                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", "))
+                                    )
+                                 ) AS sloc,
                                  FORMAT(ROUND(ee.init_qty,4),3) as balance_supplier
                             FROM t_balance_header a
                             LEFT JOIN (SELECT b.id_balance_head, b.id_trace_head,
@@ -191,6 +197,8 @@ class Blending extends Model
                               ON a.trace_no = ee.trace_no
                             LEFT JOIN m_supplier f
                               ON e.id_supplier = f.id_supplier
+                            LEFT JOIN m_tank_detail h
+                              ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
                            WHERE a.`status` = 1
                              AND SUBSTRING(a.trace_no,1,1) = 8
                              AND (a.id_plant = ? OR ? = 0)
@@ -211,6 +219,16 @@ class Blending extends Model
                            WHERE a.status = 1
                              AND a.id_material = ?
                            GROUP BY b.id_tank', [$idPlant, $idMaterial]);
+        return $db;
+    }
+    static function get_cmbActiveSpecificTank_rundown($request){
+        $sloc = $request->input('sloc');
+
+        $db = DB::select('SELECT a.id_tank_tail, a.tf_number AS tankNo
+                            FROM m_tank_detail a
+                           WHERE a.status = 1
+                             AND a.id_tank = ?
+                           ORDER BY a.tf_number ASC', [$sloc]);
         return $db;
     }
     static function post_blendingEntryMaterial($user, $request){
@@ -265,6 +283,8 @@ class Blending extends Model
         $totalQty = $request->input('qty');
         $totalQty = floatval(str_replace(',', '', $totalQty));
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $id_tank_tail = $request->input('tankNo');
+        $id_tank_tail_json = json_encode($id_tank_tail);
 
         $insertPlant = ($idPlant === 0 ? null : $idPlant);
 
@@ -392,6 +412,7 @@ class Blending extends Model
                     'id_material'      => $id_material,
                     'entry_date'       => $curr_entryDate,
                     'id_sloc'          => $id_tank,
+                    'id_tank_tail'     => $id_tank_tail_json,
                     'out_qty'          => $out_qty,
                     'last_qtf'         => $last_qtf,
                     'curr_qtf'         => $curr_qtf,
@@ -465,6 +486,7 @@ class Blending extends Model
                         'id_supplier'     => $idSupplier,
                         'id_material'     => $id_material,
                         'id_sloc'         => $id_tank,
+                        'id_tank_tail'    => $id_tank_tail_json,
                         'out_qty'         => $tail_out_qty,
                         'batch_sap'       => $batch_sap,
                         'created_by'      => $user,
@@ -559,6 +581,7 @@ class Blending extends Model
             'trace_no'   => $entry_no,
             'id_material'=> $id_material,
             'id_tank'    => $id_tank,
+            'id_tank_tail' => $id_tank_tail_json,
             'qty'        => $in_qty,
             'in_qty'     => $in_qty,
             'init_qty'   => $in_qty,
@@ -576,6 +599,7 @@ class Blending extends Model
             'id_material'      => $id_material,
             'entry_date'       => $curr_entryDate,
             'id_sloc'          => $id_tank,
+            'id_tank_tail'     => $id_tank_tail_json,
             'in_qty'           => $in_qty,
             'last_qtf'         => $last_qtf,
             'curr_qtf'         => $curr_qtf,
@@ -656,6 +680,7 @@ class Blending extends Model
                         'id_supplier'     => $idSupplier,
                         'id_material'     => $id_material,
                         'id_tank'         => $id_tank,
+                        'id_tank_tail'    => $id_tank_tail_json,
                         'qty'             => $rundownSupplier,
                         'in_qty'          => $rundownSupplier,
                         'init_qty'        => $rundownSupplier,
@@ -672,6 +697,7 @@ class Blending extends Model
                         'id_supplier'     => $idSupplier,
                         'id_material'     => $id_material,
                         'id_sloc'         => $id_tank,
+                        'id_tank_tail'    => $id_tank_tail_json,
                         'in_qty'          => $rundownSupplier,
                         'batch_sap'       => $batchSap,
                         'created_by'      => $user,
@@ -916,6 +942,65 @@ class Blending extends Model
 
 
     }
+    static function post_updateEntrySubTank($user, $request){
+      $idHead   = $request->input('idHead');
+      $tails  = $request->input('idTankTail');
+      $idPlant = \App\Models\BaseModel::resolvePlant($request);
+  
+      if (!is_array($tails)) {
+          return [(object)['response' => 0, 'message' => 'INVALID SUBTANK DATA']];
+      }
+  
+      $jsonTails = json_encode(array_values(array_unique($tails)));
+  
+      // Fetch existing header
+      $row = DB::selectOne('SELECT id_tank_tail, trace_no 
+                            FROM t_balance_header 
+                            WHERE id_balance_head = ? AND status = 1', [$idHead]);
+  
+      // Update header
+      DB::update('UPDATE t_balance_header
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_balance_head = ?',
+                  [$jsonTails, $user, $idHead]);
+  
+      // Update trace header
+      DB::update('UPDATE t_trace_header
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_balance_head = ?',
+                  [$jsonTails, $user, $idHead]);
+  
+      // Update ALL balance details
+      DB::update('UPDATE t_balance_detail
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_balance_head = ?',
+                  [$jsonTails, $user, $idHead]);
+  
+      // Update ALL trace details
+      DB::update('UPDATE t_trace_detail
+                  SET id_tank_tail = ?, updated_by = ?
+                  WHERE id_trace_head IN (
+                      SELECT id_trace_head 
+                      FROM t_trace_header 
+                      WHERE id_balance_head = ?
+                  )', [$jsonTails, $user, $idHead]);
+  
+      // Log change
+      DB::insert(
+          'INSERT INTO log_transactions
+              (log_module, log_type, log_description, created_by)
+          VALUES (?, ?, ?, ?)',
+          [
+              'T_BALANCE_HEAD', 'UPDATE_SUBTANK',
+              'IDHEAD: '.$idHead.' | TRACE: '.$row->trace_no.
+              ' | SUBTANKS: '.implode(',', $tails),
+              $user
+          ]
+      );
+  
+      return [(object)['response' => 1]];
+  }
+
 }  
 
 function adjustQtyToTotal(&$dataPerHead, $targetTotal) {

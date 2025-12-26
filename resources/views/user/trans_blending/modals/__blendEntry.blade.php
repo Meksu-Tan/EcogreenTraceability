@@ -44,7 +44,7 @@
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-8">
+                                        <div class="col-md-4">
                                             <div class="form-group">
                                                 <label for="name">Blended Material</label>
                                                 <select name="id_material" id="form-blendingEntry-result" style="width: 100%;" class="form-control" required>
@@ -57,6 +57,13 @@
                                                 <label for="name">Storage Location (SLoc)</label>
                                                 <select name="tank" id="form-blendingEntry-tank" style="width: 100%;" class="form-control" required>
                                                     <!-- <option value="">- Select Tank -</option> -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-group">
+                                                <label for="name">Specific Storage Location (SLoc)</label>
+                                                <select name="tankNo[]" id="form-blendingEntry-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
                                                 </select>
                                             </div>
                                         </div>
@@ -128,10 +135,13 @@
         const $form_blendingEntry_materialDoc       = '#form-blendingEntry-materialDoc';
         const $form_blendingEntry_blendResult       = '#form-blendingEntry-result';
         const $form_blendingEntry_idTank            = '#form-blendingEntry-tank';
+        const $form_blendingEntry_idTankNo          = '#form-blendingEntry-tankNo';
 
         const $btn_blendingEntry_material           = '#add-blendingEntry-material';
         const $btn_blendingEntry_save               = '#save-blendingEntry';
         const $btn_blendingEntry_delete             = '#destroy-blendingEntry-material';
+
+        let blendingEntry_selectedTankTails = [];
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -259,8 +269,22 @@
                     if ( $($modal_blendEntry).hasClass('show') ) {
                         $($modal_blendEntry).css('opacity', 1);
                     }
-                });
 
+                    if (blendingEntry_selectedTankTails.length > 0) {
+                        $($form_blendingEntry_idTankNo).val(blendingEntry_selectedTankTails).trigger('change');
+                    }
+                });
+                $($modal_blendEntry).on('hidden.bs.modal', function () {
+                    blendingEntry_selectedTankTails = [];
+                    $($form_blendingEntry_idTankNo).val(null).trigger('change');
+                });
+                $(document).on('change', $form_blendingEntry_idTankNo, function () {
+                    blendingEntry_selectedTankTails = $(this).val() || [];
+                });
+                $(document).on('change', $form_blendingEntry_idTank, function () {
+                    let sloc = $(this).val();
+                    ajax_populateSpecificTankRundown($form_blendingEntry_idTankNo, sloc, blendingEntry_selectedTankTails);
+                });
 
         });
 
@@ -411,46 +435,94 @@
             })
         };
         function ajax_populateTankRundown(id, $idMaterial, selectedValue=null){
-            // Empty the dropdown
-            // $(id).find('option').not(':first').remove();
-            $(id).find('option').remove();
-            // AJAX request
+            $(id).empty();
+
             $.ajax({
                 url: show_url,
                 type: 'get',
                 dataType: 'json',
-                data:{
+                data: {
                     flag: 'get_cmbActiveTank_rundown',
                     idMaterial: $idMaterial,
                 },
-                success: function(response){
-                    var len = 0;
-                    if(response['data'] != null){
-                        len = response['data'].length;
-                    }
-                    if(len > 0){
-                        for(var i=0; i<len; i++){
-                            var populate_1 = response['data'][i].id_tank;
-                            var populate_2 = response['data'][i].tank;
+                success: function(response) {
 
-                            if (selectedValue) {
-                                if (populate_1 == selectedValue) {
-                                    var option = "<option value='"+populate_1+"' selected='"+selectedValue+"'>"+populate_2+"</option>";
-                                } else {
-                                    var option = "<option value='"+populate_1+"'>"+populate_2+"</option>";
-                                }
-                            } else {
-                                var option = "<option value='"+populate_1+"'>"+populate_2+"</option>";
-                            }
-                            $(id).append(option);
-                        }
+                    if (response.data) {
+                        response.data.forEach(row => {
+                        $(id).append(
+                            $("<option>", {
+                                value: row.id_tank,
+                                text: row.tank
+                            })
+                        );
+                    });
+
+                        // auto-select correct tank value
+                        let valueToSelect = selectedValue ?? response.data[0]?.id_tank;
+                        $(id).val(valueToSelect).trigger("change"); // this triggers the SLoc update
                     }
                 }
             });
-        };
+        }
+
+        function ajax_populateSpecificTankRundown(id, sloc=null, selectedValues=null, options={}) {
+            const $select = $(id);
+
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificTank_rundown',
+                    sloc: sloc,
+            },
+            success: function(response) {
+                $select.empty();
+
+                if (response.data && response.data.length) {
+                    response.data.forEach(row => {
+                        const isSelected = selected.includes(String(row.id_tank_tail));
+
+                        const option = new Option(
+                            row.tankNo,
+                            row.id_tank_tail,
+                            isSelected,
+                            isSelected
+                        );
+
+                        $select.append(option);
+                    });
+                }
+                
+                if (!$select.hasClass("select2-hidden-accessible")) {
+                    $select.select2({
+                        placeholder: ' - Select Specific Sloc No -',
+                        closeOnSelect: false,
+                        allowClear: true,
+                        width: '100%',
+                        dropdownParent: options.dropdownParent || $select.closest(".modal"),
+                    });
+                }
+
+                $select.trigger('change');
+            }
+        });
+    }
 
     /* FUNCTION INIT */
-        function initializeBlendEntry($mode, $idHead=null, $blendResult=null, $materialDoc=null, $entryDate=null, $entryNo=null){
+        function initializeBlendEntry($mode, $idHead=null, $blendResult=null, $materialDoc=null, $entryDate=null, $entryNo=null, $idTank=null, $idTankTail=null){
             var options = { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' };
             var currentDate = new Date().toLocaleDateString('fr-CA', options).split('/').join('');
 
@@ -469,6 +541,10 @@
                 $($form_blendingEntry_entryDate).val(currentDate);
             } else if ($mode == 'UPDATE'){
                 $($form_blendingEntry_entryDate).val($entryDate);
+            }
+
+            if ($mode == 'ADD' && blendingEntry_selectedTankTails.length === 0) {
+                ajax_populateSpecificTankRundown($form_blendingEntry_idTankNo, $idTank, $idTankTail);
             }
         };
 

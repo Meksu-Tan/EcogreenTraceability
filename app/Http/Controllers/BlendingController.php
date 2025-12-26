@@ -139,6 +139,10 @@ class BlendingController extends Controller
                 $return = BL::post_matlDocNumber($user, $request);
                 $data = $this->returnResponse($return, 'MATL DOC NO', $mode);
                 return response()->json($data);
+            } elseif ($flag == 'post_updateEntrySubTank'){
+                $return = BL::post_updateEntrySubTank($user, $request);
+                $data = $this->returnResponse($return, 'SUBTANK', $mode);
+                return response()->json($data);
             }
 
         } else {
@@ -220,6 +224,10 @@ class BlendingController extends Controller
                         ->make(true);
         } elseif ($flag == 'get_cmbActiveTank_rundown'){
             $txtData['data'] = BL::get_cmbActiveTank_rundown($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_cmbActiveSpecificTank_rundown'){
+            $txtData['data'] = BL::get_cmbActiveSpecificTank_rundown($request);
             echo json_encode($txtData);
             exit;
         }
