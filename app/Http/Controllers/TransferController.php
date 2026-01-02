@@ -120,9 +120,15 @@ class TransferController extends Controller
                     $trfQty = $request->input('trf_qty');
                     $trfSource = $request->input('source_sloc');
                     $trfDestination = $request->input('trf_sloc');
+                    $trfSourceTail = $request->input('source_sloc_no');
+                    $trfDestinationTail = $request->input('trf_sloc_no');
                     $supplierCode = $request->input('supplierCode');
                     $idSupplier = $request->input('idSupplier');
                     $trfType = $request->input('trf_type');
+                    $request->merge([
+                        'idMaterial' => $idMaterial,
+                        'idTank'     => $trfSource
+                    ]);
                     //dd($supplierCode);
 
                     $lockReturn = TRF::get_lockStatus($entryDate);
@@ -132,30 +138,37 @@ class TransferController extends Controller
                         return response()->json($data);
 
                     } else {
-                        if ($trfType !== 'all'){
-                            if (in_array($trfSource, [5, 6, 12, 13, 24, 25, 28, 29, 32, 33])) {
+                        $return = TRF::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination, $trfSourceTail, $trfDestinationTail);
+
+                        if ($return[0]->response == 4 && $trfType !== 'all'){
+                            $stockArr = TRF::get_totalStockMaterial($request);
+                            $currentStock = $stockArr[0]->total ?? 0;
+                            $shortQty = $trfQty - $currentStock;
+
+                            if ($shortQty > 0){
                                 /* AUTO STOCK IN SOURCE SLOC */
                                 $idHead = null;
                                 $entryAdjNo_dat = AD::get_adjNewEntryNumber($entryDate, $request);
                                 $entryAdjNo = $entryAdjNo_dat[0]->adj_number;
                                 /* ENTRY TO t_balance_temporary */
-                                TRF::post_adjEntrySupplier($user, $entryAdjNo, $idSupplier, $idMaterial, $trfQty, $supplierCode, $request);
+                                TRF::post_adjEntrySupplier($user, $entryAdjNo, $idSupplier, $idMaterial, $shortQty, $supplierCode, $request);
                                 /* ENTRY TO t_adjustment */
-                                AD::post_adjustmentInit($user, $mode, $idHead, $entryAdjNo, $entryDate, $trfSource, $trfQty, $idMaterial, $materialDoc, $request);
+                                AD::post_adjustmentInit($user, $mode, $idHead, $entryAdjNo, $entryDate, $trfSource, $shortQty, $idMaterial, $materialDoc, $request);
+
+                                $return = TRF::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination, $trfSourceTail, $trfDestinationTail);
                             }
                         }
 
-                        $return = TRF::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination);
                         $data = $this->returnResponse($return, 'TRANSFER', $mode);
 
-                        if ($trfType !== 'all'){
+                        if ($trfType === 'in'){
                             if (in_array($trfDestination, [5, 6, 12, 13, 24, 25, 28, 29, 32, 33])) {
                                 /* AUTOMATE TRF TO ADJUSTMENT OUT */
                                 $trfSource = $trfDestination;
                                 $trfDestination = 10;
                                 $entryNo = $entryNo + 1;
 
-                                TRF::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination);
+                                TRF::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination, $trfSourceTail, $trfDestinationTail);
                             }
                         }
 
@@ -172,6 +185,10 @@ class TransferController extends Controller
             } elseif ($flag == 'post_matlDocNumber'){
                 $return = TRF::post_matlDocNumber($user, $request);
                 $data = $this->returnResponse($return, 'MATL DOC NO', $mode);
+                return response()->json($data);
+            } elseif ($flag == 'post_updateEntrySubTank'){
+                $return = TRF::post_updateEntrySubTank($user, $request);
+                $data = $this->returnResponse($return, 'SUBTANK', $mode);
                 return response()->json($data);
             }
 
@@ -200,6 +217,10 @@ class TransferController extends Controller
             exit;
         } elseif ($flag == 'get_cmbActiveTank_rundown'){
             $txtData['data'] = TRF::get_cmbActiveTank_rundown($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag =='get_cmbActiveSpecificTank_rundown'){
+            $txtData['data'] = TRF::get_cmbActiveSpecificTank_rundown($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_totalStockMaterial'){

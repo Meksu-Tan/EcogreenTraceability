@@ -55,6 +55,7 @@
     @include('user.trans_transfer.modals.__transferEntry')
     @include('user.trans_transfer.modals.__addMaterialDocModal')
     @include('modals.__selectPlant')
+    @include('user.trans_transfer.modals.__selectSubTankModal')
 
 <!-- SCRIPT -->
 <script>
@@ -73,6 +74,16 @@
 
         const $btn_feed_addDocNo                = '#feed-addDocNo';
         const $btn_feed_editDocNo               = '#feed-editDocNo';
+
+        const $modal_editSubTank = '#modal-trf-editSubTank';
+        const $form_editSubTank = '#form-trfEntryEditSubtank';
+        const $txt_editSubTank_flag = '#form-trfEntryEditSubtank-flag';
+        const $txt_editSubTank_mode = '#form-trfEntryEditSubtank-mode';
+        const $txt_editSubTank_idHead = '#form-trfEntryEditSubtank-idHead';
+        const $txt_editSubTank_idTank = '#form-trfEntryEditSubtank-idTank';
+        const $txt_editSubTank_mainSloc = '#form-trfEntryEditSubtank-mainSloc';
+        const $cmb_editSubTank_tankNo = '#form-trfEntryEditSubtank-tankNo';
+        const $btn_editSubTank_save = '#save-trfEntryEditSubtank';
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -146,6 +157,82 @@
                             console.log(`data was dismissed by ${willDeleted.dismiss}`);
                         };
                     })
+                });
+
+                $(document).on('click', '.sloc-edit', function(e){
+                    e.preventDefault();
+
+                    const idHead = $(this).data('idhead');
+                    const idTank = $(this).data('idtank');
+                    const mainSlocLabel = $(this).data('mainsloc');
+
+                    let encoded = $(this).attr('data-idTankTail');
+                    let selectedTail = [];
+
+                    if (encoded) {
+                        try {
+                            selectedTail = JSON.parse(atob(encoded)).map(String);
+                        } catch (e) {
+                            selectedTail = [];
+                        }
+                    }
+
+                    // set hidden form values
+                    $($txt_editSubTank_idHead).val(idHead);
+                    $($txt_editSubTank_idTank).val(idTank);
+                    $($txt_editSubTank_mainSloc).val(mainSlocLabel);
+
+                    ajax_populateSpecificTankRundown($cmb_editSubTank_tankNo, null, idTank, selectedTail);
+
+                    // show modal   
+                    $($modal_editSubTank).modal('show');
+                });
+
+                /* submit update */
+                $($form_editSubTank).on('submit', function(e){
+                    e.preventDefault();
+                    var formData = new FormData(this);
+
+                    formData.append("flag", "post_updateEntrySubTank");
+
+                    Swal.fire({
+                        title: 'Confirm',
+                        text: 'Save specific sloc for this entry?',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonText: 'Yes, save'
+                    }).then((result) => {
+                        if (result.value) {
+                            $.ajax({
+                                url: post_url,
+                                method: "POST",
+                                data: formData,
+                                contentType: false,
+                                cache: false,
+                                processData: false,
+                                dataType: "JSON",
+                                success: function(data) {
+                                    if (data.status == 1) {
+                                        Swal.fire({
+                                            position: 'top-end',
+                                            icon: 'success',
+                                            title: data.message,
+                                            showConfirmButton: false,
+                                            timer: 700
+                                        });
+                                        $($modal_editSubTank).modal('hide');
+                                        // reload the datatable so Sloc column shows updated value
+                                        $($dt_transferEntry).DataTable().ajax.reload(null, false);
+                                    } else {
+                                        Swal.fire(data.message, "", "error");
+                                    }
+                                },
+                                error: function(xhr, status, err) {
+                                    Swal.fire('Error', 'Something went wrong', 'error');
+                                }
+                            });
+                        }
+                    });
                 });
         });
 
@@ -223,7 +310,34 @@
                             $(td).css('color', 'red');
                         }
                     }
-                }],
+                },
+                {
+                    targets: [6],
+                    render: function(data, type, row) {
+                        const fromTails = row.from_tf_number ? row.from_tf_number.split(',') : [];
+                        const fromIds = row.from_id_tank_tail ? row.from_id_tank_tail.split(',') : [];
+                        const fromDisplay = fromTails.length ? `${row.from_sloc_name}: [${fromTails.join(', ')}]` : row.from_sloc_name;
+                        const toTails = row.to_tf_number ? row.to_tf_number.split(',') : [];
+                        const toIds = row.from_id_tank_tail ? row.to_id_tank_tail.split(',') : [];
+                        const toDisplay = toTails.length ? `${row.to_sloc_name}: [${toTails.join(', ')}]` : row.to_sloc_name;
+                        return `
+                            <a href="#" class="sloc-edit" style="color: #7c7c7d;"
+                               data-idhead="${row.fromIdHead}" data-idtank="${row.from_id_tank}"
+                               data-mainsloc="${row.from_sloc_name}" data-idtanktail="${btoa(JSON.stringify(fromIds))}">
+                               ${fromDisplay}
+                            </a>
+
+                            &nbsp;>>>&nbsp;
+
+                            <a href="#" class="sloc-edit" style="color: #7c7c7d;"
+                                data-idhead="${row.idHead}" data-idtank="${row.to_id_tank}"
+                                data-mainsloc="${row.to_sloc_name}" data-idtanktail="${btoa(JSON.stringify(toIds))}">
+                                ${toDisplay}
+                            </a>
+                        `;
+                    }
+                }
+            ],
                 columns: [
                     { data: null, name: null, orderable: false, searchable: false, className: 'text-center' },
                     { data: 'action', name: 'action', orderable: false, searchable: false},
@@ -231,7 +345,8 @@
                     { data: 'material_document', name: 'material_document', className: 'text-center'},
                     { data: 'trace_no', name: 'trace_no', className: 'text-center'},
                     { data: 'material', name: 'material', className: 'text-left'},
-                    { data: 'sloc', name: 'sloc', className: 'text-center'},
+                    // { data: 'sloc', name: 'sloc', className: 'text-center'},
+                    { data: null, name: 'sloc', className: 'text-center'},
                     { data: 'init_qty', name: 'init_qty', className: 'text-right'},
                     { data: 'balance_supplier', name: 'balance_supplier', className: 'text-right'},
                     { data: 'qty', name: 'qty', className: 'text-right'},

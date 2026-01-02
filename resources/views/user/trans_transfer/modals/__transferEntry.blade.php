@@ -106,6 +106,20 @@
                                             </div>
                                         </div>
                                     </div>
+                                    <div class="row" id="div-sloc2" style="display:none">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="name">Specific Source Sloc</label>
+                                                <select name="source_sloc_no[]" id="form-transferEntry-sourceNo" style="width: 100%;" class="form-control" multiple="multiple"></select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="name">Specific Transfer Sloc</label>
+                                                <select name="trf_sloc_no[]" id="form-transferEntry-destinationNo" style="width: 100%;" class="form-control" multiple="multiple"></select>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="form-group">
                                         <button class="btn btn-primary" id="save-transferEntry">Save Entry</button>
                                     </div>
@@ -145,8 +159,11 @@
     const $form_transferEntry_stockQtyDest      = '#form-transferEntry-stockQtyDest';
     const $lbl_transferEntry_stock1             = '#form-transferEntry-stock1';
     const $lbl_transferEntry_stock2             = '#form-transferEntry-stock2';
+    const $form_transferEntry_sourceNo          = '#form-transferEntry-sourceNo';
+    const $form_transferEntry_destinationNo     = '#form-transferEntry-destinationNo';
 
     const $div_sloc                             = '#div-sloc';
+    const $div_sloc2                            = '#div-sloc2';
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -267,6 +284,7 @@
 
                     if ($id_material == '-'){
                         $($div_sloc).hide();
+                        $($div_sloc2).hide();
                     } else {
                         if ($trf_type !== '-'){
                             if ($trf_type == 'in'){
@@ -304,6 +322,7 @@
 
                         if ($trf_type !== '-'){
                             $($div_sloc).show();
+                            $($div_sloc2).show();
                             if ($trf_type == 'in'){
                                 ajax_populateTankRundown($form_transferEntry_source, $trf_type);
                                 ajax_populateTankRundown($form_transferEntry_destination, $trf_type, $id_material);
@@ -316,6 +335,7 @@
                             }
                         } else {
                             $($div_sloc).hide();
+                            $($div_sloc2).hide();
                         }
 
                     }
@@ -324,14 +344,19 @@
                     e.preventDefault();
 
                     $idTank = $($form_transferEntry_destination).val();
-                    ajax_getStockMaterial($lbl_transferEntry_stock2, $id_material, $idTank);
+                    $trfType = $($form_transferEntry_transferType).val();
+                    const sloc = $(this).val();
+                    ajax_getStockMaterial($lbl_transferEntry_stock2, $id_material, $idTank, $trfType);
+                    ajax_populateSpecificTankRundown($form_transferEntry_destinationNo, $trfType, sloc);
                 });
                 $(document).on('change', $form_transferEntry_source, function(e){
                     e.preventDefault();
 
                     $idTank = $($form_transferEntry_source).val();
                     $trfType = $($form_transferEntry_transferType).val();
+                    const sloc = $(this).val();
                     ajax_getStockMaterial($lbl_transferEntry_stock1, $id_material, $idTank, $trfType);
+                    ajax_populateSpecificTankRundown($form_transferEntry_sourceNo, $trfType, sloc);
                 });
 
             /* LISTENER ON MODAL STACK */
@@ -446,11 +471,86 @@
                                 ajax_getStockMaterial($lbl_transferEntry_stock1, $id_material, response['data'][0].id_tank, $trfType);
                             }
                         }
+
+                        let autoSelect = false;
+
+                        if (selectedValue) {
+                            autoSelect = true;
+                        }
+
+                        if ($trfType === 'in' && id === $form_transferEntry_destination) {
+                            autoSelect = true;
+                        }
+
+                        if ($trfType === 'out' && id === $form_transferEntry_source) {
+                            autoSelect = true;
+                        }
+
+                        if (autoSelect) {
+                            let valueToSelect = selectedValue ?? response.data[0]?.id_tank;
+                            $(id).val(valueToSelect).trigger("change");
+                        }
                     }
                 }
             });
         };
+        function ajax_populateSpecificTankRundown(id, $trfType, sloc, selectedValues=null, options={}) {
+            const $select = $(id);
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String);
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificTank_rundown',
+                    sloc: sloc,
+                },
+                success: function(response) {
+                    $select.empty();
+
+                    if (response.data && response.data.length) {
+                        response.data.forEach(row => {
+                            const option = new Option(
+                                row.tankNo,
+                                row.id_tank_tail,
+                                false,
+                                false
+                            );
+
+                            $select.append(option);
+                        });
+                    }
+
+                    if (!$select.hasClass('select2-hidden-accessible')) {
+                        $select.select2({
+                            placeholder: ' - Select Specific Sloc No -',
+                            closeOnSelect: false,
+                            allowClear: true,
+                            width: '100%',
+                            dropdownParent: options.dropdownParent || $select.closest('.modal')
+                        });
+                    }
+
+                    if (selected.length) {
+                        $select.val(selected).trigger('change');
+                    }
+                }
+            });
+        }
         function ajax_getStockMaterial($id, $idMaterial, $idTank, $trfType){
+            const TANK_IDS = [5, 6, 24, 25, 28, 29, 32, 33];
+
             $.ajax({
                 url: show_url,
                 type: 'get',
@@ -466,9 +566,11 @@
                         len = response['data'].length;
                     }
                     if(len > 0){
-                        if (($trfType == 'in' || $trfType == 'out') && $trfType !== 'all'){
+                        let total = parseFloat(response['data'][0].total) || 0;
+
+                        if ($trfType == 'in' && $trfType !== 'all'){
                             if (response['data'][0].total !== 'undefined'){
-                                if ($idTank !== 5 && $idTank !== 24 && $idTank !== 28 && $idTank !== 32){
+                                if (!TANK_IDS.includes($idTank) && total <= 0){
                                     if ($id == '#form-transferEntry-stock2'){
                                         $($id).html("AUTO IN/OUT");
                                     } else {
@@ -476,6 +578,9 @@
                                         $($form_transferEntry_supplierCode).val($supplierCode);
                                         $($form_transferEntry_idSupplier).val(0);
                                         ajax_updateSupplierMaterial($id, $idMaterial, $idTank, $trfType, $supplierCode);
+                                    }
+                                    if ($id === '#form-transferEntry-stock1') {
+                                        $($id).html("Stock (MT): " + response['data'][0].total);
                                     }
                                 } else {
                                     $($id).html("Stock (MT): " + response['data'][0].total);
@@ -555,6 +660,7 @@
             }
 
             $($div_sloc).hide();
+            $($div_sloc2).hide();
         }
 
     /* FUNCTION AUTO-REFRESH */

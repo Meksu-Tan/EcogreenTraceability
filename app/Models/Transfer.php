@@ -48,6 +48,7 @@ class Transfer extends Model
 
         return $db;
     }
+    // Get Main Tanks
     static function get_cmbActiveTank_rundown($request){
         $idMaterial = $request->input('idMaterial');
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
@@ -69,6 +70,18 @@ class Transfer extends Model
                                  AND a.id_material = ?
                                GROUP BY b.id_tank', [$idPlant, $idMaterial]);
         }
+        return $db;
+    }
+    // Get Sub Tanks
+    static function get_cmbActiveSpecificTank_rundown($request){
+        $sloc = $request->input('sloc');
+
+        $db = DB::select('SELECT a.id_tank_tail, a.tf_number AS tankNo
+                            FROM m_tank_detail a
+                          WHERE a.status = 1
+                            AND a.id_tank = ?
+                          ORDER BY a.tf_number ASC', [$sloc]);
+
         return $db;
     }
     static function get_totalStockMaterial($request){
@@ -99,15 +112,31 @@ class Transfer extends Model
     static function get_dtTransferList($request){
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
-        $db = DB::select('SELECT a.entry_date, CONCAT(b.from_sloc, " >>> ", d.`description`) AS sloc, b.material_document,
+        $db = DB::select('SELECT a.entry_date, b.material_document, a.id_tank AS to_id_tank, a.id_tank_tail, t_to.description AS to_sloc_name, GROUP_CONCAT(DISTINCT h_to.tf_number ORDER BY h_to.tf_number) AS to_tf_number,
+                                 th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_tank, t_from.description AS from_sloc_name, GROUP_CONCAT(DISTINCT h_from.tf_number ORDER BY h_from.tf_number) AS from_tf_number,
+                                 GROUP_CONCAT(DISTINCT h_from.id_tank_tail ORDER BY h_from.id_tank_tail) AS from_id_tank_tail, GROUP_CONCAT(DISTINCT h_to.id_tank_tail ORDER BY h_to.id_tank_tail) AS to_id_tank_tail,
                                  CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty, a.entry_date, a.id_balance_head AS idHead,
                                  CONCAT(c.`description`, " (", c.`code`, ")") AS material, FORMAT(ROUND(a.in_qty,3),3) AS in_qty, FORMAT(ROUND(a.out_qty,3),3) AS out_qty,
                                  GROUP_CONCAT(CONCAT(f.`description`, " / ", e.batch_sap, " / Qty : ", ROUND(e.init_qty,3), " MT / Qty : ", ROUND(e.qty,3), " MT") SEPARATOR " | ") AS supplier,
                                  b.id_trace_head AS idTraceHead, b.id_trace_head, b.is_last_row, b.next_process,
-                                 IF(ABS(ROUND(SUM(e.init_qty),3) - ROUND(a.init_qty,3)) > 0.005, FORMAT(ROUND(SUM(e.init_qty),3),3), FORMAT(ROUND(a.init_qty,3),3))  as balance_supplier,
-                                 IF(ABS(ROUND(SUM(e.qty),3) - ROUND(SUM(e.qty),3)) > 0.005, FORMAT(ROUND(SUM(e.qty),3),3), FORMAT(ROUND(a.qty,3),3)) as qty_supplier
+                                 CONCAT(COALESCE(b.from_sloc, ""),
+                                   IF(
+                                      GROUP_CONCAT(DISTINCT h_from.tf_number ORDER BY h_from.tf_number SEPARATOR ", ") IS NULL,
+                                      "",
+                                      CONCAT(" - [", GROUP_CONCAT(DISTINCT h_from.tf_number ORDER BY h_from.tf_number SEPARATOR ", "), "]")
+                                   ),
+                                  " >>> ",
+                                  COALESCE(t_to.description, ""),
+                                  IF(
+                                      GROUP_CONCAT(DISTINCT h_to.tf_number ORDER BY h_to.tf_number SEPARATOR ", ") IS NULL,
+                                      "",
+                                      CONCAT(" - [", GROUP_CONCAT(DISTINCT h_to.tf_number ORDER BY h_to.tf_number SEPARATOR ", "), "]")
+                                  )
+                                 ) AS sloc,
+                                 IF(ABS(bs.init_qty - a.init_qty) > 0.005, FORMAT(bs.init_qty,3), FORMAT(a.init_qty,3)) as balance_supplier,
+                                 IF(ABS(bs.qty - a.qty) > 0.005, FORMAT(bs.qty,3), FORMAT(a.qty,3)) as qty_supplier
                             FROM t_balance_header a
-                            LEFT JOIN (SELECT b.id_balance_head, b.id_trace_head,
+                            LEFT JOIN (SELECT b.id_balance_head, b.id_trace_head, b.from_trace_no,
                                               c.from_sloc, d.material_document,
                                               CASE
                                                 WHEN b.to_trace_no = (SELECT to_trace_no
@@ -127,7 +156,7 @@ class Transfer extends Model
                                                 ELSE NULL
                                               END AS next_process
                                          FROM t_trace_header b
-                                         LEFT JOIN (SELECT c.to_trace_no, d.description AS from_sloc
+                                         LEFT JOIN (SELECT c.to_trace_no, c.id_tank_tail, d.description AS from_sloc
                                                       FROM t_trace_header c
                                                       LEFT JOIN t_balance_header cc
                                                         ON c.id_balance_head = cc.id_balance_head
@@ -146,16 +175,32 @@ class Transfer extends Model
                               ON a.id_balance_head = b.id_balance_head
                             LEFT JOIN m_material c
                               ON c.id_material = a.id_material
-                            LEFT JOIN m_tank d
-                              ON d.id_tank = a.id_tank
+                            LEFT JOIN t_trace_header th_from
+                              ON th_from.to_trace_no = b.from_trace_no
+                            LEFT JOIN m_tank t_to
+                              ON t_to.id_tank = a.id_tank
+                            LEFT JOIN m_tank t_from
+                              ON t_from.id_tank = th_from.id_sloc
                             LEFT JOIN (SELECT e.id_balance_head, e.id_supplier, ROUND(SUM(e.init_qty),3) AS init_qty, ROUND(SUM(e.qty),3) AS qty, e.batch_sap
                                          FROM t_balance_detail e
                                         WHERE e.`status` = 1
                                           AND e.init_qty > "0.0001"
                                         GROUP BY e.id_balance_head, e.batch_sap) e
                               ON a.id_balance_head = e.id_balance_head
+                            LEFT JOIN (SELECT h.trace_no, ROUND(SUM(d.init_qty),3) AS init_qty, ROUND(SUM(d.qty),3) AS qty
+                                        FROM t_balance_header h
+                                        JOIN t_balance_detail d
+                                            ON d.id_balance_head = h.id_balance_head
+                                        WHERE d.status = 1
+                                            AND d.init_qty > 0.0001
+                                        GROUP BY h.trace_no
+                            ) bs ON bs.trace_no = a.trace_no
                             LEFT JOIN m_supplier f
                               ON e.id_supplier = f.id_supplier
+                            LEFT JOIN m_tank_detail h_to
+                              ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h_to.id_tank_tail AS CHAR)))
+                            LEFT JOIN m_tank_detail h_from
+                              ON JSON_CONTAINS(th_from.id_tank_tail, JSON_QUOTE(CAST(h_from.id_tank_tail AS CHAR)))
                            WHERE a.`status` = 1
                              AND SUBSTRING(a.trace_no,1,1) = 7
                              AND (a.id_plant = ? OR ? = 0)
@@ -270,11 +315,14 @@ class Transfer extends Model
         }
         return $db;
     }
-    static function post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination){
+    static function post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination, $trfSourceTail, $trfDestinationTail){
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $srcPlant = DB::table('m_tank')->where('id_tank', $trfSource)->value('id_plant');
         $destPlant = DB::table('m_tank')->where('id_tank', $trfDestination)->value('id_plant');
+
+        $srcTailJson = json_encode($trfSourceTail);
+        $destTailJson = json_encode($trfDestinationTail);
 
         /* CHECKING TOTAL STOCK */
             $datHead = DB::select('SELECT IFNULL(SUM(c.qty),0) AS qty
@@ -405,6 +453,7 @@ class Transfer extends Model
                                     'id_material' => $id_material,
                                     'entry_date' => $curr_entryDate,
                                     'id_sloc' => $id_tank,
+                                    'id_tank_tail' => $srcTailJson,
                                     'out_qty' => $out_qty,
                                     'last_qtf' => $last_qtf,
                                     'curr_qtf' => $curr_qtf,
@@ -468,6 +517,7 @@ class Transfer extends Model
                                                                 'id_supplier' => $idSupplier,
                                                                 'id_material' => $id_material,
                                                                 'id_sloc'   => $id_tank,
+                                                                'id_tank_tail' => $srcTailJson,
                                                                 'out_qty' => $tail_out_qty,
                                                                 'batch_sap' => $batch_sap,
                                                                 'created_by' => $user,
@@ -561,6 +611,7 @@ class Transfer extends Model
                             'trace_no' => $entry_no,
                             'id_material' => $id_material,
                             'id_tank' => $id_tank,
+                            'id_tank_tail' => $destTailJson,
                             'qty' => $in_qty,
                             'in_qty' => $in_qty,
                             'init_qty' => $in_qty,
@@ -575,6 +626,7 @@ class Transfer extends Model
                             'id_material' => $id_material,
                             'entry_date' => $curr_entryDate,
                             'id_sloc' => $id_tank,
+                            'id_tank_tail' => $destTailJson,
                             'in_qty' => $in_qty,
                             'last_qtf' => $last_qtf,
                             'curr_qtf' => $curr_qtf,
@@ -643,6 +695,7 @@ class Transfer extends Model
                                                     'id_supplier' => $idSupplier,
                                                     'id_material' => $id_material,
                                                     'id_tank' => $id_tank,
+                                                    'id_tank_tail' => $destTailJson,
                                                     'qty' => $rundownSupplier,
                                                     'in_qty' => $rundownSupplier,
                                                     'init_qty' => $rundownSupplier,
@@ -656,6 +709,7 @@ class Transfer extends Model
                                                     'id_supplier' => $idSupplier,
                                                     'id_material' => $id_material,
                                                     'id_sloc' => $id_tank,
+                                                    'id_tank_tail' => $destTailJson,
                                                     'in_qty' => $rundownSupplier,
                                                     'batch_sap' => $batchSap,
                                                     'created_by' => $user,
@@ -941,6 +995,64 @@ class Transfer extends Model
         $db = [ (object)['response' => $db ? 1 : 0 ]];
 
         return $db;
+    }
+    static function post_updateEntrySubTank($user, $request){
+        $idHead   = $request->input('idHead');
+        $tails  = $request->input('idTankTail');
+        $idPlant = \App\Models\BaseModel::resolvePlant($request);
+    
+        if (!is_array($tails)) {
+            return [(object)['response' => 0, 'message' => 'INVALID SUBTANK DATA']];
+        }
+    
+        $jsonTails = json_encode(array_values(array_unique($tails)));
+    
+        // Fetch existing header
+        $row = DB::selectOne('SELECT id_tank_tail, trace_no 
+                              FROM t_balance_header 
+                              WHERE id_balance_head = ? AND status = 1', [$idHead]);
+    
+        // Update header
+        DB::update('UPDATE t_balance_header
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update trace header
+        DB::update('UPDATE t_trace_header
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update ALL balance details
+        DB::update('UPDATE t_balance_detail
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_balance_head = ?',
+                    [$jsonTails, $user, $idHead]);
+    
+        // Update ALL trace details
+        DB::update('UPDATE t_trace_detail
+                    SET id_tank_tail = ?, updated_by = ?
+                    WHERE id_trace_head IN (
+                        SELECT id_trace_head 
+                        FROM t_trace_header 
+                        WHERE id_balance_head = ?
+                    )', [$jsonTails, $user, $idHead]);
+    
+        // Log change
+        DB::insert(
+            'INSERT INTO log_transactions
+                (log_module, log_type, log_description, created_by)
+            VALUES (?, ?, ?, ?)',
+            [
+                'T_BALANCE_HEAD', 'UPDATE_SUBTANK',
+                'IDHEAD: '.$idHead.' | TRACE: '.$row->trace_no.
+                ' | SUBTANKS: '.implode(',', $tails),
+                $user
+            ]
+        );
+    
+        return [(object)['response' => 1]];
     }
 }
 
