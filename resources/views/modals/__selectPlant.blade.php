@@ -9,11 +9,13 @@
             <label for="plantSelect">Choose Plant:</label>
             <select class="form-control" id="plantSelect">
               <option value="">-- Select Plant --</option>
-              @foreach($plants as $plant)
-                <option value="{{ $plant->code_3 }}" {{ $selectedPlant == $plant->code_3 ? 'selected' : '' }}>
-                  {{ $plant->code_2 }} ({{ $plant->code_3 }})
-                </option>
-              @endforeach
+              @if(!empty($plants))
+                @foreach($plants as $plant)
+                  <option value="{{ $plant->code_3 }}" {{ $selectedPlant == $plant->code_3 ? 'selected' : '' }}>
+                    {{ $plant->code_2 }} ({{ $plant->code_3 }})
+                  </option>
+                @endforeach
+              @endif
             </select>
           </div>
         </div>
