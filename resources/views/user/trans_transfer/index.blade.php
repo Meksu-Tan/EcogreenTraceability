@@ -318,7 +318,7 @@
                         const fromIds = row.from_id_tank_tail ? row.from_id_tank_tail.split(',') : [];
                         const fromDisplay = fromTails.length ? `${row.from_sloc_name}: [${fromTails.join(', ')}]` : row.from_sloc_name;
                         const toTails = row.to_tf_number ? row.to_tf_number.split(',') : [];
-                        const toIds = row.from_id_tank_tail ? row.to_id_tank_tail.split(',') : [];
+                        const toIds = row.to_id_tank_tail ? row.to_id_tank_tail.split(',') : [];
                         const toDisplay = toTails.length ? `${row.to_sloc_name}: [${toTails.join(', ')}]` : row.to_sloc_name;
                         return `
                             <a href="#" class="sloc-edit" style="color: #7c7c7d;"
