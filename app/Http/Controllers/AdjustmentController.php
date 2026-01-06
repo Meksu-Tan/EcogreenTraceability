@@ -162,8 +162,9 @@ class AdjustmentController extends Controller
                 $entry_no = $request->input('entry_no');
                 $entry_date = $request->input('entry_date');
                 $id_tank = $request->input('tank');
+                $id_tank_tail = $request->input('tankNo');
                 $qty = $request->input('qty');
-                $id_material = $request->input('idMaterial');
+                $id_material = $request->input('id_material');
                 $qty = floatval(str_replace(',', '', $qty));
                 $materialDoc = $request->input('material_doc');
 
@@ -172,7 +173,7 @@ class AdjustmentController extends Controller
                     $data = $this->returnResponse($lockReturn, 'ADJUSTMENT WIP', $mode);
                     return response()->json($data);
                 } else {
-                    $return = AD::post_adjustmentInit($user, $mode, $idHead, $entry_no, $entry_date, $id_tank, $qty, $id_material, $materialDoc, $request);
+                    $return = AD::post_adjustmentInit($user, $mode, $idHead, $entry_no, $entry_date, $id_tank, $qty, $id_material, $materialDoc, $id_tank_tail, $request);
                     $data = $this->returnResponse($return, 'ADJUSTMENT WIP', $mode);
                     return response()->json($data);
                 }
@@ -368,6 +369,10 @@ class AdjustmentController extends Controller
             exit;
         } elseif ($flag == 'get_cmbActiveTank'){
             $txtData['data'] = AD::get_cmbActiveTank($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_cmbActiveSpecificTank'){
+            $txtData['data'] = AD::get_cmbActiveSpecificTank($request);
             echo json_encode($txtData);
             exit;
         } elseif ($flag == 'get_dtAdjustmentWhx'){

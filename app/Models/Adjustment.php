@@ -119,10 +119,16 @@ class Adjustment extends Model
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
-        $db = DB::select('SELECT a.entry_date, CAST(a.adjust_no AS CHAR) AS adjust_no, CONCAT(b.code, " :: ", b.description) AS material,
+        $db = DB::select('SELECT a.entry_date, CAST(a.adjust_no AS CHAR) AS adjust_no, CONCAT(b.code, " :: ", b.description) AS material, a.id_tank, a.id_tank_tail,
                                  CAST(c.trace_no AS CHAR) AS trace_no, CONCAT("Qty: ", a.before_adjust, " >>> ", a.after_adjust, " MT") AS adjustment, a.id_adjust_head,
                                  GROUP_CONCAT(DISTINCT CONCAT(e.description, " / ", d.batch_sap, " / Qty: ", FORMAT(d.before_adjust,3), " >>> ", FORMAT(d.after_adjust,3), " MT") SEPARATOR " | ") AS supplier,
-                                 a.created_by, a.created_at, a.`status`, a.after_adjust, g.description AS sloc,
+                                 a.created_by, a.created_at, a.`status`, a.after_adjust, 
+                                 CONCAT(g.description, 
+                                    IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", ") IS NULL, 
+                                        "", 
+                                        CONCAT(" | ", GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ", "))
+                                    )
+                                 ) AS sloc,
                                  IF(a.after_adjust <> c.qty, 0, 1) AS adjust_flag, f.id_matdoc, f.material_document, f.id_trace_head
                             FROM t_adjustment_header a
                             LEFT JOIN m_material b
@@ -142,6 +148,8 @@ class Adjustment extends Model
                               ON a.adjust_no = f.to_trace_no
                             LEFT JOIN m_tank g
                               ON g.id_tank = a.id_tank
+                            LEFT JOIN m_tank_detail h
+                              ON JSON_CONTAINS(c.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
                            WHERE a.`status` = 1
                              AND SUBSTRING(a.adjust_no, 1, 1) = 9
                              AND a.id_plant = ?
@@ -209,6 +217,16 @@ class Adjustment extends Model
                            WHERE a.status = 1
                            AND a.id_plant = ?
                            ORDER BY a.description ASC', [$idPlant]);
+
+        return $db;
+    }
+    static function get_cmbActiveSpecificTank($request){
+        $sloc = $request->input('sloc');
+        $db = DB::select('SELECT a.id_tank_tail, a.tf_number AS tankNo
+                            FROM m_tank_detail a
+                           WHERE a.status = 1
+                            AND a.id_tank = ?
+                           ORDER BY a.tf_number ASC', [$sloc]);
 
         return $db;
     }
@@ -1340,9 +1358,10 @@ class Adjustment extends Model
     }
 
     static function post_adjustmentInit($user, $mode, $idHead, $entry_no, $entry_date, $id_tank, $qty,
-                                        $id_material, $materialDoc, $request){
+                                        $id_material, $materialDoc, $id_tank_tail, $request){
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
         $lastTwoDigitIdPlant = substr($idPlant, 2, 2);
+        $id_tank_tail_json = json_encode($id_tank_tail);
 
         /* CEK SUPPLIER ENTRY */
             $dat = DB::select('SELECT id_supplier, qty AS qty_tail, batch_sap
@@ -1374,6 +1393,7 @@ class Adjustment extends Model
                             'trace_no' => $new_entry_no,
                             'id_material' => $id_material,
                             'id_tank' => $id_tank,
+                            'id_tank_tail' => $id_tank_tail_json,
                             'entry_date' => $entry_date,
                             'qty' => $qty,
                             'in_qty' => $qty,
@@ -1387,6 +1407,7 @@ class Adjustment extends Model
                                 'id_material' => $id_material,
                                 'entry_date' => $entry_date,
                                 'id_sloc' => $id_tank,
+                                'id_tank_tail' => $id_tank_tail_json,
                                 'in_qty' => $qty,
                                 'id_plant' => $idPlant,
                                 'created_by' => $user,
@@ -1399,6 +1420,7 @@ class Adjustment extends Model
                     'id_balance_head' => $idHead,
                     'id_material' => $id_material,
                     'id_tank' => $id_tank,
+                    'id_tank_tail' => $id_tank_tail_json,
                     'in_qty' => $qty,
                     'before_adjust' => 0,
                     'after_adjust' => $qty,
@@ -1431,6 +1453,7 @@ class Adjustment extends Model
                                         'init_qty' => $qty_tail,
                                         'batch_sap' => $batchSap,
                                         'id_tank' => $id_tank,
+                                        'id_tank_tail' => $id_tank_tail_json,
                                         'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
@@ -1442,6 +1465,7 @@ class Adjustment extends Model
                                         'batch_sap' => $batchSap,
                                         'in_qty' => $qty_tail,
                                         'id_sloc' => $id_tank,
+                                        'id_tank_tail' => $id_tank_tail_json,
                                         'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);
@@ -1456,6 +1480,7 @@ class Adjustment extends Model
                                         'before_adjust' => 0,
                                         'after_adjust' => $qty_tail,
                                         'id_tank' => $id_tank,
+                                        'id_tank_tail' => $id_tank_tail_json,
                                         'id_plant' => $idPlant,
                                         'created_by' => $user
                                     ]);

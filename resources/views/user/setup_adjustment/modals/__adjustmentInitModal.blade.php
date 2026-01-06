@@ -61,11 +61,18 @@
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-12">
+                                        <div class="col-md-8">
                                             <div class="form-group">
                                                 <label for="name">Material ( Do not change material selection after input supplier! )</label>
-                                                <select name="idMaterial" id="form-adjustmentInit-material" style="width: 100%;" class="form-control" required>
+                                                <select name="id_material" id="form-adjustmentInit-material" style="width: 100%;" class="form-control" required>
                                                     <option value="">- Select Material -</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="form-group">
+                                                <label for="name">Specific Sloc</label>
+                                                <select name="tankNo[]" id="form-adjustmentInit-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
                                                 </select>
                                             </div>
                                         </div>
@@ -136,6 +143,7 @@
         const $txt_adjustmentInit_material         = '#form-adjustmentInit-material';
         const $tbl_adjustmentInit_detail           = '#form-adjustmentInit-detail';
         const $cmb_adjustmentInit_tank             = '#form-adjustmentInit-tank';
+        const $cmb_adjustmentInit_tankNo           = '#form-adjustmentInit-tankNo';
         const $txt_adjustmentInit_materialDoc      = '#form-adjustmentInit-materialDoc';
         const $txt_adjustmentInit_poNo             = '#form-adjustmentInit-poNo';
         const $txt_adjustmentInit_batchNo          = '#form-adjustmentInit-batchNo';
@@ -148,6 +156,8 @@
 
         const $div_whxEntry1                        = '#div-whx1';
         const $div_whxEntry2                        = '#div-whx2';
+
+        let adjustmentEntry_selectedTankTails = [];
 
     /* FUNCTION DOCUMENT READY */
         $(document).ready(function() {
@@ -292,6 +302,21 @@
                     if ( $($modal_adjustmentInit).hasClass('show') ) {
                         $($modal_adjustmentInit).css('opacity', 1);
                     }
+
+                    if (adjustmentEntry_selectedTankTails.length > 0) {
+                        $($cmb_adjustmentInit_tankNo).val(adjustmentEntry_selectedTankTails).trigger('change');
+                    }
+                });
+                $($modal_adjustmentInit).on('hidden.bs.modal', function () {
+                    adjustmentEntry_selectedTankTails = [];
+                    $($form_blendingEntry_idTankNo).val(null).trigger('change');
+                });
+                $(document).on('change', $cmb_adjustmentInit_tankNo, function () {
+                    adjustmentEntry_selectedTankTails = $(this).val() || [];
+                });
+                $(document).on('change', $cmb_adjustmentInit_tank, function () {
+                    let sloc = $(this).val();
+                    ajax_populateTankNo($cmb_adjustmentInit_tankNo, sloc, adjustmentEntry_selectedTankTails);
                 });
 
         });
@@ -448,6 +473,60 @@
                 }
             });
         };
+        function ajax_populateTankNo(id, sloc=null, selectedValues=null, options={}){
+            const $select = $(id);
+            let selected = [];
+
+            if (Array.isArray(selectedValues)) {
+                selected = selectedValues.map(String);
+            } else if (typeof selectedValues === 'string') {
+                try {
+                    selected = JSON.parse(selectedValues).map(String)
+                } catch {
+                    selected = [];
+                }
+            }
+
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data: {
+                    flag: 'get_cmbActiveSpecificTank',
+                    sloc: sloc,
+                },
+                success: function(response) {
+                    $select.empty();
+
+                    if (response.data && response.data.length){
+                        response.data.forEach(row =>{
+                            const isSelected = selected.includes(String(row.id_tank_tail));
+
+                            const option = new Option(
+                                row.tankNo,
+                                row.id_tank_tail,
+                                isSelected,
+                                isSelected
+                            );
+
+                            $select.append(option);
+                        });
+                    }
+
+                    if(!$select.hasClass('select2-hidden-accessible')) {
+                        $select.select2({
+                            placeholder: ' - Select Specific Sloc No -',
+                            closeOnSelect: false,
+                            allowClear: true,
+                            width: '100%',
+                            dropdownParent: options.dropdownParent || $select.closest('.modal'),
+                        });
+                    }
+
+                    $select.trigger('change');
+                }
+            })
+        }
         function ajax_populateWhx(id, selectedValue=null){
             // Empty the dropdown
             $(id).find('option').not(':first').remove();
@@ -571,7 +650,7 @@
 
     /* FUNCTION INIT */
         function initialize_modalAdjustmentInit($flag, $mode, $adj_number=null, $idHead=null, $entryDate=null,
-                                                $idTank=null, $materialDoc=null, $idMaterial=null,
+                                                $idTank=null, $materialDoc=null, $idMaterial=null, $idTankTail=null,
                                                 $batchNo=null, $poNo=null){
 
             var options = { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' };
@@ -618,6 +697,10 @@
 
                 ajax_dtSupplierList($tbl_adjustmentInit_detail, $idHead, $mode);
                 ajax_getTotalQtySupplier($txt_adjustmentInit_qty, $idHead, $mode);
+            }
+
+            if ($mode == 'ADD' && adjustmentEntry_selectedTankTails.length === 0) {
+                ajax_populateTankNo($cmb_adjustmentInit_tankNo, $idTank, $idTankTail)
             }
         };
 
