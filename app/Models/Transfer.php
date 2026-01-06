@@ -117,7 +117,7 @@ class Transfer extends Model
                                  GROUP_CONCAT(DISTINCT h_from.id_tank_tail ORDER BY h_from.id_tank_tail) AS from_id_tank_tail, GROUP_CONCAT(DISTINCT h_to.id_tank_tail ORDER BY h_to.id_tank_tail) AS to_id_tank_tail,
                                  CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty, a.entry_date, a.id_balance_head AS idHead,
                                  CONCAT(c.`description`, " (", c.`code`, ")") AS material, FORMAT(ROUND(a.in_qty,3),3) AS in_qty, FORMAT(ROUND(a.out_qty,3),3) AS out_qty,
-                                 GROUP_CONCAT(CONCAT(f.`description`, " / ", e.batch_sap, " / Qty : ", ROUND(e.init_qty,3), " MT / Qty : ", ROUND(e.qty,3), " MT") SEPARATOR " | ") AS supplier,
+                                 GROUP_CONCAT(DISTINCT CONCAT(f.`description`, " / ", e.batch_sap, " / Qty : ", ROUND(e.init_qty,3), " MT / Qty : ", ROUND(e.qty,3), " MT") SEPARATOR " | ") AS supplier,
                                  b.id_trace_head AS idTraceHead, b.id_trace_head, b.is_last_row, b.next_process,
                                  CONCAT(COALESCE(b.from_sloc, ""),
                                    IF(
