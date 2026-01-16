@@ -153,7 +153,7 @@ class TransferController extends Controller
                                 /* ENTRY TO t_balance_temporary */
                                 TRF::post_adjEntrySupplier($user, $entryAdjNo, $idSupplier, $idMaterial, $shortQty, $supplierCode, $request);
                                 /* ENTRY TO t_adjustment */
-                                AD::post_adjustmentInit($user, $mode, $idHead, $entryAdjNo, $entryDate, $trfSource, $shortQty, $idMaterial, $materialDoc, $request);
+                                AD::post_adjustmentInit($user, $mode, $idHead, $entryAdjNo, $entryDate, $trfSource, $shortQty, $idMaterial, $materialDoc, $trfSourceTail, $request);
 
                                 $return = TRF::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination, $trfSourceTail, $trfDestinationTail);
                             }

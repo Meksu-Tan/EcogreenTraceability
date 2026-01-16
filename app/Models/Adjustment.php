@@ -52,6 +52,35 @@ class Adjustment extends Model
                             LIMIT 1');
         return $db;
     }
+    // static function get_adjSupplierNewEntryNumber($entryDate=null, $request){
+    //     $idPlant = \App\Models\BaseModel::resolvePlant($request);
+    //     if ($entryDate == null){
+    //         $db = DB::select('SELECT a.adj_number
+    //                             FROM (SELECT a.adjust_no+1 AS adj_number
+    //                                     FROM t_adjustment_header a
+    //                                    WHERE SUBSTRING(a.adjust_no,1,7) = CONCAT("9", DATE_FORMAT(CURDATE(), "%y%m%d"))
+    //                                      AND a.status = 1
+    //                                    ORDER BY a.id_adjust_head DESC
+    //                                    LIMIT 1 ) a
+    //                            UNION ALL
+    //                           SELECT CONCAT("9", DATE_FORMAT(CURDATE(), "%y%m%d"), LPAD(RIGHT(?, 2), 2, "0"),"0001") AS adj_number
+    //                            LIMIT 1', [$idPlant]);
+    //     } else {
+    //         $db = DB::select('SELECT a.adj_number
+    //                             FROM (
+    //                                 SELECT a.adjust_no+1 AS adj_number
+    //                                 FROM t_adjustment_header a
+    //                                 WHERE SUBSTRING(a.adjust_no, 1, 7) = CONCAT("9", DATE_FORMAT(LAST_DAY(?), "%y%m%d") )
+    //                                 AND a.status = 1
+    //                                 ORDER BY a.id_adjust_head DESC
+    //                                 LIMIT 1
+    //                             ) a
+    //                           UNION ALL
+    //                          SELECT CONCAT("9", DATE_FORMAT(LAST_DAY(?),"%y%m%d"), LPAD(RIGHT(?, 2), 2, "0"), "0001") AS adj_number
+    //                           LIMIT 1;', [$entryDate, $entryDate, $idPlant]);
+    //     }
+    //     return $db;
+    // }
     static function get_dtSupplierList($request){
         $mode = $request->input('mode');
         $number = $request->input('number');
@@ -153,7 +182,7 @@ class Adjustment extends Model
                            WHERE a.`status` = 1
                              AND SUBSTRING(a.adjust_no, 1, 1) = 9
                              AND a.id_plant = ?
-                           GROUP BY a.adjust_no
+                           GROUP BY a.id_adjust_head
                            ORDER BY a.entry_date DESC', [$idPlant]);
 
         return $db;
@@ -2007,10 +2036,10 @@ class Adjustment extends Model
                 $adjNo = $datAdjustNo[0]->adj_number;
                 $out = static::initSupplier_periodAdjustment($adjNo, $trfQty, $idMaterial, $user);
                 if ($out[0]->response == 1){
-                    static::post_adjustmentInit($user, $request, 'ADD', $idHead, $adjNo, $entryDate, $trfSource, $trfQty, $idMaterial, null);
+                    static::post_adjustmentInit($user, $request, 'ADD', $idHead, $adjNo, $entryDate, $trfSource, $trfQty, $idMaterial, null, null);
 
                     /* DO TRANSFER ADJUSTMENT */
-                    $out = Transfer::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination);
+                    $out = Transfer::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination, null, null);
                     $adjustNumber = $adjNo . ' >>> ' . $entryNo;
                 }
             } elseif ($adjType == "OUT"){
@@ -2019,7 +2048,7 @@ class Adjustment extends Model
                 $trfDestination = 10;
 
                 /* DO TRANSFER ADJUSTMENT */
-                $out = Transfer::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination);
+                $out = Transfer::post_transferEntry($user, $entryNo, $entryDate, $idMaterial, $materialDoc, $trfQty, $trfSource, $trfDestination, null, null);
                 $adjustNumber = $entryNo;
             }
 
@@ -2165,6 +2194,293 @@ class Adjustment extends Model
                 $db = [ (object)['response' => 0 ]];
             }
             return $db;
+    }
+    static function get_supplierByFilter($request){
+        $idMaterial = $request->input('idMaterial');
+        $idTank = $request->input('tank');
+
+        $db = DB::select('SELECT CONCAT(a.code, " :: ", a.description) AS supplier, a.id_supplier, SUM(b.qty) AS total_qty
+                            FROM t_balance_detail b
+                            JOIN m_supplier a ON a.id_supplier = b.id_supplier
+                            WHERE b.id_material = ?
+                                AND b.id_tank = ?
+                                AND b.qty > 0
+                                AND a.status = 1
+                            GROUP BY a.id_supplier, a.description, a.code
+                            ORDER BY a.description ASC', [$idMaterial, $idTank]);
+
+        return $db;
+    }
+    static function get_batchBySupplier($request){
+        $idMaterial = $request->input('idMaterial');
+        $idTank     = $request->input('tank');
+        $idSupplier = $request->input('idSupplier');
+    
+        $db = DB::select('SELECT b.batch_sap, SUM(b.qty) AS qty, MIN(b.created_at) AS first_created
+                            FROM t_balance_detail b
+                            WHERE b.id_material = ?
+                                AND b.id_tank = ?
+                                AND b.id_supplier = ?
+                                AND b.qty > 0
+                                AND b.status = 1
+                            GROUP BY b.batch_sap
+                            ORDER BY first_created ASC', [$idMaterial, $idTank, $idSupplier]);
+        
+        return $db;
+    }
+    static function post_adjustmentSupplier($user, $request){
+        $entryDate   = $request->input('entryDate');
+        $entryNo     = $request->input('entryNo');
+        $idPlant     = \App\Models\BaseModel::resolvePlant($request);
+        $idHead      = $request->input('idHead');
+        $idMaterial  = $request->input('idMaterial');
+        $idTank      = $request->input('tank');
+        $idSupplier  = $request->input('idSupplier');
+        $adjustQty   = floatval($request->input('qty'));
+        $batchSap    = $request->input('batchSap');
+        $adjustType  = $request->input('adjustType');
+
+        if (!$idMaterial || !$idTank || !$idSupplier || $adjustQty <= 0) {
+            return [ (object)['response' => 14] ];
+        }
+
+        if (!$idHead && $batchSap) {
+            $dat = DB::select('SELECT DISTINCT id_balance_head
+                                FROM t_balance_detail
+                                WHERE id_material = ?
+                                  AND id_tank = ?
+                                  AND id_supplier = ?
+                                  AND batch_sap = ?
+                                  AND `status` = 1
+                                LIMIT 1',
+                                [$idMaterial, $idTank, $idSupplier, $batchSap]);
+        
+            if (count($dat) > 0) {
+                // reuse existing batch head
+                $idHead = $dat[0]->id_balance_head;
+            } else {
+                // use latest head
+                $dat = DB::select('SELECT id_balance_head
+                                    FROM t_balance_header
+                                    WHERE id_material = ?
+                                      AND id_tank = ?
+                                      AND `status` = 1
+                                    ORDER BY id_balance_head DESC
+                                    LIMIT 1',
+                                    [$idMaterial, $idTank]);
+        
+                if (count($dat) == 0) {
+                    return [(object)['response' => 12]];
+                }
+        
+                $idHead = $dat[0]->id_balance_head;
+            }
+        }        
+
+        $trace = DB::select('SELECT id_trace_head
+                             FROM t_trace_header
+                             WHERE id_balance_head = ? AND `status` = 1
+                             ORDER BY id_trace_head DESC LIMIT 1', [$idHead]);
+
+        if (count($trace) == 0) {
+            return [ (object)['response' => 13] ];
+        }
+
+        $idTraceHead = $trace[0]->id_trace_head;
+
+        /* CHECK AVAILABLE QTY (ADJUST OUT) */
+        if ($adjustType == 'out') {
+            $dat = DB::select('SELECT SUM(qty) AS total_qty
+                                FROM t_balance_detail
+                                WHERE id_balance_head = ?
+                                    AND id_material = ?
+                                    AND id_tank = ?
+                                    AND id_supplier = ?
+                                    AND `status` = 1', [$idHead, $idMaterial, $idTank, $idSupplier]);
+
+            $available = floatval($dat[0]->total_qty ?? 0);
+
+            if ($available < $adjustQty) {
+                return [ (object)['response' => 15] ];
+            }
+        }
+
+        $idAdjustHead = DB::table('t_adjustment_header')->insertGetId([
+            'entry_date'      => $entryDate,
+            'adjust_no'       => $entryNo,
+            'id_balance_head' => $idHead,
+            'id_material'     => $idMaterial,
+            'id_tank'         => $idTank,
+            'in_qty'          => $adjustType === 'in' ? $adjustQty : 0,
+            'out_qty'         => $adjustType === 'out' ? $adjustQty : 0,
+            'before_adjust'   => 0,
+            'after_adjust'    => 0,
+            'id_plant'        => $idPlant,
+            'created_by'      => $user
+        ]);
+
+        $dat = DB::select('SELECT SUM(qty) AS total_qty
+                            FROM t_balance_detail
+                            WHERE id_balance_head = ?
+                                AND id_material = ?
+                                AND id_tank = ?
+                                AND id_supplier = ?
+                                AND `status` = 1', [$idHead, $idMaterial, $idTank, $idSupplier]);
+
+        $beforeSupplierQty = floatval($dat[0]->total_qty ?? 0);
+
+        /* LOGGING */
+        DB::insert('INSERT INTO log_transactions 
+                        (log_module, log_type, log_description, created_by)
+                    VALUES (?, ?, ?, ?)', ['T_ADJUST_HEAD', 'ADD SUPPLIER ADJUST',
+                                            'IDADJUSTHEAD: '.$idAdjustHead.' | IDHEAD: '.$idHead.
+                                            ' | SUPPLIER: '.$idSupplier. ' | TYPE: '.$adjustType.' | QTY: '.$adjustQty, $user]);
+
+        /* ===============================
+            ADJUST OUT (FIFO)
+        =============================== */
+        if ($adjustType === 'out') {
+            $qtyToDeduct = $adjustQty;
+
+            $rows = DB::select('SELECT id_balance_tail, qty, batch_sap
+                                FROM t_balance_detail
+                                WHERE id_balance_head = ?
+                                    AND id_material = ?
+                                    AND id_tank = ?
+                                    AND id_supplier = ?
+                                    AND qty > 0
+                                    AND `status` = 1
+                                ORDER BY id_balance_tail ASC', [$idHead, $idMaterial, $idTank, $idSupplier]);
+
+            foreach ($rows as $row) {
+                if ($qtyToDeduct <= 0) break;
+
+                $takeQty  = min($row->qty, $qtyToDeduct);
+                $afterQty = $row->qty - $takeQty;
+
+                DB::update('UPDATE t_balance_detail
+                            SET qty = ?, out_qty = ?, updated_by = ?
+                            WHERE id_balance_tail = ?', [$afterQty, $takeQty, $user, $row->id_balance_tail]);
+
+                DB::table('t_adjustment_detail')->insert([
+                    'id_adjust_head' => $idAdjustHead,
+                    'id_balance_tail'=> $row->id_balance_tail,
+                    'id_supplier'    => $idSupplier,
+                    'id_material'    => $idMaterial,
+                    'batch_sap'      => $row->batch_sap,
+                    'out_qty'        => $takeQty,
+                    'before_adjust'  => $row->qty,
+                    'after_adjust'   => $afterQty,
+                    'id_tank'        => $idTank,
+                    'id_plant'       => $idPlant,
+                    'created_by'     => $user
+                ]);
+                DB::table('t_trace_detail')->insert([
+                    'id_trace_head'   => $idTraceHead,
+                    'id_balance_tail' => $row->id_balance_tail,
+                    'id_supplier'     => $idSupplier,
+                    'id_material'     => $idMaterial,
+                    'batch_sap'       => $row->batch_sap,
+                    'out_qty'         => $takeQty,
+                    'id_sloc'         => $idTank,
+                    'id_plant'        => $idPlant,
+                    'created_by'      => $user
+                ]);
+
+                $qtyToDeduct -= $takeQty;
+            }
+
+            DB::update('UPDATE t_trace_header
+                        SET out_qty = ?, updated_by = ?
+                        WHERE id_trace_head = ?', [$adjustQty, $user, $idTraceHead]);
+        }
+
+        /* ===============================
+            ADJUST IN
+        =============================== */
+        if ($adjustType === 'in') {
+            $dat = DB::select('SELECT id_balance_tail, qty
+                                FROM t_balance_detail
+                                WHERE id_balance_head = ?
+                                    AND id_material = ?
+                                    AND id_tank = ?
+                                    AND id_supplier = ?
+                                    AND batch_sap = ?
+                                    AND `status` = 1
+                                LIMIT 1', [$idHead, $idMaterial, $idTank, $idSupplier, $batchSap]);
+
+            if (count($dat) > 0) {
+                $idTail = $dat[0]->id_balance_tail;
+                $beforeQty = $dat[0]->qty;
+                $afterQty  = $beforeQty + $adjustQty;
+
+                DB::update('UPDATE t_balance_detail
+                            SET qty = ?, in_qty = ?, updated_by = ?
+                            WHERE id_balance_tail = ?', [$afterQty, $adjustQty, $user, $idTail]);
+            } else {
+                $beforeQty = 0;
+                $afterQty  = $adjustQty;
+
+                $idTail = DB::table('t_balance_detail')->insertGetId([
+                    'id_balance_head' => $idHead,
+                    'id_supplier'     => $idSupplier,
+                    'id_material'     => $idMaterial,
+                    'batch_sap'       => $batchSap,
+                    'qty'             => $adjustQty,
+                    'in_qty'          => $adjustQty,
+                    'id_tank'         => $idTank,
+                    'id_plant'        => $idPlant,
+                    'created_by'      => $user
+                ]);
+            }
+
+            DB::table('t_adjustment_detail')->insert([
+                'id_adjust_head' => $idAdjustHead,
+                'id_balance_tail'=> $idTail,
+                'id_supplier'    => $idSupplier,
+                'id_material'    => $idMaterial,
+                'batch_sap'      => $batchSap,
+                'in_qty'         => $adjustQty,
+                'before_adjust'  => $beforeQty,
+                'after_adjust'   => $afterQty,
+                'id_tank'        => $idTank,
+                'id_plant'       => $idPlant,
+                'created_by'     => $user
+            ]);
+            DB::table('t_trace_detail')->insert([
+                'id_trace_head'   => $idTraceHead,
+                'id_balance_tail' => $idTail,
+                'id_supplier'     => $idSupplier,
+                'id_material'     => $idMaterial,
+                'batch_sap'       => $batchSap,
+                'in_qty'          => $adjustQty,
+                'id_sloc'         => $idTank,
+                'id_plant'        => $idPlant,
+                'created_by'      => $user
+            ]);
+
+            DB::update('UPDATE t_trace_header
+                        SET in_qty = ?, updated_by = ?
+                        WHERE id_trace_head = ?', [$adjustQty, $user, $idTraceHead]);
+        }
+
+        $sum = DB::select('SELECT SUM(qty) AS total_qty
+                            FROM t_balance_detail
+                            WHERE id_balance_head = ? AND `status` = 1', [$idHead]);
+
+        $totalQty = floatval($sum[0]->total_qty ?? 0);
+
+        DB::update('UPDATE t_balance_header
+                    SET qty = ?, in_qty = ?, out_qty = ?, updated_by = ?
+                    WHERE id_balance_head = ?', [$totalQty, $adjustType === 'in'  ? $adjustQty : 0, $adjustType === 'out' ? $adjustQty : 0, $user, $idHead]);
+
+        $afterSupplierQty = $adjustType === 'in' ? $beforeSupplierQty + $adjustQty : $beforeSupplierQty - $adjustQty;
+
+        DB::update('UPDATE t_adjustment_header
+                    SET before_adjust = ?, after_adjust = ?
+                    WHERE id_adjust_head = ?', [$beforeSupplierQty, $afterSupplierQty, $idAdjustHead]);
+
+        return [ (object)['response' => 1] ];
     }
 }
 

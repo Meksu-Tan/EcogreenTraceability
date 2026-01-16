@@ -17,6 +17,7 @@
                                 <button type="button" id="adjustment-add" class="btn btn-primary" style="color:white"><i class="fab fa-fly" aria-hidden="true"></i> Adjustment Last Record </button>
                                 <button type="button" id="adjustment-init" class="btn btn-primary" style="color:white"><i class="fab fa-bity" aria-hidden="true"></i> Stock Initialization </button>
                                 <button type="button" id="adjustment-period" class="btn btn-primary" style="color:white"><i class="fab fa-ethereum" aria-hidden="true"></i> Period Adjustment </button>
+                                <button type="button" id="adjustment-supplier" class="btn btn-primary" style="color:white"><i class="fas fa-male" aria-hidden="true"></i> Supplier Adjustment </button>
 
                                 <!-- <button type="button" id="email" class="btn btn-primary" style="color:white"><i class="fab fa-ethereum" aria-hidden="true"></i> Trial Email </button> -->
                             </div>
@@ -63,6 +64,7 @@
     @include('user.setup_adjustment.modals.__adjustmentPeriodDetailModal')
     @include('user.setup_adjustment.modals.__adjustmentPeriodNewModal')
     @include('user.setup_adjustment.modals.__adjustmentPeriodViewModal')
+    @include('user.setup_adjustment.modals.__adjustmentSupplierModal')
 
 
     @include('user.setup_adjustment.modals.__adjustmentPeriodUploadExcelModal')
@@ -83,6 +85,7 @@
         const $btn_adjustmentAddMatlDoc         = '#adjustment-addDocNo';
         const $btn_adjustmentEditMatlDoc        = '#adjustment-editDocNo';
         const $btn_adjustmentInit               = '#adjustment-init';
+        const $btn_adjustmentSupplier           = '#adjustment-supplier';
 
         const $modal_adjustment                 = '#modal-adjustment';
         const $modal_adjustmentMatlDoc          = '#modal-materialdoc-add';
@@ -93,6 +96,7 @@
         const $modal_adjustmentPeriodNew        = '#modal-adjPeriodNew';
         const $modal_adjustmentPeriodUpload     = '#modal-adjPeriodUpload';
         const $modal_adjustmentPeriodView       = '#modal-adjPeriodView';
+        const $modal_adjustmentSupplier         = '#modal-adjustmentSupplier';
 
         const $btn_adjustmentPeriod             = '#adjustment-period';
         const $btn_email                        = '#email';
@@ -171,6 +175,10 @@
                     $($modal_adjustmentInit).modal('show');
                     initialize_modalAdjustmentInit('post_adjustmentInit', 'ADD');
                 });
+                $(document).on('click', $btn_adjustmentSupplier, function(){
+                    $($modal_adjustmentSupplier).modal('show');
+                    initialize_modalAdjustmentSupplier('post_adjustmentSupplier', 'ADD');
+                })
                 $(document).on('click', $btn_adjustmentPeriod, function(){
                     $($modal_adjustmentPeriodHeader).modal('show');
                     initialize_adjustmentPeriodHeader();

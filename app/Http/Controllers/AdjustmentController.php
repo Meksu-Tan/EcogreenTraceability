@@ -291,6 +291,26 @@ class AdjustmentController extends Controller
                 }
 
                 return response()->json($data);
+            } elseif ($flag == 'post_adjustmentSupplier'){
+                $entryDate = $request->input('entryDate');
+                
+                DB::beginTransaction();
+                try {
+                    $lockReturn = AD::get_lockStatus($entryDate);
+                    if ($lockReturn[0]->response == 99){
+                        $data = $this->returnResponse($lockReturn, 'ADJUSTMENT SUPPLIER', $mode);
+                        return response()->json($data);
+                    } else {
+                        $return = AD::post_adjustmentSupplier($user, $request);
+                        DB::commit();
+                        $data = $this->returnResponse($return, 'ADJUSTMENT SUPPLIER', $mode);
+                        return response()->json($data);
+                    }
+                } catch (\Exception $e) {
+                    DB::rollback();
+                    $data = $this->returnResponse(null, $e->getMessage(), 500);
+                    return response()->json($data);
+                }
             }
 
         } else {
@@ -438,6 +458,14 @@ class AdjustmentController extends Controller
                     ->make(true);
         } elseif ($flag == 'get_adjustStatus'){
             $txtData['data'] = AD::get_adjustStatus($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_supplierByFilter') {
+            $txtData['data'] = AD::get_supplierByFilter($request);
+            echo json_encode($txtData);
+            exit;
+        } elseif ($flag == 'get_batchBySupplier'){
+            $txtData['data'] = AD::get_batchBySupplier($request);
             echo json_encode($txtData);
             exit;
         }
@@ -601,6 +629,22 @@ class AdjustmentController extends Controller
                 $data = [
                     'status'  => 0,
                     'message' => 'Last record is Adjustment record, cannot adjust!' ];
+            } elseif ($return[0]->response == '12'){
+                $data = [
+                    'status'  => 0,
+                    'message' => $feature . ' No Balance Header Found! Please initialize stock first.' ];
+            } elseif ($return[0]->response == '13'){
+                $data = [
+                    'status'  => 0,
+                    'message' => $feature . ' No Trace Header Found! Cannot adjust.' ];
+            } elseif ($return[0]->response == '14'){
+                $data = [
+                    'status'  => 0,
+                    'message' => $feature . ' Invalid input data!' ];
+            } elseif ($return[0]->response == '15'){
+                $data = [
+                    'status'  => 0,
+                    'message' => $feature . ' Not enough stock.' ];
             } elseif ($return[0]->response == '99'){
                 $data = [
                     'status'  => 0,
