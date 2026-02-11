@@ -161,7 +161,7 @@ class TransferController extends Controller
 
                         $data = $this->returnResponse($return, 'TRANSFER', $mode);
 
-                        if ($trfType === 'in'){
+                        if ($trfType !== 'all'){
                             if (in_array($trfDestination, [5, 6, 12, 13, 24, 25, 28, 29, 32, 33])) {
                                 /* AUTOMATE TRF TO ADJUSTMENT OUT */
                                 $trfSource = $trfDestination;
@@ -357,6 +357,10 @@ class TransferController extends Controller
      */
     protected function returnResponse($return, $feature, $mode){
 
+        if (isset($return['response'])) {
+            $return = [ (object)['response' => (string)$return['response']] ];
+        }
+
         if ($return == null){
             $data = [
                 'status'  => 0,
@@ -382,6 +386,10 @@ class TransferController extends Controller
                 $data = [
                     'status'  => 0,
                     'message' => $feature . ' Stock Not Enough' ];
+            } elseif ($return[0]->response === '6'){
+                $data = [
+                    'status'  => 0,
+                    'message' => $feature . ' Supplier Trace Missing' ];
             } elseif ($return[0]->response == '99'){
                 $data = [
                     'status'  => 0,

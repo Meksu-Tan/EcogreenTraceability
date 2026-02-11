@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use App\Helpers\Feed;
+use App\Helpers\Rundown;
 
 class Blending extends Model
 {
@@ -240,6 +242,7 @@ class Blending extends Model
         $idHead = $request->input('idHead');
         $qty = floatval(str_replace(',', '', $qty));
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
+        $idTank = $request->input('idTank');
 
         if ($mode == 'ADD'){
             /* CHECK FOR SAME MATERIAL */
@@ -255,9 +258,9 @@ class Blending extends Model
             };
 
             $db = DB::insert('INSERT INTO t_balance_temporary
-                                    (entry_no, id_material, qty, created_by, id_plant)
-                            VALUES (?, ?, ?, ?, ?)',
-                            [$entryNo, $idMaterialSource, $qty, $user, $idPlant]);
+                                    (entry_no, id_material, qty, created_by, id_tank, id_plant)
+                            VALUES (?, ?, ?, ?, ?, ?)',
+                            [$entryNo, $idMaterialSource, $qty, $user, $idTank, $idPlant]);
             $db = [ (object)['response' => $db ? 1 : 0 ]];
 
         } elseif ($mode == 'UPDATE'){
@@ -272,6 +275,510 @@ class Blending extends Model
         $db = [ (object)['response' => 1 ]];
         return $db;
     }
+    // static function post_blendingEntry($user, $request){
+    //     $flag = $request->input('flag');
+    //     $mode = $request->input('mode');
+    //     $idHead = $request->input('idHead');
+    //     $entryNo = $request->input('entry_no');
+    //     $entryDate = $request->input('entry_date');
+    //     $idMaterial = $request->input('id_material');
+    //     $materialDoc = $request->input('material_doc');
+    //     $totalQty = $request->input('qty');
+    //     $totalQty = floatval(str_replace(',', '', $totalQty));
+    //     $idPlant = \App\Models\BaseModel::resolvePlant($request);
+    //     $id_tank_tail = $request->input('tankNo');
+    //     $id_tank_tail_json = json_encode($id_tank_tail);
+
+    //     $insertPlant = ($idPlant === 0 ? null : $idPlant);
+
+    //     DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
+
+    //     /* CHECK LOCK PERIOD */
+    //     $lockDateTime = new \DateTime($entryDate);
+    //     // Mengambil tahun
+    //     $lockYear = $lockDateTime->format('Y');
+    //     // Mengambil bulan
+    //     $lockMonth = $lockDateTime->format('m');
+
+    //     $datLock = DB::select('SELECT lock_status
+    //                         FROM t_report_pspa_head
+    //                         WHERE `status` = 1
+    //                         AND YEAR(`period`) = ?
+    //                         AND MONTH(`period`) = ?
+    //                         UNION ALL
+    //                     SELECT "0" AS lock_status',
+    //                         [$lockYear, $lockMonth]);
+    //     $lockStatus = $datLock[0]->lock_status;
+    //     if ($lockStatus == 1){
+    //         $db = [ (object)['response' => 99 ]];
+    //         return $db;
+    //     }
+
+    //     /* CHECKING MATERIAL SOURCE */
+    //     $datMaterialEntry = DB::select('SELECT COUNT(a.entry_no) AS itemCnt
+    //                                   FROM t_balance_temporary a
+    //                                  WHERE a.entry_no = ?', [$entryNo]);
+    //     $itemCnt = $datMaterialEntry[0]->itemCnt;
+
+    //     if ($itemCnt == 0){
+    //         $db = [ (object)['response' => 4 ]];
+    //         return $db;
+    //     }
+
+    //     /* CONTINUE ROUTE BLENDING */
+    //     $datMaterial = DB::select('SELECT id_material, qty, id_tank
+    //                              FROM t_balance_temporary
+    //                             WHERE entry_no = ?', [$entryNo]);
+    //     $lenDatMatl = count($datMaterial);
+
+    //     /* MULTI-MATERIAL FEED FOR STOCK-OUT TO BLENDING */
+    //     for ($z = 0; $z < $lenDatMatl; $z++){
+    //         $idMaterialSource = $datMaterial[$z]->id_material;
+    //         $qtySource = $datMaterial[$z]->qty;
+
+    //         /* USE FEED ROUTING TO TAKE OUT MATERIAL FOR BLENDING */
+    //         $datHead = DB::select('SELECT b.id_material, c.id_balance_head, c.qty, c.in_qty, c.out_qty, c.init_qty, c.trace_no, c.id_tank
+    //                              FROM m_material a
+    //                              LEFT JOIN (SELECT b.code, b.id_material
+    //                                           FROM m_material b
+    //                                          WHERE b.status = 1) b
+    //                                ON a.code = b.code
+    //                              LEFT JOIN (SELECT c.id_material, c.id_balance_head, c.qty, c.in_qty, c.out_qty, c.init_qty, c.trace_no, c.id_tank
+    //                                           FROM m_tank cc
+    //                                           LEFT JOIN t_balance_header c
+    //                                             ON c.id_tank = cc.id_tank
+    //                                          WHERE c.status = 1
+    //                                            AND cc.status = 1
+    //                                            AND (SUBSTRING(c.trace_no,1,1) = 1 OR SUBSTRING(c.trace_no,1,1) = 2 OR SUBSTRING(c.trace_no,1,1) = 7 OR
+    //                                                 SUBSTRING(c.trace_no,1,1) = 8 OR SUBSTRING(c.trace_no,1,1) = 9)
+    //                                            AND cc.id_plant = ?
+    //                                            AND c.qty > 0
+    //                                         ) c
+    //                                ON b.id_material = c.id_material
+    //                             WHERE a.status = 1
+    //                               AND a.id_material = ?
+    //                               AND c.id_balance_head IS NOT NULL
+    //                             ORDER BY c.id_balance_head ASC', [$idPlant, $idMaterialSource]);
+    //         $lenDatHead = count($datHead);
+
+    //         /* VARIABLE ADJUSTMENT */
+    //         $out_qty = $qtySource;
+    //         $entry_no = substr_replace($entryNo, '0', 8, 1); /* REPLACE RUNDOWN_ID TO FEED_ID */
+    //         $curr_entryDate = $entryDate;
+    //         $curr_qtf = $qtySource;
+    //         $last_qtf = 0;
+
+    //         /* FEEDING ALGORITHM */
+    //         for ($i = 0; $i < $lenDatHead; $i++) {
+    //             $idHead = $datHead[$i]->id_balance_head;
+    //             $qty = $datHead[$i]->qty;
+    //             $total_in_qty = $datHead[$i]->in_qty;
+    //             $total_out_qty = $datHead[$i]->out_qty;
+    //             $init_qty = $datHead[$i]->init_qty;
+    //             $from_trace_no = $datHead[$i]->trace_no;
+    //             $id_material = $datHead[$i]->id_material;
+    //             $id_tank = $datHead[$i]->id_tank;
+
+    //             $new_total_in_qty = $total_in_qty;
+    //             $new_total_out_qty = $total_out_qty + $out_qty;
+
+    //             $tail_out_qty = $out_qty;
+
+    //             $balanceAfter = $qty - $out_qty;
+    //             if ($balanceAfter < 0){
+    //                 if ($lenDatHead == 1){
+    //                   $db = [ (object)['response' => 3 ]];
+    //                   break;
+    //                 }
+    //                 $new_balance = 0;
+    //                 $new_total_out_qty = $init_qty;
+    //                 $temp_out_qty = $out_qty - $qty;
+    //                 $out_qty = $qty;
+    //             } else {
+    //                 $new_balance = $qty - $out_qty;
+    //             }
+
+    //             /* UPDATE INTO T_BALANCE_HEADER */
+    //             DB::update('UPDATE t_balance_header
+    //                        SET qty = ?,
+    //                            in_qty = ?,
+    //                            out_qty = ?,
+    //                            updated_by = ?
+    //                      WHERE id_balance_head = ?',
+    //                      [$new_balance, $new_total_in_qty, $new_total_out_qty, $user, $idHead]);
+
+    //             /* INSERT INTO T_TRACE_HEADER (FEED -> OUT) */
+    //             $traceHeaderData = [
+    //                 'from_trace_no'    => $from_trace_no,
+    //                 'to_trace_no'      => $entry_no,
+    //                 'id_balance_head'  => $idHead,
+    //                 'id_material'      => $id_material,
+    //                 'entry_date'       => $curr_entryDate,
+    //                 'id_sloc'          => $id_tank,
+    //                 'id_tank_tail'     => $id_tank_tail_json,
+    //                 'out_qty'          => $out_qty,
+    //                 'last_qtf'         => $last_qtf,
+    //                 'curr_qtf'         => $curr_qtf,
+    //                 'created_by'       => $user,
+    //             ];
+    //             if ($insertPlant !== null) $traceHeaderData['id_plant'] = $insertPlant;
+
+    //             $idTraceHead = DB::table('t_trace_header')->insertGetId($traceHeaderData);
+
+    //             /* HEADER LOGGING */
+    //             DB::insert('INSERT INTO log_transactions
+    //                         (log_module, log_type, log_description, created_by)
+    //                     VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'BLENDING OUT', 'IDHEAD: ' . $idHead . ' | DATE: ' . $curr_entryDate .
+    //                                             ' / TANK: ' . $id_tank . ' / MATERIAL: ' . $id_material . ' / QTY: ' . $qty . ' >>> ' . $new_balance .
+    //                                             ' / IN_QTY: ' . $total_in_qty . ' >>> ' . $new_total_in_qty .
+    //                                             ' / OUT_QTY: ' . $total_out_qty . ' >>> ' . $new_total_out_qty .
+    //                                             ' | Status: 1', $user ]);
+
+    //             /* ROUTING FOR DETAIL PER SUPPLIER */
+    //             $datTail = DB::select('SELECT id_balance_tail, id_supplier, qty, in_qty, out_qty, init_qty, batch_sap
+    //                                  FROM t_balance_detail
+    //                                 WHERE id_balance_head = ?
+    //                                   AND `status` = 1
+    //                                   AND qty > "0.0001"
+    //                                 ORDER BY id_balance_tail ASC', [$idHead]);
+    //             $lenTail = count($datTail);
+    //             for ($k = 0; $k < $lenTail; $k++) {
+    //                 $idTail = $datTail[$k]->id_balance_tail;
+    //                 $idSupplier = $datTail[$k]->id_supplier;
+    //                 $tail_qty = $datTail[$k]->qty;
+    //                 $tail_total_in_qty = $datTail[$k]->in_qty;
+    //                 $tail_total_out_qty = $datTail[$k]->out_qty;
+    //                 $tail_init_qty = $datTail[$k]->init_qty;
+    //                 $batch_sap = $datTail[$k]->batch_sap;
+
+    //                 $new_tail_total_in_qty = $tail_total_in_qty;
+    //                 $new_tail_total_out_qty = $tail_total_out_qty + $tail_out_qty;
+
+    //                 $tailBalanceAfter = $tail_qty - $tail_out_qty;
+
+    //                 if ($tailBalanceAfter < 0){
+    //                     $new_tail_balance = 0;
+    //                     $new_tail_total_out_qty = $tail_init_qty;
+    //                     $temp_tail_out_qty = $tail_out_qty - $tail_qty;
+    //                     $tail_out_qty = $tail_qty;
+    //                 } else {
+    //                     $new_tail_balance = $tail_qty - $tail_out_qty;
+    //                 }
+
+    //                 $tail_out_qty = round($tail_out_qty, 4);
+    //                 $tail_total_in_qty = round($tail_total_in_qty, 4);
+    //                 $tail_total_out_qty = round($tail_total_out_qty, 4);
+    //                 $tail_qty = round($tail_qty, 4);
+    //                 $new_tail_balance = round($new_tail_balance, 4);
+    //                 $new_tail_total_in_qty = round($new_tail_total_in_qty, 4);
+    //                 $new_tail_total_out_qty = round($new_tail_total_out_qty, 4);
+
+    //                 /* POPULATE NEW BALANCE DETAIL */
+    //                 DB::update('UPDATE t_balance_detail
+    //                            SET qty = ?,
+    //                                in_qty = ?,
+    //                                out_qty = ?,
+    //                                updated_by = ?
+    //                          WHERE id_balance_tail = ?',
+    //                          [$new_tail_balance, $new_tail_total_in_qty, $new_tail_total_out_qty, $user, $idTail]);
+
+    //                 /* POPULATE TRACE DETAIL (FEED -> OUT DETAIL) */
+    //                 $traceDetailOut = [
+    //                     'id_trace_head'   => $idTraceHead,
+    //                     'id_balance_tail' => $idTail,
+    //                     'id_supplier'     => $idSupplier,
+    //                     'id_material'     => $id_material,
+    //                     'id_sloc'         => $id_tank,
+    //                     'id_tank_tail'    => $id_tank_tail_json,
+    //                     'out_qty'         => $tail_out_qty,
+    //                     'batch_sap'       => $batch_sap,
+    //                     'created_by'      => $user,
+    //                 ];
+    //                 if ($insertPlant !== null) $traceDetailOut['id_plant'] = $insertPlant;
+
+    //                 $idTraceTail = DB::table('t_trace_detail')->insertGetId($traceDetailOut);
+
+    //                 /* DETAIL LOGGING */
+    //                 DB::insert('INSERT INTO log_transactions
+    //                             (log_module, log_type, log_description, created_by)
+    //                         VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'BLENDING OUT', ' IDTAIL: ' . $idTail .
+    //                                                 ' / SUPPLIER: ' . $idSupplier . ' / MATERIAL: ' . $id_material .
+    //                                                 ' / QTY: ' . $tail_qty . ' >>> ' . $new_tail_balance .
+    //                                                 ' / IN_QTY: ' . $tail_total_in_qty . ' >>> ' . $new_tail_total_in_qty .
+    //                                                 ' / OUT_QTY: ' . $tail_total_out_qty . ' >>> ' . $new_tail_total_out_qty .
+    //                                                 ' | Status: 1', $user ]);
+
+    //                 /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
+    //                 if ($tailBalanceAfter >= 0){
+    //                     break;
+    //                 }
+
+    //                 /* ROUTING FOR USING NEXT BATCH BALANCE RESERVE */
+    //                 $tail_out_qty = $temp_tail_out_qty;
+    //             }
+
+    //             /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
+    //             if ($balanceAfter >= 0){
+    //                 $db = [ (object)['response' => 1 ]];
+    //                 break;
+    //             }
+
+    //             /* ROUTING FOR USING NEXT BATCH BALANCE RESERVE */
+    //             $out_qty = $temp_out_qty;
+    //         } // end feeding algorithm
+    //     } // end foreach materials feed
+
+    //     /* USE RUNDOWN ROUTING TO TAKE IN BLENDING MATERIAL */
+    //     /* VARIABLE ADJUSTMENT */
+    //     $id_material = $idMaterial;
+    //     $process_yield = 1;
+    //     $feed_entryNo = $entry_no;
+    //     $entry_no = $entryNo;
+    //     $curr_qtf = $totalQty;
+
+    //     /* GET FEED TRACE RELATED TO RUNDOWN */
+    //     $batch_seq = substr($feed_entryNo, 12, 2);
+    //     $feed_id = substr($feed_entryNo, 7, 3);
+
+    //     $datTraceHead = DB::select('SELECT to_trace_no, id_trace_head, SUM(out_qty) AS out_qty, id_material
+    //                               FROM t_trace_header
+    //                              WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
+    //                                AND SUBSTRING(to_trace_no,1,1) = 8
+    //                                AND SUBSTRING(to_trace_no,8,3) = ?
+    //                                AND SUBSTRING(to_trace_no,13,2) = ?
+    //                                AND `status` = 1
+    //                                AND out_qty > "0.0001"
+    //                                AND (id_plant = ? OR ? = 0)
+    //                              ORDER BY id_trace_head DESC
+    //                              LIMIT 1', [$feed_id, $batch_seq, $idPlant, $idPlant]);
+
+    //     if (!isset($datTraceHead[0]->id_trace_head)) {
+    //         $db = [ (object)['response' => 6 ]];
+    //         return $db;
+    //     }
+
+    //     $feed_idTraceHead = $datTraceHead[0]->id_trace_head;
+    //     $from_trace_no = $datTraceHead[0]->to_trace_no;
+    //     $feed_qty = $datTraceHead[0]->out_qty;
+
+    //     $in_qty = $process_yield * $feed_qty;
+
+    //     /* GET ID_TANK BASED ON MATERIAL ASSIGNMENT */
+    //     $datTank = DB::select('SELECT b.id_tank
+    //                          FROM m_material a
+    //                          LEFT JOIN m_tank b
+    //                            ON a.type = b.code_2 AND b.status = 1 AND b.id_plant = ?
+    //                         WHERE a.status = 1
+    //                           AND a.id_material = ?', [$idPlant, $id_material]);
+
+    //     if (!isset($datTank[0]->id_tank)) {
+    //         $db = [ (object)['response' => 6 ]];
+    //         return $db;
+    //     }
+
+    //     $id_tank = $datTank[0]->id_tank;
+
+    //     /* INSERT INTO T_BALANCE_HEADER (BLENDING IN) */
+    //     $balanceHeaderData = [
+    //         'entry_date' => $curr_entryDate,
+    //         'trace_no'   => $entry_no,
+    //         'id_material'=> $id_material,
+    //         'id_tank'    => $id_tank,
+    //         'id_tank_tail' => $id_tank_tail_json,
+    //         'qty'        => $in_qty,
+    //         'in_qty'     => $in_qty,
+    //         'init_qty'   => $in_qty,
+    //         'created_by' => $user,
+    //     ];
+    //     if ($insertPlant !== null) $balanceHeaderData['id_plant'] = $insertPlant;
+
+    //     $idHead = DB::table('t_balance_header')->insertGetId($balanceHeaderData);
+
+    //     /* INSERT INTO T_TRACE_HEADER (BLENDING IN) */
+    //     $traceInData = [
+    //         'from_trace_no'    => $from_trace_no,
+    //         'to_trace_no'      => $entry_no,
+    //         'id_balance_head'  => $idHead,
+    //         'id_material'      => $id_material,
+    //         'entry_date'       => $curr_entryDate,
+    //         'id_sloc'          => $id_tank,
+    //         'id_tank_tail'     => $id_tank_tail_json,
+    //         'in_qty'           => $in_qty,
+    //         'last_qtf'         => $last_qtf,
+    //         'curr_qtf'         => $curr_qtf,
+    //         'created_by'       => $user,
+    //     ];
+    //     if ($insertPlant !== null) $traceInData['id_plant'] = $insertPlant;
+
+    //     $idTraceHead = DB::table('t_trace_header')->insertGetId($traceInData);
+
+    //     DB::insert('INSERT INTO t_material_document
+    //                    (id_trace_head, material_document, created_by)
+    //             VALUES (?, ?, ?)', [$idTraceHead, $materialDoc, $user]);
+
+    //     /* HEADER LOGGING */
+    //     DB::insert('INSERT INTO log_transactions
+    //                    (log_module, log_type, log_description, created_by)
+    //             VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'BLENDING IN', 'IDHEAD: ' . $idHead . ' | DATE: ' . $curr_entryDate .
+    //                                     ' / MATERIAL: ' . $id_material . ' / QTY: ' . $in_qty .
+    //                                     ' / IN_QTY: ' . $in_qty .
+    //                                     ' / OUT_QTY: 0' .
+    //                                     ' | Status: 1', $user ]);
+
+    //     $datTraceHead = DB::select('SELECT to_trace_no, id_trace_head, out_qty, id_material
+    //                               FROM t_trace_header
+    //                              WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
+    //                                AND SUBSTRING(to_trace_no,1,1) = 8
+    //                                AND SUBSTRING(to_trace_no,8,3) = ?
+    //                                AND SUBSTRING(to_trace_no,13,2) = ?
+    //                                AND `status` = 1
+    //                                AND out_qty > "0.0001"
+    //                                AND (id_plant = ? OR ? = 0)
+    //                              ORDER BY id_trace_head DESC',
+    //                             [$feed_id, $batch_seq, $idPlant, $idPlant]);
+    //     $len = count($datTraceHead);
+
+    //     for ($i = 0; $i < $len; $i++) {
+    //         $feed_idTraceHead = $datTraceHead[$i]->id_trace_head;
+    //         $from_trace_no = $datTraceHead[$i]->to_trace_no;
+    //         $feed_qty = $datTraceHead[$i]->out_qty;
+
+    //         /* ROUTING FOR DETAIL PER SUPPLIER */
+    //         $datTraceTail = DB::select('SELECT id_trace_tail, id_balance_tail, id_supplier, out_qty, batch_sap
+    //                                   FROM t_trace_detail
+    //                                  WHERE id_trace_head = ?
+    //                                    AND `status` = 1
+    //                                  ORDER BY id_trace_tail ASC', [$feed_idTraceHead]);
+    //         $lenTraceTail = count($datTraceTail);
+    //         if ($lenTraceTail == 0){
+    //             $db = [ (object)['response' => 6 ]];
+    //             return $db;
+    //         }
+    //         for ($k = 0; $k < $lenTraceTail; $k++) {
+    //             $idTraceTail = $datTraceTail[$k]->id_trace_tail;
+    //             $idTail = $datTraceTail[$k]->id_balance_tail;
+    //             $idSupplier = $datTraceTail[$k]->id_supplier;
+    //             $feedSupplier = $datTraceTail[$k]->out_qty;
+    //             $batchSap = $datTraceTail[$k]->batch_sap;
+
+    //             $rundownSupplier = round($process_yield * $feedSupplier, 4);
+
+    //             /* POPULATE TRACE DETAIL */
+    //             $flagCheckIdSupplier = DB::select('SELECT count(id_trace_tail) AS cnt, id_trace_tail, in_qty, out_qty, id_balance_tail
+    //                                              FROM t_trace_detail
+    //                                             WHERE `status` = 1
+    //                                               AND id_trace_head = ?
+    //                                               AND id_supplier = ?
+    //                                               AND batch_sap = ?', [$idTraceHead, $idSupplier, $batchSap]);
+    //             $cntFlagCheckIdSupplier = $flagCheckIdSupplier[0]->cnt;
+    //             $idTraceTail = $flagCheckIdSupplier[0]->id_trace_tail;
+    //             $idTail = $flagCheckIdSupplier[0]->id_balance_tail;
+    //             $inQtyTail = $flagCheckIdSupplier[0]->in_qty;
+    //             $outQtyTail = $flagCheckIdSupplier[0]->out_qty;
+
+    //             if ($cntFlagCheckIdSupplier == 0){
+    //                 /* INSERT INTO T_BALANCE_DETAIL */
+    //                 $balanceDetailData = [
+    //                     'id_balance_head' => $idHead,
+    //                     'id_supplier'     => $idSupplier,
+    //                     'id_material'     => $id_material,
+    //                     'id_tank'         => $id_tank,
+    //                     'id_tank_tail'    => $id_tank_tail_json,
+    //                     'qty'             => $rundownSupplier,
+    //                     'in_qty'          => $rundownSupplier,
+    //                     'init_qty'        => $rundownSupplier,
+    //                     'batch_sap'       => $batchSap,
+    //                     'created_by'      => $user,
+    //                 ];
+    //                 if ($insertPlant !== null) $balanceDetailData['id_plant'] = $insertPlant;
+
+    //                 $idTail = DB::table('t_balance_detail')->insertGetId($balanceDetailData);
+
+    //                 $traceDetailIn = [
+    //                     'id_trace_head'   => $idTraceHead,
+    //                     'id_balance_tail' => $idTail,
+    //                     'id_supplier'     => $idSupplier,
+    //                     'id_material'     => $id_material,
+    //                     'id_sloc'         => $id_tank,
+    //                     'id_tank_tail'    => $id_tank_tail_json,
+    //                     'in_qty'          => $rundownSupplier,
+    //                     'batch_sap'       => $batchSap,
+    //                     'created_by'      => $user,
+    //                 ];
+    //                 if ($insertPlant !== null) $traceDetailIn['id_plant'] = $insertPlant;
+
+    //                 $idTraceTail = DB::table('t_trace_detail')->insertGetId($traceDetailIn);
+
+    //             } else {
+    //                 $newInQtyTail = $inQtyTail + $rundownSupplier;
+    //                 $newInQtyTail = round($newInQtyTail, 4); 
+    //                 DB::update('UPDATE t_balance_detail
+    //                            SET qty = ?,
+    //                                in_qty = ?,
+    //                                init_qty = ?,
+    //                                updated_by = ?
+    //                          WHERE id_balance_tail = ?', [$newInQtyTail, $newInQtyTail, $newInQtyTail, $user, $idTail]);
+    //                 DB::update('UPDATE t_trace_detail
+    //                            SET in_qty = ?,
+    //                                updated_by = ?
+    //                          WHERE id_trace_tail = ?', [$newInQtyTail, $user, $idTraceTail]);
+    //             }
+
+    //             /* DETAIL LOGGING */
+    //             DB::insert('INSERT INTO log_transactions
+    //                            (log_module, log_type, log_description, created_by)
+    //                     VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'BLENDING IN', ' IDTAIL: ' . $idTail .
+    //                                             ' / SUPPLIER: ' . $idSupplier . ' / MATERIAL: ' . $id_material .
+    //                                             ' / QTY: ' . $rundownSupplier .
+    //                                             ' / IN_QTY: ' . $rundownSupplier .
+    //                                             ' / OUT_QTY: ' . $rundownSupplier .
+    //                                             ' / INIT_QTY: ' . $rundownSupplier .
+    //                                             ' | Status: 1', $user ]);
+    //         }
+    //     }
+
+    //     // Fetch all supplier quantities
+    //     $details = DB::select('SELECT d.id_balance_tail, d.id_supplier, t.id_trace_tail, d.qty, d.in_qty, d.init_qty
+    //                            FROM t_balance_detail d
+    //                            LEFT JOIN t_trace_detail t 
+    //                            ON t.id_balance_tail = d.id_balance_tail
+    //                            AND t.id_trace_head = ?
+    //                            AND t.status = 1
+    //                            WHERE d.id_balance_head = ?
+    //                            ORDER BY d.id_balance_tail ASC', [$idTraceHead, $idHead]);
+
+    //     if (!empty($details)) {
+    //         // Convert to a nested array
+    //         $dataPerHead = [array_map(function ($d) {
+    //             return ['qty' => $d->qty];
+    //         }, $details)];
+
+    //         // Adjust supplier quantities proportionally so total matches header
+    //         adjustQtyToTotal($dataPerHead, $in_qty);
+
+    //         // Update DB with adjusted values
+    //         foreach ($details as $i => $d) {
+    //             $newQty = $dataPerHead[0][$i]['qty'];
+    //             DB::update('UPDATE t_balance_detail
+    //                         SET qty = ?, in_qty = ?, init_qty = ?
+    //                         WHERE id_balance_tail = ?', [$newQty, $newQty, $newQty, $d->id_balance_tail]);
+
+    //             if(!empty($d->id_trace_tail)) {
+    //                 DB::update('UPDATE t_trace_detail
+    //                             SET in_qty = ?
+    //                             WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
+    //             }
+    //         }
+    //     }
+
+    //     /* DESTROY TEMPORARY DATA */
+    //     DB::delete('DELETE FROM t_balance_temporary
+    //              WHERE entry_no = ?', [$entryNo]);
+
+    //     /* THROW OUTPUT */
+    //     $db = [ (object)['response' => 1 ]];
+    //     return $db;
+    // }
     static function post_blendingEntry($user, $request){
         $flag = $request->input('flag');
         $mode = $request->input('mode');
@@ -323,221 +830,41 @@ class Blending extends Model
         }
 
         /* CONTINUE ROUTE BLENDING */
-        $datMaterial = DB::select('SELECT id_material, qty
+        $datMaterial = DB::select('SELECT id_material, qty, id_tank
                                  FROM t_balance_temporary
                                 WHERE entry_no = ?', [$entryNo]);
         $lenDatMatl = count($datMaterial);
 
-        /* MULTI-MATERIAL FEED FOR STOCK-OUT TO BLENDING */
-        for ($z = 0; $z < $lenDatMatl; $z++){
-            $idMaterialSource = $datMaterial[$z]->id_material;
-            $qtySource = $datMaterial[$z]->qty;
+        $feed_entry_no = substr_replace($entryNo, '0', 8, 1); /* REPLACE RUNDOWN_ID TO FEED_ID */
+        $curr_entryDate = $entryDate;
+        $last_qtf = 0;
 
-            /* USE FEED ROUTING TO TAKE OUT MATERIAL FOR BLENDING */
-            $datHead = DB::select('SELECT b.id_material, c.id_balance_head, c.qty, c.in_qty, c.out_qty, c.init_qty, c.trace_no, c.id_tank
-                                 FROM m_material a
-                                 LEFT JOIN (SELECT b.code, b.id_material
-                                              FROM m_material b
-                                             WHERE b.status = 1) b
-                                   ON a.code = b.code
-                                 LEFT JOIN (SELECT c.id_material, c.id_balance_head, c.qty, c.in_qty, c.out_qty, c.init_qty, c.trace_no, c.id_tank
-                                              FROM m_tank cc
-                                              LEFT JOIN t_balance_header c
-                                                ON c.id_tank = cc.id_tank
-                                             WHERE c.status = 1
-                                               AND cc.status = 1
-                                               AND (SUBSTRING(c.trace_no,1,1) = 1 OR SUBSTRING(c.trace_no,1,1) = 2 OR SUBSTRING(c.trace_no,1,1) = 7 OR
-                                                    SUBSTRING(c.trace_no,1,1) = 8 OR SUBSTRING(c.trace_no,1,1) = 9)
-                                               AND cc.id_plant = ?
-                                               AND c.qty > 0
-                                            ) c
-                                   ON b.id_material = c.id_material
-                                WHERE a.status = 1
-                                  AND a.id_material = ?
-                                  AND c.id_balance_head IS NOT NULL
-                                ORDER BY c.id_balance_head ASC', [$idPlant, $idMaterialSource]);
-            $lenDatHead = count($datHead);
+        foreach ($datMaterial as $row) {
+            $qtySource = floatval(str_replace(',', '', $row->qty));
+            if ($qtySource <= 0) continue;
+      
+            $feedResult = Feed::generalFeed([
+                'user'         => $user,
+                'entry_date'   => $entryDate,
+                'id_material'  => $row->id_material,
+                'id_tank'      => $row->id_tank,
+                'id_tank_tail' => $id_tank_tail_json,
+                'id_plant'     => $idPlant,
+                'qty'          => $qtySource,
+                'allow_partial' => true,
+                'trace_prefixes' => [1,2,7,8,9],
+                'to_trace_no'  => $feed_entry_no,
+            ]);
+      
+            if ($feedResult['response'] != 1) {
+                return [ (object)['response' => $feedResult['response']] ];
+            }
+        }
+        
+        $batch_seq = substr($feed_entry_no, 12, 2);
+        $feed_id   = substr($feed_entry_no, 7, 3);
 
-            /* VARIABLE ADJUSTMENT */
-            $out_qty = $qtySource;
-            $entry_no = substr_replace($entryNo, '0', 8, 1); /* REPLACE RUNDOWN_ID TO FEED_ID */
-            $curr_entryDate = $entryDate;
-            $curr_qtf = $qtySource;
-            $last_qtf = 0;
-
-            /* FEEDING ALGORITHM */
-            for ($i = 0; $i < $lenDatHead; $i++) {
-                $idHead = $datHead[$i]->id_balance_head;
-                $qty = $datHead[$i]->qty;
-                $total_in_qty = $datHead[$i]->in_qty;
-                $total_out_qty = $datHead[$i]->out_qty;
-                $init_qty = $datHead[$i]->init_qty;
-                $from_trace_no = $datHead[$i]->trace_no;
-                $id_material = $datHead[$i]->id_material;
-                $id_tank = $datHead[$i]->id_tank;
-
-                $new_total_in_qty = $total_in_qty;
-                $new_total_out_qty = $total_out_qty + $out_qty;
-
-                $tail_out_qty = $out_qty;
-
-                $balanceAfter = $qty - $out_qty;
-                if ($balanceAfter < 0){
-                    if ($lenDatHead == 1){
-                      $db = [ (object)['response' => 3 ]];
-                      break;
-                    }
-                    $new_balance = 0;
-                    $new_total_out_qty = $init_qty;
-                    $temp_out_qty = $out_qty - $qty;
-                    $out_qty = $qty;
-                } else {
-                    $new_balance = $qty - $out_qty;
-                }
-
-                /* UPDATE INTO T_BALANCE_HEADER */
-                DB::update('UPDATE t_balance_header
-                           SET qty = ?,
-                               in_qty = ?,
-                               out_qty = ?,
-                               updated_by = ?
-                         WHERE id_balance_head = ?',
-                         [$new_balance, $new_total_in_qty, $new_total_out_qty, $user, $idHead]);
-
-                /* INSERT INTO T_TRACE_HEADER (FEED -> OUT) */
-                $traceHeaderData = [
-                    'from_trace_no'    => $from_trace_no,
-                    'to_trace_no'      => $entry_no,
-                    'id_balance_head'  => $idHead,
-                    'id_material'      => $id_material,
-                    'entry_date'       => $curr_entryDate,
-                    'id_sloc'          => $id_tank,
-                    'id_tank_tail'     => $id_tank_tail_json,
-                    'out_qty'          => $out_qty,
-                    'last_qtf'         => $last_qtf,
-                    'curr_qtf'         => $curr_qtf,
-                    'created_by'       => $user,
-                ];
-                if ($insertPlant !== null) $traceHeaderData['id_plant'] = $insertPlant;
-
-                $idTraceHead = DB::table('t_trace_header')->insertGetId($traceHeaderData);
-
-                /* HEADER LOGGING */
-                DB::insert('INSERT INTO log_transactions
-                            (log_module, log_type, log_description, created_by)
-                        VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'BLENDING OUT', 'IDHEAD: ' . $idHead . ' | DATE: ' . $curr_entryDate .
-                                                ' / TANK: ' . $id_tank . ' / MATERIAL: ' . $id_material . ' / QTY: ' . $qty . ' >>> ' . $new_balance .
-                                                ' / IN_QTY: ' . $total_in_qty . ' >>> ' . $new_total_in_qty .
-                                                ' / OUT_QTY: ' . $total_out_qty . ' >>> ' . $new_total_out_qty .
-                                                ' | Status: 1', $user ]);
-
-                /* ROUTING FOR DETAIL PER SUPPLIER */
-                $datTail = DB::select('SELECT id_balance_tail, id_supplier, qty, in_qty, out_qty, init_qty, batch_sap
-                                     FROM t_balance_detail
-                                    WHERE id_balance_head = ?
-                                      AND `status` = 1
-                                      AND qty > "0.0001"
-                                    ORDER BY id_balance_tail ASC', [$idHead]);
-                $lenTail = count($datTail);
-                for ($k = 0; $k < $lenTail; $k++) {
-                    $idTail = $datTail[$k]->id_balance_tail;
-                    $idSupplier = $datTail[$k]->id_supplier;
-                    $tail_qty = $datTail[$k]->qty;
-                    $tail_total_in_qty = $datTail[$k]->in_qty;
-                    $tail_total_out_qty = $datTail[$k]->out_qty;
-                    $tail_init_qty = $datTail[$k]->init_qty;
-                    $batch_sap = $datTail[$k]->batch_sap;
-
-                    $new_tail_total_in_qty = $tail_total_in_qty;
-                    $new_tail_total_out_qty = $tail_total_out_qty + $tail_out_qty;
-
-                    $tailBalanceAfter = $tail_qty - $tail_out_qty;
-
-                    if ($tailBalanceAfter < 0){
-                        $new_tail_balance = 0;
-                        $new_tail_total_out_qty = $tail_init_qty;
-                        $temp_tail_out_qty = $tail_out_qty - $tail_qty;
-                        $tail_out_qty = $tail_qty;
-                    } else {
-                        $new_tail_balance = $tail_qty - $tail_out_qty;
-                    }
-
-                    $tail_out_qty = round($tail_out_qty, 4);
-                    $tail_total_in_qty = round($tail_total_in_qty, 4);
-                    $tail_total_out_qty = round($tail_total_out_qty, 4);
-                    $tail_qty = round($tail_qty, 4);
-                    $new_tail_balance = round($new_tail_balance, 4);
-                    $new_tail_total_in_qty = round($new_tail_total_in_qty, 4);
-                    $new_tail_total_out_qty = round($new_tail_total_out_qty, 4);
-
-                    /* POPULATE NEW BALANCE DETAIL */
-                    DB::update('UPDATE t_balance_detail
-                               SET qty = ?,
-                                   in_qty = ?,
-                                   out_qty = ?,
-                                   updated_by = ?
-                             WHERE id_balance_tail = ?',
-                             [$new_tail_balance, $new_tail_total_in_qty, $new_tail_total_out_qty, $user, $idTail]);
-
-                    /* POPULATE TRACE DETAIL (FEED -> OUT DETAIL) */
-                    $traceDetailOut = [
-                        'id_trace_head'   => $idTraceHead,
-                        'id_balance_tail' => $idTail,
-                        'id_supplier'     => $idSupplier,
-                        'id_material'     => $id_material,
-                        'id_sloc'         => $id_tank,
-                        'id_tank_tail'    => $id_tank_tail_json,
-                        'out_qty'         => $tail_out_qty,
-                        'batch_sap'       => $batch_sap,
-                        'created_by'      => $user,
-                    ];
-                    if ($insertPlant !== null) $traceDetailOut['id_plant'] = $insertPlant;
-
-                    $idTraceTail = DB::table('t_trace_detail')->insertGetId($traceDetailOut);
-
-                    /* DETAIL LOGGING */
-                    DB::insert('INSERT INTO log_transactions
-                                (log_module, log_type, log_description, created_by)
-                            VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'BLENDING OUT', ' IDTAIL: ' . $idTail .
-                                                    ' / SUPPLIER: ' . $idSupplier . ' / MATERIAL: ' . $id_material .
-                                                    ' / QTY: ' . $tail_qty . ' >>> ' . $new_tail_balance .
-                                                    ' / IN_QTY: ' . $tail_total_in_qty . ' >>> ' . $new_tail_total_in_qty .
-                                                    ' / OUT_QTY: ' . $tail_total_out_qty . ' >>> ' . $new_tail_total_out_qty .
-                                                    ' | Status: 1', $user ]);
-
-                    /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
-                    if ($tailBalanceAfter >= 0){
-                        break;
-                    }
-
-                    /* ROUTING FOR USING NEXT BATCH BALANCE RESERVE */
-                    $tail_out_qty = $temp_tail_out_qty;
-                }
-
-                /* IF CURRENT BATCH BALANCE HAVE ENOUGH RESERVE TO FEED */
-                if ($balanceAfter >= 0){
-                    $db = [ (object)['response' => 1 ]];
-                    break;
-                }
-
-                /* ROUTING FOR USING NEXT BATCH BALANCE RESERVE */
-                $out_qty = $temp_out_qty;
-            } // end feeding algorithm
-        } // end foreach materials feed
-
-        /* USE RUNDOWN ROUTING TO TAKE IN BLENDING MATERIAL */
-        /* VARIABLE ADJUSTMENT */
-        $id_material = $idMaterial;
-        $process_yield = 1;
-        $feed_entryNo = $entry_no;
-        $entry_no = $entryNo;
-        $curr_qtf = $totalQty;
-
-        /* GET FEED TRACE RELATED TO RUNDOWN */
-        $batch_seq = substr($feed_entryNo, 12, 2);
-        $feed_id = substr($feed_entryNo, 7, 3);
-
-        $datTraceHead = DB::select('SELECT to_trace_no, id_trace_head, SUM(out_qty) AS out_qty, id_material
+        $checkTrace = DB::select('SELECT to_trace_no, id_trace_head, SUM(out_qty) AS out_qty, id_material
                                   FROM t_trace_header
                                  WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
                                    AND SUBSTRING(to_trace_no,1,1) = 8
@@ -546,19 +873,64 @@ class Blending extends Model
                                    AND `status` = 1
                                    AND out_qty > "0.0001"
                                    AND (id_plant = ? OR ? = 0)
-                                 ORDER BY id_trace_head DESC
+                                 ORDER BY id_trace_head DESC 
                                  LIMIT 1', [$feed_id, $batch_seq, $idPlant, $idPlant]);
 
-        if (!isset($datTraceHead[0]->id_trace_head)) {
-            $db = [ (object)['response' => 6 ]];
-            return $db;
+        if (!isset($checkTrace[0]->id_trace_head)) {
+            $datTraceHead = [];
+        } else {
+            $datTraceHead = DB::select('SELECT to_trace_no, id_trace_head, out_qty, id_material
+                                      FROM t_trace_header
+                                    WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
+                                       AND SUBSTRING(to_trace_no,1,1) = 8
+                                       AND SUBSTRING(to_trace_no,8,3) = ?
+                                       AND SUBSTRING(to_trace_no,13,2) = ?
+                                       AND `status` = 1
+                                       AND out_qty > "0.0001"
+                                       AND (id_plant = ? OR ? = 0)
+                                    ORDER BY id_trace_head DESC',
+                                   [$feed_id, $batch_seq, $idPlant, $idPlant]);
         }
 
-        $feed_idTraceHead = $datTraceHead[0]->id_trace_head;
-        $from_trace_no = $datTraceHead[0]->to_trace_no;
-        $feed_qty = $datTraceHead[0]->out_qty;
+        $totalFeedQty = array_sum(array_column($datTraceHead, 'out_qty'));
+        $in_qty = round($totalFeedQty, 4);
 
-        $in_qty = $process_yield * $feed_qty;
+        /* USE RUNDOWN ROUTING TO TAKE IN BLENDING MATERIAL */
+        /* VARIABLE ADJUSTMENT */
+        $id_material = $idMaterial;
+        $process_yield = 1;
+
+        $supplierRows = [];
+
+        foreach ($datTraceHead as $th) {
+            $tails = DB::select('SELECT id_supplier, batch_sap, out_qty
+                                FROM t_trace_detail
+                              WHERE id_trace_head = ?
+                                AND status = 1', [$th->id_trace_head]);
+
+            if (empty($tails)) {
+                continue;
+            }
+
+            foreach ($tails as $t) {
+                $key = $t->id_supplier.'|'.$t->batch_sap;
+                if (!isset($supplierRows[$key])) {
+                    $supplierRows[$key] = [
+                        'id_supplier' => $t->id_supplier,
+                        'batch_sap'   => $t->batch_sap,
+                        'rundownSupplier' => 0
+                    ];
+                }
+                $supplierRows[$key]['rundownSupplier'] += round($t->out_qty, 4);
+            }
+        }
+
+        if (empty($supplierRows)) {
+            return [ (object)['response' => 6] ];
+        }
+
+        $supplierRows = array_values($supplierRows);
+        Rundown::adjustRundownToTotal($supplierRows, $in_qty);
 
         /* GET ID_TANK BASED ON MATERIAL ASSIGNMENT */
         $datTank = DB::select('SELECT b.id_tank
@@ -575,198 +947,30 @@ class Blending extends Model
 
         $id_tank = $datTank[0]->id_tank;
 
-        /* INSERT INTO T_BALANCE_HEADER (BLENDING IN) */
-        $balanceHeaderData = [
-            'entry_date' => $curr_entryDate,
-            'trace_no'   => $entry_no,
-            'id_material'=> $id_material,
-            'id_tank'    => $id_tank,
-            'id_tank_tail' => $id_tank_tail_json,
-            'qty'        => $in_qty,
-            'in_qty'     => $in_qty,
-            'init_qty'   => $in_qty,
-            'created_by' => $user,
-        ];
-        if ($insertPlant !== null) $balanceHeaderData['id_plant'] = $insertPlant;
+        $from_trace_no = $datTraceHead[0]->to_trace_no;
 
-        $idHead = DB::table('t_balance_header')->insertGetId($balanceHeaderData);
-
-        /* INSERT INTO T_TRACE_HEADER (BLENDING IN) */
-        $traceInData = [
-            'from_trace_no'    => $from_trace_no,
-            'to_trace_no'      => $entry_no,
-            'id_balance_head'  => $idHead,
-            'id_material'      => $id_material,
-            'entry_date'       => $curr_entryDate,
-            'id_sloc'          => $id_tank,
-            'id_tank_tail'     => $id_tank_tail_json,
-            'in_qty'           => $in_qty,
-            'last_qtf'         => $last_qtf,
-            'curr_qtf'         => $curr_qtf,
-            'created_by'       => $user,
-        ];
-        if ($insertPlant !== null) $traceInData['id_plant'] = $insertPlant;
-
-        $idTraceHead = DB::table('t_trace_header')->insertGetId($traceInData);
+        $rundownResult = Rundown::generalRundown([
+            'user'          => $user,
+            'entry_date'    => $entryDate,
+            'trace_no'      => $entryNo,
+            'from_trace_no' => $from_trace_no,
+            'id_material'   => $idMaterial,
+            'id_tank'       => $id_tank,
+            'id_tank_tail'  => $id_tank_tail_json,
+            'id_plant'      => $idPlant,
+            'in_qty'        => $in_qty,
+            'last_qtf'      => 0,
+            'curr_qtf'      => $totalQty,
+            'supplier_rows' => $supplierRows,
+        ]);
+      
+        if ($rundownResult['response'] != 1) {
+            return [ (object)['response' => 3] ];
+        }
 
         DB::insert('INSERT INTO t_material_document
                        (id_trace_head, material_document, created_by)
-                VALUES (?, ?, ?)', [$idTraceHead, $materialDoc, $user]);
-
-        /* HEADER LOGGING */
-        DB::insert('INSERT INTO log_transactions
-                       (log_module, log_type, log_description, created_by)
-                VALUES (?, ?, ?, ?)', [ 'T_BALANCE_HEAD', 'BLENDING IN', 'IDHEAD: ' . $idHead . ' | DATE: ' . $curr_entryDate .
-                                        ' / MATERIAL: ' . $id_material . ' / QTY: ' . $in_qty .
-                                        ' / IN_QTY: ' . $in_qty .
-                                        ' / OUT_QTY: 0' .
-                                        ' | Status: 1', $user ]);
-
-        $datTraceHead = DB::select('SELECT to_trace_no, id_trace_head, out_qty, id_material
-                                  FROM t_trace_header
-                                 WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
-                                   AND SUBSTRING(to_trace_no,1,1) = 8
-                                   AND SUBSTRING(to_trace_no,8,3) = ?
-                                   AND SUBSTRING(to_trace_no,13,2) = ?
-                                   AND `status` = 1
-                                   AND out_qty > "0.0001"
-                                   AND (id_plant = ? OR ? = 0)
-                                 ORDER BY id_trace_head DESC',
-                                [$feed_id, $batch_seq, $idPlant, $idPlant]);
-        $len = count($datTraceHead);
-
-        for ($i = 0; $i < $len; $i++) {
-            $feed_idTraceHead = $datTraceHead[$i]->id_trace_head;
-            $from_trace_no = $datTraceHead[$i]->to_trace_no;
-            $feed_qty = $datTraceHead[$i]->out_qty;
-
-            /* ROUTING FOR DETAIL PER SUPPLIER */
-            $datTraceTail = DB::select('SELECT id_trace_tail, id_balance_tail, id_supplier, out_qty, batch_sap
-                                      FROM t_trace_detail
-                                     WHERE id_trace_head = ?
-                                       AND `status` = 1
-                                     ORDER BY id_trace_tail ASC', [$feed_idTraceHead]);
-            $lenTraceTail = count($datTraceTail);
-            if ($lenTraceTail == 0){
-                $db = [ (object)['response' => 6 ]];
-                return $db;
-            }
-            for ($k = 0; $k < $lenTraceTail; $k++) {
-                $idTraceTail = $datTraceTail[$k]->id_trace_tail;
-                $idTail = $datTraceTail[$k]->id_balance_tail;
-                $idSupplier = $datTraceTail[$k]->id_supplier;
-                $feedSupplier = $datTraceTail[$k]->out_qty;
-                $batchSap = $datTraceTail[$k]->batch_sap;
-
-                $rundownSupplier = round($process_yield * $feedSupplier, 4);
-
-                /* POPULATE TRACE DETAIL */
-                $flagCheckIdSupplier = DB::select('SELECT count(id_trace_tail) AS cnt, id_trace_tail, in_qty, out_qty, id_balance_tail
-                                                 FROM t_trace_detail
-                                                WHERE `status` = 1
-                                                  AND id_trace_head = ?
-                                                  AND id_supplier = ?
-                                                  AND batch_sap = ?', [$idTraceHead, $idSupplier, $batchSap]);
-                $cntFlagCheckIdSupplier = $flagCheckIdSupplier[0]->cnt;
-                $idTraceTail = $flagCheckIdSupplier[0]->id_trace_tail;
-                $idTail = $flagCheckIdSupplier[0]->id_balance_tail;
-                $inQtyTail = $flagCheckIdSupplier[0]->in_qty;
-                $outQtyTail = $flagCheckIdSupplier[0]->out_qty;
-
-                if ($cntFlagCheckIdSupplier == 0){
-                    /* INSERT INTO T_BALANCE_DETAIL */
-                    $balanceDetailData = [
-                        'id_balance_head' => $idHead,
-                        'id_supplier'     => $idSupplier,
-                        'id_material'     => $id_material,
-                        'id_tank'         => $id_tank,
-                        'id_tank_tail'    => $id_tank_tail_json,
-                        'qty'             => $rundownSupplier,
-                        'in_qty'          => $rundownSupplier,
-                        'init_qty'        => $rundownSupplier,
-                        'batch_sap'       => $batchSap,
-                        'created_by'      => $user,
-                    ];
-                    if ($insertPlant !== null) $balanceDetailData['id_plant'] = $insertPlant;
-
-                    $idTail = DB::table('t_balance_detail')->insertGetId($balanceDetailData);
-
-                    $traceDetailIn = [
-                        'id_trace_head'   => $idTraceHead,
-                        'id_balance_tail' => $idTail,
-                        'id_supplier'     => $idSupplier,
-                        'id_material'     => $id_material,
-                        'id_sloc'         => $id_tank,
-                        'id_tank_tail'    => $id_tank_tail_json,
-                        'in_qty'          => $rundownSupplier,
-                        'batch_sap'       => $batchSap,
-                        'created_by'      => $user,
-                    ];
-                    if ($insertPlant !== null) $traceDetailIn['id_plant'] = $insertPlant;
-
-                    $idTraceTail = DB::table('t_trace_detail')->insertGetId($traceDetailIn);
-
-                } else {
-                    $newInQtyTail = $inQtyTail + $rundownSupplier;
-                    $newInQtyTail = round($newInQtyTail, 4); 
-                    DB::update('UPDATE t_balance_detail
-                               SET qty = ?,
-                                   in_qty = ?,
-                                   init_qty = ?,
-                                   updated_by = ?
-                             WHERE id_balance_tail = ?', [$newInQtyTail, $newInQtyTail, $newInQtyTail, $user, $idTail]);
-                    DB::update('UPDATE t_trace_detail
-                               SET in_qty = ?,
-                                   updated_by = ?
-                             WHERE id_trace_tail = ?', [$newInQtyTail, $user, $idTraceTail]);
-                }
-
-                /* DETAIL LOGGING */
-                DB::insert('INSERT INTO log_transactions
-                               (log_module, log_type, log_description, created_by)
-                        VALUES (?, ?, ?, ?)', [ 'T_BALANCE_TAIL', 'BLENDING IN', ' IDTAIL: ' . $idTail .
-                                                ' / SUPPLIER: ' . $idSupplier . ' / MATERIAL: ' . $id_material .
-                                                ' / QTY: ' . $rundownSupplier .
-                                                ' / IN_QTY: ' . $rundownSupplier .
-                                                ' / OUT_QTY: ' . $rundownSupplier .
-                                                ' / INIT_QTY: ' . $rundownSupplier .
-                                                ' | Status: 1', $user ]);
-            }
-        }
-
-        // Fetch all supplier quantities
-        $details = DB::select('SELECT d.id_balance_tail, d.id_supplier, t.id_trace_tail, d.qty, d.in_qty, d.init_qty
-                               FROM t_balance_detail d
-                               LEFT JOIN t_trace_detail t 
-                               ON t.id_balance_tail = d.id_balance_tail
-                               AND t.id_trace_head = ?
-                               AND t.status = 1
-                               WHERE d.id_balance_head = ?
-                               ORDER BY d.id_balance_tail ASC', [$idTraceHead, $idHead]);
-
-        if (!empty($details)) {
-            // Convert to a nested array
-            $dataPerHead = [array_map(function ($d) {
-                return ['qty' => $d->qty];
-            }, $details)];
-
-            // Adjust supplier quantities proportionally so total matches header
-            adjustQtyToTotal($dataPerHead, $in_qty);
-
-            // Update DB with adjusted values
-            foreach ($details as $i => $d) {
-                $newQty = $dataPerHead[0][$i]['qty'];
-                DB::update('UPDATE t_balance_detail
-                            SET qty = ?, in_qty = ?, init_qty = ?
-                            WHERE id_balance_tail = ?', [$newQty, $newQty, $newQty, $d->id_balance_tail]);
-
-                if(!empty($d->id_trace_tail)) {
-                    DB::update('UPDATE t_trace_detail
-                                SET in_qty = ?
-                                WHERE id_trace_tail = ?', [$newQty, $d->id_trace_tail]);
-                }
-            }
-        }
+                 VALUES (?, ?, ?)', [$rundownResult['id_trace_head'], $materialDoc, $user]);
 
         /* DESTROY TEMPORARY DATA */
         DB::delete('DELETE FROM t_balance_temporary

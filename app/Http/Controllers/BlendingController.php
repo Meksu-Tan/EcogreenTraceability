@@ -110,12 +110,13 @@ class BlendingController extends Controller
                 $entryNo = $request->input('entryNo');
                 $idHead = $request->input('idHead');
                 $materialDoc = $request->input('materialDoc');
+                $idTank = $request->input('idTank');
 
                 DB::beginTransaction();
                 try {
                     $return = BL::post_blendingEntryMaterial($user, $request);
                     DB::commit();
-                    $data = $this->returnResponse($return, 'BLEND MATERIAL', $mode, $idMaterial, $entryDate, $entryNo, $idHead, $materialDoc);
+                    $data = $this->returnResponse($return, 'BLEND MATERIAL', $mode, $idMaterial, $entryDate, $entryNo, $idHead, $materialDoc, $idTank);
                     return response()->json($data);
                 } catch (\Exception $e) {
                     DB::rollback();
@@ -335,6 +336,10 @@ class BlendingController extends Controller
                                       $input_3=null, $input_4=null, $input_5=null,
                                       $input_6=null, $input_7=null){
 
+        if (isset($return['response'])) {
+            $return = [ (object)['response' => (string)$return['response']] ];
+        }
+
         if ($return == null){
             $data = [
                 'status'  => 0,
@@ -366,6 +371,10 @@ class BlendingController extends Controller
                 $data = [
                     'status'  => 0,
                     'message' => $feature . ' No Blend Material!' ];
+            } elseif ($return[0]->response == '6'){
+                $data = [
+                    'status'  => 0,
+                    'message' => $feature . ' No Trace found' ];
             } elseif ($return[0]->response == '99'){
                 $data = [
                     'status'  => 0,
