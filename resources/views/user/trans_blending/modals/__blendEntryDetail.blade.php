@@ -21,6 +21,7 @@
                                         <input type="hidden" name="idMaterial" id="form-blendingEntryMaterial-idMaterial" class="form-control text-uppercase" required>
                                         <input type="hidden" name="entryDate" id="form-blendingEntryMaterial-entryDate" class="form-control text-uppercase" required>
                                         <input type="hidden" name="materialDoc" id="form-blendingEntryMaterial-materialDoc" class="form-control text-uppercase" required>
+                                        <input type="hidden" name="idTank" id="form-blendingEntryMaterial-idTank" class="form-control text-uppercase" required>
                                     </div>
                                     <div class="form-group">
                                         <label for="name">Blending Material</label>
@@ -66,6 +67,7 @@
         const $txt_blendingEntryMaterial_idMaterialSource = '#form-blendingEntryMaterial-idMaterialSource';
         const $txt_blendingEntryMaterial_qty              = '#form-blendingEntryMaterial-qty';
         const $lbl_blendingEntryMaterial_stock            = '#form-blendingEntryMaterial-stock';
+        const $txt_blendingEntryMaterial_idTank           = '#form-blendingEntryMaterial-idTank';
 
         const $btn_blendingEntryMaterial_insert           = '#insert-blendingEntryMaterial';
 
@@ -123,7 +125,7 @@
 
                                         $($modal_blendEntry_material).modal('hide');
                                         initializeBlendEntry(data.mode, data.idHead, data.idMaterial, data.materialDoc,
-                                                             data.entryDate, data.entryNo);
+                                                             data.entryDate, data.entryNo, data.idTank, data.idTankTail);
                                     } else {
                                         Swal.fire(data.message, "", "error");
                                     }
@@ -165,7 +167,7 @@
 
     /* FUNCTION INIT */
         function initializeBlendEntryMaterial($mode, $idHead=null, $idMaterial=null, $materialDoc=null,
-                                              $entryDate=null, $entryNo=null, $qty=null, $idMaterialSource=null){
+                                              $entryDate=null, $entryNo=null, $idTank=null, $qty=null, $idMaterialSource=null){
 
             $($txt_blendingEntryMaterial_flag).val('post_blendingEntryMaterial');
             $($txt_blendingEntryMaterial_mode).val($mode);
@@ -174,6 +176,7 @@
             $($txt_blendingEntryMaterial_materialDoc).val($materialDoc);
             $($txt_blendingEntryMaterial_entryDate).val($entryDate);
             $($txt_blendingEntryMaterial_entryNo).val($entryNo);
+            $($txt_blendingEntryMaterial_idTank).val($idTank);
 
             $($lbl_blendingEntryMaterial_stock).html('Stock : N/A');
             $($txt_blendingEntryMaterial_qty).val($qty);

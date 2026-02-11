@@ -67,7 +67,7 @@
                                         <div class="col-md-12">
                                             <div class="form-group">
                                                 <label for="name">Specific Sloc</label>
-                                                <select name="tankNo[]" id="form-feed-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                <select name="tankNo[]" id="form-feed-tankNo" style="width: 100%;" class="form-control" multiple="multiple">
                                                 </select>
                                             </div>
                                         </div>

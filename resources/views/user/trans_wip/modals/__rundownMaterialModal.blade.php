@@ -74,7 +74,7 @@
                                         <div class="col-md-12">
                                             <div class="form-group">
                                                 <label for="name">Sloc</label>
-                                                <select name="tankNo[]" id="form-rundown-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                <select name="tankNo[]" id="form-rundown-tankNo" style="width: 100%;" class="form-control" multiple="multiple">
                                                 </select>
                                             </div>
                                         </div>

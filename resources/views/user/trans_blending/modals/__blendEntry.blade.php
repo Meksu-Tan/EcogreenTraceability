@@ -63,7 +63,7 @@
                                         <div class="col-md-4">
                                             <div class="form-group">
                                                 <label for="name">Specific Storage Location (SLoc)</label>
-                                                <select name="tankNo[]" id="form-blendingEntry-tankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                <select name="tankNo[]" id="form-blendingEntry-tankNo" style="width: 100%;" class="form-control" multiple="multiple">
                                                 </select>
                                             </div>
                                         </div>
@@ -216,6 +216,7 @@
                     $entryNo = $($form_blendingEntry_entryNo).val();
                     $mode = $($form_blendingEntry_mode).val();
                     $idHead = $($form_blendingEntry_idHead).val();
+                    $idTank = $($form_blendingEntry_idTank).val();
 
                     if ($idMaterial == '-'){
                         Swal.fire({
@@ -229,7 +230,7 @@
 
                     } else {
                         $($modal_blendEntry_material).modal('show');
-                        initializeBlendEntryMaterial($mode, $idHead, $idMaterial, $materialDoc, $entryDate, $entryNo);
+                        initializeBlendEntryMaterial($mode, $idHead, $idMaterial, $materialDoc, $entryDate, $entryNo, $idTank);
                     }
                 });
                 $(document).on('click', $btn_blendingEntry_delete, function(e){

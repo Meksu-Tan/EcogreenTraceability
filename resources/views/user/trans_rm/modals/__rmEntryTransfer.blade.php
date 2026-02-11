@@ -65,14 +65,14 @@
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="name">Specific Source Sloc No</label>
-                                                <select name="tankNo[]" id="form-rmTrfEntry-fromTankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                <select name="tankNo[]" id="form-rmTrfEntry-fromTankNo" style="width: 100%;" class="form-control" multiple="multiple">
                                                 </select>
                                             </div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="form-group">
                                                 <label for="name">Specific Trf Sloc No</label>
-                                                <select name="trfTankNo[]" id="form-rmTrfEntry-toTankNo" style="width: 100%;" class="form-control" multiple="multiple" required>
+                                                <select name="trfTankNo[]" id="form-rmTrfEntry-toTankNo" style="width: 100%;" class="form-control" multiple="multiple">
                                                 </select>
                                             </div>
                                         </div>
@@ -216,7 +216,7 @@
                     $idTail = null;
                     $entryNo = $($txt_rmTrfEntry_number).val();
                     $qty = null;
-                    $idTankFeed = $($cmb_rmTrfEntry_sourceTank).val();
+                    $idTankFeed = $($cmb_rmTrfEntry_trfTank).val();
                     $idTankStorage = $($cmb_rmTrfEntry_sourceTank).val();
                     $entryDate = $($txt_rmTrfEntry_date).val();
                     $materialDoc = $($txt_rmTrfEntry_materialDoc).val();
@@ -313,7 +313,45 @@
                 }
             });
         };
-        function ajax_populateTankTrf(id, $sloc=null, selectedValue=null, $fixedPlant=null, selectedSpecific=null){
+        function ajax_populateTankSource(id, selectedValue=null, selectedSpecific=null){
+            // Empty the dropdown
+            // $(id).find('option').not(':first').remove();
+            $(id).find('option').remove();
+            // AJAX request
+            $.ajax({
+                url: show_url,
+                type: 'get',
+                dataType: 'json',
+                data:{
+                    flag: 'get_cmbActiveTank',
+                },
+                success: function(response){
+                    var len = 0;
+                    if(response['data'] != null){
+                        len = response['data'].length;
+                    }
+                    if(len > 0){
+                        for(var i=0; i<len; i++){
+                            var populate_1 = response['data'][i].id_tank;
+                            var populate_2 = response['data'][i].tank;
+
+                            if (selectedValue) {
+                                if (populate_1 == selectedValue) {
+                                    var option = "<option value='"+populate_1+"' selected='"+selectedValue+"'>"+populate_2+"</option>";
+                                } else {
+                                    var option = "<option value='"+populate_1+"'>"+populate_2+"</option>";
+                                }
+                            } else {
+                                var option = "<option value='"+populate_1+"'>"+populate_2+"</option>";
+                            }
+                            $(id).append(option);
+                        }
+                    }
+                    ajax_populateSpecificTankSource($cmb_rmTrfEntry_sourceTankNo, 4, selectedSpecific);
+                }
+            });
+        };
+        function ajax_populateTankTrf(id, $sloc=null, selectedValue=null, selectedSpecific=null){
             // Empty the dropdown
             // $(id).find('option').not(':first').remove();
             $(id).find('option').remove();
@@ -326,7 +364,6 @@
                 data:{
                     flag: 'get_cmbActiveTank_trf',
                     sloc: $sloc,
-                    id_plant: $fixedPlant ?? null,
                 },
                 success: function(response){
                     if (prevValue && prevValue === selectedValue) {
@@ -357,8 +394,6 @@
                         let selectedFeedTank = $(id).val();
 
                         ajax_populateSpecificTankTrf($cmb_rmTrfEntry_trfTankNo, selectedFeedTank, selectedSpecific);
-                    } else if ($sloc === 'STORAGE') {
-                        ajax_populateSpecificTankSource($cmb_rmTrfEntry_sourceTankNo, 4, selectedSpecific);
                     }
                 }
             });
@@ -606,8 +641,8 @@
             $($txt_rmTrfEntry_materialDoc).val($materialDoc);
 
             if (!rmTrfEntry_isReturningFromMaterial) {
-                ajax_populateTankTrf($cmb_rmTrfEntry_sourceTank, 'STORAGE', $idTankSource, 1002, $sourceTankTails);
-                ajax_populateTankTrf($cmb_rmTrfEntry_trfTank, 'FEED', $idTankTrf, null, $trfTankTails);
+                ajax_populateTankSource($cmb_rmTrfEntry_sourceTank, $idTankSource, $sourceTankTails);
+                ajax_populateTankTrf($cmb_rmTrfEntry_trfTank, 'FEED', $idTankTrf, $trfTankTails);
             }
             ajax_getTotalQtyMaterial($txt_rmTrfEntry_qty, $trf_number, $mode);
 
