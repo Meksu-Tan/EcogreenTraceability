@@ -42,7 +42,7 @@
                                                     class="form-control col-sm-12"  readonly>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-6" style="display: none;">
                                         <div class="form-group">
                                             <label for="name">ZBATCH</label>
                                             <input type="text" id="page-shipData-zbatch" style="width: 100%;"
@@ -250,7 +250,9 @@
                 ajax_populateShipmentPage($soNo, $soItem, $batchNo);
             }
 
-            $($page_shipData_header).html('SHIPMENT OVERVIEW (SO : ' + $soNo + ' - ' + $soItem + ' | BATCH : ' + $batchNo + ')');
+            //$($page_shipData_header).html('SHIPMENT OVERVIEW (SO : ' + $soNo + ' - ' + $soItem + ' | BATCH : ' + $batchNo + ')');
+            $($page_shipData_header).html('SHIPMENT OVERVIEW (SO : ' + $soNo + ' - ' + $soItem + ')');
+
 
         };
         function populate_emptyPage(){

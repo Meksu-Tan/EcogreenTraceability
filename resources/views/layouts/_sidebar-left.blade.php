@@ -4,7 +4,7 @@
         <div style="padding-top:10px">
             <img src="{{ asset('images/Logo EOB with name.jpg') }}" class="rounded mx-auto d-block"  height="50" width="170">
         </div>
-        <a href="">PTEO EUDR-TS</a>
+        <a href="">EO-TRACE</a>
     </div>
     <div class="sidebar-brand sidebar-brand-sm">
       <a href="">TS</a>
