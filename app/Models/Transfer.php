@@ -86,23 +86,45 @@ class Transfer extends Model
 
         return $db;
     }
+    // static function get_totalStockMaterial($request){
+    //     $idMaterial = $request->input('idMaterial');
+    //     $idTank = $request->input('idTank');
+    //     $idPlant = \App\Models\BaseModel::resolvePlant($request);
+
+    //     $db = DB::select('SELECT SUM(c.qty) AS total
+    //                         FROM m_material a
+    //                         LEFT JOIN (SELECT b.code, b.id_material
+    //                                      FROM m_material b
+    //                                     WHERE b.status = 1) b
+    //                           ON a.code = b.code
+    //                         LEFT JOIN (SELECT c.id_material, c.qty
+    //                                      FROM t_balance_header c
+    //                                     WHERE c.status = 1
+    //                                       AND (SUBSTRING(c.trace_no,1,1) = 1 OR SUBSTRING(c.trace_no,1,1) = 2 OR SUBSTRING(c.trace_no,1,1) = 7 OR
+    //                                            SUBSTRING(c.trace_no,1,1) = 8 OR SUBSTRING(c.trace_no,1,1) = 9)
+    //                                       AND c.id_tank = ?
+    //                                     ) c
+    //                           ON b.id_material = c.id_material
+    //                        WHERE a.status = 1
+    //                          AND a.id_material = ?
+    //                      ', [$idTank, $idMaterial]);
+
+    //     return $db;
+    // }
     static function get_totalStockMaterial($request){
         $idMaterial = $request->input('idMaterial');
         $idTank = $request->input('idTank');
-        $idPlant = \App\Models\BaseModel::resolvePlant($request);
 
-        $db = DB::select('SELECT SUM(c.qty) AS total
+        $db = DB::select('SELECT ROUND(SUM(c.in_qty) - SUM(c.out_qty), 3) AS total
                             FROM m_material a
                             LEFT JOIN (SELECT b.code, b.id_material
                                          FROM m_material b
                                         WHERE b.status = 1) b
                               ON a.code = b.code
-                            LEFT JOIN (SELECT c.id_material, c.qty
-                                         FROM t_balance_header c
+                            LEFT JOIN (SELECT c.id_material, c.in_qty, c.out_qty
+                                         FROM t_trace_header c
                                         WHERE c.status = 1
-                                          AND (SUBSTRING(c.trace_no,1,1) = 1 OR SUBSTRING(c.trace_no,1,1) = 2 OR SUBSTRING(c.trace_no,1,1) = 7 OR
-                                               SUBSTRING(c.trace_no,1,1) = 8 OR SUBSTRING(c.trace_no,1,1) = 9)
-                                          AND c.id_tank = ?
+                                          AND c.id_sloc = ?
                                         ) c
                               ON b.id_material = c.id_material
                            WHERE a.status = 1
@@ -111,6 +133,7 @@ class Transfer extends Model
 
         return $db;
     }
+
     static function get_dtTransferList($request){
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
         DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
@@ -720,7 +743,7 @@ class Transfer extends Model
 
     //                                         } else {
     //                                             $newInQtyTail = $inQtyTail + $rundownSupplier;
-    //                                             $newInQtyTail = round($newInQtyTail, 4); 
+    //                                             $newInQtyTail = round($newInQtyTail, 4);
     //                                             DB::update('UPDATE t_balance_detail
     //                                                            SET qty = ?,
     //                                                                in_qty = ?,
@@ -852,7 +875,7 @@ class Transfer extends Model
                                                             AND to_trace_no = ?
                                                     )
                                                 GROUP BY id_supplier, batch_sap', [$entry_no]);
-                        
+
                     $supplierRowsFormatted = array_map(function ($r) {
                         return [
                             'id_supplier'       => $r->id_supplier,
@@ -865,7 +888,7 @@ class Transfer extends Model
                                                 FROM t_trace_header
                                                 WHERE status = 1
                                                     AND to_trace_no = ?', [$entry_no]);
-                        
+
                     $actualQty = round($datTraceHead[0]->out_qty ?? 0, 4);
 
                     $rundownResult = Rundown::generalRundown([
@@ -1145,45 +1168,45 @@ class Transfer extends Model
         $idHead   = $request->input('idHead');
         $tails  = $request->input('idTankTail');
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
-    
+
         if (!is_array($tails)) {
             return [(object)['response' => 0, 'message' => 'INVALID SUBTANK DATA']];
         }
-    
+
         $jsonTails = json_encode(array_values(array_unique($tails)));
-    
+
         // Fetch existing header
-        $row = DB::selectOne('SELECT id_tank_tail, trace_no 
-                              FROM t_balance_header 
+        $row = DB::selectOne('SELECT id_tank_tail, trace_no
+                              FROM t_balance_header
                               WHERE id_balance_head = ? AND status = 1', [$idHead]);
-    
+
         // Update header
         DB::update('UPDATE t_balance_header
                     SET id_tank_tail = ?, updated_by = ?
                     WHERE id_balance_head = ?',
                     [$jsonTails, $user, $idHead]);
-    
+
         // Update trace header
         DB::update('UPDATE t_trace_header
                     SET id_tank_tail = ?, updated_by = ?
                     WHERE id_balance_head = ?',
                     [$jsonTails, $user, $idHead]);
-    
+
         // Update ALL balance details
         DB::update('UPDATE t_balance_detail
                     SET id_tank_tail = ?, updated_by = ?
                     WHERE id_balance_head = ?',
                     [$jsonTails, $user, $idHead]);
-    
+
         // Update ALL trace details
         DB::update('UPDATE t_trace_detail
                     SET id_tank_tail = ?, updated_by = ?
                     WHERE id_trace_head IN (
-                        SELECT id_trace_head 
-                        FROM t_trace_header 
+                        SELECT id_trace_head
+                        FROM t_trace_header
                         WHERE id_balance_head = ?
                     )', [$jsonTails, $user, $idHead]);
-    
+
         // Log change
         DB::insert(
             'INSERT INTO log_transactions
@@ -1196,7 +1219,7 @@ class Transfer extends Model
                 $user
             ]
         );
-    
+
         return [(object)['response' => 1]];
     }
 }
@@ -1209,26 +1232,26 @@ function adjustQtyToTotal(&$dataPerHead, $targetTotal) {
             $total = bcadd($total, (string)$item['qty'], 10);
         }
     }
-  
+
     if (bccomp($total, '0', 10) == 0) {
         return; // No need to adjust if the total is 0
     }
-  
+
     // Step 2: Calculate factor
     $factor = bcdiv((string)$targetTotal, $total, 10);
-  
+
     // Step 3: Multiply everything and save the delta
     $newTotal = '0';
     $lastHeadKey = array_key_last($dataPerHead);
     $lastItemKey = array_key_last($dataPerHead[$lastHeadKey]);
-  
+
     foreach ($dataPerHead as $headKey => &$headItems) {
         foreach ($headItems as $itemKey => &$item) {
             $item['qty'] = round(bcmul((string)$item['qty'], $factor, 10), 4);
             $newTotal = bcadd($newTotal, (string)$item['qty'], 10);
         }
     }
-  
+
     // Step 4: Adjust the difference to the last item
     $delta = round((float)bcsub((string)$targetTotal, $newTotal, 10), 4);
     $dataPerHead[$lastHeadKey][$lastItemKey]['qty'] += $delta;
