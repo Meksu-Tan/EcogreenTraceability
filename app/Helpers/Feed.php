@@ -21,7 +21,6 @@ class Feed extends Model
      *   response 3  → insufficient stock (balance < requested qty)
      *   response 6  → balance head found but has no active supplier detail rows
      */
-    
     public static function generalFeed(array $feedData): array
     {
         // Pre-flight: fetch balance heads OUTSIDE the transaction so we can
@@ -152,9 +151,35 @@ class Feed extends Model
                 );
 
                 if (count($balTails) === 0) {
-                    // Head has no active supplier detail — skip supplier
-                    // propagation for this head but continue processing.
-                    continue;
+                    // HEAD HAS NO ACTIVE SUPPLIER DETAIL.
+                    //
+                    // This is a data integrity violation: a balance_head exists with
+                    // qty > 0 but no corresponding t_balance_detail rows. This means
+                    // supplier origin is unknown — a direct EUDR compliance breach.
+                    //
+                    // Possible causes:
+                    //   1. The head originated from a Transfer whose source also had
+                    //      no supplier detail (cascade from a broken transfer chain).
+                    //   2. A Stock Initialization that skipped supplier rows.
+                    //   3. A data repair that fixed the head qty but not the details.
+                    //
+                    // Throwing here causes DB::transaction() to roll back ALL writes
+                    // made so far in this call (balance_header updates + trace_header
+                    // inserts for previously processed heads in this same feed).
+                    // This is intentional: a partial feed with missing supplier data
+                    // is worse than a rejected feed the operator can investigate.
+                    //
+                    // Resolution: run the diagnostic query in EUDR_orphan_diagnostic.sql
+                    // to identify the root cause for id_balance_head = $idHead, then
+                    // use the repair script to backfill the missing t_balance_detail rows
+                    // before retrying the feed entry.
+                    throw new \RuntimeException(
+                        'Feed::generalFeed - id_balance_head=' . $idHead .
+                        ' (trace_no=' . $fromTrace . ') has qty > 0 but NO active' .
+                        ' t_balance_detail rows. Supplier origin cannot be traced.' .
+                        ' Feed rejected to prevent EUDR compliance gap.' .
+                        ' Run orphan diagnostic SQL and repair before retrying.'
+                    );
                 }
 
                 $qtyTail = $useQty;

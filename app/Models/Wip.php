@@ -14,6 +14,10 @@ class Wip extends Model
 
     protected static $movType1 = "2";
     protected static $movType2 = "3";
+    protected static $movType3 = "7";
+    protected static $movType4 = "8";
+    protected static $movType5 = "9";
+    protected static $idPlantEob1 = "1002";
 
     static function get_dtBalance($request, $rundownId){
         $idPlant = \App\Models\BaseModel::resolvePlant($request);
@@ -1151,7 +1155,23 @@ class Wip extends Model
                     'to_trace_no'  => $entry_no
                 ];
 
-                $result = Feed::generalFeed($feedData);
+                try {
+                    $result = Feed::generalFeed($feedData);
+                } catch (\RuntimeException $e) {
+                    // Feed rejected: one or more balance heads have no supplier detail.
+                    // response 6 = "orphan head — run diagnostic before retrying"
+                    \Log::error('post_materialFeed rejected', [
+                        'entry_no' => $entry_no,
+                        'tank'     => $id_tank,
+                        'plant'    => $idPlant,
+                        'error'    => $e->getMessage(),
+                    ]);
+                    return [(object)['response' => 6]];
+                }
+
+                if (($result['response'] ?? 0) != 1) {
+                    return [(object)['response' => $result['response'] ?? 3]];
+                }
 
                 Feed::normalizeSupplierRundown(
                     $result['trace_head_ids'],
