@@ -145,7 +145,6 @@ class Feed extends Model
                       WHERE a.id_balance_head = ?
                         AND a.status = 1
                         AND a.qty > "0.0001"
-                        AND b.status = 1
                       ORDER BY a.id_balance_tail ASC',
                     [$idHead]
                 );

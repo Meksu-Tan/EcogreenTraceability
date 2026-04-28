@@ -1687,7 +1687,6 @@ class Wip extends Model
                                             ", [$nextDate, $nextDate, $nextDate]);
         return $db;
     }
-
     static function post_updateEntrySubTank($user, $request){
         $idHead   = $request->input('idHead');
         $tails  = $request->input('idTankTail');
