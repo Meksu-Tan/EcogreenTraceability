@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSRF Debug - EODS</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        h1 { color: #4ec9b0; }
+        h2 { color: #569cd6; margin-top: 30px; }
+        .step {
+            background: #252526;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 3px solid #007acc;
+            border-radius: 4px;
+        }
+        .success {
+            border-left-color: #4ec9b0;
+            background: #1a2f1a;
+        }
+        .error {
+            border-left-color: #f48771;
+            background: #2f1a1a;
+        }
+        button {
+            background: #007acc;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        pre {
+            background: #1e1e1e;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #3e3e42;
+        }
+        .cookie-item {
+            background: #2d2d30;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .label {
+            color: #9cdcfe;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 CSRF Token Debug Tool</h1>
+    
+    <div class="step">
+        <h2>Step 1: Get CSRF Cookie</h2>
+        <button onclick="getCsrf()">Get CSRF Cookie</button>
+        <div id="csrf-result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 2: View All Cookies</h2>
+        <button onclick="showCookies()">Show Cookies</button>
+        <div id="cookies-result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 3: Test Login</h2>
+        <button onclick="testLogin()">Test Login (admin@eods.local)</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 4: Clear All Cookies</h2>
+        <button onclick="clearCookies()">Clear Cookies</button>
+        <div id="clear-result"></div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://127.0.0.1:8000';
+        
+        function log(elementId, message, isError = false) {
+            const el = document.getElementById(elementId);
+            const className = isError ? 'error' : 'success';
+            el.innerHTML = `<div class="${className}">${message}</div>`;
+        }
+
+        function showCookies() {
+            const cookies = document.cookie.split('; ');
+            let html = '<h3>Current Cookies:</h3>';
+            
+            if (cookies.length === 0 || (cookies.length === 1 && cookies[0] === '')) {
+                html += '<div class="cookie-item">❌ No cookies found</div>';
+            } else {
+                cookies.forEach(cookie => {
+                    const [name, value] = cookie.split('=');
+                    html += `<div class="cookie-item">
+                        <span class="label">${name}:</span> ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}
+                    </div>`;
+                });
+            }
+            
+            document.getElementById('cookies-result').innerHTML = html;
+        }
+
+        async function getCsrf() {
+            const resultDiv = document.getElementById('csrf-result');
+            resultDiv.innerHTML = '<p>⏳ Requesting CSRF cookie...</p>';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/sanctum/csrf-cookie`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                console.log('CSRF Response:', response);
+                console.log('Response Headers:', [...response.headers.entries()]);
+                
+                let html = `<h3>✅ CSRF Request Successful</h3>`;
+                html += `<p><span class="label">Status:</span> ${response.status} ${response.statusText}</p>`;
+                
+                // Check cookies
+                const xsrfToken = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith('XSRF-TOKEN='))
+                    ?.split('=')[1];
+                
+                const sessionCookie = document.cookie
+                    .split('; ')
+                    .find(row => row.includes('session'));
+                
+                if (xsrfToken) {
+                    html += `<p><span class="label">XSRF-TOKEN:</span> ✅ Found</p>`;
+                    html += `<pre>${decodeURIComponent(xsrfToken)}</pre>`;
+                } else {
+                    html += `<p><span class="label">XSRF-TOKEN:</span> ❌ Not found in cookies</p>`;
+                }
+                
+                if (sessionCookie) {
+                    html += `<p><span class="label">Session Cookie:</span> ✅ Found</p>`;
+                } else {
+                    html += `<p><span class="label">Session Cookie:</span> ❌ Not found</p>`;
+                }
+                
+                html += `<p><span class="label">All Cookies:</span></p><pre>${document.cookie || 'No cookies'}</pre>`;
+                
+                log('csrf-result', html, !xsrfToken);
+                
+            } catch (error) {
+                console.error('CSRF Error:', error);
+                log('csrf-result', `<h3>❌ Error</h3><pre>${error.message}</pre>`, true);
+            }
+        }
+
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            resultDiv.innerHTML = '<p>⏳ Testing login...</p>';
+            
+            try {
+                // First get CSRF
+                await fetch(`${API_BASE_URL}/sanctum/csrf-cookie`, {
+                    method: 'GET',
+                    credentials: 'include',
+                });
+                
+                // Wait a bit
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Get XSRF token
+                const xsrfToken = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith('XSRF-TOKEN='))
+                    ?.split('=')[1];
+                
+                console.log('XSRF Token for login:', xsrfToken);
+                
+                if (!xsrfToken) {
+                    log('login-result', '<h3>❌ No XSRF-TOKEN found</h3><p>Please run Step 1 first</p>', true);
+                    return;
+                }
+                
+                // Attempt login
+                const loginResponse = await fetch(`${API_BASE_URL}/api/login`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-XSRF-TOKEN': decodeURIComponent(xsrfToken),
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@eods.local',
+                        password: 'password123'
+                    })
+                });
+                
+                console.log('Login Response:', loginResponse);
+                console.log('Login Response Headers:', [...loginResponse.headers.entries()]);
+                
+                const data = await loginResponse.json();
+                console.log('Login Data:', data);
+                
+                let html = `<h3>${data.status === 1 ? '✅' : '❌'} Login Response</h3>`;
+                html += `<p><span class="label">Status Code:</span> ${loginResponse.status}</p>`;
+                html += `<p><span class="label">Message:</span> ${data.message}</p>`;
+                
+                if (data.status === 1) {
+                    html += `<p><span class="label">User:</span> ${data.data.name} (${data.data.email})</p>`;
+                    html += `<p><span class="label">Roles:</span> ${data.data.roles.join(', ')}</p>`;
+                } else {
+                    html += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+                
+                log('login-result', html, data.status !== 1);
+                
+            } catch (error) {
+                console.error('Login Error:', error);
+                let errorMsg = error.message;
+                if (error.response) {
+                    errorMsg += `\n\nResponse: ${JSON.stringify(error.response, null, 2)}`;
+                }
+                log('login-result', `<h3>❌ Error</h3><pre>${errorMsg}</pre>`, true);
+            }
+        }
+
+        function clearCookies() {
+            const cookies = document.cookie.split('; ');
+            cookies.forEach(cookie => {
+                const name = cookie.split('=')[0];
+                document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+            });
+            log('clear-result', '<p>✅ All cookies cleared. Refresh the page to start fresh.</p>');
+            setTimeout(() => {
+                showCookies();
+            }, 500);
+        }
+
+        // Auto-show cookies on load
+        window.onload = () => {
+            showCookies();
+        };
+    </script>
+</body>
+</html>
