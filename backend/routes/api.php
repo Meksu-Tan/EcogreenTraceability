@@ -101,6 +101,8 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('suppliers/list', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'supplierList']);
             Route::delete('suppliers/{id}', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'deleteSupplier']);
             Route::get('total-qty', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'totalQty']);
+            Route::post('transfer', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'transfer']);
+            Route::get('transfer-number', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'transferNumber']);
         });
         
         Route::get('transactions/wip-entries', function() {
