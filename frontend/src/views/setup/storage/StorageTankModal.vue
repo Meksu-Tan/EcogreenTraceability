@@ -6,31 +6,55 @@
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
-      <div class="form-group">
-        <label class="form-label">Tipe (Code 2) <span style="color:red">*</span></label>
-        <input id="tank-code2" v-model="form.code_2" type="text" class="form-control" :class="{'is-invalid': errors.code_2}" />
-        <div v-if="errors.code_2" class="form-error">{{ errors.code_2 }}</div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Tipe (Code 2) <span class="text-red-500">*</span></label>
+        <input 
+          id="tank-code2" 
+          v-model="form.code_2" 
+          type="text" 
+          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+          :class="errors.code_2 ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+        />
+        <div v-if="errors.code_2" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code_2 }}</div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Kode (Code 3) <span style="color:red">*</span></label>
-        <input id="tank-code3" v-model="form.code_3" type="text" class="form-control" :class="{'is-invalid': errors.code_3}" />
-        <div v-if="errors.code_3" class="form-error">{{ errors.code_3 }}</div>
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode (Code 3) <span class="text-red-500">*</span></label>
+        <input 
+          id="tank-code3" 
+          v-model="form.code_3" 
+          type="text" 
+          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+          :class="errors.code_3 ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+        />
+        <div v-if="errors.code_3" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code_3 }}</div>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Kode Supplier (Code 4)</label>
-      <input id="tank-code4" v-model="form.code_4" type="text" class="form-control" />
+    <div class="flex flex-col gap-1.5 mt-4">
+      <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Supplier (Code 4)</label>
+      <input id="tank-code4" v-model="form.code_4" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all" />
     </div>
-    <div class="form-group">
-      <label class="form-label">ID Plant <span style="color:red">*</span></label>
-      <input id="tank-id-plant" v-model="form.id_plant" type="text" class="form-control" :class="{'is-invalid': errors.id_plant}" />
-      <div v-if="errors.id_plant" class="form-error">{{ errors.id_plant }}</div>
+    <div class="flex flex-col gap-1.5 mt-4">
+      <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">ID Plant <span class="text-red-500">*</span></label>
+      <input 
+        id="tank-id-plant" 
+        v-model="form.id_plant" 
+        type="text" 
+        class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+        :class="errors.id_plant ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+      />
+      <div v-if="errors.id_plant" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.id_plant }}</div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Deskripsi <span style="color:red">*</span></label>
-      <input id="tank-description" v-model="form.description" type="text" class="form-control" :class="{'is-invalid': errors.description}" />
-      <div v-if="errors.description" class="form-error">{{ errors.description }}</div>
+    <div class="flex flex-col gap-1.5 mt-4">
+      <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Deskripsi <span class="text-red-500">*</span></label>
+      <input 
+        id="tank-description" 
+        v-model="form.description" 
+        type="text" 
+        class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+        :class="errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+      />
+      <div v-if="errors.description" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.description }}</div>
     </div>
   </BaseModal>
 </template>

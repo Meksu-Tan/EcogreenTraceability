@@ -1,15 +1,28 @@
 <template>
   <Teleport to="body">
-    <div class="toast-container">
-      <TransitionGroup name="toast-anim">
+    <div class="fixed top-6 right-6 z-[2000] flex flex-col gap-3 max-w-xs w-full pointer-events-none">
+      <TransitionGroup 
+        enter-active-class="transition duration-300 ease-out"
+        enter-from-class="translate-x-12 opacity-0"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-to-class="translate-x-12 opacity-0"
+      >
         <div
-          v-for="t in toasts"
+          v-for="t in toastStore.toasts"
           :key="t.id"
-          class="toast"
-          :class="`toast-${t.type}`"
+          class="pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border backdrop-blur-md"
+          :class="{
+            'bg-green-600/90 border-green-500 text-white': t.type === 'success',
+            'bg-red-600/90 border-red-500 text-white': t.type === 'error',
+            'bg-slate-800/90 border-slate-700 text-white': t.type === 'info',
+          }"
         >
-          <i :class="iconClass(t.type)"></i>
-          {{ t.message }}
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+            <i :class="iconClass(t.type)"></i>
+          </div>
+          <p class="text-sm font-bold tracking-tight">{{ t.message }}</p>
         </div>
       </TransitionGroup>
     </div>
@@ -18,18 +31,13 @@
 
 <script setup>
 import { useToastStore } from '@/stores/toast'
-const { toasts } = useToastStore()
+const toastStore = useToastStore()
+
 function iconClass(type) {
   return {
-    success: 'fas fa-check-circle',
-    error:   'fas fa-times-circle',
-    info:    'fas fa-info-circle',
-  }[type] || 'fas fa-info-circle'
+    success: 'fas fa-check',
+    error:   'fas fa-exclamation-triangle',
+    info:    'fas fa-info',
+  }[type] || 'fas fa-info'
 }
 </script>
-
-<style scoped>
-.toast-anim-enter-active, .toast-anim-leave-active { transition: all .25s ease; }
-.toast-anim-enter-from { transform: translateX(100%); opacity: 0; }
-.toast-anim-leave-to   { transform: translateX(100%); opacity: 0; }
-</style>

@@ -1,78 +1,67 @@
 <template>
-  <div class="login-page">
-    <div class="login-box">
-      <!-- Logo -->
-      <div class="login-logo">
-        <div style="display:inline-flex;align-items:center;gap:12px;margin-bottom:8px;">
-          <div style="width:48px;height:48px;background:var(--primary);border-radius:12px;display:flex;align-items:center;justify-content:center;">
-            <i class="fas fa-layer-group" style="color:#fff;font-size:20px;"></i>
-          </div>
-          <div style="text-align:left;">
-            <div class="login-logo-title" style="margin:0;">EUDR-TS</div>
-            <div class="login-logo-sub">PTEO Enterprise Operations</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Card -->
-      <div class="login-card">
-        <h4>Login</h4>
-        <p>Masuk ke akun Anda untuk melanjutkan.</p>
-
-        <form @submit.prevent="handleLogin">
-          <div class="form-group">
-            <label class="control-label" for="email">Email</label>
-            <input
-              id="email"
-              v-model="form.email"
-              type="email"
-              class="form-control"
-              :class="{ 'is-invalid': errors.email }"
-              placeholder="Masukkan email"
-              autocomplete="email"
-              autofocus
-            />
-            <span v-if="errors.email" class="invalid-feedback">{{ errors.email }}</span>
-          </div>
-
-          <div class="form-group">
-            <label class="control-label" for="password">Password</label>
-            <input
-              id="password"
-              v-model="form.password"
-              type="password"
-              class="form-control"
-              :class="{ 'is-invalid': errors.password }"
-              placeholder="Masukkan password"
-              autocomplete="current-password"
-            />
-            <span v-if="errors.password" class="invalid-feedback">{{ errors.password }}</span>
-          </div>
-
-          <!-- Error alert -->
-          <div v-if="loginError" style="background:#fdf0ef;border:1px solid #f5c6c4;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--danger);">
-            <i class="fas fa-exclamation-circle" style="margin-right:6px;"></i>{{ loginError }}
-          </div>
-
-          <div class="form-group" style="margin-bottom:0;">
-            <button
-              id="btn-login"
-              type="submit"
-              class="btn btn-primary btn-block btn-lg"
-              :disabled="authStore.loading"
-            >
-              <i v-if="authStore.loading" class="fas fa-circle-notch spinner"></i>
-              <i v-else class="fas fa-sign-in-alt"></i>
-              {{ authStore.loading ? 'Memproses...' : 'Login' }}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <div class="login-footer">
-        Copyright &copy; {{ new Date().getFullYear() }} PT. Ecogreen Oleochemicals
-      </div>
+  <div>
+    <div class="mb-6">
+      <h4 class="text-xl font-bold text-slate-800">Welcome Back</h4>
+      <p class="text-gray-500 text-sm mt-1">Please enter your details to sign in.</p>
     </div>
+
+    <form @submit.prevent="handleLogin" class="space-y-5">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide" for="email">Email Address</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i class="fas fa-envelope text-gray-400 text-xs"></i>
+          </div>
+          <input
+            id="email"
+            v-model="form.email"
+            type="email"
+            class="block w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm transition-all focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
+            :class="errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'"
+            placeholder="name@company.com"
+            autocomplete="email"
+            autofocus
+          />
+        </div>
+        <span v-if="errors.email" class="text-[10px] font-bold text-red-500 uppercase tracking-tight mt-1">{{ errors.email }}</span>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide" for="password">Password</label>
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <i class="fas fa-lock text-gray-400 text-xs"></i>
+          </div>
+          <input
+            id="password"
+            v-model="form.password"
+            type="password"
+            class="block w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm transition-all focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
+            :class="errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'"
+            placeholder="••••••••"
+            autocomplete="current-password"
+          />
+        </div>
+        <span v-if="errors.password" class="text-[10px] font-bold text-red-500 uppercase tracking-tight mt-1">{{ errors.password }}</span>
+      </div>
+
+      <!-- Error alert -->
+      <div v-if="loginError" class="bg-red-50 border border-red-100 rounded-lg p-3 flex items-center gap-3 text-red-600 text-xs font-medium">
+        <i class="fas fa-exclamation-circle text-sm"></i>
+        <span>{{ loginError }}</span>
+      </div>
+
+      <button
+        id="btn-login"
+        type="submit"
+        class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm shadow-lg shadow-green-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        :disabled="authStore.loading"
+      >
+        <i v-if="authStore.loading" class="fas fa-circle-notch animate-spin"></i>
+        <i v-else class="fas fa-sign-in-alt"></i>
+        <span>{{ authStore.loading ? 'Authenticating...' : 'Sign In' }}</span>
+      </button>
+    </form>
   </div>
 </template>
 

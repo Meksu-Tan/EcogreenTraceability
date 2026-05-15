@@ -1,30 +1,48 @@
 <template>
-  <div>
+  <div class="space-y-6">
     <!-- Section header -->
-    <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="flex items-center justify-between">
       <div>
-        <h1 style="font-size:18px;font-weight:700;color:var(--text-main);margin:0 0 4px;">Setup Storage</h1>
-        <div class="section-header-breadcrumb">
-          <div class="breadcrumb-item">TS Setup</div>
-          <div class="breadcrumb-item" style="color:var(--primary);">Storage</div>
+        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Setup Storage</h1>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="text-sm text-gray-500">TS Setup</span>
+          <span class="text-gray-300">/</span>
+          <span class="text-sm font-semibold text-green-600">Storage</span>
         </div>
       </div>
-      <button id="btn-tambah-storage" class="btn btn-primary" @click="openModal">
+      <button 
+        id="btn-tambah-storage" 
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95" 
+        @click="openModal"
+      >
         <i class="fas fa-plus"></i> Tambah
       </button>
     </div>
 
-    <div class="card card-primary">
-      <div class="card-header">
-        <h4><i class="fas fa-database" style="color:var(--primary);margin-right:8px;"></i>Data Storage</h4>
-        <div class="card-header-action">
-          <div class="nav-tabs" style="border:none;margin:0;">
-            <button class="nav-tab" :class="{ active: activeTab==='tank' }" @click="activeTab='tank'">Storage Tank</button>
-            <button class="nav-tab" :class="{ active: activeTab==='warehouse' }" @click="activeTab='warehouse'">Warehouse</button>
-          </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between gap-4 flex-wrap">
+        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+          <i class="fas fa-database text-green-600"></i>
+          Data Storage
+        </h4>
+        <div class="flex bg-slate-100 p-1 rounded-lg">
+          <button 
+            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
+            :class="activeTab==='tank' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+            @click="activeTab='tank'"
+          >
+            Storage Tank
+          </button>
+          <button 
+            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
+            :class="activeTab==='warehouse' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+            @click="activeTab='warehouse'"
+          >
+            Warehouse
+          </button>
         </div>
       </div>
-      <div class="card-body">
+      <div class="p-6">
         <StorageDetailTab v-if="activeTab==='tank'" ref="tankTabRef" />
         <WarehouseTab     v-if="activeTab==='warehouse'" ref="warehouseTabRef" />
       </div>

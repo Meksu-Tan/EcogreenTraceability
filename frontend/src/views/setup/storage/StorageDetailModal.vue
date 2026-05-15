@@ -6,10 +6,18 @@
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div class="form-group">
-      <label class="form-label">TF Number <span style="color:red">*</span></label>
-      <input id="detail-tf-number" v-model="form.tf_number" type="text" class="form-control" :class="{'is-invalid': errors.tf_number}" />
-      <div v-if="errors.tf_number" class="form-error">{{ errors.tf_number }}</div>
+    <div class="space-y-4">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">TF Number <span class="text-red-500">*</span></label>
+        <input 
+          id="detail-tf-number" 
+          v-model="form.tf_number" 
+          type="text" 
+          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+          :class="errors.tf_number ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+        />
+        <div v-if="errors.tf_number" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.tf_number }}</div>
+      </div>
     </div>
   </BaseModal>
 </template>

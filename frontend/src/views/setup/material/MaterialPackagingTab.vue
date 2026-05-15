@@ -8,7 +8,7 @@
     @toggle-status="onToggle"
   >
     <template #cell-source_product="{ value }">
-      <span style="font-size:.8125rem;color:#64748b;">{{ value }}</span>
+      <span class="text-sm font-medium text-slate-500">{{ value }}</span>
     </template>
   </DataTable>
 
@@ -37,11 +37,13 @@ const editRow    = ref(null)
 const submitting = ref(false)
 
 const columns = [
-  { key: 'code',           label: 'Kode' },
-  { key: 'code_noneudr',   label: 'Kode Non-EUDR' },
-  { key: 'description',    label: 'Deskripsi' },
+  { key: 'code',           label: 'Code' },
+  { key: 'code_noneudr',   label: 'Code (Non-EUDR)' },
+  { key: 'description',    label: 'Description' },
   { key: 'source_product', label: 'Source Product' },
   { key: 'status',         label: 'Status' },
+  { key: 'created_at',     label: 'Created at' },
+  { key: 'updated_at',     label: 'Updated at' }
 ]
 
 onMounted(() => {

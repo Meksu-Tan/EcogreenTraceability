@@ -6,27 +6,50 @@
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div class="form-group">
-      <label class="form-label">Kode Packaging <span style="color:red">*</span></label>
-      <input id="pkg-code" v-model="form.code" type="text" class="form-control" :class="{'is-invalid': errors.code}" />
-      <div v-if="errors.code" class="form-error">{{ errors.code }}</div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Kode Non-EUDR</label>
-      <input id="pkg-code-noneudr" v-model="form.code_noneudr" type="text" class="form-control" />
-    </div>
-    <div class="form-group">
-      <label class="form-label">Deskripsi <span style="color:red">*</span></label>
-      <input id="pkg-description" v-model="form.description" type="text" class="form-control" :class="{'is-invalid': errors.description}" />
-      <div v-if="errors.description" class="form-error">{{ errors.description }}</div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Source Product <span style="color:red">*</span></label>
-      <select id="pkg-source" v-model="form.id_material" class="form-control form-select" :class="{'is-invalid': errors.id_material}">
-        <option value="">-- Pilih Material --</option>
-        <option v-for="m in sourceProducts" :key="m.id_material" :value="m.id_material">{{ m.material }}</option>
-      </select>
-      <div v-if="errors.id_material" class="form-error">{{ errors.id_material }}</div>
+    <div class="space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Packaging <span class="text-red-500">*</span></label>
+          <input 
+            id="pkg-code" 
+            v-model="form.code" 
+            type="text" 
+            class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+            :class="errors.code ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+          />
+          <div v-if="errors.code" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code }}</div>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Non-EUDR</label>
+          <input id="pkg-code-noneudr" v-model="form.code_noneudr" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all" />
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Deskripsi <span class="text-red-500">*</span></label>
+        <input 
+          id="pkg-description" 
+          v-model="form.description" 
+          type="text" 
+          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+          :class="errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+        />
+        <div v-if="errors.description" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.description }}</div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Source Product <span class="text-red-500">*</span></label>
+        <select 
+          id="pkg-source" 
+          v-model="form.id_material" 
+          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none bg-white cursor-pointer appearance-none" 
+          :class="errors.id_material ? 'border-red-300 bg-red-50' : 'border-gray-300'"
+        >
+          <option value="">-- Pilih Material --</option>
+          <option v-for="m in sourceProducts" :key="m.id_material" :value="m.id_material">{{ m.material }}</option>
+        </select>
+        <div v-if="errors.id_material" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.id_material }}</div>
+      </div>
     </div>
   </BaseModal>
 </template>

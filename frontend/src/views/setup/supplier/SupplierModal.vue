@@ -6,23 +6,51 @@
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div class="form-group">
-      <label class="form-label">Kode <span style="color:red">*</span></label>
-      <input id="sup-code" v-model="form.code" type="text" class="form-control" :class="{'is-invalid': errors.code}" />
-      <div v-if="errors.code" class="form-error">{{ errors.code }}</div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Deskripsi <span style="color:red">*</span></label>
-      <input id="sup-description" v-model="form.description" type="text" class="form-control" :class="{'is-invalid': errors.description}" />
-      <div v-if="errors.description" class="form-error">{{ errors.description }}</div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Tipe (ID Tank/Sloc)</label>
-      <input id="sup-type" v-model="form.type" type="text" class="form-control" placeholder="ID Tank atau kosongkan" />
-    </div>
-    <div class="form-group">
-      <label class="form-label">Batch Code</label>
-      <input id="sup-batch-code" v-model="form.batch_code" type="text" class="form-control" />
+    <div class="space-y-4">
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode <span class="text-red-500">*</span></label>
+        <input 
+          id="sup-code" 
+          v-model="form.code" 
+          type="text" 
+          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+          :class="errors.code ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+        />
+        <div v-if="errors.code" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code }}</div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Deskripsi <span class="text-red-500">*</span></label>
+        <input 
+          id="sup-description" 
+          v-model="form.description" 
+          type="text" 
+          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none" 
+          :class="errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'" 
+        />
+        <div v-if="errors.description" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.description }}</div>
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Tipe (ID Tank/Sloc)</label>
+        <input 
+          id="sup-type" 
+          v-model="form.type" 
+          type="text" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all" 
+          placeholder="ID Tank atau kosongkan" 
+        />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Batch Code</label>
+        <input 
+          id="sup-batch-code" 
+          v-model="form.batch_code" 
+          type="text" 
+          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none transition-all" 
+        />
+      </div>
     </div>
   </BaseModal>
 </template>

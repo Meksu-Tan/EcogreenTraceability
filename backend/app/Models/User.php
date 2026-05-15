@@ -30,4 +30,26 @@ class User extends Authenticatable
             'password'          => 'hashed',
         ];
     }
+
+    public function roles(): \Illuminate\Database\Eloquent\Relations\MorphToMany
+    {
+        return $this->morphToMany(
+            config('permission.models.role'),
+            'user',
+            config('permission.table_names.model_has_roles'),
+            config('permission.column_names.model_morph_key', 'user_id'),
+            config('permission.column_names.role_pivot_key', 'role_id')
+        );
+    }
+
+    public function permissions(): \Illuminate\Database\Eloquent\Relations\MorphToMany
+    {
+        return $this->morphToMany(
+            config('permission.models.permission'),
+            'user',
+            config('permission.table_names.model_has_permissions'),
+            config('permission.column_names.model_morph_key', 'user_id'),
+            config('permission.column_names.permission_pivot_key', 'permission_id')
+        );
+    }
 }

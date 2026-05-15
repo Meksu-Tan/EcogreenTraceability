@@ -1,38 +1,53 @@
 <template>
-  <header class="app-topbar">
+  <header class="h-16 bg-green-600 flex items-center justify-between px-6 shadow-sm z-40">
     <!-- Left: hamburger + page title -->
-    <div class="topbar-left">
-      <div class="topbar-title">{{ pageTitle }}</div>
+    <div class="flex items-center gap-4">
+      <div class="text-white text-lg font-bold tracking-tight">{{ pageTitle }}</div>
     </div>
 
     <!-- Right: user dropdown -->
-    <div class="topbar-right">
+    <div class="flex items-center gap-4">
       <!-- User info + dropdown -->
-      <div style="position:relative;" ref="dropdownRef">
-        <div class="topbar-user" @click="showDropdown = !showDropdown">
-          <div class="topbar-avatar">{{ userInitial }}</div>
-          <div style="display:none;" class="topbar-name-block">
-            <div class="topbar-name">Hi, {{ authStore.user?.name }}</div>
+      <div class="relative" ref="dropdownRef">
+        <div 
+          class="flex items-center gap-3 cursor-pointer group"
+          @click="showDropdown = !showDropdown"
+        >
+          <div class="hidden sm:block text-right">
+            <div class="text-white text-xs font-medium opacity-80">Welcome,</div>
+            <div class="text-white text-sm font-bold leading-tight">{{ authStore.user?.name }}</div>
           </div>
-          <i class="fas fa-chevron-down" style="font-size:10px;color:var(--text-muted);margin-left:4px;"></i>
+          <div class="w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-white text-sm font-bold backdrop-blur-sm group-hover:bg-white/30 transition-all">
+            {{ userInitial }}
+          </div>
+          <i class="fas fa-chevron-down text-white/60 text-[10px] group-hover:text-white transition-all"></i>
         </div>
 
-        <!-- Dropdown menu (Stisla style) -->
-        <div
-          v-if="showDropdown"
-          style="position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--border-color);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.12);min-width:180px;z-index:200;overflow:hidden;"
+        <!-- Dropdown menu -->
+        <transition
+          enter-active-class="transition duration-100 ease-out"
+          enter-from-class="transform scale-95 opacity-0"
+          enter-to-class="transform scale-100 opacity-100"
+          leave-active-class="transition duration-75 ease-in"
+          leave-from-class="transform scale-100 opacity-100"
+          leave-to-class="transform scale-95 opacity-0"
         >
-          <div style="padding:10px 16px;border-bottom:1px solid var(--border-color);font-size:12px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;">
-            Account
-          </div>
           <div
-            style="display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:13px;color:var(--danger);cursor:pointer;font-weight:600;"
-            @click="handleLogout"
+            v-if="showDropdown"
+            class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden"
           >
-            <i class="fas fa-sign-out-alt"></i>
-            <span>{{ loggingOut ? 'Loading...' : 'Logout' }}</span>
+            <div class="px-4 py-2 border-b border-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Account Settings
+            </div>
+            <div
+              class="flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 cursor-pointer font-semibold transition-colors"
+              @click="handleLogout"
+            >
+              <i class="fas fa-sign-out-alt"></i>
+              <span>{{ loggingOut ? 'Processing...' : 'Logout' }}</span>
+            </div>
           </div>
-        </div>
+        </transition>
       </div>
     </div>
   </header>

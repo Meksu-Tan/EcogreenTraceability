@@ -67,5 +67,99 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('suppliers',       [SupplierController::class, 'store']);
         Route::put('suppliers/{id}',   [SupplierController::class, 'update']);
         Route::delete('suppliers/{id}', [SupplierController::class, 'destroy']);
+
+        // ──────────────────────────────────────────────────────────
+        // Setup — Additional Modules (Placeholder endpoints)
+        // ──────────────────────────────────────────────────────────
+        Route::get('adjustments', function() {
+            return response()->json(['data' => [], 'message' => 'Adjustment module under development']);
+        });
+        
+        Route::get('quantifiers', function() {
+            return response()->json(['data' => [], 'message' => 'Quantifier module under development']);
+        });
+        
+        Route::get('plants',    [\App\Http\Controllers\Api\Plant\PlantController::class, 'index']);
+        Route::post('plants',   [\App\Http\Controllers\Api\Plant\PlantController::class, 'store']);
+        Route::put('plants/{id}',    [\App\Http\Controllers\Api\Plant\PlantController::class, 'update']);
+        Route::delete('plants/{id}', [\App\Http\Controllers\Api\Plant\PlantController::class, 'destroy']);
+
+        // ──────────────────────────────────────────────────────────
+        // Transaction Modules — RM Entry
+        // ──────────────────────────────────────────────────────────
+        Route::prefix('transactions/rm-entries')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'index']);
+            Route::post('/', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'store']);
+            Route::delete('{id}', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'destroy']);
+            Route::get('new-number', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'newNumber']);
+            Route::get('tanks', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'tanks']);
+            Route::get('tanks/{id}/details', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'tankDetails']);
+            Route::get('materials', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'materials']);
+            Route::get('suppliers/search', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'searchSuppliers']);
+            Route::get('batch-code', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'batchCode']);
+            Route::post('suppliers', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'addSupplier']);
+            Route::get('suppliers/list', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'supplierList']);
+            Route::delete('suppliers/{id}', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'deleteSupplier']);
+            Route::get('total-qty', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'totalQty']);
+        });
+        
+        Route::get('transactions/wip-entries', function() {
+            return response()->json(['data' => [], 'message' => 'WIP Entry module under development']);
+        });
+        
+        Route::get('transactions/blendings', function() {
+            return response()->json(['data' => [], 'message' => 'Blending module under development']);
+        });
+        
+        Route::get('transactions/package-entries', function() {
+            return response()->json(['data' => [], 'message' => 'Package Entry module under development']);
+        });
+        
+        Route::get('transactions/shipment-entries', function() {
+            return response()->json(['data' => [], 'message' => 'Shipment Entry module under development']);
+        });
+        
+        Route::prefix('transactions/transfers')->group(function () {
+            Route::get('storage-log', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'storageLog']);
+            Route::get('feed-log', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'feedLog']);
+            Route::post('/', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'transfer']);
+            Route::delete('{id}', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'deactivate']);
+            Route::get('source-entries', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'sourceEntries']);
+            Route::get('dest-tanks', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'destTanks']);
+        });
+
+        // ──────────────────────────────────────────────────────────
+        // Inquiry Modules (Placeholder endpoints)
+        // ──────────────────────────────────────────────────────────
+        Route::get('inquiries/stock', function() {
+            return response()->json(['data' => [], 'message' => 'Stock Inquiry module under development']);
+        });
+        
+        Route::get('inquiries/ts-report', function() {
+            return response()->json(['data' => [], 'message' => 'TS Report module under development']);
+        });
+        
+        Route::get('inquiries/rm-report', function() {
+            return response()->json(['data' => [], 'message' => 'RM Report module under development']);
+        });
+
+        // ──────────────────────────────────────────────────────────
+        // Trace Modules (Placeholder endpoints)
+        // ──────────────────────────────────────────────────────────
+        Route::get('trace/forward/{id}', function($id) {
+            return response()->json(['data' => [], 'message' => 'Forward Trace module under development']);
+        });
+        
+        Route::get('trace/backward/{id}', function($id) {
+            return response()->json(['data' => [], 'message' => 'Backward Trace module under development']);
+        });
+
+        // ──────────────────────────────────────────────────────────
+        // Admin Modules
+        // ──────────────────────────────────────────────────────────
+        Route::get('admin/users',       [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);
+        Route::post('admin/users',      [\App\Http\Controllers\Api\Admin\UserController::class, 'store']);
+        Route::put('admin/users/{id}',  [\App\Http\Controllers\Api\Admin\UserController::class, 'update']);
+        Route::delete('admin/users/{id}', [\App\Http\Controllers\Api\Admin\UserController::class, 'destroy']);
     });
 });

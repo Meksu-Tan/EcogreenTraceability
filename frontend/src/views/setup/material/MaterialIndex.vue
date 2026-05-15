@@ -1,32 +1,49 @@
 <template>
-  <div>
+  <div class="space-y-6">
     <!-- Section header -->
-    <div class="section-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="flex items-center justify-between">
       <div>
-        <h1 style="font-size:18px;font-weight:700;color:var(--text-main);margin:0 0 4px;">Setup Material</h1>
-        <div class="section-header-breadcrumb">
-          <div class="breadcrumb-item">TS Setup</div>
-          <div class="breadcrumb-item" style="color:var(--primary);">Material</div>
+        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Setup Material</h1>
+        <div class="flex items-center gap-2 mt-1">
+          <span class="text-sm text-gray-500">TS Setup</span>
+          <span class="text-gray-300">/</span>
+          <span class="text-sm font-semibold text-green-600">Material</span>
         </div>
       </div>
-      <button id="btn-tambah-material" class="btn btn-primary" @click="openModal">
+      <button 
+        id="btn-tambah-material" 
+        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95" 
+        @click="openModal"
+      >
         <i class="fas fa-plus"></i> Tambah
       </button>
     </div>
 
     <!-- Card -->
-    <div class="card card-primary">
-      <div class="card-header">
-        <h4><i class="fab fa-asymmetrik" style="color:var(--primary);margin-right:8px;"></i>Data Material</h4>
-        <div class="card-header-action">
-          <!-- Tabs inside card header -->
-          <div class="nav-tabs" style="border:none;margin:0;gap:0;">
-            <button class="nav-tab" :class="{ active: activeTab==='wip' }" @click="activeTab='wip'">Material WIP</button>
-            <button class="nav-tab" :class="{ active: activeTab==='packaging' }" @click="activeTab='packaging'">Packaging</button>
-          </div>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-50 flex items-center justify-between gap-4 flex-wrap">
+        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+          <i class="fab fa-asymmetrik text-green-600"></i>
+          Data Material
+        </h4>
+        <div class="flex bg-slate-100 p-1 rounded-lg">
+          <button 
+            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
+            :class="activeTab==='wip' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+            @click="activeTab='wip'"
+          >
+            Material WIP
+          </button>
+          <button 
+            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
+            :class="activeTab==='packaging' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
+            @click="activeTab='packaging'"
+          >
+            Packaging
+          </button>
         </div>
       </div>
-      <div class="card-body">
+      <div class="p-6">
         <!-- Tab: WIP -->
         <div v-if="activeTab === 'wip'">
           <DataTable
@@ -39,7 +56,10 @@
           >
             <template #cell-yield="{ value }">{{ value }}%</template>
             <template #cell-status_packaging="{ value }">
-              <span class="badge" :class="value == 1 ? 'badge-success' : 'badge-secondary'">
+              <span 
+                class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
+                :class="value == 1 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'"
+              >
                 {{ value == 1 ? 'Ya' : 'Tidak' }}
               </span>
             </template>
@@ -79,13 +99,19 @@ const submitting      = ref(false)
 const packagingTabRef = ref(null)
 
 const materialColumns = [
-  { key: 'code',             label: 'Kode' },
-  { key: 'code_noneudr',     label: 'Non-EUDR' },
-  { key: 'description',      label: 'Deskripsi' },
-  { key: 'type',             label: 'Tipe' },
-  { key: 'yield',            label: 'Yield' },
-  { key: 'status_packaging', label: 'Packaging' },
-  { key: 'status',           label: 'Status' },
+  { key: 'code',               label: 'Code' },
+  { key: 'code_noneudr',       label: 'Code (Non-EUDR)' },
+  { key: 'code_matl_supplier', label: 'Code (Supplier)' },
+  { key: 'description',        label: 'Description' },
+  { key: 'type',               label: 'Type' },
+  { key: 'qtf_feed',           label: 'Flowmeter Feed' },
+  { key: 'qtf_rundown',        label: 'Flowmeter Rundown' },
+  { key: 'id_feed',            label: 'ID Feed' },
+  { key: 'id_rundown',         label: 'ID Rundown' },
+  { key: 'status_packaging',   label: 'For Packaging' },
+  { key: 'status',             label: 'Status' },
+  { key: 'created_at',         label: 'Created at' },
+  { key: 'updated_at',         label: 'Updated at' }
 ]
 
 onMounted(() => store.fetchMaterials())
