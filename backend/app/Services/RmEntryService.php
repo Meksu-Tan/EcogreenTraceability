@@ -11,6 +11,8 @@ use App\Models\MaterialDocument;
 use App\Models\Tank;
 use App\Models\Material;
 use App\Models\Supplier;
+use App\Helpers\Rundown;
+use App\Helpers\Feed;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -21,6 +23,7 @@ class RmEntryService
     protected $movType1 = '1';
     protected $movType2 = '9';
     protected $typeMaterial = 'RM';
+    protected $idTankSrc = "T000"; // STORAGE TANK
 
     /**
      * Generate new RM entry number
@@ -45,6 +48,33 @@ class RmEntryService
 
         return $result[0]->rm_number ?? null;
     }
+
+    /**
+     * Generate transfer number for RM (Starts with 1, like RM entry)
+     */
+    public function generateTransferNumber($plantId)
+    {
+        // Logic follow monorepo get_rmNewEntryNumberTrf
+        $idTankSrc = "T000"; // STORAGE
+        $result = DB::connection('eudr_ts')->select(
+            'SELECT CONCAT(SUBSTRING(a.rm_number,1,7), ?, SUBSTRING(a.rm_number,11,4)) + 1 AS rm_number
+               FROM (SELECT a.trace_no AS rm_number
+                       FROM t_balance_header a
+                      WHERE SUBSTRING(a.trace_no,1,7) = CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"))
+                        AND SUBSTRING(a.trace_no,2,9) = CONCAT(DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
+                        AND a.status = 1 
+                        AND a.id_plant = ?
+                      ORDER BY a.id_balance_head DESC
+                      LIMIT 1 ) a
+             UNION ALL
+            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(RIGHT(?, 2), 2, "0"), "01") AS rm_number
+             LIMIT 1',
+            [substr($idTankSrc,1,3), "000", $plantId, substr($idTankSrc,1,3), $plantId]
+        );
+
+        return $result[0]->rm_number ?? null;
+    }
+
 
     /**
      * Get RM entry list
@@ -131,9 +161,9 @@ class RmEntryService
                         AND SUBSTRING(b.trace_no,1,1) = 1
                       ORDER BY SUBSTRING(a.batch_sap,1,8) DESC
                       LIMIT 1) a
-              UNION ALL
+               UNION ALL
              SELECT "01" AS seq_no
-              LIMIT 1'
+               LIMIT 1'
         );
         $seqNo = $datSeq[0]->seq_no;
 
@@ -156,84 +186,60 @@ class RmEntryService
         DB::connection('eudr_ts')->beginTransaction();
 
         try {
-            // Validate total qty
-            $totalTemp = BalanceTemporary::where('entry_no', $data['rm_number'])
-                ->where('status', 1)
-                ->sum('qty');
+            $entry_no = $data['rm_number'];
+            $qty = floatval($data['total_qty']);
 
-            if (abs($totalTemp - $data['total_qty']) > 0.001) {
-                throw new Exception('Total quantity mismatch');
+            // Fetch temporary suppliers
+            $dat = DB::connection('eudr_ts')->select(
+                'SELECT id_supplier, qty AS qty_tail, batch_sap
+                   FROM t_balance_temporary
+                  WHERE entry_no = ? AND status = 1',
+                [$entry_no]
+            );
+
+            $supplierRows = [];
+            foreach ($dat as $row) {
+                if ($row->qty_tail <= 0) continue;
+                $supplierRows[] = [
+                    'id_supplier' => $row->id_supplier,
+                    'batch_sap' => $row->batch_sap,
+                    'rundownSupplier' => round((float)$row->qty_tail, 4),
+                ];
             }
 
-            // Create Balance Header
-            $balanceHeader = BalanceHeader::create([
+            if (empty($supplierRows)) {
+                throw new Exception('No supplier data found for this entry');
+            }
+
+            // Adjust rundown to total
+            Rundown::adjustRundownToTotal($supplierRows, $qty);
+
+            // Execute Rundown
+            $rundownResult = Rundown::generalRundown([
+                'user' => $user,
                 'entry_date' => $data['entry_date'],
-                'trace_no' => $data['rm_number'],
+                'from_trace_no' => null,
+                'trace_no' => $entry_no,
                 'id_material' => $data['id_material'],
                 'id_tank' => $data['id_tank'],
                 'id_tank_tail' => json_encode($data['id_tank_tail']),
+                'in_qty' => $qty,
+                'last_qtf' => 0,
+                'curr_qtf' => $qty,
                 'id_plant' => $data['id_plant'],
-                'qty' => $data['total_qty'],
-                'in_qty' => $data['total_qty'],
-                'out_qty' => 0,
-                'init_qty' => $data['total_qty'],
-                'status' => 1,
-                'created_by' => $user,
+                'supplier_rows' => $supplierRows,
             ]);
 
-            // Create Balance Details from temporary
-            $tempRecords = BalanceTemporary::where('entry_no', $data['rm_number'])
-                ->where('status', 1)
-                ->get();
-
-            foreach ($tempRecords as $temp) {
-                BalanceDetail::create([
-                    'id_balance_head' => $balanceHeader->id_balance_head,
-                    'id_supplier' => $temp->id_supplier,
-                    'id_material' => $temp->id_material,
-                    'batch_sap' => $temp->batch_sap,
-                    'qty' => $temp->qty,
-                    'in_qty' => $temp->qty,
-                    'out_qty' => 0,
-                    'init_qty' => $temp->qty,
-                    'status' => 1,
-                    'created_by' => $user,
-                ]);
+            if ($rundownResult['response'] != 1) {
+                throw new Exception('Rundown failed');
             }
 
-            // Create Trace Header
-            $traceHeader = TraceHeader::create([
-                'id_balance_head' => $balanceHeader->id_balance_head,
-                'entry_date' => $data['entry_date'],
-                'to_trace_no' => $data['rm_number'],
-                'id_material' => $data['id_material'],
-                'id_sloc' => $data['id_tank'],
-                'id_tank_tail' => json_encode($data['id_tank_tail']),
-                'id_plant' => $data['id_plant'],
-                'in_qty' => $data['total_qty'],
-                'out_qty' => 0,
-                'status' => 1,
-                'created_by' => $user,
-            ]);
-
-            // Create Trace Details
-            foreach ($tempRecords as $temp) {
-                TraceDetail::create([
-                    'id_trace_head' => $traceHeader->id_trace_head,
-                    'id_supplier' => $temp->id_supplier,
-                    'id_material' => $temp->id_material,
-                    'batch_sap' => $temp->batch_sap,
-                    'in_qty' => $temp->qty,
-                    'out_qty' => 0,
-                    'status' => 1,
-                    'created_by' => $user,
-                ]);
-            }
+            $idTraceHead = $rundownResult['id_trace_head'];
 
             // Create Material Document
             if (!empty($data['material_document'])) {
                 MaterialDocument::create([
-                    'id_trace_head' => $traceHeader->id_trace_head,
+                    'id_trace_head' => $idTraceHead,
                     'material_document' => $data['material_document'],
                     'po_so' => $data['po_so'] ?? null,
                     'created_by' => $user,
@@ -241,25 +247,164 @@ class RmEntryService
             }
 
             // Clear temporary records
-            BalanceTemporary::where('entry_no', $data['rm_number'])
+            BalanceTemporary::where('entry_no', $entry_no)
                 ->update(['status' => 0, 'updated_by' => $user]);
 
             // Log transaction
             DB::connection('eudr_ts')->table('log_transactions')->insert([
                 'log_module' => 'RM_ENTRY',
                 'log_type' => 'ADD',
-                'log_description' => 'ID: ' . $balanceHeader->id_balance_head . ' | Trace No: ' . $data['rm_number'],
+                'log_description' => 'ID: ' . $rundownResult['id_balance_head'] . ' | Trace No: ' . $entry_no,
                 'created_by' => $user,
                 'created_at' => now(),
             ]);
 
             DB::connection('eudr_ts')->commit();
 
-            return ['success' => true, 'id' => $balanceHeader->id_balance_head];
+            return ['success' => true, 'id' => $rundownResult['id_balance_head']];
 
         } catch (Exception $e) {
             DB::connection('eudr_ts')->rollBack();
             Log::error('RM Entry Save Error: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Save RM Transfer to Feed Tank
+     */
+    public function saveRmTrfEntry($data, $user)
+    {
+        DB::connection('eudr_ts')->beginTransaction();
+
+        try {
+            $entry_no = $data['entry_no'];
+            $curr_entryDate = $data['entry_date'];
+            $id_tankSource = $data['source_tank'];
+            $id_tank = $data['trf_tank'];
+            $materialDoc = $data['material_document'] ?? null;
+            $id_tankSourceNo = $data['tank_no']; // Array
+            $id_tankNo = $data['trf_tank_no']; // Array
+            $idPlant = $data['id_plant'];
+
+            $id_tankSourceNo_json = json_encode($id_tankSourceNo);
+            $id_tankNo_json = json_encode($id_tankNo);
+
+            $srcTankRec = DB::connection('eudr_ts')->select('SELECT code, code_3, id_plant FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tankSource]);
+            $tgtTankRec = DB::connection('eudr_ts')->select('SELECT code FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tank]);
+            
+            if (empty($srcTankRec) || empty($tgtTankRec)) {
+                throw new Exception('Invalid tank selection');
+            }
+
+            $targetTankCode = $tgtTankRec[0]->code;
+            $isStorageTank = (strtoupper($srcTankRec[0]->code_3) === 'STORAGE');
+
+            $datTempMaterial = DB::connection('eudr_ts')->select(
+                'SELECT entry_no, id_tank, id_material, qty
+                   FROM t_balance_temporary
+                  WHERE status = 1 AND entry_no = ?',
+                [$entry_no]
+            );
+
+            if (empty($datTempMaterial)) {
+                throw new Exception('No temporary material data found');
+            }
+
+            foreach ($datTempMaterial as $row) {
+                $id_material = $row->id_material;
+                $out_qty = floatval($row->qty);
+
+                // Create entry numbers following the monorepo logic
+                $batchTrf_id = substr($targetTankCode, 1, 3);
+                $batchFeed_id = "000";
+                $batch_moveType = substr($entry_no, 0, 1);
+                $batch_entryDate = substr($entry_no, 1, 6);
+                $batch_idPlant = substr($entry_no, 10, 2);
+                $batch_sequence = substr($entry_no, -2);
+
+                $entryTrfNo_in = $batch_moveType . $batch_entryDate . $batchTrf_id . $batch_idPlant . $batch_sequence;
+                $entryFeedNo_in = $batch_moveType . $batch_entryDate . $batchFeed_id . $batch_idPlant . $batch_sequence;
+
+                // Execute Feed (Deduct from Storage)
+                $feedResult = Feed::generalFeed([
+                    'user' => $user,
+                    'entry_date' => $curr_entryDate,
+                    'id_material' => $id_material,
+                    'id_tank' => $id_tankSource,
+                    'id_tank_tail' => $id_tankSourceNo_json,
+                    'id_plant' => $isStorageTank ? 0 : $idPlant,
+                    'qty' => $out_qty,
+                    'to_trace_no' => $entryTrfNo_in,
+                ]);
+
+                if ($feedResult['response'] != 1) {
+                    throw new Exception('Feed failed: ' . ($feedResult['response'] == 3 ? 'Insufficient stock' : 'Unknown error'));
+                }
+
+                // Execute Rundown for each used head (Add to Feed)
+                foreach ($feedResult['used_heads'] as $used) {
+                    $in_qty = $used['qty_used'];
+
+                    $supplierRows = [];
+                    foreach ($feedResult['feed_in_details'] as $d) {
+                        if ($d['qty'] <= 0) continue;
+                        $supplierRows[] = [
+                            'id_supplier' => $d['id_supplier'],
+                            'batch_sap' => $d['batch_sap'],
+                            'rundownSupplier' => round((float)$d['qty'], 4),
+                        ];
+                    }
+
+                    Rundown::adjustRundownToTotal($supplierRows, $in_qty);
+
+                    $rundownResult = Rundown::generalRundown([
+                        'user' => $user,
+                        'entry_date' => $curr_entryDate,
+                        'trace_no' => $entryFeedNo_in,
+                        'from_trace_no' => $entryTrfNo_in,
+                        'id_material' => $id_material,
+                        'id_tank' => $id_tank,
+                        'id_tank_tail' => $id_tankNo_json,
+                        'id_plant' => $idPlant,
+                        'in_qty' => $in_qty,
+                        'last_qtf' => 0,
+                        'curr_qtf' => $in_qty,
+                        'supplier_rows' => $supplierRows,
+                    ]);
+
+                    if (!empty($materialDoc)) {
+                        DB::connection('eudr_ts')->table('t_material_document')->insert([
+                            'id_trace_head' => $rundownResult['id_trace_head'],
+                            'material_document' => $materialDoc,
+                            'created_by' => $user,
+                            'created_at' => now(),
+                        ]);
+                    }
+                }
+            }
+
+            // Clear temporary records
+            DB::connection('eudr_ts')->table('t_balance_temporary')
+                ->where('entry_no', $entry_no)
+                ->update(['status' => 0, 'updated_by' => $user]);
+
+            // Log
+            DB::connection('eudr_ts')->table('log_transactions')->insert([
+                'log_module' => 'RMTRF_ENTRY',
+                'log_type' => 'ADD',
+                'log_description' => 'Transfer to Feed Tank | Entry No: ' . $entry_no,
+                'created_by' => $user,
+                'created_at' => now(),
+            ]);
+
+            DB::connection('eudr_ts')->commit();
+
+            return ['success' => true];
+
+        } catch (Exception $e) {
+            DB::connection('eudr_ts')->rollBack();
+            Log::error('RM Transfer Save Error: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -271,11 +416,12 @@ class RmEntryService
     {
         return BalanceTemporary::create([
             'entry_no' => $data['entry_no'],
-            'id_supplier' => $data['id_supplier'],
+            'id_supplier' => $data['id_supplier'] ?? null,
             'id_material' => $data['id_material'],
             'id_plant' => $data['id_plant'],
             'qty' => $data['qty'],
-            'batch_sap' => $data['batch_sap'],
+            'id_tank' => $data['id_tank'] ?? null,
+            'batch_sap' => $data['batch_sap'] ?? null,
             'status' => 1,
             'created_by' => $user,
         ]);
@@ -293,9 +439,9 @@ class RmEntryService
             ->map(function ($item) {
                 return [
                     'id' => $item->id_balance_temp,
-                    'supplier' => $item->supplier->code . ' :: ' . $item->supplier->description,
+                    'supplier' => $item->supplier ? ($item->supplier->code . ' :: ' . $item->supplier->description) : 'N/A',
                     'material' => $item->material->code,
-                    'batch_sap' => $item->batch_sap,
+                    'batch_sap' => $item->batch_sap ?? 'N/A',
                     'qty' => number_format($item->qty, 3),
                 ];
             });
@@ -377,3 +523,4 @@ class RmEntryService
         }
     }
 }
+

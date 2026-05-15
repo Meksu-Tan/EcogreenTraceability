@@ -16,6 +16,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
   const supplierList = ref([])
   const currentEntry = ref(null)
   const rmNumber = ref('')
+  const trfNumber = ref('')
   const totalQty = ref('0.000')
 
   // Getters
@@ -30,7 +31,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
       entries.value = response.data || []
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to fetch RM entries')
+      toastStore.error(error.response?.data?.message || 'Failed to fetch RM entries')
       throw error
     } finally {
       loading.value = false
@@ -41,11 +42,11 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     loading.value = true
     try {
       const response = await transactionRmEntryApi.create(data)
-      toastStore.showSuccess('RM Entry created successfully')
+      toastStore.success('RM Entry created successfully')
       await fetchEntries()
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to create RM entry')
+      toastStore.error(error.response?.data?.message || 'Failed to create RM entry')
       throw error
     } finally {
       loading.value = false
@@ -56,11 +57,11 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     loading.value = true
     try {
       const response = await transactionRmEntryApi.deactivate(id)
-      toastStore.showSuccess('RM Entry deactivated successfully')
+      toastStore.success('RM Entry deactivated successfully')
       await fetchEntries()
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to deactivate RM entry')
+      toastStore.error(error.response?.data?.message || 'Failed to deactivate RM entry')
       throw error
     } finally {
       loading.value = false
@@ -73,18 +74,30 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
       rmNumber.value = response.data.rm_number
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to generate RM number')
+      toastStore.error(error.response?.data?.message || 'Failed to generate RM number')
       throw error
     }
   }
 
-  async function fetchTanks() {
+  async function generateTransferNumber(params = {}) {
+    try {
+      const response = await transactionRmEntryApi.getTransferNumber(params)
+      trfNumber.value = response.data.rm_number
+      return response
+    } catch (error) {
+      toastStore.error(error.response?.data?.message || 'Failed to generate transfer number')
+      throw error
+    }
+  }
+
+  async function fetchTanks(force = false) {
+    if (!force && tanks.value.length > 0) return
     try {
       const response = await transactionRmEntryApi.getTanks()
       tanks.value = response.data || []
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to fetch tanks')
+      toastStore.error(error.response?.data?.message || 'Failed to fetch tanks')
       throw error
     }
   }
@@ -95,29 +108,31 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
       tankDetails.value = response.data || []
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to fetch tank details')
+      toastStore.error(error.response?.data?.message || 'Failed to fetch tank details')
       throw error
     }
   }
 
-  async function fetchMaterials() {
+  async function fetchMaterials(force = false) {
+    if (!force && materials.value.length > 0) return
     try {
       const response = await transactionRmEntryApi.getMaterials()
       materials.value = response.data || []
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to fetch materials')
+      toastStore.error(error.response?.data?.message || 'Failed to fetch materials')
       throw error
     }
   }
 
-  async function searchSuppliers(query) {
+  async function searchSuppliers(query, force = false) {
+    if (!force && !query && suppliers.value.length > 0) return
     try {
       const response = await transactionRmEntryApi.searchSuppliers(query)
-      suppliers.value = response || []
+      suppliers.value = Array.isArray(response) ? response : []
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to search suppliers')
+      toastStore.error(error.response?.data?.message || 'Failed to search suppliers')
       throw error
     }
   }
@@ -127,7 +142,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
       const response = await transactionRmEntryApi.getBatchCode(supplierId)
       return response.data.batch_code
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to generate batch code')
+      toastStore.error(error.response?.data?.message || 'Failed to generate batch code')
       throw error
     }
   }
@@ -135,12 +150,12 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
   async function addSupplier(data) {
     try {
       const response = await transactionRmEntryApi.addSupplier(data)
-      toastStore.showSuccess('Supplier added successfully')
+      toastStore.success('Supplier added successfully')
       await fetchSupplierList(data.entry_no)
       await fetchTotalQty(data.entry_no)
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to add supplier')
+      toastStore.error(error.response?.data?.message || 'Failed to add supplier')
       throw error
     }
   }
@@ -151,7 +166,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
       supplierList.value = response.data || []
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to fetch supplier list')
+      toastStore.error(error.response?.data?.message || 'Failed to fetch supplier list')
       throw error
     }
   }
@@ -159,12 +174,12 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
   async function deleteSupplier(id, entryNo) {
     try {
       const response = await transactionRmEntryApi.deleteSupplier(id)
-      toastStore.showSuccess('Supplier deleted successfully')
+      toastStore.success('Supplier deleted successfully')
       await fetchSupplierList(entryNo)
       await fetchTotalQty(entryNo)
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to delete supplier')
+      toastStore.error(error.response?.data?.message || 'Failed to delete supplier')
       throw error
     }
   }
@@ -175,14 +190,30 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
       totalQty.value = response.data.total
       return response
     } catch (error) {
-      toastStore.showError(error.response?.data?.message || 'Failed to fetch total qty')
+      toastStore.error(error.response?.data?.message || 'Failed to fetch total qty')
       throw error
+    }
+  }
+
+  async function transferEntry(data) {
+    loading.value = true
+    try {
+      const response = await transactionRmEntryApi.transfer(data)
+      toastStore.success('RM Transfer processed successfully')
+      await fetchEntries()
+      return response
+    } catch (error) {
+      toastStore.error(error.response?.data?.message || 'Failed to process RM transfer')
+      throw error
+    } finally {
+      loading.value = false
     }
   }
 
   function resetForm() {
     currentEntry.value = null
     rmNumber.value = ''
+    trfNumber.value = ''
     supplierList.value = []
     totalQty.value = '0.000'
     tankDetails.value = []
@@ -199,6 +230,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     supplierList,
     currentEntry,
     rmNumber,
+    trfNumber,
     totalQty,
 
     // Getters
@@ -210,6 +242,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     createEntry,
     deactivateEntry,
     generateRmNumber,
+    generateTransferNumber,
     fetchTanks,
     fetchTankDetails,
     fetchMaterials,
@@ -219,6 +252,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     fetchSupplierList,
     deleteSupplier,
     fetchTotalQty,
+    transferEntry,
     resetForm
   }
 })

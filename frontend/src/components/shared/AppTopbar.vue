@@ -2,10 +2,18 @@
   <header class="h-16 bg-green-600 flex items-center justify-between px-6 shadow-sm z-40">
     <!-- Left: hamburger + page title -->
     <div class="flex items-center gap-4">
-      <div class="text-white text-lg font-bold tracking-tight">{{ pageTitle }}</div>
+      <button 
+        @click="uiStore.toggleSidebar()"
+        class="w-10 h-10 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+        title="Toggle Sidebar"
+      >
+        <i class="fas" :class="uiStore.isSidebarCollapsed ? 'fa-indent' : 'fa-outdent'"></i>
+      </button>
+      <div class="text-white text-lg font-bold tracking-tight transition-all duration-300">
+        {{ pageTitle }}
+      </div>
     </div>
 
-    <!-- Right: user dropdown -->
     <div class="flex items-center gap-4">
       <!-- User info + dropdown -->
       <div class="relative" ref="dropdownRef">
@@ -57,8 +65,12 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
+import { usePlantSelectionStore } from '@/stores/plantSelection'
 
 const authStore    = useAuthStore()
+const uiStore      = useUiStore()
+const plantSelectionStore = usePlantSelectionStore()
 const router       = useRouter()
 const route        = useRoute()
 const loggingOut   = ref(false)
@@ -73,6 +85,7 @@ const pageTitle = computed(() => {
     '/setup/material':   'Setup Material',
     '/setup/storage':    'Setup Storage',
     '/setup/supplier':   'Setup Supplier',
+    '/setup/plant':      'Setup Plant',
   }
   return map[route.path] || 'EUDR-TS'
 })
@@ -93,3 +106,4 @@ async function handleLogout() {
   router.push({ name: 'login' })
 }
 </script>
+

@@ -1,260 +1,328 @@
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-      <!-- Background overlay -->
-      <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" @click="closeModal"></div>
+  <!-- Teleport avoids clipping/stacking bugs when modal is inside layout regions with overflow (decoupled SPA). -->
+  <Teleport to="body">
+  <div
+    v-show="isOpen"
+    class="fixed inset-0 z-[100] overflow-y-auto"
+    aria-labelledby="modal-title"
+    role="dialog"
+    aria-modal="true"
+    :aria-hidden="!isOpen"
+  >
+    <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
+      <!-- Latar: blur halaman di belakang (bukan overlay abu-abu pekat) -->
+      <div
+        class="fixed inset-0 z-[1] bg-white/[0.14] backdrop-blur-2xl backdrop-saturate-150 transition-opacity duration-300"
+        aria-hidden="true"
+        @click="closeModal"
+      />
 
-      <!-- Modal panel -->
-      <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+      <div
+        class="relative z-[2] mx-auto flex w-full max-w-5xl max-h-[min(92vh,940px)] flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_25px_50px_-12px_rgba(15,23,42,0.22)] ring-1 ring-slate-900/[0.05]"
+      >
         <!-- Header -->
-        <div class="bg-blue-600 px-6 py-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-medium text-white">
+        <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 via-green-600 to-green-600 px-6 py-4 sm:px-8">
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">RM Entry</p>
+            <h3 id="modal-title" class="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
               Raw Material Entry
             </h3>
-            <button @click="closeModal" class="text-white hover:text-gray-200">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
+          <button
+            type="button"
+            @click="closeModal"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
+            aria-label="Tutup"
+          >
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         <!-- Body -->
-        <div class="bg-white px-6 py-4 max-h-[85vh] overflow-y-auto">
-          <form @submit.prevent="handleSubmit">
-            <!-- Header section (as in monorepo card) -->
-            <div class="border border-gray-200 rounded-lg p-4 mb-6">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <!-- Entry Mode -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Entry Mode</label>
+        <div class="relative min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white px-5 py-5 sm:px-8 sm:py-6">
+          <div
+            v-if="initLoading"
+            class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-xl bg-white/75 backdrop-blur-sm"
+          >
+            <svg class="h-11 w-11 animate-spin text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p class="text-sm font-semibold text-slate-600">Memuat form RM Entry…</p>
+          </div>
+          <div
+            v-if="initError && !initLoading"
+            class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200/80 bg-red-50/95 px-4 py-3.5 text-sm text-red-800 shadow-sm"
+          >
+            <span class="min-w-0 flex-1 leading-snug">{{ initError }}</span>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-red-700"
+              @click="bootstrap"
+            >
+              Coba lagi
+            </button>
+          </div>
+          <form @submit.prevent="handleSubmit" :class="{ 'pointer-events-none opacity-45': initLoading }" class="space-y-5">
+            <!-- Kartu utama -->
+            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+              <div class="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-4">
+                <h4 class="text-sm font-bold text-slate-800 sm:text-base">Detail entri</h4>
+                <p class="max-w-md text-xs leading-relaxed text-green-700 sm:text-[11px]">
+                  Jangan ubah material setelah menambah supplier.
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Mode</label>
                   <input
                     v-model="form.mode"
                     type="text"
                     readonly
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-slate-800 font-bold"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-slate-800"
                   />
                 </div>
-                <!-- Entry Number -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Entry Number (Auto)</label>
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Nomor entri (auto)</label>
                   <input
                     v-model="form.rm_number"
                     type="text"
                     readonly
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-slate-800 font-bold"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm font-bold text-slate-900"
                   />
                 </div>
-                <!-- Date -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Date (Auto Detect)</label>
+                <div class="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tanggal</label>
                   <input
                     v-model="form.entry_date"
                     type="date"
                     required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                   />
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <!-- Sloc -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Sloc</label>
+              <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Sloc</label>
                   <select
                     v-model="form.id_tank"
-                    @change="onTankChange"
                     required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                    @change="onTankChange"
                   >
-                    <option value="">- Select Sloc -</option>
+                    <option value="">— Pilih Sloc —</option>
                     <option v-for="tank in tanks" :key="tank.id_tank" :value="tank.id_tank">
                       {{ tank.tank }}
                     </option>
                   </select>
                 </div>
-                <!-- Material Document -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Material Document (SAP)</label>
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Material doc (SAP)</label>
                   <input
                     v-model="form.material_document"
                     type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm uppercase shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                   />
                 </div>
-                <!-- PO -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Purchase Order (PO)</label>
+                <div class="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Purchase order (PO)</label>
                   <input
                     v-model="form.po_so"
                     type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent uppercase"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm uppercase shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                   />
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <!-- Material -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1 text-xs">Material ( Do not change material selection after input supplier! )</label>
+              <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-5">
+                <div class="space-y-1.5 lg:col-span-3">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Material</label>
                   <select
                     v-model="form.id_material"
                     required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                   >
-                    <option value="">- Select Material -</option>
+                    <option value="">— Pilih material —</option>
                     <option v-for="material in materials" :key="material.id_material" :value="material.id_material">
                       {{ material.material }}
                     </option>
                   </select>
                 </div>
-                <!-- Specific Sloc -->
-                <div>
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Specific Sloc No</label>
-                  <div class="border border-gray-300 rounded-lg p-2 max-h-32 overflow-y-auto">
-                    <div v-if="tankDetails.length === 0" class="text-xs text-gray-500 py-1 italic">
-                      Select Sloc first...
-                    </div>
-                    <div class="grid grid-cols-2 gap-2">
-                      <label v-for="detail in tankDetails" :key="detail.id_tank_tail" class="flex items-center gap-2 hover:bg-gray-50 p-1 rounded cursor-pointer">
+                <div class="space-y-1.5 lg:col-span-2">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Sub-Sloc</label>
+                  <div class="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-inner">
+                    <p v-if="tankDetails.length === 0" class="py-2 text-center text-xs italic text-slate-400">Pilih Sloc terlebih dahulu</p>
+                    <div v-else class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      <label
+                        v-for="detail in tankDetails"
+                        :key="detail.id_tank_tail"
+                        class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-white px-2 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-green-200 hover:bg-green-50/50"
+                      >
                         <input
+                          v-model="form.id_tank_tail"
                           type="checkbox"
                           :value="detail.id_tank_tail"
-                          v-model="form.id_tank_tail"
-                          class="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                          class="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
                         />
-                        <span class="text-xs font-medium">{{ detail.tankNo }}</span>
+                        <span>{{ detail.tankNo }}</span>
                       </label>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="flex items-center justify-between mt-4 gap-4">
-                <div class="flex gap-2">
+              <div class="mt-6 flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex flex-wrap gap-2">
                   <button
                     type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-slate-900"
                     @click="isSupplierModalOpen = true"
-                    class="px-4 py-2 bg-slate-800 text-white rounded shadow-sm hover:bg-slate-900 transition-colors"
                   >
-                    Add Supplier & Qty
+                    <i class="fas fa-user-plus text-xs opacity-90" />
+                    Supplier & Qty
                   </button>
                   <button
                     type="button"
-                    @click="handleSubmit"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                     :disabled="!canSubmit || loading"
-                    class="px-4 py-2 bg-blue-600 text-white rounded shadow-sm hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+                    @click="handleSubmit"
                   >
-                    Save Entry
+                    Simpan entri
                   </button>
                 </div>
-                <div class="flex items-center gap-2">
-                  <label class="text-sm font-bold text-gray-700">Total Qty (MT)</label>
+                <div class="flex items-center justify-end gap-3 sm:min-w-[200px]">
+                  <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Total (MT)</span>
                   <input
-                    v-model="totalQty"
+                    :value="totalQty"
                     type="text"
                     readonly
-                    class="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-right font-bold"
+                    class="w-36 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-bold tabular-nums text-slate-900"
                   />
                 </div>
               </div>
             </div>
 
-            <!-- Supplier table -->
-            <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50 text-slate-700">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-bold uppercase w-16">No</th>
-                    <th class="px-4 py-2 text-left text-xs font-bold uppercase">Action</th>
-                    <th class="px-4 py-2 text-left text-xs font-bold uppercase">Material</th>
-                    <th class="px-4 py-2 text-left text-xs font-bold uppercase">Supplier</th>
-                    <th class="px-4 py-2 text-left text-xs font-bold uppercase">Batch SAP</th>
-                    <th class="px-4 py-2 text-right text-xs font-bold uppercase">Qty (MT)</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-if="supplierList.length === 0">
-                    <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500 italic">No suppliers added yet.</td>
-                  </tr>
-                  <tr v-else v-for="(sup, index) in supplierList" :key="sup.id" class="hover:bg-gray-50 text-sm">
-                    <td class="px-4 py-2 text-center">{{ index + 1 }}</td>
-                    <td class="px-4 py-2">
-                      <button type="button" @click="removeSupplier(sup.id)" class="text-red-600 hover:text-red-900">
-                        <i class="fas fa-trash"></i>
-                      </button>
-                    </td>
-                    <td class="px-4 py-2">{{ sup.material }}</td>
-                    <td class="px-4 py-2">{{ sup.supplier }}</td>
-                    <td class="px-4 py-2">{{ sup.batch_sap }}</td>
-                    <td class="px-4 py-2 text-right font-medium">{{ sup.qty }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <!-- Tabel supplier -->
+            <div class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              <div class="border-b border-slate-100 bg-slate-50/90 px-4 py-3 sm:px-5">
+                <h4 class="text-xs font-bold uppercase tracking-wide text-slate-600">Daftar supplier</h4>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                  <thead>
+                    <tr class="bg-slate-50/80 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <th class="w-12 px-4 py-3">No</th>
+                      <th class="px-4 py-3">Aksi</th>
+                      <th class="min-w-[120px] px-4 py-3">Material</th>
+                      <th class="min-w-[140px] px-4 py-3">Supplier</th>
+                      <th class="px-4 py-3">Batch SAP</th>
+                      <th class="px-4 py-3 text-right">Qty (MT)</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-100 bg-white">
+                    <tr v-if="supplierList.length === 0">
+                      <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-400">
+                        Belum ada supplier — gunakan tombol “Supplier &amp; Qty”.
+                      </td>
+                    </tr>
+                    <tr v-for="(sup, index) in supplierList" :key="sup.id" class="transition hover:bg-slate-50/80">
+                      <td class="px-4 py-3 text-center text-slate-500">{{ index + 1 }}</td>
+                      <td class="px-4 py-3">
+                        <button
+                          type="button"
+                          class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800"
+                          @click="removeSupplier(sup.id)"
+                        >
+                          <i class="fas fa-trash text-sm" />
+                        </button>
+                      </td>
+                      <td class="max-w-[220px] px-4 py-3 text-slate-800">{{ sup.material }}</td>
+                      <td class="max-w-[200px] px-4 py-3 text-slate-700">{{ sup.supplier }}</td>
+                      <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ sup.batch_sap }}</td>
+                      <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{{ sup.qty }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </form>
         </div>
 
-        <!-- Supplier Modal Overlay -->
-        <div v-if="isSupplierModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all scale-100">
-            <div class="bg-slate-800 px-6 py-4 flex justify-between items-center">
-              <h3 class="text-lg font-bold text-white">Add Supplier & Qty</h3>
-              <button @click="isSupplierModalOpen = false" class="text-slate-400 hover:text-white transition-colors">
-                <i class="fas fa-times text-xl"></i>
+        <!-- Supplier (nested) — sama: blur ringan -->
+        <div
+          v-if="isSupplierModalOpen"
+          class="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6"
+        >
+          <div
+            class="absolute inset-0 bg-white/25 backdrop-blur-md"
+            aria-hidden="true"
+            @click="isSupplierModalOpen = false"
+          />
+          <div class="relative z-[1] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
+            <div class="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 px-5 py-4">
+              <h3 class="text-base font-bold text-white">Tambah supplier &amp; qty</h3>
+              <button
+                type="button"
+                class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 transition hover:bg-white/10 hover:text-white"
+                @click="isSupplierModalOpen = false"
+              >
+                <i class="fas fa-times" />
               </button>
             </div>
-            <div class="p-6 space-y-4">
-              <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1">Supplier</label>
+            <div class="space-y-4 p-5 sm:p-6">
+              <div class="space-y-1.5">
+                <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Supplier</label>
                 <select
                   v-model="supplierForm.id_supplier"
+                  class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                   @change="onSupplierChange"
-                  class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
                 >
-                  <option value="">- Select Supplier -</option>
+                  <option value="">— Pilih supplier —</option>
                   <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
                     {{ supplier.text }}
                   </option>
                 </select>
               </div>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-semibold text-slate-700 mb-1">Batch SAP (Auto)</label>
+              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Batch SAP (auto)</label>
                   <input
                     v-model="supplierForm.batch_sap"
                     type="text"
                     readonly
-                    class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-lg font-mono text-slate-600"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm text-slate-700"
                   />
                 </div>
-                <div>
-                  <label class="block text-sm font-semibold text-slate-700 mb-1">Quantity (MT)</label>
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Qty (MT)</label>
                   <input
                     v-model="supplierForm.qty"
                     type="number"
                     step="0.001"
-                    class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none text-right font-bold"
                     placeholder="0.000"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-right text-sm font-bold tabular-nums shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                   />
                 </div>
               </div>
-              <div class="pt-4 flex gap-3">
+              <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  @click="addSupplier"
-                  :disabled="!canAddSupplier"
-                  class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 disabled:bg-slate-300 disabled:shadow-none transition-all"
+                  class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  @click="isSupplierModalOpen = false"
                 >
-                  Confirm & Add
+                  Batal
                 </button>
                 <button
                   type="button"
-                  @click="isSupplierModalOpen = false"
-                  class="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-lg font-bold hover:bg-slate-200 transition-all"
+                  class="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  :disabled="!canAddSupplier"
+                  @click="addSupplier"
                 >
-                  Cancel
+                  Tambahkan
                 </button>
               </div>
             </div>
@@ -262,35 +330,37 @@
         </div>
 
         <!-- Footer -->
-        <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200/90 bg-white px-5 py-4 sm:px-8">
           <button
             type="button"
             @click="closeModal"
-            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
           >
-            Cancel
+            Tutup
           </button>
           <button
             type="button"
             @click="handleSubmit"
             :disabled="!canSubmit || loading"
-            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             <svg v-if="loading" class="animate-spin h-5 w-5" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>{{ loading ? 'Saving...' : 'Save RM Entry' }}</span>
+            <span>{{ loading ? 'Menyimpan…' : 'Simpan RM Entry' }}</span>
           </button>
         </div>
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useTransactionRmEntryStore } from '@/stores/transactionRmEntry'
+import { usePlantSelectionStore } from '@/stores/plantSelection'
 
 const props = defineProps({
   isOpen: {
@@ -302,9 +372,13 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const store = useTransactionRmEntryStore()
+const plantSelectionStore = usePlantSelectionStore()
 
 // State
 const isSupplierModalOpen = ref(false)
+const initLoading = ref(false)
+const initError = ref(null)
+
 const form = ref({
   mode: 'ADD',
   entry_date: new Date().toISOString().split('T')[0],
@@ -333,7 +407,9 @@ const supplierList = computed(() => store.supplierList)
 const totalQty = computed(() => store.totalQty)
 
 const canAddSupplier = computed(() => {
-  return supplierForm.value.id_supplier &&
+  return !initLoading.value &&
+         !initError.value &&
+         supplierForm.value.id_supplier &&
          supplierForm.value.batch_sap &&
          supplierForm.value.qty &&
          parseFloat(supplierForm.value.qty) > 0 &&
@@ -341,30 +417,70 @@ const canAddSupplier = computed(() => {
 })
 
 const canSubmit = computed(() => {
-  return form.value.entry_date &&
+  const qtyStr = totalQty.value ? String(totalQty.value).replace(/,/g, '') : '0'
+  return !initLoading.value &&
+         !initError.value &&
+         form.value.entry_date &&
          form.value.rm_number &&
          form.value.id_material &&
          form.value.id_tank &&
          form.value.id_tank_tail.length > 0 &&
          supplierList.value.length > 0 &&
-         parseFloat(totalQty.value.replace(/,/g, '')) > 0
+         parseFloat(qtyStr) > 0
 })
 
-// Methods
-async function initialize() {
+// Cepat: hanya nomor + master data di jalur kritis; daftar supplier di-load saat sub-modal dibuka
+async function bootstrap() {
+  initLoading.value = true
+  initError.value = null
+  store.resetForm()
+
+  form.value = {
+    mode: 'ADD',
+    entry_date: new Date().toISOString().split('T')[0],
+    rm_number: '',
+    id_material: '',
+    id_tank: '',
+    id_tank_tail: [],
+    material_document: '',
+    po_so: '',
+    total_qty: 0
+  }
+  supplierForm.value = { id_supplier: '', batch_sap: '', qty: '' }
+  isSupplierModalOpen.value = false
+
   try {
+    const params = { id_plant: plantSelectionStore.selectedPlantId }
     await Promise.all([
-      store.generateRmNumber(),
+      store.generateRmNumber(params),
       store.fetchTanks(),
-      store.fetchMaterials(),
-      store.searchSuppliers('')
+      store.fetchMaterials()
     ])
-    form.value.rm_number = store.rmNumber
+    form.value.rm_number = store.rmNumber || ''
     form.value.mode = 'ADD'
-    // Also fetch initial supplier list for this number (if any)
-    await store.fetchSupplierList(form.value.rm_number)
+    if (!form.value.rm_number) {
+      initError.value = 'Nomor RM tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
+    }
   } catch (error) {
     console.error('Initialization error:', error)
+    initError.value =
+      error.response?.data?.message ||
+      error.message ||
+      'Gagal memuat data form. Pastikan API Laravel (Sanctum) dan MySQL dapat dijangkau dari frontend.'
+  } finally {
+    initLoading.value = false
+  }
+
+  if (form.value.rm_number && !initError.value) {
+    try {
+      await store.fetchSupplierList(form.value.rm_number)
+    } catch (error) {
+      console.error('Supplier list load:', error)
+      initError.value =
+        error.response?.data?.message ||
+        error.message ||
+        'Gagal memuat baris supplier sementara.'
+    }
   }
 }
 
@@ -391,10 +507,10 @@ async function addSupplier() {
       id_supplier: supplierForm.value.id_supplier,
       id_material: form.value.id_material,
       qty: parseFloat(supplierForm.value.qty),
-      batch_sap: supplierForm.value.batch_sap
+      batch_sap: supplierForm.value.batch_sap,
+      id_plant: plantSelectionStore.selectedPlantId
     })
 
-    // Reset supplier form and close modal
     supplierForm.value = {
       id_supplier: '',
       batch_sap: '',
@@ -418,7 +534,8 @@ async function handleSubmit() {
   try {
     const data = {
       ...form.value,
-      total_qty: parseFloat(totalQty.value.replace(/,/g, ''))
+      id_plant: plantSelectionStore.selectedPlantId,
+      total_qty: parseFloat(String(totalQty.value ?? '0').replace(/,/g, ''), 10)
     }
 
     await store.createEntry(data)
@@ -433,17 +550,26 @@ function closeModal() {
   emit('close')
 }
 
-// Lifecycle
-onMounted(() => {
-  if (props.isOpen) {
-    initialize()
-  }
-})
+watch(
+  () => props.isOpen,
+  (open) => {
+    if (open) {
+      void bootstrap()
+    } else {
+      initLoading.value = false
+      initError.value = null
+      isSupplierModalOpen.value = false
+    }
+  },
+  { flush: 'post' }
+)
 
-// Watch for modal open
-watch(() => props.isOpen, (newVal) => {
-  if (newVal) {
-    initialize()
+watch(isSupplierModalOpen, async (open) => {
+  if (!open || store.suppliers.length > 0) return
+  try {
+    await store.searchSuppliers('')
+  } catch (e) {
+    console.error(e)
   }
 })
 </script>

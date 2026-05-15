@@ -2,23 +2,36 @@
   <div class="p-6 space-y-6">
     <!-- Header -->
     <div class="flex justify-between items-center mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-800">Raw Material Lists</h1>
-        <p class="text-sm text-gray-600 mt-1">Manage raw material entries and transfers</p>
+      <div class="flex items-center gap-6">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-800">Raw Material Lists</h1>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-sm text-gray-500">Lokasi:</span>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
+              <i class="fas fa-industry mr-1.5 opacity-70"></i>
+              {{ plantSelectionStore.selectedPlantName }}
+            </span>
+          </div>
+        </div>
+        <div class="h-10 w-px bg-gray-200"></div>
+        <PlantSelector @change="fetchData" />
       </div>
-      <div class="flex gap-3">
+
+      <div class="flex items-center gap-3">
         <button
+          type="button"
           @click="openCreateModal"
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
         >
-          <i class="fas fa-edit"></i>
+          <i class="fas fa-plus"></i>
           New RM Entry
         </button>
         <button
+          type="button"
           @click="openTransferModal"
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
         >
-          <i class="fas fa-edit"></i>
+          <i class="fas fa-arrow-right"></i>
           Transfer to Feed Tank
         </button>
         <div class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold flex items-center">
@@ -37,6 +50,7 @@
           <thead class="bg-gray-50 text-slate-700">
             <tr>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-16">No</th>
+              <th v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Plant</th>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Action</th>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Trace No</th>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Entry Date</th>
@@ -58,12 +72,13 @@
             <tr v-else-if="!hasEntries"><td colspan="15" class="px-6 py-4 text-center text-gray-500">No RM entries found</td></tr>
             <tr v-else v-for="(entry, index) in paginatedStorageEntries" :key="entry.id_balance_head" class="hover:bg-gray-50 text-sm">
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageStorage - 1) * itemsPerPage + index + 1 }}</td>
+              <td v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 whitespace-nowrap text-gray-600 font-semibold">{{ entry.plant_code || '-' }}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <div class="flex gap-2">
                   <button @click="deactivateEntry(entry.id_balance_head)" :disabled="entry.traced !== 'N/A'" class="text-red-600 hover:text-red-900 disabled:text-gray-400">
                     <i class="fas fa-trash"></i>
                   </button>
-                  <button @click="openUpdateModal(entry)" class="text-blue-600 hover:text-blue-900">
+                  <button @click="openUpdateModal(entry)" class="text-green-600 hover:text-green-900">
                     <i class="fas fa-edit"></i>
                   </button>
                 </div>
@@ -122,7 +137,7 @@
               :key="page"
               @click="currentPageStorage = page"
               class="px-3 py-1 rounded transition-colors"
-              :class="currentPageStorage === page ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-700'"
+              :class="currentPageStorage === page ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-700'"
             >
               {{ page }}
             </button>
@@ -157,6 +172,7 @@
           <thead class="bg-gray-50 text-slate-700">
             <tr>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-16">No</th>
+              <th v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Plant</th>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Action</th>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">TraceNo (From >>> To)</th>
               <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Entry Date</th>
@@ -174,9 +190,10 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-if="transferStore.loading"><td colspan="14" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
-            <tr v-else-if="transferStore.feedLogs.length === 0"><td colspan="14" class="px-6 py-4 text-center text-gray-500">No feed logs found</td></tr>
+            <tr v-else-if="feedLogsSafe.length === 0"><td colspan="14" class="px-6 py-4 text-center text-gray-500">No feed logs found</td></tr>
             <tr v-for="(log, index) in paginatedFeedLogs" :key="log.id_trace_head" class="hover:bg-gray-50 text-sm">
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageFeed - 1) * itemsPerPage + index + 1 }}</td>
+              <td v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 whitespace-nowrap text-gray-600 font-semibold">{{ log.plant_code || '-' }}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <button @click="deactivateTransfer(log.id_trace_head)" class="text-red-600 hover:text-red-900">
                   <i class="fas fa-trash"></i>
@@ -209,7 +226,7 @@
       <!-- Pagination Feed -->
       <div v-if="totalPagesFeed > 1" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
         <div class="text-sm text-gray-600">
-          Showing {{ (currentPageFeed - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPageFeed * itemsPerPage, transferStore.feedLogs.length) }} of {{ transferStore.feedLogs.length }} entries
+          Showing {{ (currentPageFeed - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPageFeed * itemsPerPage, feedLogsSafe.length) }} of {{ feedLogsSafe.length }} entries
         </div>
         <div class="flex gap-2">
           <button 
@@ -234,7 +251,7 @@
               :key="page"
               @click="currentPageFeed = page"
               class="px-3 py-1 rounded transition-colors"
-              :class="currentPageFeed === page ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-700'"
+              :class="currentPageFeed === page ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-700'"
             >
               {{ page }}
             </button>
@@ -259,19 +276,16 @@
       </div>
     </div>
 
-    <!-- Modals -->
+    <!-- Modals: always mounted (like Bootstrap modals in DOM) — avoids destroy/remount glitches; visibility via :is-open -->
     <RmEntryModal
-      v-if="isCreateModalOpen"
       :is-open="isCreateModalOpen"
       @close="isCreateModalOpen = false"
       @saved="fetchData"
     />
-    <TransferModal
-      v-if="isTransferModalOpen"
-      :is-open="isTransferModalOpen"
-      @close="isTransferModalOpen = false"
-      @saved="fetchData"
-    />
+    <TransferModal ref="transferModal" @saved="fetchData" />
+    
+    <!-- Plant Selection Modal (Initial Popup) -->
+    <PlantSelectionModal ref="plantSelectionModal" @selected="fetchData" />
   </div>
 </template>
 
@@ -279,18 +293,35 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTransactionRmEntryStore } from '@/stores/transactionRmEntry'
 import { useTransactionTransferStore } from '@/stores/transactionTransfer'
+import { usePlantSelectionStore } from '@/stores/plantSelection'
+import { useSetupPlantStore } from '@/stores/setupPlant'
+import PlantSelector from '@/components/shared/PlantSelector.vue'
+import PlantSelectionModal from '@/components/shared/PlantSelectionModal.vue'
 import RmEntryModal from '@/components/transaction/RmEntryModal.vue'
 import TransferModal from '@/components/transaction/TransferModal.vue'
 import Swal from 'sweetalert2'
 
 const store = useTransactionRmEntryStore()
 const transferStore = useTransactionTransferStore()
+const plantSelectionStore = usePlantSelectionStore()
 
 // State
 const isCreateModalOpen = ref(false)
 const isTransferModalOpen = ref(false)
 const isSlocModalOpen = ref(false)
 const selectedEntry = ref(null)
+
+// Modal Reference
+const plantSelectionModal = ref(null)
+
+// Load data on mount
+onMounted(async () => {
+  if (!plantSelectionStore.hasSelectedPlant) {
+    plantSelectionModal.value?.open()
+  } else {
+    await fetchData()
+  }
+})
 
 // Pagination State
 const itemsPerPage = 5
@@ -313,13 +344,17 @@ const totalPagesStorage = computed(() => {
   return Math.ceil(filteredEntries.value.length / itemsPerPage)
 })
 
+const feedLogsSafe = computed(() =>
+  Array.isArray(transferStore.feedLogs) ? transferStore.feedLogs : []
+)
+
 const paginatedFeedLogs = computed(() => {
   const start = (currentPageFeed.value - 1) * itemsPerPage
-  return transferStore.feedLogs.slice(start, start + itemsPerPage)
+  return feedLogsSafe.value.slice(start, start + itemsPerPage)
 })
 
 const totalPagesFeed = computed(() => {
-  return Math.ceil(transferStore.feedLogs.length / itemsPerPage)
+  return Math.ceil(feedLogsSafe.value.length / itemsPerPage)
 })
 
 // Computed page numbers for Storage
@@ -354,17 +389,24 @@ const visiblePagesFeed = computed(() => {
 
 // Methods
 async function fetchData() {
+  const params = { id_plant: plantSelectionStore.selectedPlantId }
   await Promise.all([
-    store.fetchEntries(),
-    transferStore.fetchFeedLogs()
+    store.fetchEntries(params),
+    transferStore.fetchFeedLogs(params),
+    // Prefetch for modals
+    store.fetchTanks(),
+    store.fetchMaterials(),
+    store.searchSuppliers('')
   ])
 }
 
 function openCreateModal() {
+  isTransferModalOpen.value = false
   isCreateModalOpen.value = true
 }
 
 function openTransferModal() {
+  isCreateModalOpen.value = false
   isTransferModalOpen.value = true
 }
 
@@ -383,14 +425,14 @@ async function deactivateEntry(id) {
     text: 'De-Activate this data',
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: '#3085d6',
+    confirmButtonColor: '#16a34a',
     cancelButtonColor: '#d33',
     confirmButtonText: 'Yes!'
   })
 
   if (result.isConfirmed) {
     try {
-      await store.deleteEntry(id)
+      await store.deactivateEntry(id)
       Swal.fire('Deactivated!', 'Entry has been deactivated.', 'success')
       fetchData()
     } catch (error) {
@@ -399,13 +441,14 @@ async function deactivateEntry(id) {
   }
 }
 
+
 async function deactivateTransfer(id) {
   const result = await Swal.fire({
     title: 'Are you sure?',
     text: 'De-Activate this transfer?',
     icon: 'warning',
     showCancelButton: true,
-    confirmButtonColor: '#3085d6',
+    confirmButtonColor: '#16a34a',
     cancelButtonColor: '#d33',
     confirmButtonText: 'Yes!'
   })

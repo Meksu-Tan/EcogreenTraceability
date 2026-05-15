@@ -9,7 +9,7 @@
     >
       <template #cell-total_tank="{ row, value }">
         <button 
-          class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors"
+          class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 border border-green-100 hover:bg-green-100 transition-colors"
           @click.stop="onViewDetail(row)"
         >
           {{ value }} detail
@@ -19,7 +19,7 @@
         <div class="flex items-center justify-center gap-1.5">
           <button
             type="button"
-            class="p-1.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-sm active:scale-90 cursor-pointer"
+            class="p-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors shadow-sm active:scale-90 cursor-pointer"
             title="View Details"
             @click.stop="onViewDetail(row)"
           >
@@ -27,7 +27,7 @@
           </button>
           <button
             type="button"
-            class="p-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm active:scale-90 cursor-pointer"
+            class="p-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm active:scale-90 cursor-pointer"
             title="Edit"
             @click.stop="onEditTank(row)"
           >

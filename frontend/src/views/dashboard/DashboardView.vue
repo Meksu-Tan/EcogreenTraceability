@@ -87,15 +87,15 @@ const firstRole = computed(() => authStore.roles?.[0] || 'User')
 const today     = computed(() => new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
 
 const stats = [
-  { label: 'Material Setup',  bgClass: 'bg-blue-500',   icon: 'fab fa-asymmetrik' },
+  { label: 'Material Setup',  bgClass: 'bg-green-600',   icon: 'fab fa-asymmetrik' },
   { label: 'Storage Setup',   bgClass: 'bg-green-600',  icon: 'fas fa-database' },
-  { label: 'Supplier Setup',  bgClass: 'bg-amber-500',  icon: 'fas fa-diagnoses' },
-  { label: 'Total Pengguna',  bgClass: 'bg-slate-700',  icon: 'fas fa-users' },
+  { label: 'Supplier Setup',  bgClass: 'bg-green-600',  icon: 'fas fa-diagnoses' },
+  { label: 'Total Pengguna',  bgClass: 'bg-green-700',  icon: 'fas fa-users' },
 ]
 
 const quickLinks = [
-  { to: '/setup/material', label: 'Setup Material', bgClass: 'bg-blue-500',   icon: 'fab fa-asymmetrik' },
+  { to: '/setup/material', label: 'Setup Material', bgClass: 'bg-green-600',   icon: 'fab fa-asymmetrik' },
   { to: '/setup/storage',  label: 'Setup Storage',  bgClass: 'bg-green-600',  icon: 'fas fa-database' },
-  { to: '/setup/supplier', label: 'Setup Supplier', bgClass: 'bg-amber-500',  icon: 'fas fa-diagnoses' },
+  { to: '/setup/supplier', label: 'Setup Supplier', bgClass: 'bg-green-600',  icon: 'fas fa-diagnoses' },
 ]
 </script>

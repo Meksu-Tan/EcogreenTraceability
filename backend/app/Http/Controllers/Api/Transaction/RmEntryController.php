@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class RmEntryController extends Controller
 {
@@ -27,7 +28,7 @@ class RmEntryController extends Controller
     public function index(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
             $data = $this->rmEntryService->getRmList($plantId);
 
             return response()->json([
@@ -68,8 +69,8 @@ class RmEntryController extends Controller
 
         try {
             $data = $request->all();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()->id_plant ?? 0);
-            $user = Auth::user()->name;
+            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $user = Auth::user()?->name ?? 'System';
 
             $result = $this->rmEntryService->saveRmEntry($data, $user);
 
@@ -92,7 +93,7 @@ class RmEntryController extends Controller
     public function destroy($id)
     {
         try {
-            $user = Auth::user()->name;
+            $user = Auth::user()?->name ?? 'System';
             $result = $this->rmEntryService->deactivateRmEntry($id, $user);
 
             return response()->json([
@@ -113,7 +114,7 @@ class RmEntryController extends Controller
     public function newNumber(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
             $rmNumber = $this->rmEntryService->generateRmNumber($plantId);
 
             return response()->json([
@@ -259,10 +260,10 @@ class RmEntryController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'entry_no' => 'required|string',
-            'id_supplier' => 'required|integer',
+            'id_supplier' => 'nullable|integer',
             'id_material' => 'required|integer',
             'qty' => 'required|numeric|min:0.001',
-            'batch_sap' => 'required|string',
+            'batch_sap' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -275,8 +276,8 @@ class RmEntryController extends Controller
 
         try {
             $data = $request->all();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()->id_plant ?? 0);
-            $user = Auth::user()->name;
+            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $user = Auth::user()?->name ?? 'System';
 
             $result = $this->rmEntryService->addSupplierTemp($data, $user);
 
@@ -320,7 +321,7 @@ class RmEntryController extends Controller
     public function deleteSupplier($id)
     {
         try {
-            $user = Auth::user()->name;
+            $user = Auth::user()?->name ?? 'System';
             $this->rmEntryService->deleteSupplierTemp($id, $user);
 
             return response()->json([
@@ -347,6 +348,70 @@ class RmEntryController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => ['total' => number_format($total, 3)]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Transfer RM to Feed Tank
+     */
+    public function transfer(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'entry_date' => 'required|date',
+            'entry_no' => 'required|string',
+            'source_tank' => 'required|integer',
+            'trf_tank' => 'required|integer',
+            'tank_no' => 'required|array',
+            'trf_tank_no' => 'required|array',
+            'material_document' => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $data = $request->all();
+            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $user = Auth::user()?->name ?? 'System';
+
+            $result = $this->rmEntryService->saveRmTrfEntry($data, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'RM Transfer processed successfully',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate new transfer number
+     */
+    public function transferNumber(Request $request)
+    {
+        try {
+            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $rmNumber = $this->rmEntryService->generateTransferNumber($plantId);
+
+            return response()->json([
+                'success' => true,
+                'data' => ['rm_number' => $rmNumber]
             ]);
         } catch (\Exception $e) {
             return response()->json([

@@ -23,12 +23,21 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response interceptor — redirect to login on 401
+// Response interceptor — SPA navigation on 401 (avoid full page reload → blank flash)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
-      window.location.href = '/login'
+      localStorage.removeItem('auth_token')
+      import('@/router')
+        .then(({ default: router }) => {
+          if (router.currentRoute.value.name !== 'login') {
+            router.replace({ name: 'login' })
+          }
+        })
+        .catch(() => {
+          window.location.assign('/login')
+        })
     }
     return Promise.reject(error)
   }

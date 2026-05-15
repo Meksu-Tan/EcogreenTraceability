@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePlantSelectionStore } from '@/stores/plantSelection'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -183,26 +184,30 @@ const router = createRouter({
 // ──────────────────────────────────────────────────────────
 // Navigation Guard
 // ──────────────────────────────────────────────────────────
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
-
-  // If authenticated state is unknown, try fetching from server
+  const plantSelectionStore = usePlantSelectionStore()
+  
+  // Initialize user if not already authenticated (e.g. on page refresh)
   if (!authStore.isAuthenticated && to.meta.requiresAuth) {
-    const ok = await authStore.fetchUser()
-    if (!ok) {
-      return next({ name: 'login' })
-    }
-  }
-
-  if (to.meta.requiresGuest && authStore.isAuthenticated) {
-    return next({ name: 'dashboard' })
+    await authStore.fetchUser()
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next({ name: 'login' })
+    return { name: 'login' }
+  } 
+  
+  if (to.path === '/login' && authStore.isAuthenticated) {
+    return { name: 'dashboard' }
   }
 
-  next()
+  // Clear plant selection when going back to key pages (as requested)
+  const resetRoutes = ['dashboard', 'login', 'setup', 'admin']
+  if (resetRoutes.some(r => to.path.includes(r))) {
+    plantSelectionStore.clearPlant()
+  }
+
+  return true
 })
 
 export default router

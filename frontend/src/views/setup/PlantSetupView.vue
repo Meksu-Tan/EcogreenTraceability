@@ -54,7 +54,7 @@
             <div class="flex items-center justify-center gap-1.5">
               <button
                 type="button"
-                class="p-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm active:scale-90 cursor-pointer"
+                class="p-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm active:scale-90 cursor-pointer"
                 title="Edit"
                 @click.stop="onEdit(row)"
               >

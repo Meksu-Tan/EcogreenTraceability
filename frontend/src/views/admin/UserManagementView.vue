@@ -55,7 +55,7 @@
               :key="role.id"
               class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
               :class="{
-                'bg-blue-100 text-blue-800': role.name === 'admin',
+                'bg-green-100 text-green-800': role.name === 'admin',
                 'bg-green-100 text-green-800': role.name === 'user',
                 'bg-gray-100 text-gray-800': !['admin', 'user'].includes(role.name)
               }"
@@ -69,7 +69,7 @@
           <template #actions="{ row }">
             <div class="flex items-center justify-center gap-1.5">
               <button
-                class="p-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm active:scale-90"
+                class="p-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm active:scale-90"
                 title="Edit"
                 @click="onEdit(row)"
               >

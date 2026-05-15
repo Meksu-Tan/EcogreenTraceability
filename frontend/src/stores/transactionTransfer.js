@@ -29,7 +29,8 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
       this.loading = true
       try {
         const response = await api.get('/api/v1/transactions/transfers/feed-log')
-        this.feedLogs = response.data.data
+        const rows = response.data?.data
+        this.feedLogs = Array.isArray(rows) ? rows : []
       } catch (error) {
         this.error = error.message
       } finally {

@@ -87,5 +87,18 @@ export default {
       params: { entry_no: entryNo }
     })
     return response.data
+  },
+
+  // Transfer RM to Feed Tank
+  async transfer(data) {
+    const response = await axios.post(`${BASE_URL}/transfer`, data)
+    return response.data
+  },
+
+  // Generate new transfer number
+  async getTransferNumber(params = {}) {
+    const response = await axios.get(`${BASE_URL}/transfer-number`, { params })
+    return response.data
   }
 }
+

@@ -16,10 +16,10 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        if (!Auth::attempt(['email' => $request->email, 'password' => $request->password, 'isActive' => 1])) {
             return response()->json([
                 'status'  => 0,
-                'message' => 'Email atau password salah.',
+                'message' => 'Email atau password salah, atau akun Anda tidak aktif.',
             ], 401);
         }
 
@@ -34,7 +34,8 @@ class AuthController extends Controller
                 'id'          => $user->id,
                 'name'        => $user->name,
                 'email'       => $user->email,
-                'roles'       => $user->getRoleNames(),
+                'id_plant'    => $user->id_plant,
+                'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
                 'permissions' => $user->getAllPermissions()->pluck('name'),
             ],
         ]);
@@ -66,7 +67,8 @@ class AuthController extends Controller
                 'id'          => $user->id,
                 'name'        => $user->name,
                 'email'       => $user->email,
-                'roles'       => $user->getRoleNames(),
+                'id_plant'    => $user->id_plant,
+                'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
                 'permissions' => $user->getAllPermissions()->pluck('name'),
             ],
         ]);

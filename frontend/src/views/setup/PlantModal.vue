@@ -16,7 +16,6 @@
           class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none border-gray-300 bg-white" 
         />
       </div>
-    </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
       <div class="flex flex-col gap-1.5">
         <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Plant Code <span class="text-red-500">*</span></label>
