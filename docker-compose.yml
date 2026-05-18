@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  # MySQL Database Service
+  mysql:
+    image: mysql:8.0
+    container_name: eods_mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: eudr_ts
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_USER: eo_trace
+      MYSQL_PASSWORD: eoTrace_password
+    ports:
+      - "3309:3306"
+    volumes:
+      - eods_db_data:/var/lib/mysql
+    networks:
+      - eods_network
+
+  # Laravel Master monolithic application (Port 8001)
+  master:
+    build:
+      context: .
+      dockerfile: docker/master.dockerfile
+    container_name: eods_master
+    restart: always
+    depends_on:
+      - mysql
+    ports:
+      - "8001:80"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=eudr_ts
+      - DB_USERNAME=eo_trace
+      - DB_PASSWORD=eoTrace_password
+    volumes:
+      - .:/var/www/html
+    networks:
+      - eods_network
+
+  # Laravel Backend API application (Port 8000)
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.dockerfile
+    container_name: eods_backend
+    restart: always
+    depends_on:
+      - mysql
+    ports:
+      - "8000:80"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=eudr_ts
+      - DB_USERNAME=eo_trace
+      - DB_PASSWORD=eoTrace_password
+    volumes:
+      - ./backend:/var/www/html
+    networks:
+      - eods_network
+
+  # Vue.js Frontend Application (Port 5173 - Development Mode)
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.dev.dockerfile
+    container_name: eods_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - eods_network
+
+volumes:
+  eods_db_data:
+    driver: local
+
+networks:
+  eods_network:
+    driver: bridge

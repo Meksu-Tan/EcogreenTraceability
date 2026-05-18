@@ -2,6 +2,6 @@
   <StorageIndex />
 </template>
 
-<script setup lang="ts">
+<script setup>
 import StorageIndex from './StorageIndex.vue'
 </script>

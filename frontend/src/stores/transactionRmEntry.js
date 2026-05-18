@@ -53,6 +53,21 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     }
   }
 
+  async function updateEntry(id, data) {
+    loading.value = true
+    try {
+      const response = await transactionRmEntryApi.update(id, data)
+      toastStore.success('RM Entry updated successfully')
+      await fetchEntries()
+      return response
+    } catch (error) {
+      toastStore.error(error.response?.data?.message || 'Failed to update RM entry')
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function deactivateEntry(id) {
     loading.value = true
     try {
@@ -151,8 +166,13 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     try {
       const response = await transactionRmEntryApi.addSupplier(data)
       toastStore.success('Supplier added successfully')
-      await fetchSupplierList(data.entry_no)
-      await fetchTotalQty(data.entry_no)
+      const params = {}
+      if (data.mode === 'UPDATE') {
+        params.mode = 'UPDATE'
+        params.id_balance_head = data.idHead
+      }
+      await fetchSupplierList(data.entry_no, params)
+      await fetchTotalQty(data.entry_no, params)
       return response
     } catch (error) {
       toastStore.error(error.response?.data?.message || 'Failed to add supplier')
@@ -160,9 +180,9 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     }
   }
 
-  async function fetchSupplierList(entryNo) {
+  async function fetchSupplierList(entryNo, params = {}) {
     try {
-      const response = await transactionRmEntryApi.getSupplierList(entryNo)
+      const response = await transactionRmEntryApi.getSupplierList(entryNo, params)
       supplierList.value = response.data || []
       return response
     } catch (error) {
@@ -171,12 +191,12 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     }
   }
 
-  async function deleteSupplier(id, entryNo) {
+  async function deleteSupplier(id, entryNo, params = {}) {
     try {
-      const response = await transactionRmEntryApi.deleteSupplier(id)
+      const response = await transactionRmEntryApi.deleteSupplier(id, params)
       toastStore.success('Supplier deleted successfully')
-      await fetchSupplierList(entryNo)
-      await fetchTotalQty(entryNo)
+      await fetchSupplierList(entryNo, params)
+      await fetchTotalQty(entryNo, params)
       return response
     } catch (error) {
       toastStore.error(error.response?.data?.message || 'Failed to delete supplier')
@@ -184,9 +204,9 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     }
   }
 
-  async function fetchTotalQty(entryNo) {
+  async function fetchTotalQty(entryNo, params = {}) {
     try {
-      const response = await transactionRmEntryApi.getTotalQty(entryNo)
+      const response = await transactionRmEntryApi.getTotalQty(entryNo, params)
       totalQty.value = response.data.total
       return response
     } catch (error) {
@@ -240,6 +260,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     // Actions
     fetchEntries,
     createEntry,
+    updateEntry,
     deactivateEntry,
     generateRmNumber,
     generateTransferNumber,

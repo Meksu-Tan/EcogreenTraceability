@@ -114,6 +114,10 @@ export const sidebarMenu: MenuGroup[] = [
         label: 'Supplier'
       },
       {
+        path: '/setup/manufacturer',
+        label: 'Manufacturer'
+      },
+      {
         path: '/setup/adjustment',
         label: 'Adjustment'
       },

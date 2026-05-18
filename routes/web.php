@@ -2,9 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\HomeController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\PermissionController;
-use App\Http\Controllers\RoleController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\RmentryController;
 use App\Http\Controllers\SupplierSetupController;
@@ -50,10 +47,6 @@ Route::group(['middleware' => ['auth']], function() {
 
     Route::resource('dashboard', HomeController::class);
     Route::resource('admin', AdminController::class);
-
-    Route::resource('user', UserController::class);
-    Route::resource('permission', PermissionController::class);
-    Route::resource('role', RoleController::class);
 
     Route::resource('rmentry', RmentryController::class);
     Route::resource('wipentry', WipentryController::class);

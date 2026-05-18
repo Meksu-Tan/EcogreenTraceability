@@ -70,7 +70,21 @@
                 <p class="mt-1 text-xs text-slate-500">Dari storage ke feed tank — isi tangki sumber &amp; tujuan lalu tambahkan material.</p>
               </div>
 
-              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Plant</label>
+                  <select
+                    v-model="form.id_plant"
+                    required
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                    @change="onPlantChange"
+                  >
+                    <option value="">Pilih plant</option>
+                    <option v-for="plant in plants" :key="plant.id_plant" :value="plantValue(plant)">
+                      {{ plant.description }}
+                    </option>
+                  </select>
+                </div>
                 <div class="space-y-1.5">
                   <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Nomor entri (auto)</label>
                   <input
@@ -158,7 +172,7 @@
                         @change="onTrfTankChange"
                       >
                         <option value="">— Pilih Sloc —</option>
-                        <option v-for="tank in tanks" :key="tank.id_tank" :value="tank.id_tank">
+                        <option v-for="tank in destTanks" :key="tank.id_tank" :value="tank.id_tank">
                           {{ tank.tank }}
                         </option>
                       </select>
@@ -352,6 +366,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useTransactionRmEntryStore } from '@/stores/transactionRmEntry'
+import { useTransactionTransferStore } from '@/stores/transactionTransfer'
+import { usePlantSelectionStore } from '@/stores/plantSelection'
+import { useSetupPlantStore } from '@/stores/setupPlant'
 
 const props = defineProps({
   isOpen: { type: Boolean, required: true }
@@ -360,6 +377,9 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const store = useTransactionRmEntryStore()
+const transferStore = useTransactionTransferStore()
+const plantSelectionStore = usePlantSelectionStore()
+const plantStore = useSetupPlantStore()
 
 // State
 const isMaterialModalOpen = ref(false)
@@ -369,6 +389,7 @@ const sourceTankDetails = ref([])
 const trfTankDetails = ref([])
 
 const form = ref({
+  id_plant: '',
   entry_date: new Date().toISOString().split('T')[0],
   entry_no: '',
   source_tank: '',
@@ -386,9 +407,11 @@ const materialForm = ref({
 // Computed
 const loading = computed(() => store.loading)
 const tanks = computed(() => store.tanks)
+const destTanks = computed(() => transferStore.destTanks)
 const materials = computed(() => store.materials)
 const materialList = computed(() => store.supplierList)
 const totalQty = computed(() => store.totalQty)
+const plants = computed(() => plantStore.plants)
 
 const canAddMaterial = computed(() => {
   return !initLoading.value &&
@@ -401,6 +424,7 @@ const canAddMaterial = computed(() => {
 const canSubmit = computed(() => {
   return !initLoading.value &&
          !initError.value &&
+         form.value.id_plant &&
          form.value.entry_date &&
          form.value.entry_no &&
          form.value.source_tank &&
@@ -417,6 +441,7 @@ async function bootstrap() {
   store.resetForm()
 
   form.value = {
+    id_plant: plantSelectionStore.selectedPlantId || '',
     entry_date: new Date().toISOString().split('T')[0],
     entry_no: '',
     source_tank: '',
@@ -432,14 +457,11 @@ async function bootstrap() {
 
   try {
     await Promise.all([
-      store.generateTransferNumber(),
+      plantStore.fetchPlants(),
       store.fetchTanks(),
       store.fetchMaterials()
     ])
-    form.value.entry_no = store.trfNumber || ''
-    if (!form.value.entry_no) {
-      initError.value = 'Nomor transfer tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
-    }
+    if (form.value.id_plant) await loadTransferPlantData()
   } catch (error) {
     console.error('Initialization error:', error)
     initError.value =
@@ -460,6 +482,38 @@ async function bootstrap() {
         error.message ||
         'Gagal memuat daftar material sementara.'
     }
+  }
+}
+
+async function loadTransferPlantData() {
+  if (!form.value.id_plant) {
+    form.value.entry_no = ''
+    transferStore.destTanks = []
+    return
+  }
+
+  await Promise.all([
+    store.generateTransferNumber({ id_plant: form.value.id_plant }),
+    transferStore.fetchDestTanks({ id_plant: form.value.id_plant }),
+  ])
+
+  form.value.entry_no = store.trfNumber || ''
+  if (!form.value.entry_no) {
+    initError.value = 'Nomor transfer tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
+  }
+}
+
+async function onPlantChange() {
+  initError.value = null
+  store.supplierList = []
+  store.totalQty = '0.000'
+  form.value.entry_no = ''
+  form.value.trf_tank = ''
+  form.value.trf_tank_no = []
+  trfTankDetails.value = []
+  await loadTransferPlantData()
+  if (form.value.entry_no) {
+    await store.fetchSupplierList(form.value.entry_no)
   }
 }
 
@@ -489,7 +543,8 @@ async function addMaterial() {
     await store.addSupplier({
       entry_no: form.value.entry_no,
       id_material: materialForm.value.id_material,
-      qty: parseFloat(materialForm.value.qty)
+      qty: parseFloat(materialForm.value.qty),
+      id_plant: form.value.id_plant
     })
     materialForm.value = { id_material: '', qty: '' }
     isMaterialModalOpen.value = false
@@ -507,7 +562,9 @@ async function removeMaterial(id) {
 async function handleSubmit() {
   if (!canSubmit.value) return
   try {
-    await store.transferEntry(form.value)
+    await store.transferEntry({
+      ...form.value,
+    })
     emit('saved')
     closeModal()
   } catch (error) {
@@ -517,6 +574,10 @@ async function handleSubmit() {
 
 function closeModal() {
   emit('close')
+}
+
+function plantValue(plant) {
+  return plant?.code_3 || plant?.id_plant
 }
 
 watch(

@@ -30,7 +30,7 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, onMounted } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plantSelection'
 import PlantSelector from '@/components/shared/PlantSelector.vue'

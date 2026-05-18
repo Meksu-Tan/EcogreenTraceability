@@ -29,7 +29,7 @@
         <div 
           v-for="plant in plants" 
           :key="plant.id_plant"
-          @click="selectPlant(plant.id_plant, plant.description)"
+          @click="selectPlant(plantValue(plant), plant.description)"
           class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 hover:border-green-500 hover:shadow-md transition-all cursor-pointer group"
         >
           <div class="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-green-100 transition-colors">
@@ -64,5 +64,9 @@ onMounted(async () => {
 const selectPlant = (id, name) => {
   selectionStore.setPlant(id, name)
   router.push('/dashboard')
+}
+
+function plantValue(plant) {
+  return plant?.code_3 || plant?.id_plant
 }
 </script>

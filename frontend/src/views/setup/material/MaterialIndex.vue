@@ -126,7 +126,11 @@ function onEditMaterial(row) { editRow.value = row; showModal.value = true }
 async function onToggleMaterial(row) {
   if (!confirm(`${row.status == 1 ? 'Deactivate' : 'Activate'} material "${row.description}"?`)) return
   const r = await store.toggleMaterial(row.id_material, row.status)
-  r.status === 1 ? toast.success(r.message) : toast.error(r.message)
+  if (r.status === 1) {
+    toast.success(r.message)
+  } else {
+    toast.error(r.message)
+  }
 }
 
 async function onSubmitMaterial(data) {

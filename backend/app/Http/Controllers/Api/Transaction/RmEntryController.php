@@ -7,6 +7,8 @@ use App\Services\RmEntryService;
 use App\Models\Tank;
 use App\Models\TankDetail;
 use App\Models\Material;
+use App\Models\BaseModel;
+use App\Models\RawMaterial as LegacyRawMaterial;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,7 +30,7 @@ class RmEntryController extends Controller
     public function index(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $plantId = BaseModel::resolvePlant($request);
             $data = $this->rmEntryService->getRmList($plantId);
 
             return response()->json([
@@ -49,6 +51,7 @@ class RmEntryController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
+            'id_balance_head' => 'nullable|integer',
             'entry_date' => 'required|date',
             'rm_number' => 'required|string',
             'id_material' => 'required|integer',
@@ -68,17 +71,34 @@ class RmEntryController extends Controller
         }
 
         try {
-            $data = $request->all();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
             $user = Auth::user()?->name ?? 'System';
+            $plantId = BaseModel::resolvePlant($request);
+            if ((string) $plantId === '0') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pilih plant terlebih dahulu untuk RM Entry.',
+                ], 422);
+            }
 
-            $result = $this->rmEntryService->saveRmEntry($data, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'RM Entry created successfully',
-                'data' => $result
+            $request->merge(['id_plant' => $plantId]);
+            $request->merge([
+                'flag' => 'post_rmEntry',
+                'mode' => $request->input('mode', 'ADD'),
+                'idHead' => $request->input('id_balance_head', $request->input('idHead')),
+                'entry_no' => $request->input('entry_no', $request->input('rm_number')),
+                'entry_date' => $request->input('entry_date'),
+                'tank' => $request->input('tank', $request->input('id_tank')),
+                'tankNo' => $request->input('tankNo', $request->input('id_tank_tail', [])),
+                'qty' => $request->input('qty', $request->input('total_qty')),
+                'po' => $request->input('po', $request->input('po_so')),
+                'idMaterial' => $request->input('idMaterial', $request->input('id_material')),
+                'material_doc' => $request->input('material_doc', $request->input('material_document')),
             ]);
+
+            $result = LegacyRawMaterial::post_rmEntry($user, $request);
+            $legacy = $this->legacyResponse($result, 'RM Entry created successfully', 'RM Entry');
+
+            return response()->json($legacy, $legacy['success'] ? 200 : 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -94,12 +114,10 @@ class RmEntryController extends Controller
     {
         try {
             $user = Auth::user()?->name ?? 'System';
-            $result = $this->rmEntryService->deactivateRmEntry($id, $user);
+            $result = LegacyRawMaterial::deactivateRmEntry($id, $user);
+            $legacy = $this->legacyResponse($result, 'RM Entry deactivated successfully', 'RM Entry');
 
-            return response()->json([
-                'success' => true,
-                'message' => 'RM Entry deactivated successfully'
-            ]);
+            return response()->json($legacy, $legacy['success'] ? 200 : 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -114,7 +132,14 @@ class RmEntryController extends Controller
     public function newNumber(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $plantId = BaseModel::resolvePlant($request);
+            if ((string) $plantId === '0') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pilih plant terlebih dahulu untuk membuat nomor RM.',
+                ], 422);
+            }
+
             $rmNumber = $this->rmEntryService->generateRmNumber($plantId);
 
             return response()->json([
@@ -275,17 +300,32 @@ class RmEntryController extends Controller
         }
 
         try {
-            $data = $request->all();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
             $user = Auth::user()?->name ?? 'System';
+            $plantId = BaseModel::resolvePlant($request);
+            if ((string) $plantId === '0') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pilih plant terlebih dahulu untuk supplier RM.',
+                ], 422);
+            }
 
-            $result = $this->rmEntryService->addSupplierTemp($data, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Supplier added successfully',
-                'data' => $result
+            $request->merge(['id_plant' => $plantId]);
+            $request->merge([
+                'flag' => 'post_rmEntrySupplier',
+                'mode' => $request->input('mode', 'ADD'),
+                'rmNumber' => $request->input('rmNumber', $request->input('entry_no')),
+                'idSupplier' => $request->input('idSupplier', $request->input('id_supplier')),
+                'idMaterial' => $request->input('idMaterial', $request->input('id_material')),
+                'batchSap' => $request->input('batchSap', $request->input('batch_sap')),
+                'qty' => $request->input('qty'),
+                'idHead' => $request->input('idHead'),
+                'idTail' => $request->input('idTail'),
             ]);
+
+            $result = LegacyRawMaterial::post_rmEntrySupplier($user, $request);
+            $legacy = $this->legacyResponse($result, 'Supplier added successfully', 'Supplier');
+
+            return response()->json($legacy, $legacy['success'] ? 200 : 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -300,8 +340,16 @@ class RmEntryController extends Controller
     public function supplierList(Request $request)
     {
         try {
+            $mode = $request->input('mode', 'ADD');
             $entryNo = $request->input('entry_no');
-            $data = $this->rmEntryService->getSupplierList($entryNo);
+            $idHead = $request->input('id_balance_head');
+
+            $request->merge([
+                'mode' => $mode,
+                'number' => $mode === 'UPDATE' ? $idHead : $entryNo
+            ]);
+
+            $data = LegacyRawMaterial::get_dtSupplierList($request);
 
             return response()->json([
                 'success' => true,
@@ -318,16 +366,14 @@ class RmEntryController extends Controller
     /**
      * Delete supplier from temporary
      */
-    public function deleteSupplier($id)
+    public function deleteSupplier(Request $request, $id)
     {
         try {
             $user = Auth::user()?->name ?? 'System';
-            $this->rmEntryService->deleteSupplierTemp($id, $user);
+            $result = LegacyRawMaterial::deleteSupplier($id, $user, $request);
+            $legacy = $this->legacyResponse($result, 'Supplier deleted successfully', 'Supplier');
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Supplier deleted successfully'
-            ]);
+            return response()->json($legacy, $legacy['success'] ? 200 : 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -342,12 +388,20 @@ class RmEntryController extends Controller
     public function totalQty(Request $request)
     {
         try {
+            $mode = $request->input('mode', 'ADD');
             $entryNo = $request->input('entry_no');
-            $total = $this->rmEntryService->getTotalQtyTemp($entryNo);
+            $idHead = $request->input('id_balance_head');
+
+            $request->merge([
+                'mode' => $mode,
+                'number' => $mode === 'UPDATE' ? $idHead : $entryNo,
+            ]);
+            $rows = LegacyRawMaterial::get_totalQtySupplier($request);
+            $total = $rows[0]->total ?? '0.000';
 
             return response()->json([
                 'success' => true,
-                'data' => ['total' => number_format($total, 3)]
+                'data' => ['total' => $total]
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -382,7 +436,14 @@ class RmEntryController extends Controller
 
         try {
             $data = $request->all();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $data['id_plant'] = BaseModel::resolvePlant($request);
+            if ((string) $data['id_plant'] === '0') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pilih plant terlebih dahulu untuk transfer RM.',
+                ], 422);
+            }
+
             $user = Auth::user()?->name ?? 'System';
 
             $result = $this->rmEntryService->saveRmTrfEntry($data, $user);
@@ -406,7 +467,14 @@ class RmEntryController extends Controller
     public function transferNumber(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $plantId = BaseModel::resolvePlant($request);
+            if ((string) $plantId === '0') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pilih plant terlebih dahulu untuk membuat nomor transfer.',
+                ], 422);
+            }
+
             $rmNumber = $this->rmEntryService->generateTransferNumber($plantId);
 
             return response()->json([
@@ -419,5 +487,34 @@ class RmEntryController extends Controller
                 'message' => $e->getMessage()
             ], 500);
         }
+    }
+
+    protected function legacyResponse($return, string $successMessage, string $feature): array
+    {
+        $code = '0';
+
+        if (is_array($return)) {
+            $first = $return[0] ?? null;
+            $code = (string) (is_array($first) ? ($first['response'] ?? '0') : ($first->response ?? '0'));
+        }
+
+        $message = match ($code) {
+            '1' => $successMessage,
+            '2' => "{$feature} already exists",
+            '3' => "{$feature} has been used",
+            '4' => "{$feature} cannot be activated",
+            '5' => "{$feature} Stock Not Enough",
+            '6' => "{$feature} No RM Data",
+            '99' => "{$feature} Period Locked",
+            default => "Failed {$feature}",
+        };
+
+        return [
+            'success' => $code === '1',
+            'status' => $code === '1' ? 1 : 0,
+            'response' => $code,
+            'message' => $message,
+            'data' => $return,
+        ];
     }
 }

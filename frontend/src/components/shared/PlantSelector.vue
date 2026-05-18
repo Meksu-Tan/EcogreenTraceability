@@ -37,15 +37,15 @@
         <button 
           v-for="plant in plantStore.plants" 
           :key="plant.id_plant"
-          @click="selectPlant(plant.id_plant, plant.description)"
+          @click="selectPlant(plantValue(plant), plant.description)"
           class="w-full flex items-center justify-between px-4 py-3 hover:bg-green-50 transition-colors group"
-          :class="plantSelectionStore.selectedPlantId === plant.id_plant ? 'bg-green-50 text-green-700' : 'text-gray-600'"
+          :class="plantSelectionStore.selectedPlantId === plantValue(plant) ? 'bg-green-50 text-green-700' : 'text-gray-600'"
         >
           <div class="flex items-center gap-3">
             <i class="fas fa-factory text-xs opacity-50"></i>
             <span class="text-sm font-semibold">{{ plant.description }}</span>
           </div>
-          <i v-if="plantSelectionStore.selectedPlantId === plant.id_plant" class="fas fa-check text-[10px]"></i>
+          <i v-if="plantSelectionStore.selectedPlantId === plantValue(plant)" class="fas fa-check text-[10px]"></i>
         </button>
       </div>
     </div>
@@ -68,6 +68,10 @@ async function selectPlant(id, name) {
   plantSelectionStore.setPlant(id, name)
   isOpen.value = false
   emit('change', id)
+}
+
+function plantValue(plant) {
+  return plant?.code_3 || plant?.id_plant
 }
 
 // Close dropdown on click outside

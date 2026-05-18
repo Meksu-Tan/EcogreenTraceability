@@ -15,7 +15,13 @@ export default {
     return response.data
   },
 
-  // Deactivate RM Entry
+  // Update RM Entry (PUT)
+  async update(id, data) {
+    const response = await axios.put(`${BASE_URL}/${id}`, data)
+    return response.data
+  },
+
+  // Deactivate RM Entry (DELETE)
   async deactivate(id) {
     const response = await axios.delete(`${BASE_URL}/${id}`)
     return response.data
@@ -68,23 +74,23 @@ export default {
   },
 
   // Get supplier list from temporary
-  async getSupplierList(entryNo) {
+  async getSupplierList(entryNo, params = {}) {
     const response = await axios.get(`${BASE_URL}/suppliers/list`, {
-      params: { entry_no: entryNo }
+      params: { entry_no: entryNo, ...params }
     })
     return response.data
   },
 
   // Delete supplier from temporary
-  async deleteSupplier(id) {
-    const response = await axios.delete(`${BASE_URL}/suppliers/${id}`)
+  async deleteSupplier(id, params = {}) {
+    const response = await axios.delete(`${BASE_URL}/suppliers/${id}`, { params })
     return response.data
   },
 
   // Get total qty from temporary
-  async getTotalQty(entryNo) {
+  async getTotalQty(entryNo, params = {}) {
     const response = await axios.get(`${BASE_URL}/total-qty`, {
-      params: { entry_no: entryNo }
+      params: { entry_no: entryNo, ...params }
     })
     return response.data
   },
@@ -101,4 +107,3 @@ export default {
     return response.data
   }
 }
-

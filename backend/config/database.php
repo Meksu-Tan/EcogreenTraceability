@@ -78,6 +78,25 @@ return [
             'engine' => null,
         ],
 
+        'dwsql' => [
+            'driver' => 'mysql',
+            'host' => env('DWSQL_HOST', '172.16.11.19'),
+            'port' => env('DWSQL_PORT', '3302'),
+            'database' => env('DWSQL_DATABASE', 'EOB1_SQL_7AM.EUDR_AIRFLOW'),
+            'username' => env('DWSQL_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DWSQL_PASSWORD', env('DB_PASSWORD', '')),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

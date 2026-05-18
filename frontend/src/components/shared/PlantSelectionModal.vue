@@ -35,9 +35,9 @@
           <button 
             v-for="plant in plantStore.plants" 
             :key="plant.id_plant"
-            @click="selectPlant(plant.id_plant, plant.description)"
+            @click="selectPlant(plantValue(plant), plant.description)"
             class="group flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 text-left"
-            :class="plantSelectionStore.selectedPlantId === plant.id_plant ? 'border-green-500 bg-green-50 shadow-md' : 'border-slate-100 hover:border-green-200 hover:bg-slate-50'"
+            :class="plantSelectionStore.selectedPlantId === plantValue(plant) ? 'border-green-500 bg-green-50 shadow-md' : 'border-slate-100 hover:border-green-200 hover:bg-slate-50'"
           >
             <div class="flex items-center gap-4">
               <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
@@ -45,10 +45,10 @@
               </div>
               <div>
                 <span class="block font-bold text-slate-800">{{ plant.description }}</span>
-                <span class="text-xs text-slate-500 uppercase tracking-wider">ID Plant: {{ plant.id_plant }}</span>
+                <span class="text-xs text-slate-500 uppercase tracking-wider">ID Plant: {{ plantValue(plant) }}</span>
               </div>
             </div>
-            <i v-if="plantSelectionStore.selectedPlantId === plant.id_plant" class="fas fa-check-circle text-green-600 text-xl"></i>
+            <i v-if="plantSelectionStore.selectedPlantId === plantValue(plant)" class="fas fa-check-circle text-green-600 text-xl"></i>
           </button>
         </div>
       </div>
@@ -97,6 +97,10 @@ async function selectPlant(id, name) {
   plantSelectionStore.setPlant(id, name)
   isOpen.value = false
   emit('selected', id)
+}
+
+function plantValue(plant) {
+  return plant?.code_3 || plant?.id_plant
 }
 
 onMounted(async () => {

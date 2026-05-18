@@ -87,7 +87,10 @@ class RmEntryService
 
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
-        $query = "SELECT a.id_balance_head, a.id_material, a.id_tank, a.id_tank_tail, a.status,
+        $query = "SELECT a.id_balance_head, a.id_material, a.id_tank, a.id_tank_tail, a.id_plant,
+                         COALESCE(p.code_2, p.code_3, a.id_plant) AS plant_code,
+                         COALESCE(p.description, p.code_2, a.id_plant) AS plant_name,
+                         a.status,
                          CAST(a.trace_no AS CHAR) AS trace_no, 
                          FORMAT(SUM(DISTINCT a.qty),3) AS qty, 
                          a.created_by, a.created_at,
@@ -110,6 +113,8 @@ class RmEntryService
                       ON a.id_balance_head = b.id_balance_head AND b.status = 1
                     LEFT JOIN m_material c
                       ON a.id_material = c.id_material
+                    LEFT JOIN m_plant p
+                      ON p.code_3 = a.id_plant
                     LEFT JOIN m_tank d
                       ON a.id_tank = d.id_tank AND d.status = 1 AND (d.code_3 = 'STORAGE' OR d.id_plant = ? OR ? = 0)
                     LEFT JOIN m_supplier e
@@ -122,7 +127,8 @@ class RmEntryService
                                 GROUP BY f.id_balance_head) f
                       ON f.id_balance_head = a.id_balance_head
                     LEFT JOIN m_tank_detail h
-                      ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
+                      ON (JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
+                           OR JSON_CONTAINS(a.id_tank_tail, CAST(h.id_tank_tail AS JSON)))
                     LEFT JOIN (
                         SELECT id_balance_head, SUM(init_qty) AS supplier_qty
                         FROM t_balance_detail
@@ -523,4 +529,3 @@ class RmEntryService
         }
     }
 }
-

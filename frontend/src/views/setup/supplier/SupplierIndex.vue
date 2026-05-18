@@ -82,7 +82,11 @@ function onEdit(row) { editRow.value = row; showModal.value = true }
 async function onToggle(row) {
   if (!confirm(`${row.status==1?'Deactivate':'Activate'} supplier "${row.description}"?`)) return
   const r = await store.toggleSupplier(row.id_supplier, row.status)
-  r.status===1 ? toast.success(r.message) : toast.error(r.message)
+  if (r.status === 1) {
+    toast.success(r.message)
+  } else {
+    toast.error(r.message)
+  }
 }
 
 async function onSubmit(data) {

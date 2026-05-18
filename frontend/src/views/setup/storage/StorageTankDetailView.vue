@@ -114,7 +114,11 @@ function onEditDetail(row) {
 async function onToggleDetail(row) {
   if (!confirm(`${row.status==1?'Deactivate':'Activate'} detail "${row.tf_number}"?`)) return
   const r = await store.toggleDetail(row.id_tank_tail, row.status, props.id)
-  r.status===1 ? toast.success(r.message) : toast.error(r.message)
+  if (r.status === 1) {
+    toast.success(r.message)
+  } else {
+    toast.error(r.message)
+  }
 }
 
 async function onSubmitDetail(data) {

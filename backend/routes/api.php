@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\LegacyController;
 use App\Http\Controllers\Api\RolePermissionController;
 use App\Http\Controllers\Api\Material\MaterialController;
 use App\Http\Controllers\Api\Storage\StorageController;
 use App\Http\Controllers\Api\Supplier\SupplierController;
+use App\Http\Controllers\Api\Manufacturer\ManufacturerController;
 use Illuminate\Support\Facades\Route;
 
 // ============================================================
@@ -29,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // API v1
     // ──────────────────────────────────────────────────────────
     Route::prefix('v1')->group(function () {
+        Route::get('dashboard/summary', [DashboardController::class, 'summary']);
 
         // Setup Material — WIP
         Route::get('materials',    [MaterialController::class, 'index']);
@@ -68,6 +72,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('suppliers/{id}',   [SupplierController::class, 'update']);
         Route::delete('suppliers/{id}', [SupplierController::class, 'destroy']);
 
+        // Setup Manufacturer
+        Route::get('manufacturers/active', [ManufacturerController::class, 'active']);
+        Route::get('manufacturers',        [ManufacturerController::class, 'index']);
+        Route::post('manufacturers',       [ManufacturerController::class, 'store']);
+        Route::put('manufacturers/{id}',   [ManufacturerController::class, 'update']);
+        Route::delete('manufacturers/{id}', [ManufacturerController::class, 'destroy']);
+
         // ──────────────────────────────────────────────────────────
         // Setup — Additional Modules (Placeholder endpoints)
         // ──────────────────────────────────────────────────────────
@@ -90,7 +101,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('transactions/rm-entries')->group(function () {
             Route::get('/', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'index']);
             Route::post('/', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'store']);
-            Route::delete('{id}', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'destroy']);
+            Route::put('{id}', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'updateRmEntry']);
+            Route::delete('{id}', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'deactivateRmEntry']);
             Route::get('new-number', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'newNumber']);
             Route::get('tanks', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'tanks']);
             Route::get('tanks/{id}/details', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'tankDetails']);
@@ -105,12 +117,25 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('transfer-number', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'transferNumber']);
         });
         
-        Route::get('transactions/wip-entries', function() {
-            return response()->json(['data' => [], 'message' => 'WIP Entry module under development']);
+        Route::prefix('transactions/wip-entries')->group(function () {
+            Route::get('balance', [\App\Http\Controllers\Api\Transaction\WipController::class, 'balance']);
+            Route::get('feed', [\App\Http\Controllers\Api\Transaction\WipController::class, 'feed']);
+            Route::get('rundown', [\App\Http\Controllers\Api\Transaction\WipController::class, 'rundown']);
+            Route::get('options/{option}', [\App\Http\Controllers\Api\Transaction\WipController::class, 'options']);
+            Route::post('feed', [\App\Http\Controllers\Api\Transaction\WipController::class, 'storeFeed']);
+            Route::post('rundown', [\App\Http\Controllers\Api\Transaction\WipController::class, 'storeRundown']);
+            Route::post('cancel/feed', [\App\Http\Controllers\Api\Transaction\WipController::class, 'cancelFeed']);
+            Route::post('cancel/rundown', [\App\Http\Controllers\Api\Transaction\WipController::class, 'cancelRundown']);
         });
         
-        Route::get('transactions/blendings', function() {
-            return response()->json(['data' => [], 'message' => 'Blending module under development']);
+        Route::prefix('transactions/blendings')->group(function () {
+            Route::get('/', [LegacyController::class, 'blendingList']);
+            Route::get('materials', [LegacyController::class, 'blendingMaterials']);
+            Route::get('options/{option}', [LegacyController::class, 'blendingOption']);
+            Route::post('/', [LegacyController::class, 'blendingStore']);
+            Route::post('materials', [LegacyController::class, 'blendingMaterialStore']);
+            Route::delete('materials/{id}', [LegacyController::class, 'blendingMaterialDestroy']);
+            Route::delete('{id}', [LegacyController::class, 'blendingDestroy']);
         });
         
         Route::get('transactions/package-entries', function() {
@@ -122,39 +147,49 @@ Route::middleware('auth:sanctum')->group(function () {
         });
         
         Route::prefix('transactions/transfers')->group(function () {
+            Route::get('/', [LegacyController::class, 'transferList']);
             Route::get('storage-log', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'storageLog']);
             Route::get('feed-log', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'feedLog']);
-            Route::post('/', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'transfer']);
+            Route::get('options/{option}', [LegacyController::class, 'transferOption']);
+            Route::post('/', [LegacyController::class, 'transferStore']);
             Route::delete('{id}', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'deactivate']);
             Route::get('source-entries', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'sourceEntries']);
             Route::get('dest-tanks', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'destTanks']);
         });
 
+        Route::post('transactions/{module}/material-document', [LegacyController::class, 'materialDocument'])
+            ->whereIn('module', ['rm', 'wip', 'blending', 'transfer']);
+        Route::post('transactions/{module}/subtank', [LegacyController::class, 'updateSubTank'])
+            ->whereIn('module', ['rm', 'wip', 'blending', 'transfer']);
+
         // ──────────────────────────────────────────────────────────
         // Inquiry Modules (Placeholder endpoints)
         // ──────────────────────────────────────────────────────────
-        Route::get('inquiries/stock', function() {
-            return response()->json(['data' => [], 'message' => 'Stock Inquiry module under development']);
+        Route::prefix('inquiries/stock')->group(function () {
+            Route::get('/', [LegacyController::class, 'stockDetail']);
+            Route::get('summary', [LegacyController::class, 'stockSummary']);
+            Route::get('materials', [LegacyController::class, 'stockMaterials']);
+            Route::get('sloc', [LegacyController::class, 'stockSloc']);
         });
         
-        Route::get('inquiries/ts-report', function() {
-            return response()->json(['data' => [], 'message' => 'TS Report module under development']);
-        });
+        Route::get('inquiries/ts-report/{type?}', [LegacyController::class, 'tsReport'])
+            ->whereIn('type', ['all', 'rm', 'packaging', 'pck', 'shipment', 'ship', 'transfer', 'trf']);
         
-        Route::get('inquiries/rm-report', function() {
-            return response()->json(['data' => [], 'message' => 'RM Report module under development']);
+        Route::prefix('inquiries/rm-report')->group(function () {
+            Route::get('/', [LegacyController::class, 'rmReportSummary']);
+            Route::get('tank', [LegacyController::class, 'rmReportTank']);
+            Route::get('adjustment-out', [LegacyController::class, 'rmReportAdjustmentOut']);
+            Route::get('warehouse', [LegacyController::class, 'rmReportWarehouse']);
         });
 
         // ──────────────────────────────────────────────────────────
         // Trace Modules (Placeholder endpoints)
         // ──────────────────────────────────────────────────────────
-        Route::get('trace/forward/{id}', function($id) {
-            return response()->json(['data' => [], 'message' => 'Forward Trace module under development']);
-        });
+        Route::get('trace/forward', [LegacyController::class, 'forwardList']);
+        Route::get('trace/forward/{id}', [LegacyController::class, 'forwardTrace']);
         
-        Route::get('trace/backward/{id}', function($id) {
-            return response()->json(['data' => [], 'message' => 'Backward Trace module under development']);
-        });
+        Route::get('trace/backward', [LegacyController::class, 'backwardList']);
+        Route::get('trace/backward/{id}', [LegacyController::class, 'backwardTrace']);
 
         // ──────────────────────────────────────────────────────────
         // Admin Modules

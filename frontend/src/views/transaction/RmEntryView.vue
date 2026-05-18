@@ -68,14 +68,14 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="loading"><td colspan="15" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
-            <tr v-else-if="!hasEntries"><td colspan="15" class="px-6 py-4 text-center text-gray-500">No RM entries found</td></tr>
+            <tr v-if="loading"><td :colspan="storageColumnCount" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
+            <tr v-else-if="!hasEntries"><td :colspan="storageColumnCount" class="px-6 py-4 text-center text-gray-500">No RM entries found</td></tr>
             <tr v-else v-for="(entry, index) in paginatedStorageEntries" :key="entry.id_balance_head" class="hover:bg-gray-50 text-sm">
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageStorage - 1) * itemsPerPage + index + 1 }}</td>
               <td v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 whitespace-nowrap text-gray-600 font-semibold">{{ entry.plant_code || '-' }}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <div class="flex gap-2">
-                  <button @click="deactivateEntry(entry.id_balance_head)" :disabled="entry.traced !== 'N/A'" class="text-red-600 hover:text-red-900 disabled:text-gray-400">
+                  <button @click="deactivateEntry(entry.id_balance_head)" :disabled="!entry.traced || entry.traced.trim() === ''" class="text-red-600 hover:text-red-900 disabled:text-gray-400" :title="(!entry.traced || entry.traced.trim() === '') ? 'Entry has been used/transferred' : 'Delete Entry'">
                     <i class="fas fa-trash"></i>
                   </button>
                   <button @click="openUpdateModal(entry)" class="text-green-600 hover:text-green-900">
@@ -189,33 +189,39 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="transferStore.loading"><td colspan="14" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
-            <tr v-else-if="feedLogsSafe.length === 0"><td colspan="14" class="px-6 py-4 text-center text-gray-500">No feed logs found</td></tr>
+            <tr v-if="transferStore.loading"><td :colspan="feedColumnCount" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
+            <tr v-else-if="feedLogsSafe.length === 0"><td :colspan="feedColumnCount" class="px-6 py-4 text-center text-gray-500">No feed logs found</td></tr>
             <tr v-for="(log, index) in paginatedFeedLogs" :key="log.id_trace_head" class="hover:bg-gray-50 text-sm">
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageFeed - 1) * itemsPerPage + index + 1 }}</td>
               <td v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 whitespace-nowrap text-gray-600 font-semibold">{{ log.plant_code || '-' }}</td>
               <td class="px-4 py-3 whitespace-nowrap">
-                <button @click="deactivateTransfer(log.id_trace_head)" class="text-red-600 hover:text-red-900">
+                <button 
+                  @click="deactivateTransfer(log.id_balance_head + '|' + log.id_trace_head)" 
+                  :disabled="!log.traced || log.traced.trim() === ''"
+                  class="text-red-600 hover:text-red-900 disabled:text-gray-400" 
+                  :title="(!log.traced || log.traced.trim() === '') ? 'Transfer has been used' : 'Delete Transfer'"
+                >
                   <i class="fas fa-trash"></i>
                 </button>
               </td>
               <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-900 text-right">
-                {{ log.from_trace_no }} >>> {{ log.to_trace_no }}
+                {{ log.trace_no || (log.from_trace_no ? log.from_trace_no + ' >>> ' + log.to_trace_no : log.trace_nos) }}
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ formatDate(log.entry_date) }}</td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ log.material_document || '-' }}</td>
-              <td class="px-4 py-3 text-gray-900">{{ log.material_name }}</td>
-              <td class="px-4 py-3 text-center text-gray-900">{{ log.tank_name }}</td>
-              <td class="px-4 py-3 text-right font-medium">{{ log.in_qty }}</td>
-              <td class="px-4 py-3 text-right font-medium">{{ log.in_qty }}</td>
-              <td class="px-4 py-3 text-right font-bold text-gray-900">{{ log.in_qty }}</td>
+              <td class="px-4 py-3 text-gray-900">{{ log.material }}</td>
+              <td class="px-4 py-3 text-center text-gray-900">{{ log.tf_number }}</td>
+              <td class="px-4 py-3 text-right font-medium" :class="log.init_qty === log.balance_supplier ? 'text-green-600' : 'text-red-600'">{{ log.init_qty }}</td>
+              <td class="px-4 py-3 text-right font-medium" :class="log.init_qty === log.balance_supplier ? 'text-green-600' : 'text-red-600'">{{ log.balance_supplier }}</td>
+              <td class="px-4 py-3 text-right font-bold text-gray-900">{{ log.qty }}</td>
               <td class="px-4 py-3 text-gray-900">
                 <div class="max-h-20 overflow-y-auto whitespace-pre-wrap text-xs">
-                  {{ log.material_name }} / {{ log.from_trace_no }} / {{ log.in_qty }} MT
+                  {{ formatSuppliers(log.supplier) }}
                 </div>
               </td>
               <td class="px-4 py-3 text-center">
-                <i class="fas fa-check text-green-500" title="Active"></i>
+                <i v-if="log.traced === 'N/A'" class="fas fa-check text-green-500" title="Active / Not Transferred"></i>
+                <i v-else class="fas fa-arrow-right text-blue-500" title="Transferred/Used"></i>
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ log.created_at }}</td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ log.created_by }}</td>
@@ -279,10 +285,15 @@
     <!-- Modals: always mounted (like Bootstrap modals in DOM) — avoids destroy/remount glitches; visibility via :is-open -->
     <RmEntryModal
       :is-open="isCreateModalOpen"
+      :entry="selectedEntryForEdit"
       @close="isCreateModalOpen = false"
       @saved="fetchData"
     />
-    <TransferModal ref="transferModal" @saved="fetchData" />
+    <TransferModal
+      :is-open="isTransferModalOpen"
+      @close="isTransferModalOpen = false"
+      @saved="fetchData"
+    />
     
     <!-- Plant Selection Modal (Initial Popup) -->
     <PlantSelectionModal ref="plantSelectionModal" @selected="fetchData" />
@@ -310,6 +321,7 @@ const isCreateModalOpen = ref(false)
 const isTransferModalOpen = ref(false)
 const isSlocModalOpen = ref(false)
 const selectedEntry = ref(null)
+const selectedEntryForEdit = ref(null)
 
 // Modal Reference
 const plantSelectionModal = ref(null)
@@ -332,8 +344,11 @@ const maxVisiblePages = 5
 // Computed
 const loading = computed(() => store.loading)
 const entries = computed(() => store.entries)
-const hasEntries = computed(() => entries.value.length > 0)
-const filteredEntries = computed(() => entries.value)
+const filteredEntries = computed(() => Array.isArray(entries.value) ? entries.value : [])
+const hasEntries = computed(() => filteredEntries.value.length > 0)
+const isAllPlants = computed(() => !plantSelectionStore.selectedPlantId)
+const storageColumnCount = computed(() => isAllPlants.value ? 16 : 15)
+const feedColumnCount = computed(() => isAllPlants.value ? 15 : 14)
 
 const paginatedStorageEntries = computed(() => {
   const start = (currentPageStorage.value - 1) * itemsPerPage
@@ -344,9 +359,7 @@ const totalPagesStorage = computed(() => {
   return Math.ceil(filteredEntries.value.length / itemsPerPage)
 })
 
-const feedLogsSafe = computed(() =>
-  Array.isArray(transferStore.feedLogs) ? transferStore.feedLogs : []
-)
+const feedLogsSafe = computed(() => Array.isArray(transferStore.feedLogs) ? transferStore.feedLogs : [])
 
 const paginatedFeedLogs = computed(() => {
   const start = (currentPageFeed.value - 1) * itemsPerPage
@@ -389,7 +402,7 @@ const visiblePagesFeed = computed(() => {
 
 // Methods
 async function fetchData() {
-  const params = { id_plant: plantSelectionStore.selectedPlantId }
+  const params = { id_plant: plantSelectionStore.selectedPlantId || 0 }
   await Promise.all([
     store.fetchEntries(params),
     transferStore.fetchFeedLogs(params),
@@ -401,6 +414,7 @@ async function fetchData() {
 }
 
 function openCreateModal() {
+  selectedEntryForEdit.value = null
   isTransferModalOpen.value = false
   isCreateModalOpen.value = true
 }
@@ -411,7 +425,9 @@ function openTransferModal() {
 }
 
 function openUpdateModal(entry) {
-  console.log('Update entry:', entry)
+  selectedEntryForEdit.value = entry
+  isTransferModalOpen.value = false
+  isCreateModalOpen.value = true
 }
 
 function openSlocEdit(entry) {
@@ -475,10 +491,4 @@ function formatSuppliers(supplierString) {
 }
 
 // Lifecycle
-onMounted(() => {
-  fetchData()
-})
 </script>
-
-
-

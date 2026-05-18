@@ -13,11 +13,11 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
   }),
 
   actions: {
-    async fetchStorageLogs() {
+    async fetchStorageLogs(params = {}) {
       this.loading = true
       try {
-        const response = await api.get('/api/v1/transactions/transfers/storage-log')
-        this.storageLogs = response.data.data
+        const response = await api.get('/api/v1/transactions/transfers/storage-log', { params })
+        this.storageLogs = Array.isArray(response.data?.data) ? response.data.data : []
       } catch (error) {
         this.error = error.message
       } finally {
@@ -25,10 +25,10 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
       }
     },
 
-    async fetchFeedLogs() {
+    async fetchFeedLogs(params = {}) {
       this.loading = true
       try {
-        const response = await api.get('/api/v1/transactions/transfers/feed-log')
+        const response = await api.get('/api/v1/transactions/transfers/feed-log', { params })
         const rows = response.data?.data
         this.feedLogs = Array.isArray(rows) ? rows : []
       } catch (error) {
@@ -38,18 +38,18 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
       }
     },
 
-    async fetchSourceEntries() {
+    async fetchSourceEntries(params = {}) {
       try {
-        const response = await api.get('/v1/transactions/transfers/source-entries')
+        const response = await api.get('/api/v1/transactions/transfers/source-entries', { params })
         this.sourceEntries = response.data.data
       } catch (error) {
         console.error('Fetch source entries error:', error)
       }
     },
 
-    async fetchDestTanks() {
+    async fetchDestTanks(params = {}) {
       try {
-        const response = await api.get('/v1/transactions/transfers/dest-tanks')
+        const response = await api.get('/api/v1/transactions/transfers/dest-tanks', { params })
         this.destTanks = response.data.data
       } catch (error) {
         console.error('Fetch dest tanks error:', error)
@@ -78,10 +78,18 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
       }
     },
 
+    /**
+     * Delete Feed Tank entry.
+     * id must be composite format: "idHead|idTraceHead"
+     * Backend algorithm: Transfer::transfer_destroy (monorepo)
+     */
     async deleteTransfer(id) {
       this.loading = true
       try {
-        const response = await api.delete(`/api/v1/transactions/transfers/${id}`)
+        const response = await api.delete(`/api/v1/transactions/transfers/${encodeURIComponent(id)}`)
+        if (!response.data?.success) {
+          throw new Error(response.data?.message || 'Failed to deactivate transfer')
+        }
         return response.data
       } catch (error) {
         this.error = error.response?.data?.message || error.message

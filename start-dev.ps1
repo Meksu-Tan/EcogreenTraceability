@@ -6,8 +6,15 @@ $frontend = Join-Path $root 'frontend'
 
 Write-Host 'Stopping existing local dev processes...'
 $patterns = @(
+    '*artisan*serve*',
+    '*php.exe -S 127.0.0.1:8001*',
+    '*php.exe  -S 127.0.0.1:8001*',
+    '*php.exe -S 127.0.0.1:8000*',
+    '*php.exe  -S 127.0.0.1:8000*',
     '*artisan*serve*--port=8001*',
+    '*artisan*serve*--port 8001*',
     '*artisan*serve*--port=8000*',
+    '*artisan*serve*--port 8000*',
     '*vite*--host*127.0.0.1*',
     '*npm*run*dev*--*--host*127.0.0.1*'
 )
@@ -18,8 +25,23 @@ $processes = Get-CimInstance Win32_Process | Where-Object {
 }
 
 foreach ($process in $processes) {
+    if ($process.ProcessId -eq $PID) {
+        continue
+    }
     Write-Host "Stopping PID $($process.ProcessId)"
-    Stop-Process -Id $process.ProcessId -Force
+    Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+}
+
+$ports = @(8001, 8000, 5173)
+$listeners = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+    Where-Object { $ports -contains $_.LocalPort } |
+    Select-Object -ExpandProperty OwningProcess -Unique
+
+foreach ($listenerPid in $listeners) {
+    if ($listenerPid -and $listenerPid -ne $PID) {
+        Write-Host "Stopping listener PID $listenerPid"
+        Stop-Process -Id $listenerPid -Force -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host 'Clearing Laravel config/cache...'
@@ -36,13 +58,13 @@ php artisan view:clear | Out-Host
 Pop-Location
 
 Write-Host 'Starting Laravel Master on http://127.0.0.1:8001 ...'
-Start-Process -FilePath php -ArgumentList @('artisan','serve','--host=127.0.0.1','--port=8001') -WorkingDirectory $root -WindowStyle Hidden
+Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',"Set-Location -LiteralPath '$root'; php artisan serve --host=127.0.0.1 --port=8001") -WindowStyle Hidden
 
 Write-Host 'Starting Laravel Backend API on http://127.0.0.1:8000 ...'
-Start-Process -FilePath php -ArgumentList @('artisan','serve','--host=127.0.0.1','--port=8000') -WorkingDirectory $backend -WindowStyle Hidden
+Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',"Set-Location -LiteralPath '$backend'; php artisan serve --host=127.0.0.1 --port=8000") -WindowStyle Hidden
 
 Write-Host 'Starting Vue Frontend on http://127.0.0.1:5173 ...'
-Start-Process -FilePath npm.cmd -ArgumentList @('run','dev','--','--host','127.0.0.1','--port','5173') -WorkingDirectory $frontend -WindowStyle Hidden
+Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',"Set-Location -LiteralPath '$frontend'; npm run dev -- --host 127.0.0.1 --port 5173") -WindowStyle Hidden
 
 Start-Sleep -Seconds 3
 

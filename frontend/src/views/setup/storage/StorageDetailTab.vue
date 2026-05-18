@@ -96,7 +96,11 @@ function onEditTank(row) {
 async function onToggleTank(row) {
   if (!confirm(`${row.status==1?'Deactivate':'Activate'} tank "${row.description}"?`)) return
   const r = await store.toggleTank(row.id_tank, row.status)
-  r.status===1 ? toast.success(r.message) : toast.error(r.message)
+  if (r.status === 1) {
+    toast.success(r.message)
+  } else {
+    toast.error(r.message)
+  }
 }
 
 async function onSubmitTank(data) {

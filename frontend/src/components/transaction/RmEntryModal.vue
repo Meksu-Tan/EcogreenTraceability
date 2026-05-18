@@ -75,7 +75,7 @@
                 </p>
               </div>
 
-              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
+              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
                 <div class="space-y-1.5">
                   <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Mode</label>
                   <input
@@ -84,6 +84,21 @@
                     readonly
                     class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-slate-800"
                   />
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Plant</label>
+                  <select
+                    v-model="form.id_plant"
+                    required
+                    :disabled="form.mode === 'UPDATE'"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                    @change="onPlantChange"
+                  >
+                    <option value="">Pilih plant</option>
+                    <option v-for="plant in plants" :key="plant.id_plant" :value="plantValue(plant)">
+                      {{ plant.description }}
+                    </option>
+                  </select>
                 </div>
                 <div class="space-y-1.5">
                   <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Nomor entri (auto)</label>
@@ -144,7 +159,8 @@
                   <select
                     v-model="form.id_material"
                     required
-                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                    :disabled="form.mode === 'UPDATE'"
+                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   >
                     <option value="">— Pilih material —</option>
                     <option v-for="material in materials" :key="material.id_material" :value="material.id_material">
@@ -361,11 +377,16 @@
 import { ref, computed, watch } from 'vue'
 import { useTransactionRmEntryStore } from '@/stores/transactionRmEntry'
 import { usePlantSelectionStore } from '@/stores/plantSelection'
+import { useSetupPlantStore } from '@/stores/setupPlant'
 
 const props = defineProps({
   isOpen: {
     type: Boolean,
     required: true
+  },
+  entry: {
+    type: Object,
+    default: null
   }
 })
 
@@ -373,6 +394,7 @@ const emit = defineEmits(['close', 'saved'])
 
 const store = useTransactionRmEntryStore()
 const plantSelectionStore = usePlantSelectionStore()
+const plantStore = useSetupPlantStore()
 
 // State
 const isSupplierModalOpen = ref(false)
@@ -381,6 +403,7 @@ const initError = ref(null)
 
 const form = ref({
   mode: 'ADD',
+  id_plant: '',
   entry_date: new Date().toISOString().split('T')[0],
   rm_number: '',
   id_material: '',
@@ -405,6 +428,7 @@ const materials = computed(() => store.materials)
 const suppliers = computed(() => store.suppliers)
 const supplierList = computed(() => store.supplierList)
 const totalQty = computed(() => store.totalQty)
+const plants = computed(() => plantStore.plants)
 
 const canAddSupplier = computed(() => {
   return !initLoading.value &&
@@ -421,6 +445,7 @@ const canSubmit = computed(() => {
   return !initLoading.value &&
          !initError.value &&
          form.value.entry_date &&
+         form.value.id_plant &&
          form.value.rm_number &&
          form.value.id_material &&
          form.value.id_tank &&
@@ -435,31 +460,63 @@ async function bootstrap() {
   initError.value = null
   store.resetForm()
 
-  form.value = {
-    mode: 'ADD',
-    entry_date: new Date().toISOString().split('T')[0],
-    rm_number: '',
-    id_material: '',
-    id_tank: '',
-    id_tank_tail: [],
-    material_document: '',
-    po_so: '',
-    total_qty: 0
+  if (props.entry) {
+    let tankTails = []
+    if (props.entry.id_tank_tail) {
+      try {
+        tankTails = typeof props.entry.id_tank_tail === 'string'
+          ? JSON.parse(props.entry.id_tank_tail)
+          : props.entry.id_tank_tail
+      } catch (e) {
+        console.error(e)
+      }
+    }
+    const parsedTails = Array.isArray(tankTails) ? tankTails.map(Number) : []
+
+    form.value = {
+      mode: 'UPDATE',
+      id_balance_head: props.entry.id_balance_head,
+      id_plant: props.entry.id_plant || '',
+      entry_date: props.entry.entry_date || new Date().toISOString().split('T')[0],
+      rm_number: props.entry.trace_no || '',
+      id_material: props.entry.id_material || '',
+      id_tank: props.entry.id_tank || '',
+      id_tank_tail: parsedTails,
+      material_document: props.entry.material_document || '',
+      po_so: props.entry.po_so || '',
+      total_qty: props.entry.init_qty ? parseFloat(String(props.entry.init_qty).replace(/,/g, '')) : 0
+    }
+  } else {
+    form.value = {
+      mode: 'ADD',
+      id_plant: plantSelectionStore.selectedPlantId || '',
+      entry_date: new Date().toISOString().split('T')[0],
+      rm_number: '',
+      id_material: '',
+      id_tank: '',
+      id_tank_tail: [],
+      material_document: '',
+      po_so: '',
+      total_qty: 0
+    }
   }
+
   supplierForm.value = { id_supplier: '', batch_sap: '', qty: '' }
   isSupplierModalOpen.value = false
 
   try {
-    const params = { id_plant: plantSelectionStore.selectedPlantId }
     await Promise.all([
-      store.generateRmNumber(params),
+      plantStore.fetchPlants(),
       store.fetchTanks(),
       store.fetchMaterials()
     ])
-    form.value.rm_number = store.rmNumber || ''
-    form.value.mode = 'ADD'
-    if (!form.value.rm_number) {
-      initError.value = 'Nomor RM tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
+    
+    if (props.entry) {
+      if (form.value.id_tank) {
+        await store.fetchTankDetails(form.value.id_tank)
+      }
+    } else {
+      if (form.value.id_plant) await loadRmNumber()
     }
   } catch (error) {
     console.error('Initialization error:', error)
@@ -473,14 +530,45 @@ async function bootstrap() {
 
   if (form.value.rm_number && !initError.value) {
     try {
-      await store.fetchSupplierList(form.value.rm_number)
+      const params = {}
+      if (form.value.mode === 'UPDATE') {
+        params.mode = 'UPDATE'
+        params.id_balance_head = form.value.id_balance_head
+      }
+      await store.fetchSupplierList(form.value.rm_number, params)
+      await store.fetchTotalQty(form.value.rm_number, params)
     } catch (error) {
       console.error('Supplier list load:', error)
       initError.value =
         error.response?.data?.message ||
         error.message ||
-        'Gagal memuat baris supplier sementara.'
+        'Gagal memuat baris supplier.'
     }
+  }
+}
+
+async function loadRmNumber() {
+  if (!form.value.id_plant) {
+    form.value.rm_number = ''
+    return
+  }
+
+  await store.generateRmNumber({ id_plant: form.value.id_plant })
+  form.value.rm_number = store.rmNumber || ''
+
+  if (!form.value.rm_number) {
+    initError.value = 'Nomor RM tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
+  }
+}
+
+async function onPlantChange() {
+  initError.value = null
+  store.supplierList = []
+  store.totalQty = '0.000'
+  form.value.rm_number = ''
+  await loadRmNumber()
+  if (form.value.rm_number) {
+    await store.fetchSupplierList(form.value.rm_number)
   }
 }
 
@@ -502,14 +590,21 @@ async function addSupplier() {
   if (!canAddSupplier.value) return
 
   try {
-    await store.addSupplier({
+    const payload = {
       entry_no: form.value.rm_number,
       id_supplier: supplierForm.value.id_supplier,
       id_material: form.value.id_material,
       qty: parseFloat(supplierForm.value.qty),
       batch_sap: supplierForm.value.batch_sap,
-      id_plant: plantSelectionStore.selectedPlantId
-    })
+      id_plant: form.value.id_plant
+    }
+
+    if (form.value.mode === 'UPDATE') {
+      payload.mode = 'UPDATE'
+      payload.idHead = form.value.id_balance_head
+    }
+
+    await store.addSupplier(payload)
 
     supplierForm.value = {
       id_supplier: '',
@@ -524,7 +619,12 @@ async function addSupplier() {
 
 async function removeSupplier(id) {
   if (confirm('Are you sure you want to remove this supplier?')) {
-    await store.deleteSupplier(id, form.value.rm_number)
+    const params = {}
+    if (form.value.mode === 'UPDATE') {
+      params.mode = 'UPDATE'
+      params.id_balance_head = form.value.id_balance_head
+    }
+    await store.deleteSupplier(id, form.value.rm_number, params)
   }
 }
 
@@ -534,7 +634,6 @@ async function handleSubmit() {
   try {
     const data = {
       ...form.value,
-      id_plant: plantSelectionStore.selectedPlantId,
       total_qty: parseFloat(String(totalQty.value ?? '0').replace(/,/g, ''), 10)
     }
 
@@ -544,6 +643,10 @@ async function handleSubmit() {
   } catch (error) {
     console.error('Submit error:', error)
   }
+}
+
+function plantValue(plant) {
+  return plant?.code_3 || plant?.id_plant
 }
 
 function closeModal() {

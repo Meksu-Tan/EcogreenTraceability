@@ -2,6 +2,6 @@
   <MaterialIndex />
 </template>
 
-<script setup lang="ts">
+<script setup>
 import MaterialIndex from './MaterialIndex.vue'
 </script>

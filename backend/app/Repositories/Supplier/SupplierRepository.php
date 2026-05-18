@@ -14,11 +14,16 @@ class SupplierRepository implements SupplierRepositoryInterface
                    a.created_at, a.created_by, a.updated_at, a.updated_by,
                    a.type, a.batch_code,
                    CASE
-                       WHEN b.id_plant IS NULL THEN "other"
-                       WHEN b.id_plant IS NOT NULL THEN CONCAT(b.id_plant, " - ", b.description, " (", b.code_4, ")")
+                       WHEN td.tf_number IS NOT NULL AND b.id_plant IS NOT NULL 
+                           THEN CONCAT(b.id_plant, " - ", b.description, " (", td.tf_number, ")")
+                       WHEN b.id_plant IS NOT NULL 
+                           THEN CONCAT(b.id_plant, " - ", b.description, " (", b.code_4, ")")
+                       ELSE "other"
                    END AS sloc
             FROM m_supplier a
-            LEFT JOIN m_tank b ON a.type = b.id_tank
+            LEFT JOIN m_tank_detail td ON a.type = CAST(td.id_tank_tail AS CHAR(50)) OR a.type = td.tf_number
+            LEFT JOIN m_tank b ON (td.id_tank IS NOT NULL AND td.id_tank = b.id_tank) 
+                              OR (td.id_tank IS NULL AND a.type REGEXP "^[0-9]+$" AND CAST(a.type AS UNSIGNED) = b.id_tank)
             ORDER BY a.description ASC
         ');
     }

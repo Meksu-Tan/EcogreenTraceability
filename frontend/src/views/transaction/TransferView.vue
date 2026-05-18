@@ -1,53 +1,89 @@
 <template>
-  <div class="p-6">
-    <div class="flex justify-between items-center mb-6">
-      <div class="flex items-center gap-6">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-800">Stock Transfer</h1>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-sm text-gray-500">Lokasi:</span>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-              <i class="fas fa-industry mr-1.5 opacity-70"></i>
-              {{ plantSelectionStore.selectedPlantName }}
-            </span>
-          </div>
-        </div>
-        <div class="h-10 w-px bg-gray-200"></div>
-        <PlantSelector @change="fetchData" />
-      </div>
-    </div>
+  <TransactionShell
+    title="Stock Transfer"
+    entry-label="New Transfer Entry"
+    entry-icon="fa-edit"
+    :columns="columns"
+    :fields="fields"
+    :rows="rows"
+    :loading="loading"
+    row-key="idHead"
+    empty-text="No transfer entries found"
+    :plant-selection-store="plantSelectionStore"
+    @entry="openModal('entry', 'New Transfer Entry')"
+    @plant-change="fetchData"
+  />
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-      <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-        <p class="text-green-800 text-sm">
-          <i class="fas fa-info-circle mr-2"></i>
-          This module is under development for <strong>{{ plantSelectionStore.selectedPlantName }}</strong>. Full functionality will be available soon.
-        </p>
-      </div>
-    </div>
-
-    <PlantSelectionModal ref="plantSelectionModal" @selected="fetchData" />
-  </div>
+  <TransactionModal v-if="activeModal" :modal="activeModal" @close="activeModal = null" />
+  <PlantSelectionModal ref="plantSelectionModal" @selected="fetchData" />
 </template>
 
-<script setup lang="ts">
-import { ref, onMounted } from 'vue'
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import legacyApi from '@/api/legacy'
 import { usePlantSelectionStore } from '@/stores/plantSelection'
-import PlantSelector from '@/components/shared/PlantSelector.vue'
 import PlantSelectionModal from '@/components/shared/PlantSelectionModal.vue'
+import TransactionShell from './_TransactionShell.vue'
+import TransactionModal from './_TransactionModal.vue'
 
 const plantSelectionStore = usePlantSelectionStore()
 const plantSelectionModal = ref(null)
+const activeModal = ref(null)
+const rows = ref([])
+const loading = ref(false)
 
-function fetchData() {
-  console.log('Fetching Transfer data for plant:', plantSelectionStore.selectedPlantId)
+const isAllPlants = computed(() => !plantSelectionStore.selectedPlantId)
+
+const columns = computed(() => [
+  'No',
+  ...(isAllPlants.value ? ['Plant'] : []),
+  'Action', 'Entry Date', 'Matl Doc', 'Trace No', 'Material',
+  'Sloc (From >>> To)', 'Init Material (MT)', 'Init Supplier (MT)',
+  'On-Hand Material (MT)', 'On-Hand Supplier (MT)',
+  'Supplier / Batch SAP / Init Qty (MT) / TO Sloc On-hand Qty (MT)',
+])
+
+const fields = computed(() => [
+  '__index',
+  ...(isAllPlants.value ? ['plant_code'] : []),
+  (row) => ({ type: 'button', label: 'Detail', icon: 'fa-eye', onClick: openDetail }),
+  'entry_date',
+  'material_document',
+  'trace_no',
+  'material',
+  'sloc',
+  'init_qty',
+  'balance_supplier',
+  'qty',
+  'balance_supplier',
+  'supplier',
+])
+
+async function fetchData() {
+  loading.value = true
+  try {
+    const response = await legacyApi.transferList({ id_plant: plantSelectionStore.selectedPlantId || 0 })
+    rows.value = response.data || []
+  } finally {
+    loading.value = false
+  }
+}
+
+function openModal(kind, title) {
+  activeModal.value = { kind, title, subtitle: plantSelectionStore.selectedPlantName, module: 'transfer' }
+}
+
+function openDetail(row) {
+  activeModal.value = {
+    kind: 'doc',
+    title: `Transfer Detail - ${row.trace_no || row.entry_no || ''}`,
+    subtitle: plantSelectionStore.selectedPlantName,
+    module: 'transfer',
+  }
 }
 
 onMounted(() => {
-  if (!plantSelectionStore.hasSelectedPlant) {
-    plantSelectionModal.value?.open()
-  } else {
-    fetchData()
-  }
+  if (!plantSelectionStore.hasSelectedPlant) plantSelectionModal.value?.open()
+  else fetchData()
 })
 </script>

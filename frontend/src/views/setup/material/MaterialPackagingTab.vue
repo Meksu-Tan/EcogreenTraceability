@@ -64,7 +64,11 @@ function onEdit(row) {
 async function onToggle(row) {
   if (!confirm(`${row.status == 1 ? 'Deactivate' : 'Activate'} packaging "${row.description}"?`)) return
   const result = await store.togglePackaging(row.id_materialpck, row.status)
-  result.status === 1 ? toast.success(result.message) : toast.error(result.message)
+  if (result.status === 1) {
+    toast.success(result.message)
+  } else {
+    toast.error(result.message)
+  }
 }
 
 async function onSubmit(data) {
