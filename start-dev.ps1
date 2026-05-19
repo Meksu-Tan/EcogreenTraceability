@@ -22,12 +22,7 @@ foreach ($process in $processes) {
     Stop-Process -Id $process.ProcessId -Force
 }
 
-Write-Host 'Clearing Laravel config/cache...'
-Push-Location $root
-php artisan config:clear | Out-Host
-php artisan route:clear | Out-Host
-php artisan view:clear | Out-Host
-Pop-Location
+
 
 Push-Location $backend
 php artisan config:clear | Out-Host
@@ -35,8 +30,7 @@ php artisan route:clear | Out-Host
 php artisan view:clear | Out-Host
 Pop-Location
 
-Write-Host 'Starting Laravel Master on http://127.0.0.1:8001 ...'
-Start-Process -FilePath php -ArgumentList @('artisan','serve','--host=127.0.0.1','--port=8001') -WorkingDirectory $root -WindowStyle Hidden
+
 
 Write-Host 'Starting Laravel Backend API on http://127.0.0.1:8000 ...'
 Start-Process -FilePath php -ArgumentList @('artisan','serve','--host=127.0.0.1','--port=8000') -WorkingDirectory $backend -WindowStyle Hidden
@@ -47,7 +41,6 @@ Start-Process -FilePath npm.cmd -ArgumentList @('run','dev','--','--host','127.0
 Start-Sleep -Seconds 3
 
 $targets = @(
-    @{ Name = 'Laravel Master'; Url = 'http://127.0.0.1:8001' },
     @{ Name = 'Backend API'; Url = 'http://127.0.0.1:8000/api/user'; ExpectedStatus = 401; Headers = @{ Accept = 'application/json' } },
     @{ Name = 'Frontend'; Url = 'http://127.0.0.1:5173' }
 )
@@ -77,6 +70,5 @@ foreach ($target in $targets) {
 
 Write-Host ''
 Write-Host 'URLs:'
-Write-Host '  Master   http://127.0.0.1:8001'
 Write-Host '  Backend  http://127.0.0.1:8000'
 Write-Host '  Frontend http://127.0.0.1:5173'
