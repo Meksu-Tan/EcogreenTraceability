@@ -1,0 +1,1 @@
+@keyframes bounce-slow-9ce79410{0%,to{transform:translateY(0)}50%{transform:translateY(-8px)}}.animate-bounce-slow[data-v-9ce79410]{animation:3s ease-in-out infinite bounce-slow-9ce79410}@keyframes spin-slow-9ce79410{0%{transform:rotate(0)}to{transform:rotate(360deg)}}.animate-spin-slow[data-v-9ce79410]{animation:4s linear infinite spin-slow-9ce79410}

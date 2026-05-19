@@ -1,0 +1,266 @@
+﻿{
+    "success":  true,
+    "data":  [
+                 {
+                     "plantCode":  "1007",
+                     "plantName":  "EOB-3",
+                     "tanks":  [
+                                   {
+                                       "id":  "1",
+                                       "tankNumber":  "722T01",
+                                       "tankHeight":  1466.5
+                                   },
+                                   {
+                                       "id":  "2",
+                                       "tankNumber":  "722T02",
+                                       "tankHeight":  1651
+                                   },
+                                   {
+                                       "id":  "3",
+                                       "tankNumber":  "722T03",
+                                       "tankHeight":  1284.5
+                                   },
+                                   {
+                                       "id":  "14",
+                                       "tankNumber":  "722T04",
+                                       "tankHeight":  1307.5
+                                   },
+                                   {
+                                       "id":  "41",
+                                       "tankNumber":  "524T09",
+                                       "tankHeight":  2201.2
+                                   },
+                                   {
+                                       "id":  "40",
+                                       "tankNumber":  "524T10",
+                                       "tankHeight":  2201.1
+                                   },
+                                   {
+                                       "id":  "5",
+                                       "tankNumber":  "722T11",
+                                       "tankHeight":  1373.2
+                                   },
+                                   {
+                                       "id":  "7",
+                                       "tankNumber":  "722T12",
+                                       "tankHeight":  1398.1
+                                   },
+                                   {
+                                       "id":  "6",
+                                       "tankNumber":  "722T13",
+                                       "tankHeight":  1375.5
+                                   },
+                                   {
+                                       "id":  "12",
+                                       "tankNumber":  "722T14",
+                                       "tankHeight":  1371.2
+                                   },
+                                   {
+                                       "id":  "11",
+                                       "tankNumber":  "722T15",
+                                       "tankHeight":  1219.3
+                                   },
+                                   {
+                                       "id":  "10",
+                                       "tankNumber":  "722T16",
+                                       "tankHeight":  1527
+                                   },
+                                   {
+                                       "id":  "9",
+                                       "tankNumber":  "722T21",
+                                       "tankHeight":  1649.5
+                                   },
+                                   {
+                                       "id":  "8",
+                                       "tankNumber":  "722T22",
+                                       "tankHeight":  16495
+                                   },
+                                   {
+                                       "id":  "13",
+                                       "tankNumber":  "722T23",
+                                       "tankHeight":  1277.8
+                                   },
+                                   {
+                                       "id":  "4",
+                                       "tankNumber":  "722T24",
+                                       "tankHeight":  12800
+                                   },
+                                   {
+                                       "id":  "20",
+                                       "tankNumber":  "722T25",
+                                       "tankHeight":  1468.3
+                                   },
+                                   {
+                                       "id":  "19",
+                                       "tankNumber":  "722T26",
+                                       "tankHeight":  1649.3
+                                   },
+                                   {
+                                       "id":  "18",
+                                       "tankNumber":  "722T27",
+                                       "tankHeight":  1648.4
+                                   },
+                                   {
+                                       "id":  "17",
+                                       "tankNumber":  "722T28",
+                                       "tankHeight":  1290.9
+                                   },
+                                   {
+                                       "id":  "16",
+                                       "tankNumber":  "722T29",
+                                       "tankHeight":  1293.1
+                                   },
+                                   {
+                                       "id":  "15",
+                                       "tankNumber":  "722T30",
+                                       "tankHeight":  1465.6
+                                   },
+                                   {
+                                       "id":  "26",
+                                       "tankNumber":  "722T31",
+                                       "tankHeight":  1287.8
+                                   },
+                                   {
+                                       "id":  "25",
+                                       "tankNumber":  "722T32",
+                                       "tankHeight":  1467.5
+                                   },
+                                   {
+                                       "id":  "24",
+                                       "tankNumber":  "722T41",
+                                       "tankHeight":  1368.3
+                                   },
+                                   {
+                                       "id":  "23",
+                                       "tankNumber":  "722T42",
+                                       "tankHeight":  1369.2
+                                   },
+                                   {
+                                       "id":  "22",
+                                       "tankNumber":  "722T43",
+                                       "tankHeight":  1216.5
+                                   },
+                                   {
+                                       "id":  "21",
+                                       "tankNumber":  "722T44",
+                                       "tankHeight":  1216.5
+                                   },
+                                   {
+                                       "id":  "28",
+                                       "tankNumber":  "722T45",
+                                       "tankHeight":  1217.7
+                                   },
+                                   {
+                                       "id":  "27",
+                                       "tankNumber":  "722T46",
+                                       "tankHeight":  1218.3
+                                   },
+                                   {
+                                       "id":  "30",
+                                       "tankNumber":  "722T51",
+                                       "tankHeight":  1647.7
+                                   },
+                                   {
+                                       "id":  "29",
+                                       "tankNumber":  "722T52",
+                                       "tankHeight":  1649.7
+                                   },
+                                   {
+                                       "id":  "32",
+                                       "tankNumber":  "722T53",
+                                       "tankHeight":  1467.5
+                                   },
+                                   {
+                                       "id":  "31",
+                                       "tankNumber":  "722T54",
+                                       "tankHeight":  1466
+                                   },
+                                   {
+                                       "id":  "39",
+                                       "tankNumber":  "722T55",
+                                       "tankHeight":  1653.2
+                                   },
+                                   {
+                                       "id":  "38",
+                                       "tankNumber":  "722T56",
+                                       "tankHeight":  1280.5
+                                   },
+                                   {
+                                       "id":  "37",
+                                       "tankNumber":  "722T57",
+                                       "tankHeight":  1472.2
+                                   },
+                                   {
+                                       "id":  "36",
+                                       "tankNumber":  "722T58",
+                                       "tankHeight":  1283.5
+                                   },
+                                   {
+                                       "id":  "35",
+                                       "tankNumber":  "722T59",
+                                       "tankHeight":  1280
+                                   },
+                                   {
+                                       "id":  "34",
+                                       "tankNumber":  "722T60",
+                                       "tankHeight":  1281.4
+                                   },
+                                   {
+                                       "id":  "33",
+                                       "tankNumber":  "722T61",
+                                       "tankHeight":  1282
+                                   },
+                                   {
+                                       "id":  "51",
+                                       "tankNumber":  "722T62",
+                                       "tankHeight":  1279.6
+                                   },
+                                   {
+                                       "id":  "50",
+                                       "tankNumber":  "722T63",
+                                       "tankHeight":  1279.6
+                                   },
+                                   {
+                                       "id":  "49",
+                                       "tankNumber":  "722T64",
+                                       "tankHeight":  1282.5
+                                   },
+                                   {
+                                       "id":  "48",
+                                       "tankNumber":  "722T65",
+                                       "tankHeight":  1281.7
+                                   },
+                                   {
+                                       "id":  "47",
+                                       "tankNumber":  "722T66",
+                                       "tankHeight":  1278.5
+                                   },
+                                   {
+                                       "id":  "46",
+                                       "tankNumber":  "722T71",
+                                       "tankHeight":  1466.5
+                                   },
+                                   {
+                                       "id":  "45",
+                                       "tankNumber":  "722T72",
+                                       "tankHeight":  1278.2
+                                   },
+                                   {
+                                       "id":  "44",
+                                       "tankNumber":  "722T73",
+                                       "tankHeight":  1277
+                                   },
+                                   {
+                                       "id":  "43",
+                                       "tankNumber":  "722T74",
+                                       "tankHeight":  920.2
+                                   },
+                                   {
+                                       "id":  "42",
+                                       "tankNumber":  "722T75",
+                                       "tankHeight":  1527.3
+                                   }
+                               ]
+                 }
+             ]
+}

@@ -1,0 +1,196 @@
+﻿{
+    "success":  true,
+    "data":  [
+                 {
+                     "plantCode":  "1001",
+                     "plantName":  "EOMB",
+                     "tanks":  [
+                                   {
+                                       "id":  "52",
+                                       "tankNumber":  "210T01",
+                                       "tankHeight":  1460
+                                   },
+                                   {
+                                       "id":  "53",
+                                       "tankNumber":  "210T02",
+                                       "tankHeight":  1460
+                                   },
+                                   {
+                                       "id":  "54",
+                                       "tankNumber":  "210T11",
+                                       "tankHeight":  753
+                                   },
+                                   {
+                                       "id":  "55",
+                                       "tankNumber":  "210T12",
+                                       "tankHeight":  753
+                                   },
+                                   {
+                                       "id":  "56",
+                                       "tankNumber":  "210T13",
+                                       "tankHeight":  643
+                                   },
+                                   {
+                                       "id":  "57",
+                                       "tankNumber":  "210T14",
+                                       "tankHeight":  753
+                                   },
+                                   {
+                                       "id":  "58",
+                                       "tankNumber":  "210T15",
+                                       "tankHeight":  1288
+                                   },
+                                   {
+                                       "id":  "59",
+                                       "tankNumber":  "210T21",
+                                       "tankHeight":  1288
+                                   },
+                                   {
+                                       "id":  "60",
+                                       "tankNumber":  "210T22",
+                                       "tankHeight":  1270
+                                   },
+                                   {
+                                       "id":  "61",
+                                       "tankNumber":  "210T23",
+                                       "tankHeight":  1334
+                                   },
+                                   {
+                                       "id":  "62",
+                                       "tankNumber":  "210T24",
+                                       "tankHeight":  1336
+                                   },
+                                   {
+                                       "id":  "63",
+                                       "tankNumber":  "210T25",
+                                       "tankHeight":  1336
+                                   },
+                                   {
+                                       "id":  "64",
+                                       "tankNumber":  "210T26",
+                                       "tankHeight":  875
+                                   },
+                                   {
+                                       "id":  "65",
+                                       "tankNumber":  "210T27",
+                                       "tankHeight":  885
+                                   },
+                                   {
+                                       "id":  "66",
+                                       "tankNumber":  "210T28",
+                                       "tankHeight":  882
+                                   },
+                                   {
+                                       "id":  "67",
+                                       "tankNumber":  "210T29",
+                                       "tankHeight":  882
+                                   },
+                                   {
+                                       "id":  "68",
+                                       "tankNumber":  "210T51",
+                                       "tankHeight":  1283
+                                   },
+                                   {
+                                       "id":  "69",
+                                       "tankNumber":  "210T52",
+                                       "tankHeight":  1283
+                                   },
+                                   {
+                                       "id":  "70",
+                                       "tankNumber":  "210T53",
+                                       "tankHeight":  1285
+                                   },
+                                   {
+                                       "id":  "71",
+                                       "tankNumber":  "210T54",
+                                       "tankHeight":  1285
+                                   },
+                                   {
+                                       "id":  "72",
+                                       "tankNumber":  "210T55",
+                                       "tankHeight":  1285
+                                   },
+                                   {
+                                       "id":  "73",
+                                       "tankNumber":  "210T56",
+                                       "tankHeight":  1284
+                                   },
+                                   {
+                                       "id":  "74",
+                                       "tankNumber":  "210T57",
+                                       "tankHeight":  1284
+                                   },
+                                   {
+                                       "id":  "75",
+                                       "tankNumber":  "210T58",
+                                       "tankHeight":  1275
+                                   },
+                                   {
+                                       "id":  "76",
+                                       "tankNumber":  "210T59",
+                                       "tankHeight":  1283
+                                   },
+                                   {
+                                       "id":  "77",
+                                       "tankNumber":  "210T60",
+                                       "tankHeight":  1283
+                                   },
+                                   {
+                                       "id":  "80",
+                                       "tankNumber":  "210T61",
+                                       "tankHeight":  1283
+                                   },
+                                   {
+                                       "id":  "81",
+                                       "tankNumber":  "210T62",
+                                       "tankHeight":  1283
+                                   },
+                                   {
+                                       "id":  "82",
+                                       "tankNumber":  "210T63",
+                                       "tankHeight":  930
+                                   },
+                                   {
+                                       "id":  "83",
+                                       "tankNumber":  "210T64",
+                                       "tankHeight":  1815
+                                   },
+                                   {
+                                       "id":  "84",
+                                       "tankNumber":  "210T65",
+                                       "tankHeight":  1815
+                                   },
+                                   {
+                                       "id":  "85",
+                                       "tankNumber":  "210T66",
+                                       "tankHeight":  1815
+                                   },
+                                   {
+                                       "id":  "86",
+                                       "tankNumber":  "210T67",
+                                       "tankHeight":  1815
+                                   },
+                                   {
+                                       "id":  "87",
+                                       "tankNumber":  "210T71",
+                                       "tankHeight":  930
+                                   },
+                                   {
+                                       "id":  "88",
+                                       "tankNumber":  "210T72",
+                                       "tankHeight":  935
+                                   },
+                                   {
+                                       "id":  "89",
+                                       "tankNumber":  "210T73",
+                                       "tankHeight":  930
+                                   },
+                                   {
+                                       "id":  "90",
+                                       "tankNumber":  "210T74",
+                                       "tankHeight":  934
+                                   }
+                               ]
+                 }
+             ]
+}
