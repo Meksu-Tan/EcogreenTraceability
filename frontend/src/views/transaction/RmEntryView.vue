@@ -385,8 +385,15 @@ const visiblePagesFeed = computed(() => {
 })
 
 // Methods
+function buildPlantParams() {
+  const id = plantSelectionStore.selectedPlantId
+  return { id_plant: id === null || id === undefined || id === '' ? 0 : id }
+}
+
 async function fetchData() {
-  const params = { id_plant: plantSelectionStore.selectedPlantId }
+  const params = buildPlantParams()
+  currentPageStorage.value = 1
+  currentPageFeed.value = 1
   await Promise.all([
     store.fetchEntries(params),
     transferStore.fetchFeedLogs(params),

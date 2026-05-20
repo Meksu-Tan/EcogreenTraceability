@@ -115,7 +115,7 @@
                     @change="onTankChange"
                   >
                     <option value="">— Pilih Sloc —</option>
-                    <option v-for="tank in tanks" :key="tank.id_tank" :value="tank.id_tank">
+                    <option v-for="tank in tanks" :key="tank.tank" :value="tank.tank">
                       {{ tank.tank }}
                     </option>
                   </select>
@@ -487,7 +487,15 @@ async function bootstrap() {
 async function onTankChange() {
   form.value.id_tank_tail = []
   if (form.value.id_tank) {
-    await store.fetchTankDetails(form.value.id_tank)
+    await store.fetchTankDetails(form.value.id_tank, plantSelectionStore.selectedPlantId)
+    
+    if (!plantSelectionStore.selectedPlantId || plantSelectionStore.selectedPlantId == 0) {
+      await store.generateRmNumber({ 
+        id_plant: 0, 
+        tank_desc: form.value.id_tank 
+      })
+      form.value.rm_number = store.rmNumber || ''
+    }
   }
 }
 
@@ -531,9 +539,22 @@ async function removeSupplier(id) {
 async function handleSubmit() {
   if (!canSubmit.value) return
 
+  const checkedDetails = tankDetails.value.filter(detail => 
+    form.value.id_tank_tail.includes(detail.id_tank_tail)
+  )
+
+  if (checkedDetails.length === 0) return
+
+  const realIdTank = checkedDetails[0].id_sloc
+  const realIdTankTail = checkedDetails
+    .map(d => d.id_tank_tail)
+    .filter(id => !String(id).startsWith('s_'))
+
   try {
     const data = {
       ...form.value,
+      id_tank: realIdTank,
+      id_tank_tail: realIdTankTail,
       id_plant: plantSelectionStore.selectedPlantId,
       total_qty: parseFloat(String(totalQty.value ?? '0').replace(/,/g, ''), 10)
     }
@@ -543,6 +564,7 @@ async function handleSubmit() {
     closeModal()
   } catch (error) {
     console.error('Submit error:', error)
+    await bootstrap()
   }
 }
 

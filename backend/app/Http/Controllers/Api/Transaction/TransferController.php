@@ -26,7 +26,9 @@ class TransferController extends Controller
     public function storageLog(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+            $plantId = $request->has('id_plant')
+                ? $request->input('id_plant')
+                : (Auth::user()?->id_plant ?? 0);
             $data = $this->transferService->getStorageLog($plantId);
             return response()->json(['success' => true, 'data' => $data]);
         } catch (\Exception $e) {
@@ -40,8 +42,26 @@ class TransferController extends Controller
     public function feedLog(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+            $plantId = $request->has('id_plant')
+                ? $request->input('id_plant')
+                : (Auth::user()?->id_plant ?? 0);
             $data = $this->transferService->getFeedLog($plantId);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Debug Feed Tank Log with sub-sloc details
+     */
+    public function debugFeedLog(Request $request)
+    {
+        try {
+            $plantId = $request->has('id_plant')
+                ? $request->input('id_plant')
+                : (Auth::user()?->id_plant ?? 0);
+            $data = $this->transferService->debugFeedLog($plantId);
             return response()->json(['success' => true, 'data' => $data]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -131,7 +151,9 @@ class TransferController extends Controller
             $tanks = Tank::active()
                 ->feed()
                 ->where('plant_code', $plantId)
-                ->get(['id_sloc as id_tank', 'description as tank']);
+                ->orderBy('description')
+                ->groupBy('description')
+                ->get(['description as tank']);
 
             return response()->json(['success' => true, 'data' => $tanks]);
         } catch (\Exception $e) {

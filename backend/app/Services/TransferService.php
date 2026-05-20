@@ -38,6 +38,76 @@ class TransferService
     }
 
     /**
+     * Debug Feed Tank Log with sub-sloc details
+     */
+    public function debugFeedLog($plantId)
+    {
+        $plantId = $this->resolvePlantCode($plantId);
+        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
+        
+        $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date, 
+                         a.from_trace_no, a.to_trace_no, 
+                         c.code AS material_code, c.description AS material_name,
+                         d.description AS tank_description,
+                         d.tank_number,
+                         a.id_tank_tail,
+                         h.tf_number AS sub_sloc_number,
+                         h.description AS sub_sloc_description,
+                         FORMAT(a.in_qty, 3) AS in_qty, 
+                         FORMAT(a.out_qty, 3) AS out_qty,
+                         a.created_by, a.created_at,
+                         md.material_document, md.po_so
+                    FROM t_trace_header a
+                    JOIN m_material c ON a.id_material = c.id_material
+                    JOIN m_sloc d ON a.id_sloc = d.id_sloc
+                    LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
+                    LEFT JOIN m_sloc_detail h ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
+                   WHERE a.status = 1
+                     AND d.description LIKE CONCAT('%', 'FEED', '%')
+                     AND (d.plant_code = ? OR ? = 0)
+                   ORDER BY a.id_trace_head DESC, h.tf_number ASC";
+
+        $rawData = DB::connection('eudr_ts')->select($query, [$plantId, $plantId]);
+        
+        // Group by trace head and combine sub-sloc info
+        $groupedData = [];
+        foreach ($rawData as $row) {
+            $key = $row->id_trace_head;
+            
+            if (!isset($groupedData[$key])) {
+                $groupedData[$key] = [
+                    'id_trace_head' => $row->id_trace_head,
+                    'id_balance_head' => $row->id_balance_head,
+                    'entry_date' => $row->entry_date,
+                    'from_trace_no' => $row->from_trace_no,
+                    'to_trace_no' => $row->to_trace_no,
+                    'material_code' => $row->material_code,
+                    'material_name' => $row->material_name,
+                    'tank_description' => $row->tank_description,
+                    'tank_number' => $row->tank_number,
+                    'id_tank_tail' => $row->id_tank_tail,
+                    'in_qty' => $row->in_qty,
+                    'out_qty' => $row->out_qty,
+                    'created_by' => $row->created_by,
+                    'created_at' => $row->created_at,
+                    'material_document' => $row->material_document,
+                    'po_so' => $row->po_so,
+                    'sub_slocs' => []
+                ];
+            }
+            
+            if ($row->sub_sloc_number) {
+                $groupedData[$key]['sub_slocs'][] = [
+                    'tf_number' => $row->sub_sloc_number,
+                    'description' => $row->sub_sloc_description
+                ];
+            }
+        }
+        
+        return array_values($groupedData);
+    }
+
+    /**
      * Get Feed Tank Log
      */
     public function getFeedLog($plantId)
@@ -56,14 +126,23 @@ class TransferService
                          a.from_trace_no, a.to_trace_no, 
                          c.code AS material_code, c.description AS material_name,
                          CONCAT(d.description,
-                            IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', ') IS NULL,
-                                '',
-                                CONCAT(' | ', GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', '))
+                            IF(
+                                a.id_tank_tail IS NOT NULL 
+                                AND a.id_tank_tail != '' 
+                                AND a.id_tank_tail != '[]',
+                                CONCAT(' | ', 
+                                    COALESCE(
+                                        GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & '),
+                                        REPLACE(REPLACE(REPLACE(a.id_tank_tail, '[', ''), ']', ''), '\"', '')
+                                    )
+                                ),
+                                ''
                             )
                          ) AS tank_name,
                          FORMAT(a.in_qty, 3) AS in_qty, 
                          FORMAT(a.out_qty, 3) AS out_qty,
                          a.created_by, a.created_at,
+                         a.id_tank_tail,
                          md.material_document, md.po_so
                     FROM t_trace_header a
                     JOIN m_material c ON a.id_material = c.id_material

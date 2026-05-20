@@ -13,10 +13,20 @@ class Rundown
     {
         return DB::connection('eudr_ts')->transaction(function () use ($data) {
 
+            $traceNo = is_numeric($data['trace_no'])
+                ? (int) $data['trace_no']
+                : (int) preg_replace('/\D/', '', (string) $data['trace_no']);
+            $fromTraceNo = null;
+            if (!empty($data['from_trace_no'])) {
+                $fromTraceNo = is_numeric($data['from_trace_no'])
+                    ? (int) $data['from_trace_no']
+                    : (int) preg_replace('/\D/', '', (string) $data['from_trace_no']);
+            }
+
             // INSERT BALANCE HEADER
             $idHead = DB::connection('eudr_ts')->table('t_balance_header')->insertGetId([
                 'entry_date'   => $data['entry_date'],
-                'trace_no'     => $data['trace_no'],
+                'trace_no'     => $traceNo,
                 'id_material'  => $data['id_material'],
                 'id_sloc'      => $data['id_tank'],
                 'id_sloc_tail' => $data['id_tank_tail'],
@@ -32,8 +42,8 @@ class Rundown
 
             // INSERT TRACE HEADER
             $idTraceHead = DB::connection('eudr_ts')->table('t_trace_header')->insertGetId([
-                'from_trace_no'   => $data['from_trace_no'] ?? null,
-                'to_trace_no'     => $data['trace_no'],
+                'from_trace_no'   => $fromTraceNo,
+                'to_trace_no'     => $traceNo,
                 'id_balance_head' => $idHead,
                 'id_material'     => $data['id_material'],
                 'entry_date'      => $data['entry_date'],
@@ -93,7 +103,7 @@ class Rundown
                         'id_supplier'     => $idSupplier,
                         'id_material'     => $data['id_material'],
                         'id_sloc'         => $data['id_tank'],
-                        'id_tank_tail'    => $data['id_tank_tail'],
+                        'id_sloc_tail'    => $data['id_tank_tail'],
                         'in_qty'          => $qty,
                         'batch_sap'       => $batchSap,
                         'id_plant'        => $data['id_plant'],

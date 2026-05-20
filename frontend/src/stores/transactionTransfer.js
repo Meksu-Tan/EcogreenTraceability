@@ -25,10 +25,10 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
       }
     },
 
-    async fetchFeedLogs() {
+    async fetchFeedLogs(params = {}) {
       this.loading = true
       try {
-        const response = await api.get('/api/v1/transactions/transfers/feed-log')
+        const response = await api.get('/api/v1/transactions/transfers/feed-log', { params })
         const rows = response.data?.data
         this.feedLogs = Array.isArray(rows) ? rows : []
       } catch (error) {
@@ -56,9 +56,10 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
       }
     },
 
-    async fetchTankDetails(tankId) {
+    async fetchTankDetails(tankId, plantId = null) {
       try {
-        const response = await api.get(`/api/v1/transactions/rm-entries/tanks/${tankId}/details`)
+        const params = plantId ? { id_plant: plantId } : {}
+        const response = await api.get(`/api/v1/transactions/rm-entries/tanks/${encodeURIComponent(tankId)}/details`, { params })
         this.tankDetails = response.data.data
       } catch (error) {
         console.error('Fetch tank details error:', error)

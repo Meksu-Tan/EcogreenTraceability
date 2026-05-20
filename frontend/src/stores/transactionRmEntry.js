@@ -41,6 +41,14 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
   async function createEntry(data) {
     loading.value = true
     try {
+      // Validate stock synchronization before submission
+      if (data.rm_number && data.total_qty > 0) {
+        const stockCheck = await validateStockSynchronization(data.rm_number, data.id_material)
+        if (!stockCheck.valid) {
+          throw new Error(stockCheck.message || 'Stock synchronization validation failed')
+        }
+      }
+      
       const response = await transactionRmEntryApi.create(data)
       toastStore.success('RM Entry created successfully')
       await fetchEntries()
@@ -102,9 +110,10 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     }
   }
 
-  async function fetchTankDetails(tankId) {
+  async function fetchTankDetails(tankId, plantId = null) {
     try {
-      const response = await transactionRmEntryApi.getTankDetails(tankId)
+      const params = plantId ? { id_plant: plantId } : {}
+      const response = await transactionRmEntryApi.getTankDetails(tankId, params)
       tankDetails.value = response.data || []
       return response
     } catch (error) {
@@ -195,18 +204,49 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     }
   }
 
-  async function transferEntry(data) {
+  async function transferEntry(data, refreshParams = {}) {
     loading.value = true
     try {
       const response = await transactionRmEntryApi.transfer(data)
       toastStore.success('RM Transfer processed successfully')
-      await fetchEntries()
+      await fetchEntries(refreshParams)
       return response
     } catch (error) {
       toastStore.error(error.response?.data?.message || 'Failed to process RM transfer')
       throw error
     } finally {
       loading.value = false
+    }
+  }
+
+  async function validateStockSynchronization(entryNo, materialId) {
+    try {
+      // Check if there are temporary records for this entry
+      await fetchSupplierList(entryNo)
+      await fetchTotalQty(entryNo)
+      
+      const tempTotal = parseFloat(totalQty.value.replace(/,/g, ''))
+      
+      if (supplierList.value.length === 0) {
+        return {
+          valid: false,
+          message: 'No supplier data found. Please add supplier information first.'
+        }
+      }
+      
+      if (tempTotal <= 0) {
+        return {
+          valid: false,
+          message: 'Total quantity must be greater than 0. Please check supplier quantities.'
+        }
+      }
+      
+      return { valid: true }
+    } catch (error) {
+      return {
+        valid: false,
+        message: 'Stock validation failed: ' + (error.message || 'Unknown error')
+      }
     }
   }
 
@@ -253,6 +293,7 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     deleteSupplier,
     fetchTotalQty,
     transferEntry,
+    validateStockSynchronization,
     resetForm
   }
 })

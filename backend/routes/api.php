@@ -116,6 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('total-qty', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'totalQty']);
             Route::post('transfer', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'transfer']);
             Route::get('transfer-number', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'transferNumber']);
+            Route::get('stock-sync-check', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'checkStockSync']);
+            Route::get('debug-fifo-stock', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'debugFifoStock']);
+            Route::get('verify-separate-entries', [\App\Http\Controllers\Api\Transaction\RmEntryController::class, 'verifySeparateEntries']);
         });
         
         Route::get('transactions/wip-entries', function() {
@@ -137,6 +140,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('transactions/transfers')->group(function () {
             Route::get('storage-log', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'storageLog']);
             Route::get('feed-log', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'feedLog']);
+            Route::get('debug-feed-log', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'debugFeedLog']);
             Route::post('/', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'transfer']);
             Route::delete('{id}', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'deactivate']);
             Route::get('source-entries', [\App\Http\Controllers\Api\Transaction\TransferController::class, 'sourceEntries']);

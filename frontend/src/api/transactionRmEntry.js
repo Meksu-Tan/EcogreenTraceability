@@ -34,8 +34,8 @@ export default {
   },
 
   // Get tank details (sub tanks)
-  async getTankDetails(tankId) {
-    const response = await axios.get(`${BASE_URL}/tanks/${tankId}/details`)
+  async getTankDetails(tankId, params = {}) {
+    const response = await axios.get(`${BASE_URL}/tanks/${encodeURIComponent(tankId)}/details`, { params })
     return response.data
   },
 
@@ -98,6 +98,18 @@ export default {
   // Generate new transfer number
   async getTransferNumber(params = {}) {
     const response = await axios.get(`${BASE_URL}/transfer-number`, { params })
+    return response.data
+  },
+
+  // Check stock synchronization status
+  async checkStockSync(params = {}) {
+    const response = await axios.get(`${BASE_URL}/stock-sync-check`, { params })
+    return response.data
+  },
+
+  // Debug FIFO stock details
+  async debugFifoStock(params = {}) {
+    const response = await axios.get(`${BASE_URL}/debug-fifo-stock`, { params })
     return response.data
   }
 }

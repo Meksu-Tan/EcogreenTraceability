@@ -37,55 +37,93 @@ class RmEntryService
     }
 
     /**
-     * Generate new RM entry number
+     * Trace numbers are stored as bigint — must be digits only (14 chars).
+     * Layout: [section 1][yymmdd 6][warehouse 3][plant 2][sequence 2]
+     * Section: 1=storage, 3=feed
+     * Warehouse: 000 for both storage & feed
      */
-    public function generateRmNumber($plantId)
+    protected function buildTraceNo(string $section, string $entryDate, string $warehouse, string $plantCode, int $sequence): string
     {
-        $plantId = $this->resolvePlantCode($plantId);
-        $result = DB::connection('eudr_ts')->select(
-            'SELECT a.rm_number
-               FROM (SELECT a.trace_no+1 AS rm_number
-                       FROM t_balance_header a
-                      WHERE SUBSTRING(a.trace_no,1,7) = CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"))
-                        AND SUBSTRING(a.trace_no,8,3) = ?
-                        AND a.status = 1 
-                        AND a.id_plant = ?
-                      ORDER BY a.id_balance_head DESC
-                      LIMIT 1) a
-             UNION ALL
-            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(RIGHT(?, 2), 2, "0"), "01") AS rm_number
-             LIMIT 1',
-            [$this->movSeq, $plantId, $this->movSeq, $plantId]
-        );
+        $trace = $section
+            . str_pad(substr($entryDate, 0, 6), 6, '0', STR_PAD_LEFT)
+            . str_pad(substr(preg_replace('/\D/', '', $warehouse) ?: '000', 0, 3), 3, '0', STR_PAD_LEFT)
+            . str_pad(substr(preg_replace('/\D/', '', $plantCode) ?: '0', -2, 2), 2, '0', STR_PAD_LEFT)
+            . str_pad((string) max(1, min(99, $sequence)), 2, '0', STR_PAD_LEFT);
 
-        return $result[0]->rm_number ?? null;
+        return preg_replace('/\D/', '', $trace);
+    }
+
+    protected function traceNoToInt(string $traceNo): int
+    {
+        $digits = preg_replace('/\D/', '', $traceNo);
+
+        return (int) ($digits !== '' ? $digits : 0);
     }
 
     /**
-     * Generate transfer number for RM (Starts with 1, like RM entry)
+     * Generate new RM entry number - storage section (1)
+     */
+    public function generateRmNumber($plantId)
+    {
+        $resolvedPlantId = $this->resolvePlantCode($plantId);
+        $warehouse = '000'; // Fixed warehouse for storage
+        $section = '1'; // Storage section
+        
+        // For storage tank log, always use plant code 00 (not dependent on plant)
+        $tracePlantCode = '00';
+        
+        // Get the highest sequence number for today to ensure uniqueness
+        $result = DB::connection('eudr_ts')->select(
+            'SELECT MAX(CAST(RIGHT(trace_no, 2) AS UNSIGNED)) as max_seq
+               FROM t_balance_header 
+              WHERE SUBSTRING(trace_no,1,1) = ?
+                AND SUBSTRING(trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
+                AND SUBSTRING(trace_no,8,3) = ?
+                AND SUBSTRING(trace_no,11,2) = ?
+                AND status = 1',
+            [$section, $warehouse, $tracePlantCode]
+        );
+
+        $maxSeq = $result[0]->max_seq ?? 0;
+        $newSeq = $maxSeq + 1;
+        
+        // Format: section(1) + yymmdd + warehouse(000) + plant(00) + sequence(2)
+        $rmNumber = $this->buildTraceNo($section, date("ymd"), $warehouse, $tracePlantCode, $newSeq);
+
+        return $rmNumber;
+    }
+
+    /**
+     * Generate transfer number for RM - feed section (3)
      */
     public function generateTransferNumber($plantId)
     {
-        $plantId = $this->resolvePlantCode($plantId);
-        // Logic follow monorepo get_rmNewEntryNumberTrf
-        $idTankSrc = "T000"; // STORAGE
+        $resolvedPlantId = $this->resolvePlantCode($plantId);
+        $warehouse = '000'; // Fixed warehouse for feed
+        $section = '3'; // Feed section
+        
+        // For feed transfer from storage without plant, use plant code 00 in trace number
+        $tracePlantCode = ($resolvedPlantId == 0 || $resolvedPlantId == '0') ? '00' : str_pad(substr($resolvedPlantId, -2), 2, '0', STR_PAD_LEFT);
+        
+        // Get the highest sequence number for today to ensure uniqueness
         $result = DB::connection('eudr_ts')->select(
-            'SELECT CONCAT(SUBSTRING(a.rm_number,1,7), ?, SUBSTRING(a.rm_number,11,4)) + 1 AS rm_number
-               FROM (SELECT a.trace_no AS rm_number
-                       FROM t_balance_header a
-                      WHERE SUBSTRING(a.trace_no,1,7) = CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"))
-                        AND SUBSTRING(a.trace_no,2,9) = CONCAT(DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
-                        AND a.status = 1 
-                        AND a.id_plant = ?
-                      ORDER BY a.id_balance_head DESC
-                      LIMIT 1 ) a
-             UNION ALL
-            SELECT CONCAT("1", DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(RIGHT(?, 2), 2, "0"), "01") AS rm_number
-             LIMIT 1',
-            [substr($idTankSrc,1,3), "000", $plantId, substr($idTankSrc,1,3), $plantId]
+            'SELECT MAX(CAST(RIGHT(trace_no, 2) AS UNSIGNED)) as max_seq
+               FROM t_balance_header 
+              WHERE SUBSTRING(trace_no,1,1) = ?
+                AND SUBSTRING(trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
+                AND SUBSTRING(trace_no,8,3) = ?
+                AND SUBSTRING(trace_no,11,2) = ?
+                AND status = 1',
+            [$section, $warehouse, $tracePlantCode]
         );
 
-        return $result[0]->rm_number ?? null;
+        $maxSeq = $result[0]->max_seq ?? 0;
+        $newSeq = $maxSeq + 1;
+        
+        // Format: section(3) + yymmdd + warehouse(000) + plant(2) + sequence(2)
+        $transferNumber = $this->buildTraceNo($section, date("ymd"), $warehouse, $tracePlantCode, $newSeq);
+
+        return $transferNumber;
     }
 
 
@@ -94,31 +132,53 @@ class RmEntryService
      */
     public function getRmList($plantId)
     {
-        $plantId = $this->resolvePlantCode($plantId);
-        $idTankStorageIds = Tank::where('status', 1)
-            ->where('description', 'like', '%STORAGE%')
-            ->where('plant_code', $plantId)
-            ->pluck('id_sloc')
-            ->toArray();
+        $resolvedPlant = $this->resolvePlantCode($plantId);
+        $allPlants = $resolvedPlant === null
+            || $resolvedPlant === ''
+            || $resolvedPlant === 0
+            || $resolvedPlant === '0';
+
+        $tankQuery = Tank::where('status', 1)
+            ->where('description', 'like', '%STORAGE%');
+
+        if (!$allPlants) {
+            $tankQuery->where('plant_code', $resolvedPlant);
+        }
+
+        $idTankStorageIds = $tankQuery->pluck('id_sloc')->toArray();
 
         if (empty($idTankStorageIds)) {
             $idTankStorageIds = [0];
         }
 
         $inClause = implode(',', array_map('intval', $idTankStorageIds));
+        $filterPlant = $allPlants ? 0 : $resolvedPlant;
 
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $query = "SELECT a.id_balance_head, a.id_material, COALESCE(a.id_sloc, a.id_tank) AS id_tank, COALESCE(a.id_sloc_tail, a.id_tank_tail) AS id_tank_tail, a.status,
                          CAST(a.trace_no AS CHAR) AS trace_no, 
-                         FORMAT(SUM(DISTINCT a.qty),3) AS qty, 
+                         FORMAT(a.qty,3) AS qty, 
                          a.created_by, a.created_at,
+                         COALESCE(
+                            pl.description,
+                            CAST(a.id_plant AS CHAR),
+                            CAST(d.plant_code AS CHAR),
+                            '-'
+                         ) COLLATE utf8mb4_unicode_ci AS plant_code,
                          CONCAT(c.code, ' :: ', c.description) AS material, 
-                         FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
+                         FORMAT(a.init_qty,3) AS init_qty,
                          CONCAT(d.description,
-                            IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', ') IS NULL,
-                               '',
-                               CONCAT(' | ', GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', '))
+                            IF(
+                                COALESCE(
+                                    GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & '),
+                                    d.tank_number
+                                ) IS NULL,
+                                '',
+                                CONCAT(' | ', COALESCE(
+                                    GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & '),
+                                    d.tank_number
+                                ))
                             )
                          ) AS tf_number, 
                          a.entry_date, b.batch_sap,
@@ -133,7 +193,18 @@ class RmEntryService
                     LEFT JOIN m_material c
                       ON a.id_material = c.id_material
                     LEFT JOIN m_sloc d
-                      ON COALESCE(a.id_sloc, a.id_tank) = d.id_sloc AND d.status = 1 AND (d.description LIKE '%STORAGE%' OR d.plant_code = ? OR ? = 0)
+                      ON COALESCE(a.id_sloc, a.id_tank) = d.id_sloc AND d.status = 1
+                      AND (
+                        d.description LIKE '%STORAGE%'
+                        OR CAST(d.plant_code AS CHAR) COLLATE utf8mb4_unicode_ci = CAST(? AS CHAR) COLLATE utf8mb4_unicode_ci
+                        OR ? = 0
+                      )
+                    LEFT JOIN m_plant pl
+                      ON pl.status = 1
+                      AND (
+                        pl.code_3 COLLATE utf8mb4_unicode_ci = CAST(a.id_plant AS CHAR) COLLATE utf8mb4_unicode_ci
+                        OR pl.code_3 COLLATE utf8mb4_unicode_ci = CAST(d.plant_code AS CHAR) COLLATE utf8mb4_unicode_ci
+                      )
                     LEFT JOIN m_supplier e
                       ON e.id_supplier = b.id_supplier
                     LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head
@@ -152,18 +223,18 @@ class RmEntryService
                         GROUP BY id_balance_head
                     ) bs ON bs.id_balance_head = a.id_balance_head
                    WHERE c.type = ?
-                     AND (SUBSTRING(a.trace_no,1,1) = ? OR SUBSTRING(a.trace_no,1,1) = ?)
-                     AND SUBSTRING(a.trace_no,8,3) = ?
+                     AND SUBSTRING(a.trace_no,1,1) = ? -- Storage section (1)
+                     AND SUBSTRING(a.trace_no,8,3) = ? -- Warehouse (000)
                      AND a.status = 1
                      AND (a.id_plant = ? OR ? = 0)
                      AND COALESCE(a.id_sloc, a.id_tank) IN ($inClause)
-                   GROUP BY a.trace_no
+                   GROUP BY a.id_balance_head
                    ORDER BY a.id_balance_head DESC";
 
         return DB::connection('eudr_ts')->select($query, [
-            $plantId, $plantId,
-            $this->typeMaterial, $this->movType1, $this->movType2, $this->movSeq,
-            $plantId, $plantId
+            $filterPlant, $filterPlant,
+            $this->typeMaterial, '1', '000', // Storage section (1), Warehouse (000)
+            $filterPlant, $filterPlant
         ]);
     }
 
@@ -212,9 +283,9 @@ class RmEntryService
             $entry_no = $data['rm_number'];
             $qty = floatval($data['total_qty']);
 
-            // Fetch temporary suppliers
+            // Fetch temporary suppliers (remove material filter to ensure stock synchronization)
             $dat = DB::connection('eudr_ts')->select(
-                'SELECT id_supplier, qty AS qty_tail, batch_sap
+                'SELECT id_supplier, qty AS qty_tail, batch_sap, id_material
                    FROM t_balance_temporary
                   WHERE entry_no = ? AND status = 1',
                 [$entry_no]
@@ -223,6 +294,7 @@ class RmEntryService
             $supplierRows = [];
             foreach ($dat as $row) {
                 if ($row->qty_tail <= 0) continue;
+                if (empty($row->id_supplier)) continue; // skip non-supplier rows
                 $supplierRows[] = [
                     'id_supplier' => $row->id_supplier,
                     'batch_sap' => $row->batch_sap,
@@ -238,6 +310,7 @@ class RmEntryService
             Rundown::adjustRundownToTotal($supplierRows, $qty);
 
             // Execute Rundown
+            $tankTailJson = !empty($data['id_tank_tail']) ? json_encode(array_values($data['id_tank_tail'])) : null;
             $rundownResult = Rundown::generalRundown([
                 'user' => $user,
                 'entry_date' => $data['entry_date'],
@@ -245,7 +318,7 @@ class RmEntryService
                 'trace_no' => $entry_no,
                 'id_material' => $data['id_material'],
                 'id_tank' => $data['id_tank'],
-                'id_tank_tail' => json_encode($data['id_tank_tail']),
+                'id_tank_tail' => $tankTailJson,
                 'in_qty' => $qty,
                 'last_qtf' => 0,
                 'curr_qtf' => $qty,
@@ -310,8 +383,8 @@ class RmEntryService
             $id_tankNo = $data['trf_tank_no']; // Array
             $idPlant = $this->resolvePlantCode($data['id_plant'] ?? 0);
 
-            $id_tankSourceNo_json = json_encode($id_tankSourceNo);
-            $id_tankNo_json = json_encode($id_tankNo);
+            $id_tankSourceNo_json = !empty($id_tankSourceNo) ? json_encode(array_values($id_tankSourceNo)) : null;
+            $id_tankNo_json = !empty($id_tankNo) ? json_encode(array_values($id_tankNo)) : null;
 
             $srcTankRec = DB::connection('eudr_ts')->select('SELECT tank_number as code, description, plant_code as id_plant FROM m_sloc WHERE id_sloc = ? AND status = 1 LIMIT 1', [$id_tankSource]);
             $tgtTankRec = DB::connection('eudr_ts')->select('SELECT tank_number as code FROM m_sloc WHERE id_sloc = ? AND status = 1 LIMIT 1', [$id_tank]);
@@ -322,7 +395,10 @@ class RmEntryService
 
             $targetTankCode = $tgtTankRec[0]->code;
             $isStorageTank = (str_contains(strtoupper($srcTankRec[0]->description), 'STORAGE'));
-
+            $balancePlant = $idPlant;
+            if (!$balancePlant && !empty($srcTankRec[0]->id_plant)) {
+                $balancePlant = $srcTankRec[0]->id_plant;
+            }
             $datTempMaterial = DB::connection('eudr_ts')->select(
                 'SELECT entry_no, id_tank, id_material, qty
                    FROM t_balance_temporary
@@ -334,32 +410,64 @@ class RmEntryService
                 throw new Exception('No temporary material data found');
             }
 
+            $batch_moveType = substr($entry_no, 0, 1);
+            $batch_entryDate = substr($entry_no, 1, 6);
+            $batch_idPlant = substr($entry_no, 10, 2);
+            $batch_sequence = (int) substr($entry_no, -2);
+            $feedSequence = $batch_sequence + 2;
+
             foreach ($datTempMaterial as $row) {
                 $id_material = $row->id_material;
                 $out_qty = floatval($row->qty);
 
-                // Create entry numbers following the monorepo logic
-                $batchTrf_id = substr($targetTankCode, 1, 3);
-                $batchFeed_id = "000";
-                $batch_moveType = substr($entry_no, 0, 1);
-                $batch_entryDate = substr($entry_no, 1, 6);
-                $batch_idPlant = substr($entry_no, 10, 2);
-                $batch_sequence = substr($entry_no, -2);
-
-                $entryTrfNo_in = $batch_moveType . $batch_entryDate . $batchTrf_id . $batch_idPlant . $batch_sequence;
-                $entryFeedNo_in = $batch_moveType . $batch_entryDate . $batchFeed_id . $batch_idPlant . $batch_sequence;
-
-                // Execute Feed (Deduct from Storage)
-                $feedResult = Feed::generalFeed([
-                    'user' => $user,
-                    'entry_date' => $curr_entryDate,
+                $feedParams = [
                     'id_material' => $id_material,
                     'id_tank' => $id_tankSource,
                     'id_tank_tail' => $id_tankSourceNo_json,
+                    'balance_plant' => $balancePlant,
+                    'trace_prefixes' => ['1'], // Only storage section (1) for FIFO
+                    'tank_matching' => 'flexible', // Use flexible matching for FIFO with parameter adjustment
+                ];
+
+                $availableQty = Feed::getAvailableQty($feedParams);
+                if (round($availableQty, 4) < round($out_qty, 4)) {
+                    $material = Material::find($id_material);
+                    $matLabel = $material ? ($material->code . ' :: ' . $material->description) : (string) $id_material;
+                    
+                    // Check if this is a temporary entry issue
+                    $tempCheck = DB::connection('eudr_ts')->select(
+                        'SELECT COUNT(*) as count FROM t_balance_temporary 
+                         WHERE entry_no = ? AND status = 1 AND id_material = ? AND qty > 0',
+                        [$entry_no, $id_material]
+                    );
+                    
+                    if ($tempCheck[0]->count > 0) {
+                        throw new Exception(
+                            'Stock synchronization issue detected. Material ' . $matLabel .
+                            ' has temporary data but stock not updated. Available: ' . number_format($availableQty, 3) .
+                            ' MT, requested: ' . number_format($out_qty, 3) . ' MT. Please complete RM Entry process first.'
+                        );
+                    }
+                    
+                    throw new Exception(
+                        'Insufficient stock for ' . $matLabel .
+                        '. Available: ' . number_format($availableQty, 3) .
+                        ' MT, requested: ' . number_format($out_qty, 3) . ' MT (FIFO sloc/sub-sloc/plant).'
+                    );
+                }
+
+                // Trace layout: section(1)+yymmdd(6)+warehouse(3)+plant(2)+seq(2); storage=1, feed=3, warehouse=000
+                $entryTrfNo_in = $this->buildTraceNo('1', $batch_entryDate, '000', $batch_idPlant, $batch_sequence);
+
+                // Execute Feed (Deduct on-hand from storage — init_qty tidak diubah)
+                $feedResult = Feed::generalFeed(array_merge($feedParams, [
+                    'user' => $user,
+                    'entry_date' => $curr_entryDate,
                     'id_plant' => $isStorageTank ? 0 : $idPlant,
                     'qty' => $out_qty,
-                    'to_trace_no' => $entryTrfNo_in,
-                ]);
+                    'to_trace_no' => $this->traceNoToInt($entryTrfNo_in),
+                    'tank_matching' => 'flexible', // Ensure flexible matching is passed through
+                ]));
 
                 if ($feedResult['response'] != 1) {
                     throw new Exception('Feed failed: ' . ($feedResult['response'] == 3 ? 'Insufficient stock' : 'Unknown error'));
@@ -367,16 +475,30 @@ class RmEntryService
 
                 // Execute Rundown for each used head (Add to Feed)
                 foreach ($feedResult['used_heads'] as $used) {
+                    $entryFeedNo_in = $this->buildTraceNo('3', $batch_entryDate, '000', $batch_idPlant, $feedSequence);
+                    $feedSequence += 2;
+
                     $in_qty = $used['qty_used'];
+                    $headDetails = $used['feed_in_details'] ?? [];
+                    if (empty($headDetails) && count($feedResult['used_heads']) === 1) {
+                        $headDetails = $feedResult['feed_in_details'] ?? [];
+                    }
 
                     $supplierRows = [];
-                    foreach ($feedResult['feed_in_details'] as $d) {
-                        if ($d['qty'] <= 0) continue;
+                    foreach ($headDetails as $d) {
+                        if (($d['qty'] ?? 0) <= 0) continue;
                         $supplierRows[] = [
                             'id_supplier' => $d['id_supplier'],
                             'batch_sap' => $d['batch_sap'],
-                            'rundownSupplier' => round((float)$d['qty'], 4),
+                            'rundownSupplier' => round((float) $d['qty'], 4),
                         ];
+                    }
+
+                    if (empty($supplierRows)) {
+                        throw new Exception(
+                            'Supplier breakdown kosong untuk transfer ' . number_format($in_qty, 3) .
+                            ' MT. Pastikan RM entry memiliki data supplier aktif.'
+                        );
                     }
 
                     Rundown::adjustRundownToTotal($supplierRows, $in_qty);
@@ -384,8 +506,8 @@ class RmEntryService
                     $rundownResult = Rundown::generalRundown([
                         'user' => $user,
                         'entry_date' => $curr_entryDate,
-                        'trace_no' => $entryFeedNo_in,
-                        'from_trace_no' => $entryTrfNo_in,
+                        'trace_no' => $this->traceNoToInt($entryFeedNo_in),
+                        'from_trace_no' => $this->traceNoToInt($entryTrfNo_in),
                         'id_material' => $id_material,
                         'id_tank' => $id_tank,
                         'id_tank_tail' => $id_tankNo_json,
@@ -395,6 +517,10 @@ class RmEntryService
                         'curr_qtf' => $in_qty,
                         'supplier_rows' => $supplierRows,
                     ]);
+
+                    if (($rundownResult['response'] ?? 0) != 1) {
+                        throw new Exception('Rundown failed for feed tank');
+                    }
 
                     if (!empty($materialDoc)) {
                         DB::connection('eudr_ts')->table('t_material_document')->insert([
@@ -488,6 +614,86 @@ class RmEntryService
         return BalanceTemporary::where('entry_no', $entryNo)
             ->where('status', 1)
             ->sum('qty');
+    }
+
+    /**
+     * Verify that RM Entry creates separate balance headers
+     */
+    public function verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack = 24)
+    {
+        $since = now()->subHours($hoursBack);
+        
+        $entries = DB::connection('eudr_ts')->select(
+            'SELECT id_balance_head, trace_no, qty, init_qty, entry_date, created_at
+               FROM t_balance_header 
+              WHERE id_material = ? 
+                AND COALESCE(id_sloc, id_tank) = ?
+                AND id_plant = ?
+                AND status = 1
+                AND created_at >= ?
+              ORDER BY id_balance_head ASC',
+            [$materialId, $tankId, $plantId, $since]
+        );
+        
+        return [
+            'total_entries' => count($entries),
+            'entries' => $entries,
+            'total_qty' => array_sum(array_column($entries, 'qty')),
+            'separate_entries_created' => count($entries) > 1,
+            'parameters' => [
+                'id_material' => $materialId,
+                'id_tank' => $tankId,
+                'id_plant' => $plantId,
+                'hours_back' => $hoursBack
+            ]
+        ];
+    }
+
+    /**
+     * Check stock synchronization status
+     */
+    public function checkStockSynchronization($entryNo, $materialId = null)
+    {
+        try {
+            // Check temporary records
+            $tempQuery = 'SELECT COUNT(*) as temp_count, SUM(qty) as temp_qty 
+                          FROM t_balance_temporary 
+                          WHERE entry_no = ? AND status = 1';
+            $tempParams = [$entryNo];
+            
+            if ($materialId) {
+                $tempQuery .= ' AND id_material = ?';
+                $tempParams[] = $materialId;
+            }
+            
+            $tempData = DB::connection('eudr_ts')->select($tempQuery, $tempParams);
+            $tempCount = $tempData[0]->temp_count ?? 0;
+            $tempQty = $tempData[0]->temp_qty ?? 0;
+            
+            // Check if RM entry is already processed
+            $balanceCheck = DB::connection('eudr_ts')->select(
+                'SELECT COUNT(*) as balance_count, SUM(qty) as balance_qty 
+                 FROM t_balance_header 
+                 WHERE trace_no = ? AND status = 1',
+                [$entryNo]
+            );
+            $balanceCount = $balanceCheck[0]->balance_count ?? 0;
+            $balanceQty = $balanceCheck[0]->balance_qty ?? 0;
+            
+            return [
+                'has_temporary_data' => $tempCount > 0,
+                'temporary_quantity' => floatval($tempQty),
+                'has_balance_data' => $balanceCount > 0,
+                'balance_quantity' => floatval($balanceQty),
+                'is_synchronized' => $balanceCount > 0 && $tempCount == 0,
+                'status' => $balanceCount > 0 ? 'processed' : ($tempCount > 0 ? 'pending' : 'no_data'),
+                'message' => $balanceCount > 0 ? 'RM Entry has been processed and stock is synchronized' : 
+                           ($tempCount > 0 ? 'RM Entry has temporary data but not yet processed' : 'No data found for this entry')
+            ];
+        } catch (Exception $e) {
+            Log::error('Stock Sync Check Error: ' . $e->getMessage());
+            throw $e;
+        }
     }
 
     /**

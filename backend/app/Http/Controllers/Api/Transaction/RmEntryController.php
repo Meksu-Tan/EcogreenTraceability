@@ -28,7 +28,9 @@ class RmEntryController extends Controller
     public function index(Request $request)
     {
         try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $plantId = $request->has('id_plant')
+                ? $request->input('id_plant')
+                : (Auth::user()?->id_plant ?? 0);
             $data = $this->rmEntryService->getRmList($plantId);
 
             return response()->json([
@@ -53,7 +55,7 @@ class RmEntryController extends Controller
             'rm_number' => 'required|string',
             'id_material' => 'required|integer',
             'id_tank' => 'required|integer',
-            'id_tank_tail' => 'required|array',
+            'id_tank_tail' => 'present|array',
             'total_qty' => 'required|numeric|min:0.001',
             'material_document' => 'nullable|string',
             'po_so' => 'nullable|string',
@@ -115,6 +117,15 @@ class RmEntryController extends Controller
     {
         try {
             $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $tankDesc = $request->input('tank_desc');
+
+            if ($plantId == 0 && $tankDesc) {
+                $tank = Tank::where('description', $tankDesc)->first();
+                if ($tank) {
+                    $plantId = $tank->plant_code;
+                }
+            }
+
             $rmNumber = $this->rmEntryService->generateRmNumber($plantId);
 
             return response()->json([
@@ -152,7 +163,8 @@ class RmEntryController extends Controller
             }
 
             $tanks = $query->orderBy('description')
-                ->get(['id_sloc as id_tank', 'description as tank']);
+                ->groupBy('description')
+                ->get(['description as tank']);
 
             return response()->json([
                 'success' => true,
@@ -169,17 +181,58 @@ class RmEntryController extends Controller
     /**
      * Get tank details (sub tanks)
      */
-    public function tankDetails($tankId)
+    public function tankDetails(Request $request, $tankId)
     {
         try {
+            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            if ($plantId) {
+                if (is_numeric($plantId)) {
+                    $plant = \App\Models\Plant::find($plantId);
+                    if ($plant && $plant->code_3) {
+                        $plantId = $plant->code_3;
+                    }
+                }
+            }
+
+            // Find all active tanks with description matching $tankId (which is the desc) in the selected plant
+            $tanksQuery = Tank::active()->where('description', $tankId);
+            if ($plantId) {
+                $tanksQuery->where('plant_code', $plantId);
+            }
+            $tanks = $tanksQuery->get();
+            $tankIds = $tanks->pluck('id_sloc')->toArray();
+
+            // Query real details from m_sloc_detail
             $details = TankDetail::active()
-                ->where('id_sloc', $tankId)
+                ->whereIn('id_sloc', $tankIds)
                 ->orderBy('tf_number')
-                ->get(['id_sloc_tail as id_tank_tail', 'tf_number as tankNo']);
+                ->get(['id_sloc_tail as id_tank_tail', 'tf_number as tankNo', 'id_sloc']);
+
+            // Find if any of the tanks do NOT have details in TankDetail.
+            // If they don't, we add them dynamically to the response as "virtual" details.
+            $detailsSlocIds = $details->pluck('id_sloc')->toArray();
+            $virtualDetails = [];
+            foreach ($tanks as $tank) {
+                if (!in_array($tank->id_sloc, $detailsSlocIds) && !empty($tank->tank_number)) {
+                    $virtualDetails[] = [
+                        'id_tank_tail' => 's_' . $tank->id_sloc,
+                        'tankNo' => $tank->tank_number,
+                        'id_sloc' => $tank->id_sloc
+                    ];
+                }
+            }
+
+            // Merge real and virtual details
+            $result = array_merge($details->toArray(), $virtualDetails);
+
+            // Sort results by tankNo alphabetically
+            usort($result, function($a, $b) {
+                return strcmp($a['tankNo'], $b['tankNo']);
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $details
+                'data' => $result
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -381,8 +434,8 @@ class RmEntryController extends Controller
             'entry_no' => 'required|string',
             'source_tank' => 'required|integer',
             'trf_tank' => 'required|integer',
-            'tank_no' => 'required|array',
-            'trf_tank_no' => 'required|array',
+            'tank_no' => 'present|array',
+            'trf_tank_no' => 'present|array',
             'material_document' => 'nullable|string',
         ]);
 
@@ -421,11 +474,124 @@ class RmEntryController extends Controller
     {
         try {
             $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $tankDesc = $request->input('tank_desc');
+
+            if ($plantId == 0 && $tankDesc) {
+                $tank = Tank::where('description', $tankDesc)->first();
+                if ($tank) {
+                    $plantId = $tank->plant_code;
+                }
+            }
+
             $rmNumber = $this->rmEntryService->generateTransferNumber($plantId);
 
             return response()->json([
                 'success' => true,
                 'data' => ['rm_number' => $rmNumber]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Check stock synchronization status
+     */
+    public function checkStockSync(Request $request)
+    {
+        try {
+            $entryNo = $request->input('entry_no');
+            $materialId = $request->input('id_material');
+
+            if (!$entryNo) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Entry number is required'
+                ], 422);
+            }
+
+            $syncStatus = $this->rmEntryService->checkStockSynchronization($entryNo, $materialId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $syncStatus
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Debug FIFO stock details
+     */
+    public function debugFifoStock(Request $request)
+    {
+        try {
+            $materialId = $request->input('id_material');
+            $tankId = $request->input('id_tank');
+            $tankTail = $request->input('id_tank_tail');
+            $plantId = $request->input('id_plant');
+            $tankMatching = $request->input('tank_matching', 'flexible');
+
+            if (!$materialId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Material ID is required'
+                ], 422);
+            }
+
+            $feedData = [
+                'id_material' => $materialId,
+                'id_tank' => $tankId,
+                'id_tank_tail' => $tankTail ? json_encode($tankTail) : null,
+                'balance_plant' => $plantId,
+                'trace_prefixes' => ['1'], // Storage section (1) only
+                'tank_matching' => $tankMatching
+            ];
+
+            $fifoDetails = \App\Helpers\Feed::getDetailedFifoStock($feedData);
+
+            return response()->json([
+                'success' => true,
+                'data' => $fifoDetails
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Verify separate entries are created for identical parameters
+     */
+    public function verifySeparateEntries(Request $request)
+    {
+        try {
+            $materialId = $request->input('id_material');
+            $tankId = $request->input('id_tank');
+            $plantId = $request->input('id_plant');
+            $hoursBack = $request->input('hours_back', 24);
+
+            if (!$materialId || !$tankId || !$plantId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Material ID, Tank ID, and Plant ID are required'
+                ], 422);
+            }
+
+            $verification = $this->rmEntryService->verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack);
+
+            return response()->json([
+                'success' => true,
+                'data' => $verification
             ]);
         } catch (\Exception $e) {
             return response()->json([

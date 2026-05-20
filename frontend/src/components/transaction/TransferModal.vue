@@ -70,14 +70,23 @@
                 <p class="mt-1 text-xs text-slate-500">Dari storage ke feed tank — isi tangki sumber &amp; tujuan lalu tambahkan material.</p>
               </div>
 
+              <div
+                v-if="isPlantLocked"
+                class="mb-4 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3.5 py-2.5 text-xs font-semibold text-green-800"
+              >
+                <i class="fas fa-lock opacity-70" />
+                Sloc terkunci ke plant: {{ plantSelectionStore.selectedPlantName }}
+              </div>
+
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
                 <div class="space-y-1.5">
                   <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Nomor entri (auto)</label>
                   <input
-                    v-model="form.entry_no"
+                    :value="form.entry_no"
                     type="text"
                     readonly
-                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm font-bold text-slate-900"
+                    :placeholder="entryNoPlaceholder"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal"
                   />
                 </div>
                 <div class="space-y-1.5">
@@ -115,7 +124,7 @@
                         @change="onSourceTankChange"
                       >
                         <option value="">— Pilih Sloc —</option>
-                        <option v-for="tank in tanks" :key="tank.id_tank" :value="tank.id_tank">
+                        <option v-for="tank in tanks" :key="tank.tank" :value="tank.tank">
                           {{ tank.tank }}
                         </option>
                       </select>
@@ -158,7 +167,7 @@
                         @change="onTrfTankChange"
                       >
                         <option value="">— Pilih Sloc —</option>
-                        <option v-for="tank in destTanks" :key="tank.id_tank" :value="tank.id_tank">
+                        <option v-for="tank in destTanks" :key="tank.tank" :value="tank.tank">
                           {{ tank.tank }}
                         </option>
                       </select>
@@ -398,6 +407,7 @@ const totalQty = computed(() => store.totalQty)
 const canAddMaterial = computed(() => {
   return !initLoading.value &&
          !initError.value &&
+         form.value.entry_no &&
          materialForm.value.id_material &&
          materialForm.value.qty &&
          parseFloat(materialForm.value.qty) > 0
@@ -414,6 +424,43 @@ const canSubmit = computed(() => {
          form.value.trf_tank_no.length > 0 &&
          materialList.value.length > 0
 })
+
+const isPlantLocked = computed(() => {
+  const id = plantSelectionStore.selectedPlantId
+  return id !== null && id !== undefined && id !== '' && Number(id) !== 0
+})
+
+const entryNoPlaceholder = computed(() => {
+  if (form.value.entry_no) return ''
+  if (isPlantLocked.value) return 'Menghasilkan nomor…'
+  return 'Pilih plant atau sloc sumber'
+})
+
+async function generateEntryNumber(extra = {}) {
+  const params = {
+    id_plant: plantSelectionStore.selectedPlantId ?? 0,
+    ...extra
+  }
+  await store.generateTransferNumber(params)
+  form.value.entry_no = store.trfNumber || ''
+  return form.value.entry_no
+}
+
+async function loadTankOptions() {
+  const params = { id_plant: plantSelectionStore.selectedPlantId }
+  await Promise.all([
+    store.fetchTanks(params, true),
+    transferStore.fetchDestTanks(params)
+  ])
+}
+
+async function autoSelectTanksWhenSingle() {
+  if (!isPlantLocked.value) return
+  if (!form.value.source_tank && tanks.value.length === 1) {
+    form.value.source_tank = tanks.value[0].tank
+    await onSourceTankChange()
+  }
+}
 
 // Methods
 async function bootstrap() {
@@ -436,16 +483,14 @@ async function bootstrap() {
   isMaterialModalOpen.value = false
 
   try {
-    const params = { id_plant: plantSelectionStore.selectedPlantId }
     await Promise.all([
-      store.generateTransferNumber(params),
-      store.fetchTanks(params, true),
-      transferStore.fetchDestTanks(params),
+      loadTankOptions(),
       store.fetchMaterials()
     ])
-    form.value.entry_no = store.trfNumber || ''
-    if (!form.value.entry_no) {
-      initError.value = 'Nomor transfer tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
+
+    if (isPlantLocked.value) {
+      await generateEntryNumber()
+      await autoSelectTanksWhenSingle()
     }
   } catch (error) {
     console.error('Initialization error:', error)
@@ -473,17 +518,30 @@ async function bootstrap() {
 async function onSourceTankChange() {
   form.value.tank_no = []
   if (form.value.source_tank) {
-    await store.fetchTankDetails(form.value.source_tank)
+    await store.fetchTankDetails(form.value.source_tank, plantSelectionStore.selectedPlantId)
     sourceTankDetails.value = [...store.tankDetails]
+    
+    // Automatically set destination feed tank
+    form.value.trf_tank = form.value.source_tank.replace('Storage', 'Feed')
+    await onTrfTankChange()
+
+    if (!isPlantLocked.value) {
+      await generateEntryNumber({
+        id_plant: 0,
+        tank_desc: form.value.source_tank
+      })
+    }
   } else {
     sourceTankDetails.value = []
+    form.value.trf_tank = ''
+    trfTankDetails.value = []
   }
 }
 
 async function onTrfTankChange() {
   form.value.trf_tank_no = []
   if (form.value.trf_tank) {
-    await store.fetchTankDetails(form.value.trf_tank)
+    await store.fetchTankDetails(form.value.trf_tank, plantSelectionStore.selectedPlantId)
     trfTankDetails.value = [...store.tankDetails]
   } else {
     trfTankDetails.value = []
@@ -514,15 +572,41 @@ async function removeMaterial(id) {
 
 async function handleSubmit() {
   if (!canSubmit.value) return
+
+  // Resolve source tank and details
+  const checkedSourceDetails = sourceTankDetails.value.filter(detail => 
+    form.value.tank_no.includes(detail.id_tank_tail)
+  )
+  if (checkedSourceDetails.length === 0) return
+  const realSourceTank = checkedSourceDetails[0].id_sloc
+  const realSourceTankNo = checkedSourceDetails
+    .map(d => d.id_tank_tail)
+    .filter(id => !String(id).startsWith('s_'))
+
+  // Resolve transfer (destination) tank and details
+  const checkedTrfDetails = trfTankDetails.value.filter(detail => 
+    form.value.trf_tank_no.includes(detail.id_tank_tail)
+  )
+  if (checkedTrfDetails.length === 0) return
+  const realTrfTank = checkedTrfDetails[0].id_sloc
+  const realTrfTankNo = checkedTrfDetails
+    .map(d => d.id_tank_tail)
+    .filter(id => !String(id).startsWith('s_'))
+
   try {
     await store.transferEntry({
       ...form.value,
+      source_tank: realSourceTank,
+      tank_no: realSourceTankNo,
+      trf_tank: realTrfTank,
+      trf_tank_no: realTrfTankNo,
       id_plant: plantSelectionStore.selectedPlantId
     })
     emit('saved')
     closeModal()
   } catch (error) {
     console.error('Submit error:', error)
+    await bootstrap()
   }
 }
 
@@ -542,5 +626,33 @@ watch(
     }
   },
   { flush: 'post' }
+)
+
+watch(
+  () => plantSelectionStore.selectedPlantId,
+  async (plantId, prevId) => {
+    if (!props.isOpen || plantId === prevId) return
+
+    form.value.source_tank = ''
+    form.value.trf_tank = ''
+    form.value.tank_no = []
+    form.value.trf_tank_no = []
+    sourceTankDetails.value = []
+    trfTankDetails.value = []
+    form.value.entry_no = ''
+
+    try {
+      await loadTankOptions()
+      if (isPlantLocked.value) {
+        await generateEntryNumber()
+        await autoSelectTanksWhenSingle()
+        if (form.value.entry_no) {
+          await store.fetchSupplierList(form.value.entry_no)
+        }
+      }
+    } catch (error) {
+      console.error('Plant switch reload:', error)
+    }
+  }
 )
 </script>
