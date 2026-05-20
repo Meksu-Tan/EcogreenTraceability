@@ -132,12 +132,26 @@ class RmEntryController extends Controller
     /**
      * Get storage tanks
      */
-    public function tanks()
+    public function tanks(Request $request)
     {
         try {
-            $tanks = Tank::active()
-                ->storage()
-                ->orderBy('description')
+            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            if ($plantId) {
+                if (is_numeric($plantId)) {
+                    $plant = \App\Models\Plant::find($plantId);
+                    if ($plant && $plant->code_3) {
+                        $plantId = $plant->code_3;
+                    }
+                }
+            }
+
+            $query = Tank::active()->storage();
+
+            if ($plantId) {
+                $query->where('plant_code', $plantId);
+            }
+
+            $tanks = $query->orderBy('description')
                 ->get(['id_sloc as id_tank', 'description as tank']);
 
             return response()->json([

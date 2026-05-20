@@ -10,22 +10,22 @@ class TankRepository implements TankRepositoryInterface
     public function getAll(): array
     {
         return DB::select('
-            SELECT id, plant_code, plant_name, tank_number, tank_height, status,
+            SELECT id_sloc as id, plant_code, plant_name, tank_number, tank_height, status,
                    created_at, created_by, updated_at, updated_by
             FROM m_sloc
-            ORDER BY id ASC
+            ORDER BY id_sloc ASC
         ');
     }
 
     public function findById(int $id): ?object
     {
-        $result = DB::select('SELECT * FROM m_sloc WHERE id = ?', [$id]);
+        $result = DB::select('SELECT id_sloc as id, plant_code, plant_name, tank_number, tank_height, status FROM m_sloc WHERE id_sloc = ?', [$id]);
         return $result[0] ?? null;
     }
 
     public function create(array $data): int|bool
     {
-        $exists = DB::select('SELECT COUNT(id) as cnt FROM m_sloc WHERE tank_number = ? AND plant_code = ? AND status = "1"', [
+        $exists = DB::select('SELECT COUNT(id_sloc) as cnt FROM m_sloc WHERE tank_number = ? AND plant_code = ? AND status = "1"', [
             $data['tank_number'], $data['plant_code']
         ]);
         
@@ -36,12 +36,12 @@ class TankRepository implements TankRepositoryInterface
         // Get next ID if not provided
         $id = $data['id'] ?? null;
         if (!$id) {
-            $maxResult = DB::select('SELECT MAX(id) as max_id FROM m_sloc');
+            $maxResult = DB::select('SELECT MAX(id_sloc) as max_id FROM m_sloc');
             $id = ($maxResult[0]->max_id ?? 0) + 1;
         }
 
         $result = DB::insert('
-            INSERT INTO m_sloc (id, plant_code, plant_name, tank_number, tank_height, status, created_by, created_at, updated_at)
+            INSERT INTO m_sloc (id_sloc, plant_code, plant_name, tank_number, tank_height, status, created_by, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ', [
             $id,
@@ -67,7 +67,7 @@ class TankRepository implements TankRepositoryInterface
 
     public function update(int $id, array $data): bool
     {
-        $old = DB::select('SELECT plant_code, tank_number, tank_height FROM m_sloc WHERE id = ?', [$id]);
+        $old = DB::select('SELECT plant_code, tank_number, tank_height FROM m_sloc WHERE id_sloc = ?', [$id]);
         if (empty($old)) return false;
 
         DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
@@ -79,7 +79,7 @@ class TankRepository implements TankRepositoryInterface
         $result = DB::update('
             UPDATE m_sloc
                SET plant_code = ?, plant_name = ?, tank_number = ?, tank_height = ?, updated_by = ?, updated_at = NOW()
-             WHERE id = ?
+             WHERE id_sloc = ?
         ', [
             $data['plant_code'],
             $data['plant_name'],
@@ -97,7 +97,7 @@ class TankRepository implements TankRepositoryInterface
         DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_SLOC', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user,
         ]);
-        return (bool) DB::update('UPDATE m_sloc SET status = "0", updated_by = ?, updated_at = NOW() WHERE id = ?', [$user, $id]);
+        return (bool) DB::update('UPDATE m_sloc SET status = "0", updated_by = ?, updated_at = NOW() WHERE id_sloc = ?', [$user, $id]);
     }
 
     public function activate(int $id, string $user): bool
@@ -105,6 +105,6 @@ class TankRepository implements TankRepositoryInterface
         DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_SLOC', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user,
         ]);
-        return (bool) DB::update('UPDATE m_sloc SET status = "1", updated_by = ?, updated_at = NOW() WHERE id = ?', [$user, $id]);
+        return (bool) DB::update('UPDATE m_sloc SET status = "1", updated_by = ?, updated_at = NOW() WHERE id_sloc = ?', [$user, $id]);
     }
 }

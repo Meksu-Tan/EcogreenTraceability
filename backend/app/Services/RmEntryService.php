@@ -95,13 +95,21 @@ class RmEntryService
     public function getRmList($plantId)
     {
         $plantId = $this->resolvePlantCode($plantId);
-        $idTankStorage = Tank::where('status', 1)
+        $idTankStorageIds = Tank::where('status', 1)
             ->where('description', 'like', '%STORAGE%')
-            ->value('id_sloc');
+            ->where('plant_code', $plantId)
+            ->pluck('id_sloc')
+            ->toArray();
+
+        if (empty($idTankStorageIds)) {
+            $idTankStorageIds = [0];
+        }
+
+        $inClause = implode(',', array_map('intval', $idTankStorageIds));
 
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
-        $query = "SELECT a.id_balance_head, a.id_material, a.id_tank, a.id_tank_tail, a.status,
+        $query = "SELECT a.id_balance_head, a.id_material, COALESCE(a.id_sloc, a.id_tank) AS id_tank, COALESCE(a.id_sloc_tail, a.id_tank_tail) AS id_tank_tail, a.status,
                          CAST(a.trace_no AS CHAR) AS trace_no, 
                          FORMAT(SUM(DISTINCT a.qty),3) AS qty, 
                          a.created_by, a.created_at,
@@ -109,8 +117,8 @@ class RmEntryService
                          FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
                          CONCAT(d.description,
                             IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', ') IS NULL,
-                                '',
-                                CONCAT(' | ', GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', '))
+                               '',
+                               CONCAT(' | ', GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', '))
                             )
                          ) AS tf_number, 
                          a.entry_date, b.batch_sap,
@@ -125,7 +133,7 @@ class RmEntryService
                     LEFT JOIN m_material c
                       ON a.id_material = c.id_material
                     LEFT JOIN m_sloc d
-                      ON a.id_tank = d.id_sloc AND d.status = 1 AND (d.description LIKE '%STORAGE%' OR d.plant_code = ? OR ? = 0)
+                      ON COALESCE(a.id_sloc, a.id_tank) = d.id_sloc AND d.status = 1 AND (d.description LIKE '%STORAGE%' OR d.plant_code = ? OR ? = 0)
                     LEFT JOIN m_supplier e
                       ON e.id_supplier = b.id_supplier
                     LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head
@@ -136,7 +144,7 @@ class RmEntryService
                                 GROUP BY f.id_balance_head) f
                       ON f.id_balance_head = a.id_balance_head
                     LEFT JOIN m_sloc_detail h
-                      ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
+                      ON JSON_CONTAINS(COALESCE(a.id_sloc_tail, a.id_tank_tail), JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
                     LEFT JOIN (
                         SELECT id_balance_head, SUM(init_qty) AS supplier_qty
                         FROM t_balance_detail
@@ -148,14 +156,14 @@ class RmEntryService
                      AND SUBSTRING(a.trace_no,8,3) = ?
                      AND a.status = 1
                      AND (a.id_plant = ? OR ? = 0)
-                     AND a.id_tank = ?
+                     AND COALESCE(a.id_sloc, a.id_tank) IN ($inClause)
                    GROUP BY a.trace_no
                    ORDER BY a.id_balance_head DESC";
 
         return DB::connection('eudr_ts')->select($query, [
             $plantId, $plantId,
             $this->typeMaterial, $this->movType1, $this->movType2, $this->movSeq,
-            $plantId, $plantId, $idTankStorage
+            $plantId, $plantId
         ]);
     }
 

@@ -391,7 +391,7 @@ async function fetchData() {
     store.fetchEntries(params),
     transferStore.fetchFeedLogs(params),
     // Prefetch for modals
-    store.fetchTanks(),
+    store.fetchTanks(params, true),
     store.fetchMaterials(),
     store.searchSuppliers('')
   ])

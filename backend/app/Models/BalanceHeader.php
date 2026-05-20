@@ -18,6 +18,8 @@ class BalanceHeader extends Model
         'entry_date',
         'trace_no',
         'id_material',
+        'id_sloc',
+        'id_sloc_tail',
         'id_tank',
         'id_tank_tail',
         'id_plant',
@@ -38,6 +40,7 @@ class BalanceHeader extends Model
         'out_qty' => 'decimal:4',
         'init_qty' => 'decimal:4',
         'status' => 'integer',
+        'id_sloc_tail' => 'array', // JSON field
         'id_tank_tail' => 'array', // JSON field
     ];
 
@@ -49,7 +52,7 @@ class BalanceHeader extends Model
 
     public function tank()
     {
-        return $this->belongsTo(Tank::class, 'id_tank', 'id_sloc');
+        return $this->belongsTo(Tank::class, 'id_sloc', 'id_sloc');
     }
 
     public function details()

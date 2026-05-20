@@ -51,10 +51,16 @@ class TransferService
     protected function getTankLog($plantId, $tankType)
     {
         $plantId = $this->resolvePlantCode($plantId);
+        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
         $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date, 
                          a.from_trace_no, a.to_trace_no, 
                          c.code AS material_code, c.description AS material_name,
-                         d.description AS tank_name,
+                         CONCAT(d.description,
+                            IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', ') IS NULL,
+                                '',
+                                CONCAT(' | ', GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', '))
+                            )
+                         ) AS tank_name,
                          FORMAT(a.in_qty, 3) AS in_qty, 
                          FORMAT(a.out_qty, 3) AS out_qty,
                          a.created_by, a.created_at,
@@ -63,9 +69,11 @@ class TransferService
                     JOIN m_material c ON a.id_material = c.id_material
                     JOIN m_sloc d ON a.id_sloc = d.id_sloc
                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
+                    LEFT JOIN m_sloc_detail h ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
                    WHERE a.status = 1
                      AND d.description LIKE CONCAT('%', ?, '%')
                      AND (d.plant_code = ? OR ? = 0)
+                   GROUP BY a.id_trace_head
                    ORDER BY a.id_trace_head DESC";
 
         return DB::connection('eudr_ts')->select($query, [$tankType, $plantId, $plantId]);
@@ -119,8 +127,10 @@ class TransferService
                 'entry_date' => $data['entry_date'],
                 'trace_no' => $transferNo,
                 'id_material' => $sourceBalance->id_material,
-                'id_tank' => $data['id_dest_tank'],
-                'id_tank_tail' => json_encode($data['id_dest_tank_tail']),
+                'id_sloc' => $data['id_dest_tank'],
+                'id_sloc_tail' => $data['id_dest_tank_tail'],
+                'id_tank' => null,
+                'id_tank_tail' => null,
                 'id_plant' => $data['id_plant'],
                 'qty' => $data['qty'],
                 'in_qty' => $data['qty'],
@@ -138,7 +148,7 @@ class TransferService
                 'to_trace_no' => $transferNo,
                 'id_material' => $sourceBalance->id_material,
                 'id_sloc' => $data['id_dest_tank'],
-                'id_tank_tail' => json_encode($data['id_dest_tank_tail']),
+                'id_tank_tail' => $data['id_dest_tank_tail'],
                 'id_plant' => $data['id_plant'],
                 'in_qty' => $data['qty'],
                 'out_qty' => 0,

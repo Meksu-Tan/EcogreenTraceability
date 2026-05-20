@@ -439,7 +439,7 @@ async function bootstrap() {
     const params = { id_plant: plantSelectionStore.selectedPlantId }
     await Promise.all([
       store.generateTransferNumber(params),
-      store.fetchTanks(),
+      store.fetchTanks(params, true),
       transferStore.fetchDestTanks(params),
       store.fetchMaterials()
     ])

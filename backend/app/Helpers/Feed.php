@@ -20,7 +20,7 @@ class Feed
         $params = [$feedData['id_material']];
 
         if (!empty($feedData['id_tank'])) {
-            $sql .= ' AND id_tank = ?';
+            $sql .= ' AND id_sloc = ?';
             $params[] = $feedData['id_tank'];
         }
 

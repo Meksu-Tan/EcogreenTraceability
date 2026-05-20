@@ -90,10 +90,10 @@ export const useTransactionRmEntryStore = defineStore('transactionRmEntry', () =
     }
   }
 
-  async function fetchTanks(force = false) {
+  async function fetchTanks(params = {}, force = false) {
     if (!force && tanks.value.length > 0) return
     try {
-      const response = await transactionRmEntryApi.getTanks()
+      const response = await transactionRmEntryApi.getTanks(params)
       tanks.value = response.data || []
       return response
     } catch (error) {

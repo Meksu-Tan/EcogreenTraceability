@@ -28,8 +28,8 @@ export default {
   },
 
   // Get storage tanks
-  async getTanks() {
-    const response = await axios.get(`${BASE_URL}/tanks`)
+  async getTanks(params = {}) {
+    const response = await axios.get(`${BASE_URL}/tanks`, { params })
     return response.data
   },
 

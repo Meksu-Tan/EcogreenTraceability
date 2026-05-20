@@ -453,7 +453,7 @@ async function bootstrap() {
     const params = { id_plant: plantSelectionStore.selectedPlantId }
     await Promise.all([
       store.generateRmNumber(params),
-      store.fetchTanks(),
+      store.fetchTanks(params, true),
       store.fetchMaterials()
     ])
     form.value.rm_number = store.rmNumber || ''
