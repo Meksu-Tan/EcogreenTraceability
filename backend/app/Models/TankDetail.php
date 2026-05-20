@@ -7,15 +7,15 @@ use Illuminate\Database\Eloquent\Model;
 class TankDetail extends Model
 {
     protected $connection = 'eudr_ts';
-    protected $table = 'm_tank_detail';
-    protected $primaryKey = 'id_tank_tail';
+    protected $table = 'm_sloc_detail';
+    protected $primaryKey = 'id_sloc_tail';
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
-        'id_tank',
+        'id_sloc',
         'tf_number',
         'status',
         'created_by',
@@ -24,13 +24,13 @@ class TankDetail extends Model
 
     protected $casts = [
         'status' => 'integer',
-        'id_tank' => 'integer',
+        'id_sloc' => 'integer',
     ];
 
     // Relationships
     public function tank()
     {
-        return $this->belongsTo(Tank::class, 'id_tank', 'id_tank');
+        return $this->belongsTo(Tank::class, 'id_sloc', 'id_sloc');
     }
 
     // Scopes

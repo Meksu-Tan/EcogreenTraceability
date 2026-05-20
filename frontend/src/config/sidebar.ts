@@ -110,8 +110,16 @@ export const sidebarMenu: MenuGroup[] = [
         label: 'Storage'
       },
       {
+        path: '/setup/tank',
+        label: 'Tank'
+      },
+      {
         path: '/setup/supplier',
         label: 'Supplier'
+      },
+      {
+        path: '/setup/manufacturer',
+        label: 'Manufacturer'
       },
       {
         path: '/setup/adjustment',

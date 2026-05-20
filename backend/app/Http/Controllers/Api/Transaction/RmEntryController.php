@@ -138,7 +138,7 @@ class RmEntryController extends Controller
             $tanks = Tank::active()
                 ->storage()
                 ->orderBy('description')
-                ->get(['id_tank', 'description as tank']);
+                ->get(['id_sloc as id_tank', 'description as tank']);
 
             return response()->json([
                 'success' => true,
@@ -159,9 +159,9 @@ class RmEntryController extends Controller
     {
         try {
             $details = TankDetail::active()
-                ->where('id_tank', $tankId)
+                ->where('id_sloc', $tankId)
                 ->orderBy('tf_number')
-                ->get(['id_tank_tail', 'tf_number as tankNo']);
+                ->get(['id_sloc_tail as id_tank_tail', 'tf_number as tankNo']);
 
             return response()->json([
                 'success' => true,

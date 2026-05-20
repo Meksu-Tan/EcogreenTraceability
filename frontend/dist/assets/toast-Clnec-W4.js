@@ -1,1 +1,0 @@
-import{K as e}from"./runtime-core.esm-bundler-DgOalTZP.js";import{n as t}from"./pinia-7snCLBvN.js";var n=t(`toast`,()=>{let t=e([]),n=0;function r(e,r=`success`,i=3e3){let a=++n;t.value.push({id:a,message:e,type:r}),setTimeout(()=>{t.value=t.value.filter(e=>e.id!==a)},i)}return{toasts:t,success:e=>r(e,`success`),error:e=>r(e,`error`),info:e=>r(e,`info`)}});export{n as t};

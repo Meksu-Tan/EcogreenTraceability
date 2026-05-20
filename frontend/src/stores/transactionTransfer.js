@@ -40,16 +40,16 @@ export const useTransactionTransferStore = defineStore('transactionTransfer', {
 
     async fetchSourceEntries() {
       try {
-        const response = await api.get('/v1/transactions/transfers/source-entries')
+        const response = await api.get('/api/v1/transactions/transfers/source-entries')
         this.sourceEntries = response.data.data
       } catch (error) {
         console.error('Fetch source entries error:', error)
       }
     },
 
-    async fetchDestTanks() {
+    async fetchDestTanks(params = {}) {
       try {
-        const response = await api.get('/v1/transactions/transfers/dest-tanks')
+        const response = await api.get('/api/v1/transactions/transfers/dest-tanks', { params })
         this.destTanks = response.data.data
       } catch (error) {
         console.error('Fetch dest tanks error:', error)

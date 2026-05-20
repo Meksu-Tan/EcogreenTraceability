@@ -68,6 +68,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('suppliers/{id}',   [SupplierController::class, 'update']);
         Route::delete('suppliers/{id}', [SupplierController::class, 'destroy']);
 
+        // Setup Manufacturer
+        Route::get('manufacturers/active', [\App\Http\Controllers\Api\Manufacturer\ManufacturerController::class, 'active']);
+        Route::get('manufacturers',        [\App\Http\Controllers\Api\Manufacturer\ManufacturerController::class, 'index']);
+        Route::post('manufacturers',       [\App\Http\Controllers\Api\Manufacturer\ManufacturerController::class, 'store']);
+        Route::put('manufacturers/{id}',   [\App\Http\Controllers\Api\Manufacturer\ManufacturerController::class, 'update']);
+        Route::delete('manufacturers/{id}', [\App\Http\Controllers\Api\Manufacturer\ManufacturerController::class, 'destroy']);
+
         // ──────────────────────────────────────────────────────────
         // Setup — Additional Modules (Placeholder endpoints)
         // ──────────────────────────────────────────────────────────
@@ -83,6 +90,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('plants',   [\App\Http\Controllers\Api\Plant\PlantController::class, 'store']);
         Route::put('plants/{id}',    [\App\Http\Controllers\Api\Plant\PlantController::class, 'update']);
         Route::delete('plants/{id}', [\App\Http\Controllers\Api\Plant\PlantController::class, 'destroy']);
+
+        // Setup Tank (m_sloc)
+        Route::get('tanks',        [\App\Http\Controllers\Api\Tank\TankController::class, 'index']);
+        Route::post('tanks',       [\App\Http\Controllers\Api\Tank\TankController::class, 'store']);
+        Route::put('tanks/{id}',   [\App\Http\Controllers\Api\Tank\TankController::class, 'update']);
+        Route::delete('tanks/{id}', [\App\Http\Controllers\Api\Tank\TankController::class, 'destroy']);
 
         // ──────────────────────────────────────────────────────────
         // Transaction Modules — RM Entry

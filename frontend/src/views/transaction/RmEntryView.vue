@@ -282,10 +282,13 @@
       @close="isCreateModalOpen = false"
       @saved="fetchData"
     />
-    <TransferModal ref="transferModal" @saved="fetchData" />
+    <TransferModal
+      :is-open="isTransferModalOpen"
+      @close="isTransferModalOpen = false"
+      @saved="fetchData"
+    />
     
     <!-- Plant Selection Modal (Initial Popup) -->
-    <PlantSelectionModal ref="plantSelectionModal" @selected="fetchData" />
   </div>
 </template>
 
@@ -296,7 +299,6 @@ import { useTransactionTransferStore } from '@/stores/transactionTransfer'
 import { usePlantSelectionStore } from '@/stores/plantSelection'
 import { useSetupPlantStore } from '@/stores/setupPlant'
 import PlantSelector from '@/components/shared/PlantSelector.vue'
-import PlantSelectionModal from '@/components/shared/PlantSelectionModal.vue'
 import RmEntryModal from '@/components/transaction/RmEntryModal.vue'
 import TransferModal from '@/components/transaction/TransferModal.vue'
 import Swal from 'sweetalert2'
@@ -312,15 +314,10 @@ const isSlocModalOpen = ref(false)
 const selectedEntry = ref(null)
 
 // Modal Reference
-const plantSelectionModal = ref(null)
 
 // Load data on mount
 onMounted(async () => {
-  if (!plantSelectionStore.hasSelectedPlant) {
-    plantSelectionModal.value?.open()
-  } else {
-    await fetchData()
-  }
+  await fetchData()
 })
 
 // Pagination State

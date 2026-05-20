@@ -158,7 +158,7 @@
                         @change="onTrfTankChange"
                       >
                         <option value="">— Pilih Sloc —</option>
-                        <option v-for="tank in tanks" :key="tank.id_tank" :value="tank.id_tank">
+                        <option v-for="tank in destTanks" :key="tank.id_tank" :value="tank.id_tank">
                           {{ tank.tank }}
                         </option>
                       </select>
@@ -352,6 +352,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useTransactionRmEntryStore } from '@/stores/transactionRmEntry'
+import { useTransactionTransferStore } from '@/stores/transactionTransfer'
+import { usePlantSelectionStore } from '@/stores/plantSelection'
 
 const props = defineProps({
   isOpen: { type: Boolean, required: true }
@@ -360,6 +362,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const store = useTransactionRmEntryStore()
+const transferStore = useTransactionTransferStore()
+const plantSelectionStore = usePlantSelectionStore()
 
 // State
 const isMaterialModalOpen = ref(false)
@@ -386,6 +390,7 @@ const materialForm = ref({
 // Computed
 const loading = computed(() => store.loading)
 const tanks = computed(() => store.tanks)
+const destTanks = computed(() => transferStore.destTanks)
 const materials = computed(() => store.materials)
 const materialList = computed(() => store.supplierList)
 const totalQty = computed(() => store.totalQty)
@@ -431,9 +436,11 @@ async function bootstrap() {
   isMaterialModalOpen.value = false
 
   try {
+    const params = { id_plant: plantSelectionStore.selectedPlantId }
     await Promise.all([
-      store.generateTransferNumber(),
+      store.generateTransferNumber(params),
       store.fetchTanks(),
+      transferStore.fetchDestTanks(params),
       store.fetchMaterials()
     ])
     form.value.entry_no = store.trfNumber || ''
@@ -489,7 +496,8 @@ async function addMaterial() {
     await store.addSupplier({
       entry_no: form.value.entry_no,
       id_material: materialForm.value.id_material,
-      qty: parseFloat(materialForm.value.qty)
+      qty: parseFloat(materialForm.value.qty),
+      id_plant: plantSelectionStore.selectedPlantId
     })
     materialForm.value = { id_material: '', qty: '' }
     isMaterialModalOpen.value = false
@@ -507,7 +515,10 @@ async function removeMaterial(id) {
 async function handleSubmit() {
   if (!canSubmit.value) return
   try {
-    await store.transferEntry(form.value)
+    await store.transferEntry({
+      ...form.value,
+      id_plant: plantSelectionStore.selectedPlantId
+    })
     emit('saved')
     closeModal()
   } catch (error) {

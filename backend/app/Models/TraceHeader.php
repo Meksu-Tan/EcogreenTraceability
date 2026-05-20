@@ -51,7 +51,7 @@ class TraceHeader extends Model
 
     public function tank()
     {
-        return $this->belongsTo(Tank::class, 'id_sloc', 'id_tank');
+        return $this->belongsTo(Tank::class, 'id_sloc', 'id_sloc');
     }
 
     public function details()

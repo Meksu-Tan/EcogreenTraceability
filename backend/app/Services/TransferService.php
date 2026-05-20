@@ -18,6 +18,17 @@ class TransferService
     protected $movSeq = '000';
     protected $typeTransfer = '7';
 
+    protected function resolvePlantCode($plantId)
+    {
+        if ($plantId) {
+            $plant = \App\Models\Plant::find($plantId);
+            if ($plant && $plant->code_3) {
+                return $plant->code_3;
+            }
+        }
+        return $plantId;
+    }
+
     /**
      * Get Storage Tank Log
      */
@@ -39,6 +50,7 @@ class TransferService
      */
     protected function getTankLog($plantId, $tankType)
     {
+        $plantId = $this->resolvePlantCode($plantId);
         $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date, 
                          a.from_trace_no, a.to_trace_no, 
                          c.code AS material_code, c.description AS material_name,
@@ -49,11 +61,11 @@ class TransferService
                          md.material_document, md.po_so
                     FROM t_trace_header a
                     JOIN m_material c ON a.id_material = c.id_material
-                    JOIN m_tank d ON a.id_sloc = d.id_tank
+                    JOIN m_sloc d ON a.id_sloc = d.id_sloc
                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
                    WHERE a.status = 1
-                     AND d.code_3 = ?
-                     AND (a.id_plant = ? OR ? = 0)
+                     AND d.description LIKE CONCAT('%', ?, '%')
+                     AND (d.plant_code = ? OR ? = 0)
                    ORDER BY a.id_trace_head DESC";
 
         return DB::connection('eudr_ts')->select($query, [$tankType, $plantId, $plantId]);
@@ -64,6 +76,7 @@ class TransferService
      */
     public function generateTransferNumber($plantId)
     {
+        $plantId = $this->resolvePlantCode($plantId);
         $result = DB::connection('eudr_ts')->select(
             'SELECT a.trace_no
                FROM (SELECT a.trace_no+1 AS trace_no
@@ -88,6 +101,7 @@ class TransferService
      */
     public function transfer($data, $user)
     {
+        $data['id_plant'] = $this->resolvePlantCode($data['id_plant'] ?? 0);
         DB::connection('eudr_ts')->beginTransaction();
 
         try {

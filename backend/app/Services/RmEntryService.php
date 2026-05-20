@@ -25,11 +25,23 @@ class RmEntryService
     protected $typeMaterial = 'RM';
     protected $idTankSrc = "T000"; // STORAGE TANK
 
+    protected function resolvePlantCode($plantId)
+    {
+        if ($plantId) {
+            $plant = \App\Models\Plant::find($plantId);
+            if ($plant && $plant->code_3) {
+                return $plant->code_3;
+            }
+        }
+        return $plantId;
+    }
+
     /**
      * Generate new RM entry number
      */
     public function generateRmNumber($plantId)
     {
+        $plantId = $this->resolvePlantCode($plantId);
         $result = DB::connection('eudr_ts')->select(
             'SELECT a.rm_number
                FROM (SELECT a.trace_no+1 AS rm_number
@@ -54,6 +66,7 @@ class RmEntryService
      */
     public function generateTransferNumber($plantId)
     {
+        $plantId = $this->resolvePlantCode($plantId);
         // Logic follow monorepo get_rmNewEntryNumberTrf
         $idTankSrc = "T000"; // STORAGE
         $result = DB::connection('eudr_ts')->select(
@@ -81,9 +94,10 @@ class RmEntryService
      */
     public function getRmList($plantId)
     {
+        $plantId = $this->resolvePlantCode($plantId);
         $idTankStorage = Tank::where('status', 1)
-            ->where('code_3', 'STORAGE')
-            ->value('id_tank');
+            ->where('description', 'like', '%STORAGE%')
+            ->value('id_sloc');
 
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
@@ -110,8 +124,8 @@ class RmEntryService
                       ON a.id_balance_head = b.id_balance_head AND b.status = 1
                     LEFT JOIN m_material c
                       ON a.id_material = c.id_material
-                    LEFT JOIN m_tank d
-                      ON a.id_tank = d.id_tank AND d.status = 1 AND (d.code_3 = 'STORAGE' OR d.id_plant = ? OR ? = 0)
+                    LEFT JOIN m_sloc d
+                      ON a.id_tank = d.id_sloc AND d.status = 1 AND (d.description LIKE '%STORAGE%' OR d.plant_code = ? OR ? = 0)
                     LEFT JOIN m_supplier e
                       ON e.id_supplier = b.id_supplier
                     LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head
@@ -121,8 +135,8 @@ class RmEntryService
                                 WHERE f.status = 1
                                 GROUP BY f.id_balance_head) f
                       ON f.id_balance_head = a.id_balance_head
-                    LEFT JOIN m_tank_detail h
-                      ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
+                    LEFT JOIN m_sloc_detail h
+                      ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
                     LEFT JOIN (
                         SELECT id_balance_head, SUM(init_qty) AS supplier_qty
                         FROM t_balance_detail
@@ -183,6 +197,7 @@ class RmEntryService
      */
     public function saveRmEntry($data, $user)
     {
+        $data['id_plant'] = $this->resolvePlantCode($data['id_plant'] ?? 0);
         DB::connection('eudr_ts')->beginTransaction();
 
         try {
@@ -285,20 +300,20 @@ class RmEntryService
             $materialDoc = $data['material_document'] ?? null;
             $id_tankSourceNo = $data['tank_no']; // Array
             $id_tankNo = $data['trf_tank_no']; // Array
-            $idPlant = $data['id_plant'];
+            $idPlant = $this->resolvePlantCode($data['id_plant'] ?? 0);
 
             $id_tankSourceNo_json = json_encode($id_tankSourceNo);
             $id_tankNo_json = json_encode($id_tankNo);
 
-            $srcTankRec = DB::connection('eudr_ts')->select('SELECT code, code_3, id_plant FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tankSource]);
-            $tgtTankRec = DB::connection('eudr_ts')->select('SELECT code FROM m_tank WHERE id_tank = ? AND status = 1 LIMIT 1', [$id_tank]);
+            $srcTankRec = DB::connection('eudr_ts')->select('SELECT tank_number as code, description, plant_code as id_plant FROM m_sloc WHERE id_sloc = ? AND status = 1 LIMIT 1', [$id_tankSource]);
+            $tgtTankRec = DB::connection('eudr_ts')->select('SELECT tank_number as code FROM m_sloc WHERE id_sloc = ? AND status = 1 LIMIT 1', [$id_tank]);
             
             if (empty($srcTankRec) || empty($tgtTankRec)) {
                 throw new Exception('Invalid tank selection');
             }
 
             $targetTankCode = $tgtTankRec[0]->code;
-            $isStorageTank = (strtoupper($srcTankRec[0]->code_3) === 'STORAGE');
+            $isStorageTank = (str_contains(strtoupper($srcTankRec[0]->description), 'STORAGE'));
 
             $datTempMaterial = DB::connection('eudr_ts')->select(
                 'SELECT entry_no, id_tank, id_material, qty

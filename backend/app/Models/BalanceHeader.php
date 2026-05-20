@@ -49,7 +49,7 @@ class BalanceHeader extends Model
 
     public function tank()
     {
-        return $this->belongsTo(Tank::class, 'id_tank', 'id_tank');
+        return $this->belongsTo(Tank::class, 'id_tank', 'id_sloc');
     }
 
     public function details()

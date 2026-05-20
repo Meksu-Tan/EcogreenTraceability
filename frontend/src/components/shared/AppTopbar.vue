@@ -84,7 +84,9 @@ const pageTitle = computed(() => {
     '/dashboard':        'Dashboard',
     '/setup/material':   'Setup Material',
     '/setup/storage':    'Setup Storage',
+    '/setup/tank':       'Setup Tank',
     '/setup/supplier':   'Setup Supplier',
+    '/setup/manufacturer': 'Setup Manufacturer',
     '/setup/plant':      'Setup Plant',
   }
   return map[route.path] || 'EUDR-TS'

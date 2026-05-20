@@ -25,8 +25,6 @@
         </p>
       </div>
     </div>
-
-    <PlantSelectionModal ref="plantSelectionModal" @selected="fetchData" />
   </div>
 </template>
 
@@ -34,20 +32,14 @@
 import { ref, onMounted } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plantSelection'
 import PlantSelector from '@/components/shared/PlantSelector.vue'
-import PlantSelectionModal from '@/components/shared/PlantSelectionModal.vue'
 
 const plantSelectionStore = usePlantSelectionStore()
-const plantSelectionModal = ref(null)
 
 function fetchData() {
   console.log('Fetching Blending data for plant:', plantSelectionStore.selectedPlantId)
 }
 
 onMounted(() => {
-  if (!plantSelectionStore.hasSelectedPlant) {
-    plantSelectionModal.value?.open()
-  } else {
-    fetchData()
-  }
+  fetchData()
 })
 </script>

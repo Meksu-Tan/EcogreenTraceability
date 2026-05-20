@@ -71,6 +71,22 @@ const router = createRouter({
           meta: { title: 'Setup Supplier', requiresAuth: true },
         },
 
+        // Setup Tank
+        {
+          path: 'setup/tank',
+          name: 'setup.tank',
+          component: () => import('@/views/setup/TankSetupView.vue'),
+          meta: { title: 'Setup Tank', requiresAuth: true },
+        },
+
+        // Setup Manufacturer
+        {
+          path: 'setup/manufacturer',
+          name: 'setup.manufacturer',
+          component: () => import('@/views/setup/manufacturer/ManufacturerIndex.vue'),
+          meta: { title: 'Setup Manufacturer', requiresAuth: true },
+        },
+
         // Dashboard Traces
         {
           path: 'forward-trace',
