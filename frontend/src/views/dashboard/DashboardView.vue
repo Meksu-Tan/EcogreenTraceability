@@ -43,7 +43,7 @@
           <i :class="stat.icon" class="text-lg"></i>
         </div>
         <div class="min-w-0">
-          <div class="text-2xl font-extrabold text-slate-800 leading-tight">—</div>
+          <div class="text-2xl font-extrabold text-slate-800 leading-tight">{{ stat.value }}</div>
           <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mt-0.5">{{ stat.label }}</div>
         </div>
       </div>
@@ -78,24 +78,31 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useDashboardStore } from '@/stores/dashboard.js'
 
 const authStore = useAuthStore()
+const dashboardStore = useDashboardStore()
+
 const firstRole = computed(() => authStore.roles?.[0] || 'User')
 const today     = computed(() => new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
 
-const stats = [
-  { label: 'Material Setup',  bgClass: 'bg-green-600',   icon: 'fab fa-asymmetrik' },
-  { label: 'Storage Setup',   bgClass: 'bg-green-600',  icon: 'fas fa-database' },
-  { label: 'Supplier Setup',  bgClass: 'bg-green-600',  icon: 'fas fa-diagnoses' },
-  { label: 'Total Pengguna',  bgClass: 'bg-green-700',  icon: 'fas fa-users' },
-]
+const stats = computed(() => [
+  { label: 'Material Setup',  bgClass: 'bg-green-600',   icon: 'fab fa-asymmetrik', value: dashboardStore.materialCount },
+  { label: 'Storage Setup',   bgClass: 'bg-green-600',  icon: 'fas fa-database',  value: dashboardStore.storageCount },
+  { label: 'Supplier Setup',  bgClass: 'bg-green-600',  icon: 'fas fa-diagnoses', value: dashboardStore.supplierCount },
+  { label: 'Total Pengguna',  bgClass: 'bg-green-700',  icon: 'fas fa-users',     value: dashboardStore.userCount },
+])
 
 const quickLinks = [
   { to: '/setup/material', label: 'Setup Material', bgClass: 'bg-green-600',   icon: 'fab fa-asymmetrik' },
   { to: '/setup/storage',  label: 'Setup Storage',  bgClass: 'bg-green-600',  icon: 'fas fa-database' },
   { to: '/setup/supplier', label: 'Setup Supplier', bgClass: 'bg-green-600',  icon: 'fas fa-diagnoses' },
 ]
+
+onMounted(() => {
+  dashboardStore.fetchStats()
+})
 </script>

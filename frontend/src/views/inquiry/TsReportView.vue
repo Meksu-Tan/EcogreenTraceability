@@ -18,6 +18,6 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 // TS Report View - Placeholder
 </script>

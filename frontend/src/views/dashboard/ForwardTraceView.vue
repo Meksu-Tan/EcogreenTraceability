@@ -18,6 +18,6 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 // Forward Trace View - Placeholder
 </script>

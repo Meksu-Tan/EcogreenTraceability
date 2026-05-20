@@ -156,9 +156,10 @@ class RmEntryService
 
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
+        // Use JSON_TABLE for precise sub-sloc extraction matching stored JSON array
         $query = "SELECT a.id_balance_head, a.id_material, COALESCE(a.id_sloc, a.id_tank) AS id_tank, COALESCE(a.id_sloc_tail, a.id_tank_tail) AS id_tank_tail, a.status,
-                         CAST(a.trace_no AS CHAR) AS trace_no, 
-                         FORMAT(a.qty,3) AS qty, 
+                         CAST(a.trace_no AS CHAR) AS trace_no,
+                         FORMAT(a.qty,3) AS qty,
                          a.created_by, a.created_at,
                          COALESCE(
                             pl.description,
@@ -166,25 +167,42 @@ class RmEntryService
                             CAST(d.plant_code AS CHAR),
                             '-'
                          ) COLLATE utf8mb4_unicode_ci AS plant_code,
-                         CONCAT(c.code, ' :: ', c.description) AS material, 
+                         CONCAT(c.code, ' :: ', c.description) AS material,
                          FORMAT(a.init_qty,3) AS init_qty,
                          CONCAT(d.description,
                             IF(
                                 COALESCE(
-                                    GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & '),
+                                    (
+                                        SELECT GROUP_CONCAT(h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & ')
+                                        FROM JSON_TABLE(
+                                            COALESCE(a.id_sloc_tail, a.id_tank_tail, '[]'),
+                                            '$[*]' COLUMNS (sloc_id INT PATH '$')
+                                        ) AS jt
+                                        JOIN m_sloc_detail h ON h.id_sloc_tail = jt.sloc_id AND h.status = 1
+                                    ),
                                     d.tank_number
-                                ) IS NULL,
+                                ) IS NULL OR
+                                COALESCE(a.id_sloc_tail, a.id_tank_tail, '[]') = '[]' OR
+                                COALESCE(a.id_sloc_tail, a.id_tank_tail, '[]') = '' OR
+                                COALESCE(a.id_sloc_tail, a.id_tank_tail) IS NULL,
                                 '',
                                 CONCAT(' | ', COALESCE(
-                                    GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & '),
+                                    (
+                                        SELECT GROUP_CONCAT(h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & ')
+                                        FROM JSON_TABLE(
+                                            COALESCE(a.id_sloc_tail, a.id_tank_tail, '[]'),
+                                            '$[*]' COLUMNS (sloc_id INT PATH '$')
+                                        ) AS jt
+                                        JOIN m_sloc_detail h ON h.id_sloc_tail = jt.sloc_id AND h.status = 1
+                                    ),
                                     d.tank_number
                                 ))
                             )
-                         ) AS tf_number, 
+                         ) AS tf_number,
                          a.entry_date, b.batch_sap,
                          GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ',') AS id_balance_detail,
                          GROUP_CONCAT(DISTINCT CONCAT(e.code, ' :: ', e.description, ' / ', b.batch_sap, ' / Qty : ', FORMAT(b.init_qty, 3), ' MT / ', IF(b.out_qty = 0, '-', 'BATCH TRANSFERRED')) SEPARATOR ' | ') AS supplier,
-                         IF(b.out_qty = 0, 'N/A', '') AS traced, 
+                         IF(b.out_qty = 0, 'N/A', '') AS traced,
                          f.material_document, f.po_so, f.id_trace_head,
                          FORMAT(bs.supplier_qty,3) AS balance_supplier
                     FROM t_balance_header a
@@ -214,8 +232,6 @@ class RmEntryService
                                 WHERE f.status = 1
                                 GROUP BY f.id_balance_head) f
                       ON f.id_balance_head = a.id_balance_head
-                    LEFT JOIN m_sloc_detail h
-                      ON JSON_CONTAINS(COALESCE(a.id_sloc_tail, a.id_tank_tail), JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
                     LEFT JOIN (
                         SELECT id_balance_head, SUM(init_qty) AS supplier_qty
                         FROM t_balance_detail

@@ -174,6 +174,11 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         // ──────────────────────────────────────────────────────────
+        // Dashboard
+        // ──────────────────────────────────────────────────────────
+        Route::get('dashboard/stats', [DashboardController::class, 'stats']);
+
+        // ──────────────────────────────────────────────────────────
         // Admin Modules
         // ──────────────────────────────────────────────────────────
         Route::get('admin/users',       [\App\Http\Controllers\Api\Admin\UserController::class, 'index']);

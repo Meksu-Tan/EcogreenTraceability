@@ -18,6 +18,6 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 // Adjustment Setup View - Placeholder
 </script>

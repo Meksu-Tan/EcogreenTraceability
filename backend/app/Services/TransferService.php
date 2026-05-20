@@ -44,36 +44,42 @@ class TransferService
     {
         $plantId = $this->resolvePlantCode($plantId);
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
-        
-        $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date, 
-                         a.from_trace_no, a.to_trace_no, 
+
+        // Use JSON_TABLE for precise sub-sloc extraction matching stored JSON array
+        $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date,
+                         a.from_trace_no, a.to_trace_no,
                          c.code AS material_code, c.description AS material_name,
                          d.description AS tank_description,
                          d.tank_number,
                          a.id_tank_tail,
-                         h.tf_number AS sub_sloc_number,
-                         h.description AS sub_sloc_description,
-                         FORMAT(a.in_qty, 3) AS in_qty, 
+                         FORMAT(a.in_qty, 3) AS in_qty,
                          FORMAT(a.out_qty, 3) AS out_qty,
                          a.created_by, a.created_at,
-                         md.material_document, md.po_so
+                         md.material_document, md.po_so,
+                         (
+                            SELECT GROUP_CONCAT(CONCAT(h.tf_number, ' - ', h.description) ORDER BY h.tf_number ASC SEPARATOR ' | ')
+                            FROM JSON_TABLE(
+                                a.id_tank_tail,
+                                '$[*]' COLUMNS (sloc_id INT PATH '$')
+                            ) AS jt
+                            JOIN m_sloc_detail h ON h.id_sloc_tail = jt.sloc_id AND h.status = 1
+                         ) AS sub_slocs_raw
                     FROM t_trace_header a
                     JOIN m_material c ON a.id_material = c.id_material
                     JOIN m_sloc d ON a.id_sloc = d.id_sloc
                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
-                    LEFT JOIN m_sloc_detail h ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
                    WHERE a.status = 1
                      AND d.description LIKE CONCAT('%', 'FEED', '%')
                      AND (d.plant_code = ? OR ? = 0)
-                   ORDER BY a.id_trace_head DESC, h.tf_number ASC";
+                   ORDER BY a.id_trace_head DESC";
 
         $rawData = DB::connection('eudr_ts')->select($query, [$plantId, $plantId]);
-        
+
         // Group by trace head and combine sub-sloc info
         $groupedData = [];
         foreach ($rawData as $row) {
             $key = $row->id_trace_head;
-            
+
             if (!isset($groupedData[$key])) {
                 $groupedData[$key] = [
                     'id_trace_head' => $row->id_trace_head,
@@ -95,15 +101,22 @@ class TransferService
                     'sub_slocs' => []
                 ];
             }
-            
-            if ($row->sub_sloc_number) {
-                $groupedData[$key]['sub_slocs'][] = [
-                    'tf_number' => $row->sub_sloc_number,
-                    'description' => $row->sub_sloc_description
-                ];
+
+            if ($row->sub_slocs_raw) {
+                // Parse the grouped sub-slocs into array
+                $slocParts = explode(' | ', $row->sub_slocs_raw);
+                foreach ($slocParts as $part) {
+                    $parts = explode(' - ', $part, 2);
+                    if (count($parts) === 2) {
+                        $groupedData[$key]['sub_slocs'][] = [
+                            'tf_number' => trim($parts[0]),
+                            'description' => trim($parts[1])
+                        ];
+                    }
+                }
             }
         }
-        
+
         return array_values($groupedData);
     }
 
@@ -122,24 +135,33 @@ class TransferService
     {
         $plantId = $this->resolvePlantCode($plantId);
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
-        $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date, 
-                         a.from_trace_no, a.to_trace_no, 
+
+        // Use JSON_TABLE for precise sub-sloc extraction matching stored JSON array
+        $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date,
+                         a.from_trace_no, a.to_trace_no,
                          c.code AS material_code, c.description AS material_name,
                          CONCAT(d.description,
                             IF(
-                                a.id_tank_tail IS NOT NULL 
-                                AND a.id_tank_tail != '' 
+                                a.id_tank_tail IS NOT NULL
+                                AND a.id_tank_tail != ''
                                 AND a.id_tank_tail != '[]',
-                                CONCAT(' | ', 
+                                CONCAT(' | ',
                                     COALESCE(
-                                        GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & '),
+                                        (
+                                            SELECT GROUP_CONCAT(h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & ')
+                                            FROM JSON_TABLE(
+                                                a.id_tank_tail,
+                                                '$[*]' COLUMNS (sloc_id INT PATH '$')
+                                            ) AS jt
+                                            JOIN m_sloc_detail h ON h.id_sloc_tail = jt.sloc_id AND h.status = 1
+                                        ),
                                         REPLACE(REPLACE(REPLACE(a.id_tank_tail, '[', ''), ']', ''), '\"', '')
                                     )
                                 ),
                                 ''
                             )
                          ) AS tank_name,
-                         FORMAT(a.in_qty, 3) AS in_qty, 
+                         FORMAT(a.in_qty, 3) AS in_qty,
                          FORMAT(a.out_qty, 3) AS out_qty,
                          a.created_by, a.created_at,
                          a.id_tank_tail,
@@ -148,7 +170,6 @@ class TransferService
                     JOIN m_material c ON a.id_material = c.id_material
                     JOIN m_sloc d ON a.id_sloc = d.id_sloc
                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
-                    LEFT JOIN m_sloc_detail h ON JSON_CONTAINS(a.id_tank_tail, JSON_QUOTE(CAST(h.id_sloc_tail AS CHAR)))
                    WHERE a.status = 1
                      AND d.description LIKE CONCAT('%', ?, '%')
                      AND (d.plant_code = ? OR ? = 0)

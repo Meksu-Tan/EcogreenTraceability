@@ -2,6 +2,6 @@
   <ManufacturerIndex />
 </template>
 
-<script setup lang="ts">
+<script setup>
 import ManufacturerIndex from './ManufacturerIndex.vue'
 </script>

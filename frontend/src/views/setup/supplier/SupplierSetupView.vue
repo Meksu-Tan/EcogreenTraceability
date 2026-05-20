@@ -2,6 +2,6 @@
   <SupplierIndex />
 </template>
 
-<script setup lang="ts">
+<script setup>
 import SupplierIndex from './SupplierIndex.vue'
 </script>
