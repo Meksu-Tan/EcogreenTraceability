@@ -1,0 +1,11 @@
+{
+    "name": "Inquiry",
+    "alias": "inquiry",
+    "description": "Stock inquiry, TS Report, RM Report modules",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Inquiry\\Providers\\InquiryServiceProvider"
+    ],
+    "files": []
+}

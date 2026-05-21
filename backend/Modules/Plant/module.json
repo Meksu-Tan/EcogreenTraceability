@@ -1,0 +1,11 @@
+{
+    "name": "Plant",
+    "alias": "plant",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Plant\\Providers\\PlantServiceProvider"
+    ],
+    "files": []
+}

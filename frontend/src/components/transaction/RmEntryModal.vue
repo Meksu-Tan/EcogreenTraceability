@@ -489,6 +489,10 @@ async function onTankChange() {
   if (form.value.id_tank) {
     await store.fetchTankDetails(form.value.id_tank, plantSelectionStore.selectedPlantId)
     
+    if (store.tankDetails.length === 1) {
+      form.value.id_tank_tail = [store.tankDetails[0].id_tank_tail]
+    }
+    
     if (!plantSelectionStore.selectedPlantId || plantSelectionStore.selectedPlantId == 0) {
       await store.generateRmNumber({ 
         id_plant: 0, 
@@ -564,6 +568,13 @@ async function handleSubmit() {
     closeModal()
   } catch (error) {
     console.error('Submit error:', error)
+    if (form.value.entry_no) {
+      try {
+        await store.clearTempList(form.value.entry_no)
+      } catch (e) {
+        console.error('Failed to clear temp list on submit error:', e)
+      }
+    }
     await bootstrap()
   }
 }

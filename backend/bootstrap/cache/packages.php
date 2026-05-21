@@ -1,4 +1,15 @@
 <?php return array (
+  'binarytorch/larecipe' => 
+  array (
+    'aliases' => 
+    array (
+      'LaRecipe' => 'BinaryTorch\\LaRecipe\\LaRecipe',
+    ),
+    'providers' => 
+    array (
+      0 => 'BinaryTorch\\LaRecipe\\LaRecipeServiceProvider',
+    ),
+  ),
   'laravel/pail' => 
   array (
     'providers' => 
@@ -46,6 +57,17 @@
     'providers' => 
     array (
       0 => 'Termwind\\Laravel\\TermwindServiceProvider',
+    ),
+  ),
+  'nwidart/laravel-modules' => 
+  array (
+    'aliases' => 
+    array (
+      'Module' => 'Nwidart\\Modules\\Facades\\Module',
+    ),
+    'providers' => 
+    array (
+      0 => 'Nwidart\\Modules\\LaravelModulesServiceProvider',
     ),
   ),
   'spatie/laravel-permission' => 

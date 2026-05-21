@@ -1,0 +1,11 @@
+{
+    "name": "Tank",
+    "alias": "tank",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Tank\\Providers\\TankServiceProvider"
+    ],
+    "files": []
+}

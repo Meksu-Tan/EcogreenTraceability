@@ -399,7 +399,15 @@ const materialForm = ref({
 // Computed
 const loading = computed(() => store.loading)
 const tanks = computed(() => store.tanks)
-const destTanks = computed(() => transferStore.destTanks)
+const destTanks = computed(() => {
+  if (form.value.source_tank) {
+    const selectedSourceTank = tanks.value.find(t => t.tank === form.value.source_tank)
+    if (selectedSourceTank && selectedSourceTank.id_plant) {
+      return transferStore.destTanks.filter(t => t.id_plant === selectedSourceTank.id_plant)
+    }
+  }
+  return transferStore.destTanks
+})
 const materials = computed(() => store.materials)
 const materialList = computed(() => store.supplierList)
 const totalQty = computed(() => store.totalQty)
@@ -520,6 +528,9 @@ async function onSourceTankChange() {
   if (form.value.source_tank) {
     await store.fetchTankDetails(form.value.source_tank, plantSelectionStore.selectedPlantId)
     sourceTankDetails.value = [...store.tankDetails]
+    if (sourceTankDetails.value.length === 1) {
+      form.value.tank_no = [sourceTankDetails.value[0].id_tank_tail]
+    }
     
     // Automatically set destination feed tank
     form.value.trf_tank = form.value.source_tank.replace('Storage', 'Feed')
@@ -543,6 +554,9 @@ async function onTrfTankChange() {
   if (form.value.trf_tank) {
     await store.fetchTankDetails(form.value.trf_tank, plantSelectionStore.selectedPlantId)
     trfTankDetails.value = [...store.tankDetails]
+    if (trfTankDetails.value.length === 1) {
+      form.value.trf_tank_no = [trfTankDetails.value[0].id_tank_tail]
+    }
   } else {
     trfTankDetails.value = []
   }
@@ -606,6 +620,13 @@ async function handleSubmit() {
     closeModal()
   } catch (error) {
     console.error('Submit error:', error)
+    if (form.value.entry_no) {
+      try {
+        await store.clearTempList(form.value.entry_no)
+      } catch (e) {
+        console.error('Failed to clear temp list on submit error:', e)
+      }
+    }
     await bootstrap()
   }
 }

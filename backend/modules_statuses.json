@@ -1,0 +1,14 @@
+{
+    "Material": true,
+    "Manufacturer": true,
+    "Plant": true,
+    "Storage": true,
+    "Supplier": true,
+    "Tank": true,
+    "Transaction": true,
+    "Auth": true,
+    "Dashboard": true,
+    "Admin": true,
+    "Shared": true,
+    "Inquiry": true
+}

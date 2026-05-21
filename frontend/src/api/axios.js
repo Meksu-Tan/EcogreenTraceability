@@ -13,7 +13,6 @@ const api = axios.create({
   },
 })
 
-// Request interceptor — attach token from localStorage
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token')
 
@@ -23,7 +22,6 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Response interceptor — SPA navigation on 401 (avoid full page reload → blank flash)
 api.interceptors.response.use(
   (response) => response,
   (error) => {

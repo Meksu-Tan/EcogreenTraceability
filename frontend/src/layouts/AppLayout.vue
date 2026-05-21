@@ -20,7 +20,5 @@
 </template>
 
 <script setup>
-import AppSidebar from '@/components/shared/AppSidebar.vue'
-import AppTopbar  from '@/components/shared/AppTopbar.vue'
-import AppToast   from '@/components/shared/AppToast.vue'
+import { AppSidebar, AppTopbar, AppToast } from '@/modules/shared/components'
 </script>
