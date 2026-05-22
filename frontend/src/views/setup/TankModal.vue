@@ -83,7 +83,7 @@
 <script setup>
 import { reactive, computed, watch, onMounted } from 'vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
-import { useSetupPlantStore } from '@/stores/setupPlant'
+import { useSetupPlantStore } from '@/stores/plant'
 
 const props  = defineProps({ modelValue: Boolean, editData: Object, loading: Boolean })
 const emit   = defineEmits(['update:modelValue', 'submit'])

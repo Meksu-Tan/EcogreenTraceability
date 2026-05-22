@@ -54,8 +54,8 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plantSelection'
-import { useSetupPlantStore } from '@/stores/setupPlant'
+import { usePlantSelectionStore } from '@/stores/plant'
+import { useSetupPlantStore } from '@/stores/plant'
 
 const emit = defineEmits(['change'])
 

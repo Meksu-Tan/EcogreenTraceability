@@ -65,8 +65,8 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useUiStore } from '@/stores/ui'
-import { usePlantSelectionStore } from '@/stores/plantSelection'
+import { useUiStore } from '@/modules/shared/stores/ui'
+import { usePlantSelectionStore } from '@/stores/plant'
 
 const authStore    = useAuthStore()
 const uiStore      = useUiStore()

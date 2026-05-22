@@ -48,8 +48,8 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useSetupPlantStore } from '@/stores/setupPlant'
-import { usePlantSelectionStore } from '@/stores/plantSelection'
+import { useSetupPlantStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant'
 import { storeToRefs } from 'pinia'
 
 const router = useRouter()

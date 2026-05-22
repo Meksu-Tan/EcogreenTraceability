@@ -146,7 +146,7 @@
 import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useUiStore } from '@/stores/ui'
+import { useUiStore } from '@/modules/shared/stores/ui'
 import { sidebarMenu } from '@/config/sidebar.js'
 
 const authStore = useAuthStore()

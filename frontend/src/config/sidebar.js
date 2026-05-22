@@ -34,27 +34,27 @@ export const sidebarMenu = [
     icon: 'fa-exchange-alt',
     children: [
       {
-        path: '/transaction/rm-entry',
+        path: '/ts-raw/rm-entry',
         label: 'RM Entry'
       },
       {
-        path: '/transaction/wip-entry',
+        path: '/ts-raw/wip-entry',
         label: 'WIP Entry'
       },
       {
-        path: '/transaction/blending',
+        path: '/ts-raw/blending',
         label: 'Blending'
       },
       {
-        path: '/transaction/package-entry',
+        path: '/ts-raw/package-entry',
         label: 'Package Entry'
       },
       {
-        path: '/transaction/shipment-entry',
+        path: '/ts-raw/shipment-entry',
         label: 'Shipment Entry'
       },
       {
-        path: '/transaction/transfer',
+        path: '/ts-raw/transfer',
         label: 'Transfer'
       }
     ]

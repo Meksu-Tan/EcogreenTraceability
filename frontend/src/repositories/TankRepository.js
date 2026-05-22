@@ -1,4 +1,4 @@
-import RmEntryApi from '@/api/transactionRmEntry'
+import RmEntryApi from '@/modules/ts-raw/api'
 
 class TankRepository {
   async getAvailable(params = {}) {

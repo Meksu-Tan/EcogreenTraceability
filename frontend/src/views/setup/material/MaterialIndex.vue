@@ -87,7 +87,7 @@ import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import MaterialModal from './MaterialModal.vue'
 import MaterialPackagingTab from './MaterialPackagingTab.vue'
-import { useSetupMaterialStore } from '@/stores/setupMaterial'
+import { useSetupMaterialStore } from '@/modules/material/stores'
 import { useToastStore } from '@/stores/toast'
 
 const store           = useSetupMaterialStore()

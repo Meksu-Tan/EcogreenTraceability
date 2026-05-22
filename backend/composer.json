@@ -36,7 +36,7 @@
             "Modules\\Storage\\": "Modules/Storage/app/",
             "Modules\\Supplier\\": "Modules/Supplier/app/",
             "Modules\\Tank\\": "Modules/Tank/app/",
-            "Modules\\Transaction\\": "Modules/Transaction/app/",
+            "Modules\\TsRaw\\": "Modules/TsRaw/app/",
             "Modules\\Inquiry\\": "Modules/Inquiry/app/",
             "Database\\Factories\\": [
                 "database/factories/",

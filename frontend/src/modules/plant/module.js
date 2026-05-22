@@ -1,4 +1,4 @@
-import { useSetupPlantStore, usePlantSelectionStore } from './stores'
+import { useSetupPlantStore, usePlantSelectionStore } from '@/stores/plant'
 
 export default {
   name: 'plant',

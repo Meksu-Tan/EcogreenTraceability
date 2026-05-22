@@ -56,7 +56,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable from '@/components/shared/DataTable.vue'
 import StorageTankModal   from './StorageTankModal.vue'
-import { useSetupStorageStore } from '@/stores/setupStorage'
+import { useSetupStorageStore } from '@/modules/storage/stores'
 import { useToastStore } from '@/stores/toast'
 
 defineExpose({ openTankModal })

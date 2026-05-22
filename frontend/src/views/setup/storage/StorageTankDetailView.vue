@@ -68,7 +68,7 @@
 import { ref, onMounted, computed } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import StorageDetailModal from './StorageDetailModal.vue'
-import { useSetupStorageStore } from '@/stores/setupStorage'
+import { useSetupStorageStore } from '@/modules/storage/stores'
 import { useToastStore } from '@/stores/toast'
 
 const props = defineProps({

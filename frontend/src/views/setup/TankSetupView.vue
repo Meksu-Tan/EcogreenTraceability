@@ -92,7 +92,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import TankModal from './TankModal.vue'
-import { useSetupTankStore } from '@/stores/setupTank'
+import { useSetupTankStore } from '@/modules/tank/stores'
 import { useToastStore } from '@/stores/toast'
 
 const store      = useSetupTankStore()

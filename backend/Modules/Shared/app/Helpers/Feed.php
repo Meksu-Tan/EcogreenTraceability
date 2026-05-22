@@ -69,19 +69,22 @@ class Feed
                     // Flexible tail matching - allow partial matches
                     $tailConditions = [];
                     foreach ($validTails as $tailId) {
-                        $tailConditions[] = 'JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?))';
+                        $tailConditions[] = '(JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?)) OR JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), ?))';
+                        $params[] = $tailId;
                         $params[] = $tailId;
                     }
                     // Also allow empty tail matches for flexibility
                     $tailConditions[] = '(COALESCE(id_sloc_tail, id_tank_tail) IS NULL OR COALESCE(id_sloc_tail, id_tank_tail) = "" OR COALESCE(id_sloc_tail, id_tank_tail) = "[]")';
                     $sql .= ' AND (' . implode(' OR ', $tailConditions) . ')';
                 } elseif (count($validTails) === 1) {
-                    $sql .= ' AND JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?))';
+                    $sql .= ' AND (JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?)) OR JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), ?))';
+                    $params[] = $validTails[0];
                     $params[] = $validTails[0];
                 } elseif (count($validTails) > 1) {
                     $tailConditions = [];
                     foreach ($validTails as $tailId) {
-                        $tailConditions[] = 'JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?))';
+                        $tailConditions[] = '(JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?)) OR JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), ?))';
+                        $params[] = $tailId;
                         $params[] = $tailId;
                     }
                     $sql .= ' AND (' . implode(' OR ', $tailConditions) . ')';

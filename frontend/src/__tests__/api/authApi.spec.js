@@ -7,7 +7,7 @@ vi.mock('@/api/axios', () => ({
   }
 }))
 
-import { login, logout, getAuthUser } from '@/api/auth'
+import { login, logout, getAuthUser } from '@/modules/auth/api'
 import api from '@/api/axios'
 
 describe('Auth API', () => {

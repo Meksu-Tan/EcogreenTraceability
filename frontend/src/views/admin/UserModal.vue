@@ -83,7 +83,7 @@
 <script setup>
 import { reactive, computed, watch } from 'vue'
 import BaseModal from '@/components/shared/BaseModal.vue'
-import { useAdminUsersStore } from '@/stores/adminUsers'
+import { useAdminUsersStore } from '@/modules/admin/stores'
 
 const props = defineProps({
   modelValue: Boolean,

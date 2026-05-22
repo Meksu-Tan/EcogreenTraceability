@@ -43,7 +43,7 @@ class Tank extends Model
 
     public function balanceHeaders()
     {
-        return $this->hasMany(\Modules\Transaction\Models\BalanceHeader::class, 'id_sloc', 'id_sloc');
+        return $this->hasMany(\Modules\TsRaw\Models\BalanceHeader::class, 'id_sloc', 'id_sloc');
     }
 
     public function scopeActive($query)

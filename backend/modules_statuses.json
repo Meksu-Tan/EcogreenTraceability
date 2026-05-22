@@ -10,5 +10,6 @@
     "Dashboard": true,
     "Admin": true,
     "Shared": true,
-    "Inquiry": true
+    "Inquiry": true,
+    "TsRaw": true
 }

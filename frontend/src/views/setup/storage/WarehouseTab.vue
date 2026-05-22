@@ -16,7 +16,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import StorageWarehouseModal from './StorageWarehouseModal.vue'
-import { useSetupStorageStore } from '@/stores/setupStorage'
+import { useSetupStorageStore } from '@/modules/storage/stores'
 import { useToastStore } from '@/stores/toast'
 
 defineExpose({ openModal })

@@ -102,7 +102,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import UserModal from './UserModal.vue'
-import { useAdminUsersStore } from '@/stores/adminUsers'
+import { useAdminUsersStore } from '@/modules/admin/stores'
 import { useToastStore } from '@/stores/toast'
 
 const store      = useAdminUsersStore()

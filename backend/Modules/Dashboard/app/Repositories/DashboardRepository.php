@@ -7,7 +7,7 @@ use Modules\Dashboard\Repositories\Contracts\DashboardRepositoryInterface;
 use Modules\Material\Models\Material;
 use Modules\Storage\Models\StorageTank;
 use Modules\Supplier\Models\Supplier;
-use Modules\Transaction\Models\BalanceHeader;
+use Modules\TsRaw\Models\BalanceHeader;
 
 class DashboardRepository implements DashboardRepositoryInterface
 {

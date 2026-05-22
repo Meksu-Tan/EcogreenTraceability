@@ -1,0 +1,11 @@
+{
+    "name": "TsRaw",
+    "alias": "transaction",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsRaw\\Providers\\TsRawServiceProvider"
+    ],
+    "files": []
+}

@@ -55,7 +55,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import ManufacturerModal from './ManufacturerModal.vue'
-import { useSetupManufacturerStore } from '@/stores/setupManufacturer'
+import { useSetupManufacturerStore } from '@/modules/manufacturer/stores'
 import { useToastStore } from '@/stores/toast'
 
 const store      = useSetupManufacturerStore()

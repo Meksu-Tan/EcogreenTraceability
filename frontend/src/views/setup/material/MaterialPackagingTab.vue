@@ -25,7 +25,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import MaterialPackagingModal from './MaterialPackagingModal.vue'
-import { useSetupMaterialStore } from '@/stores/setupMaterial'
+import { useSetupMaterialStore } from '@/modules/material/stores'
 import { useToastStore } from '@/stores/toast'
 
 defineExpose({ openModal })

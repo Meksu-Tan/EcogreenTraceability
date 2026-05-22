@@ -86,6 +86,8 @@ class Rundown
                         'id_balance_head' => $idHead,
                         'id_supplier'     => $idSupplier,
                         'id_material'     => $data['id_material'],
+                        'id_sloc'         => $data['id_tank'],
+                        'id_sloc_tail'    => $data['id_tank_tail'],
                         'id_tank'         => null,
                         'id_tank_tail'    => null,
                         'qty'             => $qty,

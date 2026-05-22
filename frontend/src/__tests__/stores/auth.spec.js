@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 
-vi.mock('@/api/auth', () => ({
+vi.mock('@/modules/auth/api', () => ({
   login: vi.fn(),
   logout: vi.fn().mockResolvedValue({}),
   getAuthUser: vi.fn().mockRejectedValue(new Error('not authenticated')),

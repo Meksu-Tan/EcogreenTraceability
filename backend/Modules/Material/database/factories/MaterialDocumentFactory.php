@@ -6,12 +6,12 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 
 class MaterialDocumentFactory extends Factory
 {
-    protected $model = \Modules\Transaction\Models\MaterialDocument::class;
+    protected $model = \Modules\TsRaw\Models\MaterialDocument::class;
 
     public function definition(): array
     {
         return [
-            'id_trace_head' => \Modules\Transaction\Models\TraceHeader::factory(),
+            'id_trace_head' => \Modules\TsRaw\Models\TraceHeader::factory(),
             'material_document' => $this->faker->unique()->bothify('DOC-####-??'),
             'po_so' => $this->faker->bothify('PO-####-??'),
             'created_by' => 1,
