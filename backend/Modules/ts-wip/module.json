@@ -1,0 +1,11 @@
+{
+    "name": "TsWip",
+    "alias": "tswip",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsWip\\Providers\\TsWipServiceProvider"
+    ],
+    "files": []
+}

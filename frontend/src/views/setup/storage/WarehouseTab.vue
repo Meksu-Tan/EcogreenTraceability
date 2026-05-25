@@ -16,7 +16,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import StorageWarehouseModal from './StorageWarehouseModal.vue'
-import { useSetupStorageStore } from '@/modules/storage/stores'
+import { useSetupStorageStore } from '@/modules/m-storage/stores'
 import { useToastStore } from '@/stores/toast'
 
 defineExpose({ openModal })
@@ -34,7 +34,13 @@ const columns = [
   { key: 'status',      label: 'Status' },
 ]
 
-onMounted(() => store.fetchWarehouses())
+onMounted(async () => {
+  try {
+    await store.fetchWarehouses()
+  } catch (error) {
+    console.error('Failed to fetch warehouses:', error)
+  }
+})
 
 function openModal() { editRow.value = null; showModal.value = true }
 function onEdit(row) { editRow.value = row; showModal.value = true }

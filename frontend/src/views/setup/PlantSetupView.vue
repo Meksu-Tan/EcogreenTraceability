@@ -106,7 +106,13 @@ const columns = [
   { key: 'updated_at',  label: 'Updated at' },
 ]
 
-onMounted(() => store.fetchPlants())
+onMounted(async () => {
+  try {
+    await store.fetchPlants()
+  } catch (error) {
+    console.error('Failed to fetch plants:', error)
+  }
+})
 
 function openModal() {
   editData.value = null

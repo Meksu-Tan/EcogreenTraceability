@@ -10,7 +10,7 @@ describe('App Router', () => {
     expect(router.hasRoute('setup.supplier')).toBe(true)
     expect(router.hasRoute('setup.adjustment')).toBe(true)
     expect(router.hasRoute('setup.quantifier')).toBe(true)
-    expect(router.hasRoute('transaction-rm-entry')).toBe(true)
+    expect(router.hasRoute('ts-raw-rm-entry')).toBe(true)
   })
 
   it('redirects unknown routes to dashboard', () => {

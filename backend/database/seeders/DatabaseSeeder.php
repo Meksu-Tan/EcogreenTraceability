@@ -10,6 +10,11 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             \Database\Seeders\RolePermissionSeeder::class,
+            // \Database\Seeders\TankSeeder::class, // Skipped - requires manual data entry
+            \Database\Seeders\MaterialSeeder::class,
+            \Database\Seeders\SupplierSeeder::class,
+            // \Database\Seeders\PlantSeeder::class,
+            // \Database\Seeders\StorageSeeder::class,
         ]);
     }
 }

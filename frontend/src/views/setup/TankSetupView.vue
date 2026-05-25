@@ -92,7 +92,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import TankModal from './TankModal.vue'
-import { useSetupTankStore } from '@/modules/tank/stores'
+import { useSetupTankStore } from '@/modules/m-tank/stores'
 import { useToastStore } from '@/stores/toast'
 
 const store      = useSetupTankStore()
@@ -111,7 +111,13 @@ const columns = [
   { key: 'updated_at',  label: 'Updated at' },
 ]
 
-onMounted(() => store.fetchTanks())
+onMounted(async () => {
+  try {
+    await store.fetchTanks()
+  } catch (error) {
+    console.error('Failed to fetch tanks:', error)
+  }
+})
 
 function openModal() {
   editData.value = null

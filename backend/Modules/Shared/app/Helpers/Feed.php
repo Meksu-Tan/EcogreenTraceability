@@ -26,24 +26,24 @@ class Feed
         $tankMatching = $feedData['tank_matching'] ?? 'exact'; // exact, flexible, any
         
         if ($tankMatching === 'exact') {
-            // Exact tank matching
-            if (!empty($feedData['id_tank'])) {
+            // Exact sloc matching
+            if (!empty($feedData['id_sloc'])) {
                 $sql .= ' AND id_sloc = ?';
-                $params[] = $feedData['id_tank'];
+                $params[] = $feedData['id_sloc'];
             }
         } elseif ($tankMatching === 'flexible') {
-            // Flexible tank matching - try exact first, then same tank type
-            if (!empty($feedData['id_tank'])) {
+            // Flexible sloc matching - try exact first, then same sloc type
+            if (!empty($feedData['id_sloc'])) {
                 $sql .= ' AND (id_sloc = ? OR id_sloc IN (
-                    SELECT id_sloc FROM m_sloc 
-                    WHERE description = (SELECT description FROM m_sloc WHERE id_sloc = ?) 
+                    SELECT id_sloc FROM m_sloc
+                    WHERE description = (SELECT description FROM m_sloc WHERE id_sloc = ?)
                     AND status = 1
                 ))';
-                $params[] = $feedData['id_tank'];
-                $params[] = $feedData['id_tank'];
+                $params[] = $feedData['id_sloc'];
+                $params[] = $feedData['id_sloc'];
             }
         }
-        // 'any' mode - no tank filtering
+        // 'any' mode - no sloc filtering
 
         $balancePlant = $feedData['balance_plant'] ?? ($feedData['id_plant'] ?? null);
         if ($balancePlant !== null && $balancePlant !== '' && $balancePlant !== 0 && $balancePlant !== '0') {
@@ -51,9 +51,9 @@ class Feed
             $params[] = $balancePlant;
         }
 
-        // Enhanced tank tail matching
-        if (!empty($feedData['id_tank_tail'])) {
-            $tailIds = json_decode($feedData['id_tank_tail'], true);
+        // Enhanced sloc tail matching
+        if (!empty($feedData['id_sloc_tail'])) {
+            $tailIds = json_decode($feedData['id_sloc_tail'], true);
             if (is_array($tailIds) && count($tailIds) > 0) {
                 $validTails = [];
                 foreach ($tailIds as $tailId) {
@@ -64,26 +64,26 @@ class Feed
                         $validTails[] = (string) $tailId;
                     }
                 }
-                
+
                 if ($tankMatching === 'flexible' && count($validTails) > 0) {
                     // Flexible tail matching - allow partial matches
                     $tailConditions = [];
                     foreach ($validTails as $tailId) {
-                        $tailConditions[] = '(JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?)) OR JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), ?))';
+                        $tailConditions[] = '(JSON_CONTAINS(id_sloc_tail, JSON_QUOTE(?)) OR JSON_CONTAINS(id_sloc_tail, ?))';
                         $params[] = $tailId;
                         $params[] = $tailId;
                     }
                     // Also allow empty tail matches for flexibility
-                    $tailConditions[] = '(COALESCE(id_sloc_tail, id_tank_tail) IS NULL OR COALESCE(id_sloc_tail, id_tank_tail) = "" OR COALESCE(id_sloc_tail, id_tank_tail) = "[]")';
+                    $tailConditions[] = '(id_sloc_tail IS NULL OR id_sloc_tail = "" OR id_sloc_tail = "[]")';
                     $sql .= ' AND (' . implode(' OR ', $tailConditions) . ')';
                 } elseif (count($validTails) === 1) {
-                    $sql .= ' AND (JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?)) OR JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), ?))';
+                    $sql .= ' AND (JSON_CONTAINS(id_sloc_tail, JSON_QUOTE(?)) OR JSON_CONTAINS(id_sloc_tail, ?))';
                     $params[] = $validTails[0];
                     $params[] = $validTails[0];
                 } elseif (count($validTails) > 1) {
                     $tailConditions = [];
                     foreach ($validTails as $tailId) {
-                        $tailConditions[] = '(JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), JSON_QUOTE(?)) OR JSON_CONTAINS(COALESCE(id_sloc_tail, id_tank_tail), ?))';
+                        $tailConditions[] = '(JSON_CONTAINS(id_sloc_tail, JSON_QUOTE(?)) OR JSON_CONTAINS(id_sloc_tail, ?))';
                         $params[] = $tailId;
                         $params[] = $tailId;
                     }
@@ -206,8 +206,8 @@ class Feed
                     'id_balance_head' => $idHead,
                     'id_material'     => $feedData['id_material'],
                     'entry_date'      => $feedData['entry_date'],
-                    'id_sloc'         => $feedData['id_tank'],
-                    'id_tank_tail'    => $feedData['id_tank_tail'],
+                    'id_sloc'         => $feedData['id_sloc'],
+                    'id_sloc_tail'    => $feedData['id_sloc_tail'],
                     'out_qty'         => $useQty,
                     'last_qtf'        => $feedData['last_qtf'] ?? 0,
                     'curr_qtf'        => $feedData['qty'],
@@ -296,12 +296,18 @@ class Feed
                         'id_material'     => $feedData['id_material'],
                         'out_qty'         => round($useTailQty, 4),
                         'batch_sap'       => $tail->batch_sap,
-                        'id_sloc'         => $feedData['id_tank'],
-                        'id_sloc_tail'    => $feedData['id_tank_tail'],
+                        'id_sloc'         => $feedData['id_sloc'],
+                        'id_sloc_tail'    => $feedData['id_sloc_tail'],
                         'id_plant'        => $feedData['id_plant'],
                         'created_by'      => $feedData['user'],
                         'created_at'      => now(),
                     ]);
+                }
+
+                // PACKAGING-SPECIFIC hook (optional callback) - supports afterSupplierFeed callback
+                // This allows callers like packaging module to perform post-processing per supplier
+                if (!empty($feedData['afterSupplierFeed']) && is_callable($feedData['afterSupplierFeed'])) {
+                    $feedData['afterSupplierFeed']($idHead, $useQty);
                 }
 
                 $usedHeads[] = [
@@ -356,8 +362,8 @@ class Feed
             'stock_details' => $detailedStock,
             'parameters_used' => [
                 'id_material' => $feedData['id_material'],
-                'id_tank' => $feedData['id_tank'] ?? null,
-                'id_tank_tail' => $feedData['id_tank_tail'] ?? null,
+                'id_sloc' => $feedData['id_sloc'] ?? null,
+                'id_sloc_tail' => $feedData['id_sloc_tail'] ?? null,
                 'balance_plant' => $feedData['balance_plant'] ?? null,
                 'tank_matching' => $feedData['tank_matching'] ?? 'exact'
             ]

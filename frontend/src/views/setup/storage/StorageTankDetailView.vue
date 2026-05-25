@@ -68,7 +68,7 @@
 import { ref, onMounted, computed } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import StorageDetailModal from './StorageDetailModal.vue'
-import { useSetupStorageStore } from '@/modules/storage/stores'
+import { useSetupStorageStore } from '@/modules/m-storage/stores'
 import { useToastStore } from '@/stores/toast'
 
 const props = defineProps({
@@ -95,10 +95,14 @@ const detailColumns = [
 ]
 
 onMounted(async () => {
-  if (store.tanks.length === 0) {
-    await store.fetchTanks()
+  try {
+    if (store.tanks.length === 0) {
+      await store.fetchTanks()
+    }
+    await store.fetchDetails(props.id)
+  } catch (error) {
+    console.error('Failed to fetch storage detail data:', error)
   }
-  await store.fetchDetails(props.id)
 })
 
 function openDetailModal() { 

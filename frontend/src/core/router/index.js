@@ -47,13 +47,23 @@ export function createAppRouter(moduleRoutes = []) {
   router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
     routes: baseRoutes,
+    scrollBehavior() {
+      return { top: 0, left: 0 }
+    },
   })
 
   router.beforeEach(async (to) => {
     const authStore = useAuthStore()
     const plantSelectionStore = usePlantSelectionStore()
 
-    if (!authStore.isAuthenticated && to.meta.requiresAuth) {
+    // Check if user has token in localStorage
+    const hasToken = localStorage.getItem('auth_token')
+
+    if (to.meta.requiresAuth && !hasToken) {
+      return { name: 'login' }
+    }
+
+    if (to.meta.requiresAuth && !authStore.isAuthenticated && hasToken) {
       await authStore.fetchUser()
     }
 

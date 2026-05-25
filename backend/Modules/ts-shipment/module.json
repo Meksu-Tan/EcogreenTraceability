@@ -1,0 +1,11 @@
+{
+    "name": "TsShipment",
+    "alias": "tsshipment",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsShipment\\Providers\\TsShipmentServiceProvider"
+    ],
+    "files": []
+}

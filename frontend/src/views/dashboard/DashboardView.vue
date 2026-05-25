@@ -10,14 +10,6 @@
           <span class="text-sm font-semibold text-green-600">Dashboard</span>
         </div>
       </div>
-      <button
-        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
-        :disabled="dashboardStore.loading"
-        @click="dashboardStore.fetchStats()"
-      >
-        <i class="fas fa-sync-alt" :class="{ 'fa-spin': dashboardStore.loading }"></i>
-        {{ dashboardStore.loading ? 'Loading...' : 'Refresh' }}
-      </button>
     </div>
 
     <!-- Welcome card -->
@@ -37,38 +29,6 @@
         </div>
         <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30 shadow-lg">
           <i class="fas fa-user text-white text-2xl"></i>
-        </div>
-      </div>
-    </div>
-
-    <!-- Error state -->
-    <div v-if="dashboardStore.error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
-      <i class="fas fa-exclamation-circle"></i>
-      <span>{{ dashboardStore.error }}</span>
-      <button class="ml-auto text-sm underline" @click="dashboardStore.fetchStats()">Coba lagi</button>
-    </div>
-
-    <!-- Stats row -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-      <div
-        v-for="stat in stats"
-        :key="stat.label"
-        class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 transition-all hover:shadow-md hover:-translate-y-1 group cursor-pointer"
-        @click="navigateTo(stat.path)"
-        :title="'Klik untuk membuka ' + stat.label"
-      >
-        <div
-          class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white shadow-lg transition-transform group-hover:scale-110"
-          :class="stat.bgClass"
-        >
-          <i :class="stat.icon" class="text-lg"></i>
-        </div>
-        <div class="min-w-0">
-          <div class="text-2xl font-extrabold text-slate-800 leading-tight">
-            <span v-if="dashboardStore.loading" class="animate-pulse">-</span>
-            <span v-else>{{ stat.value }}</span>
-          </div>
-          <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mt-0.5">{{ stat.label }}</div>
         </div>
       </div>
     </div>
@@ -102,26 +62,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { useDashboardStore } from '@/modules/dashboard/stores'
 
 const authStore = useAuthStore()
-const dashboardStore = useDashboardStore()
-const router = useRouter()
 
 const firstRole = computed(() => authStore.roles?.[0] || 'User')
 const today = computed(() => new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
-
-const stats = computed(() => [
-  { label: 'Material Setup',   path: '/setup/material',     bgClass: 'bg-green-600', icon: 'fab fa-asymmetrik', value: dashboardStore.materialCount },
-  { label: 'Storage Setup',    path: '/setup/storage',      bgClass: 'bg-green-600', icon: 'fas fa-database',  value: dashboardStore.storageCount },
-  { label: 'Supplier Setup',   path: '/setup/supplier',     bgClass: 'bg-green-600', icon: 'fas fa-diagnoses',  value: dashboardStore.supplierCount },
-  { label: 'Tank Setup',       path: '/setup/tank',         bgClass: 'bg-green-700', icon: 'fas fa-oil-can',   value: dashboardStore.tankCount },
-  { label: 'Manufacturer',     path: '/setup/manufacturer', bgClass: 'bg-green-700', icon: 'fas fa-industry',  value: dashboardStore.manufacturerCount },
-  { label: 'Total Pengguna',  path: '/admin/user-management', bgClass: 'bg-green-800', icon: 'fas fa-users',  value: dashboardStore.userCount },
-])
 
 const quickLinks = [
   { to: '/setup/material',       label: 'Setup Material',       bgClass: 'bg-green-600', icon: 'fab fa-asymmetrik' },
@@ -131,12 +79,4 @@ const quickLinks = [
   { to: '/setup/manufacturer',   label: 'Setup Manufacturer',   bgClass: 'bg-green-700', icon: 'fas fa-industry' },
   { to: '/setup/plant',          label: 'Setup Plant',          bgClass: 'bg-green-800', icon: 'fas fa-building' },
 ]
-
-function navigateTo(path) {
-  router.push(path)
-}
-
-onMounted(() => {
-  dashboardStore.fetchStats()
-})
 </script>

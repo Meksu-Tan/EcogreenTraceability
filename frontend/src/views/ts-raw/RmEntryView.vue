@@ -295,12 +295,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
-import { useTsRawTransferStore } from '@/modules/ts-raw/stores'
+import { useTsRawTransferStore } from '@/modules/ts-transfer/stores'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useSetupPlantStore } from '@/stores/plant'
 import PlantSelector from '@/components/shared/PlantSelector.vue'
 import RmEntryModal from '@/modules/ts-raw/components/RmEntryModal.vue'
-import TransferModal from '@/modules/ts-raw/components/TransferModal.vue'
+import TransferModal from '@/modules/ts-transfer/components/TransferModal.vue'
 import Swal from 'sweetalert2'
 
 const store = useTsRawRmEntryStore()

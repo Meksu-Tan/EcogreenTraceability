@@ -1,0 +1,21 @@
+<?php
+
+namespace Modules\TsWip\Providers;
+
+use Illuminate\Support\ServiceProvider;
+
+class TsWipServiceProvider extends ServiceProvider
+{
+    public function register(): void
+    {
+        $this->app->bind(
+            \Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface::class,
+            \Modules\TsWip\Repositories\WipEntryRepository::class
+        );
+    }
+
+    public function boot(): void
+    {
+        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+    }
+}

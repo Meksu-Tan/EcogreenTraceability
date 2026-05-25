@@ -25,7 +25,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import MaterialPackagingModal from './MaterialPackagingModal.vue'
-import { useSetupMaterialStore } from '@/modules/material/stores'
+import { useSetupMaterialStore } from '@/modules/m-material/stores'
 import { useToastStore } from '@/stores/toast'
 
 defineExpose({ openModal })
@@ -46,9 +46,13 @@ const columns = [
   { key: 'updated_at',     label: 'Updated at' }
 ]
 
-onMounted(() => {
-  store.fetchPackagings()
-  store.fetchSourceProducts()
+onMounted(async () => {
+  try {
+    await store.fetchPackagings()
+    await store.fetchSourceProducts()
+  } catch (error) {
+    console.error('Failed to fetch packaging data:', error)
+  }
 })
 
 function openModal() {

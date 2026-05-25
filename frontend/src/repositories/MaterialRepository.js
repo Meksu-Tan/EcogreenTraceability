@@ -1,4 +1,4 @@
-import * as MaterialApi from '@/modules/material/api'
+import * as MaterialApi from '@/modules/m-material/api'
 
 class MaterialRepository {
   async all() {

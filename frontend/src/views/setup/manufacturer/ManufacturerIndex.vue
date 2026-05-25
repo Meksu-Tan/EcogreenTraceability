@@ -55,7 +55,7 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import ManufacturerModal from './ManufacturerModal.vue'
-import { useSetupManufacturerStore } from '@/modules/manufacturer/stores'
+import { useSetupManufacturerStore } from '@/modules/m-manufacturer/stores'
 import { useToastStore } from '@/stores/toast'
 
 const store      = useSetupManufacturerStore()
@@ -74,7 +74,13 @@ const columns = [
   { key: 'updated_at',  label: 'Updated at' },
 ]
 
-onMounted(() => store.fetchManufacturers())
+onMounted(async () => {
+  try {
+    await store.fetchManufacturers()
+  } catch (error) {
+    console.error('Failed to fetch manufacturers:', error)
+  }
+})
 
 function openModal() { editRow.value = null; showModal.value = true }
 function onEdit(row) { editRow.value = row; showModal.value = true }

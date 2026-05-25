@@ -1,0 +1,11 @@
+{
+    "name": "TsPackage",
+    "alias": "tspackage",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsPackage\\Providers\\TsPackageServiceProvider"
+    ],
+    "files": []
+}

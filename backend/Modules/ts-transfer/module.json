@@ -1,0 +1,11 @@
+{
+    "name": "TsTransfer",
+    "alias": "tstransfer",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsTransfer\\Providers\\TsTransferServiceProvider"
+    ],
+    "files": []
+}

@@ -1,6 +1,6 @@
 <template>
   <div class="relative inline-block text-left" ref="dropdownRef">
-    <button 
+    <button
       @click="isOpen = !isOpen"
       class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-green-300 transition-all shadow-sm group"
     >
@@ -20,22 +20,21 @@
         <span class="text-xs font-bold text-gray-500 uppercase tracking-widest">Pilih Lokasi Plant</span>
       </div>
       <div class="max-h-64 overflow-y-auto">
-        <!-- All Plants -->
-        <button 
+        <!-- All Plants Option -->
+        <button
           @click="selectPlant(null, 'All Plants')"
           class="w-full flex items-center justify-between px-4 py-3 hover:bg-green-50 transition-colors group"
           :class="plantSelectionStore.selectedPlantId === null ? 'bg-green-50 text-green-700' : 'text-gray-600'"
         >
           <div class="flex items-center gap-3">
             <i class="fas fa-globe text-xs opacity-50"></i>
-            <span class="text-sm font-semibold">Semua Plant</span>
+            <span class="text-sm font-semibold">All Plants</span>
           </div>
           <i v-if="plantSelectionStore.selectedPlantId === null" class="fas fa-check text-[10px]"></i>
         </button>
-
         <!-- List -->
-        <button 
-          v-for="plant in plantStore.plants" 
+        <button
+          v-for="plant in plantStore.plants"
           :key="plant.id_plant"
           @click="selectPlant(plant.id_plant, plant.description)"
           class="w-full flex items-center justify-between px-4 py-3 hover:bg-green-50 transition-colors group"
@@ -81,6 +80,7 @@ onMounted(async () => {
   if (plantStore.plants.length === 0) {
     await plantStore.fetchPlants()
   }
+  // NOTE: Do NOT auto-select first plant. Let user choose or default to "All Plants"
   document.addEventListener('click', handleClickOutside)
 })
 

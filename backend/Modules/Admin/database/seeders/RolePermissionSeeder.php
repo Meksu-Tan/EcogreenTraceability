@@ -28,6 +28,8 @@ class RolePermissionSeeder extends Seeder
             'supplier.update',
             'supplier.delete',
             'dashboard.view',
+            'task-read',
+            'task-update',
         ];
 
         foreach ($permissions as $permission) {
@@ -40,15 +42,15 @@ class RolePermissionSeeder extends Seeder
             'manager'            => Permission::all()->pluck('name')->toArray(),
             'superintendent'     => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
                                      'material.create', 'material.update', 'storage.create', 'storage.update',
-                                     'supplier.create', 'supplier.update'],
+                                     'supplier.create', 'supplier.update', 'task-read', 'task-update'],
             'senior-supervisor'  => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
                                      'material.create', 'material.update', 'storage.create', 'storage.update',
-                                     'supplier.create', 'supplier.update'],
+                                     'supplier.create', 'supplier.update', 'task-read', 'task-update'],
             'supervisor'         => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
                                      'material.create', 'material.update', 'storage.create', 'storage.update',
-                                     'supplier.create', 'supplier.update'],
-            'senior-staff'       => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view'],
-            'staff'              => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view'],
+                                     'supplier.create', 'supplier.update', 'task-read', 'task-update'],
+            'senior-staff'       => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view', 'task-read'],
+            'staff'              => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view', 'task-read'],
         ];
 
         foreach ($roles as $roleName => $rolePermissions) {

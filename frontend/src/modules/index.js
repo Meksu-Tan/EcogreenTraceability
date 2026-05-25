@@ -10,18 +10,23 @@
  */
 
 export const MODULES = {
-  auth:         () => import('./auth/module'),
-  material:     () => import('./material/module'),
-  storage:      () => import('./storage/module'),
-  supplier:     () => import('./supplier/module'),
-  manufacturer: () => import('./manufacturer/module'),
-  tank:         () => import('./tank/module'),
-  plant:        () => import('./plant/module'),
-  'ts-raw':  () => import('./ts-raw/module'),
-  dashboard:    () => import('./dashboard/module'),
-  admin:        () => import('./admin/module'),
-  inquiry:      () => import('./inquiry/module'),
-  shared:       () => import('./shared/module'),
+  auth:             () => import('./auth/module'),
+  'm-material':     () => import('./m-material/module'),
+  'm-storage':     () => import('./m-storage/module'),
+  'm-supplier':     () => import('./m-supplier/module'),
+  'm-manufacturer': () => import('./m-manufacturer/module'),
+  'm-tank':         () => import('./m-tank/module'),
+  'm-plant':        () => import('./m-plant/module'),
+  'ts-raw':         () => import('./ts-raw/module'),
+  'ts-blending':    () => import('./ts-blending/module'),
+  'ts-package':     () => import('./ts-package/module'),
+  'ts-shipment':    () => import('./ts-shipment/module'),
+  'ts-transfer':    () => import('./ts-transfer/module'),
+  'ts-wip':         () => import('./ts-wip/module'),
+  dashboard:        () => import('./dashboard/module'),
+  admin:            () => import('./admin/module'),
+  inquiry:          () => import('./inquiry/module'),
+  shared:           () => import('./shared/module'),
 }
 
 export const MODULE_NAMES = Object.keys(MODULES)

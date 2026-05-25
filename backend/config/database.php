@@ -78,6 +78,25 @@ return [
             'engine' => null,
         ],
 
+        // BUG A: Missing dwsql Database Connection Configuration
+        // For DCS Flowmeter quantifier integration (Airflow historian database)
+        'dwsql' => [
+            'driver' => 'mysql',
+            'host' => env('DWSQL_HOST', '172.16.11.19'),
+            'port' => env('DWSQL_PORT', '3302'),
+            'database' => env('DWSQL_DATABASE', 'EOB1_SQL_7AM.EUDR_AIRFLOW'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+            'engine' => null,
+            'options' => [
+                \PDO::ATTR_TIMEOUT => 2,
+            ],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

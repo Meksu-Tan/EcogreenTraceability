@@ -11,5 +11,10 @@
     "Admin": true,
     "Shared": true,
     "Inquiry": true,
-    "TsRaw": true
+    "TsRaw": true,
+    "TsWip": true,
+    "TsTransfer": true,
+    "TsBlending": true,
+    "TsPackage": true,
+    "TsShipment": true
 }

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import * as plantApi from '@/modules/plant/api'
+import * as plantApi from '@/modules/m-plant/api'
 
 export const useSetupPlantStore = defineStore('setupPlant', () => {
   const plants  = ref([])
@@ -42,7 +42,7 @@ export const useSetupPlantStore = defineStore('setupPlant', () => {
 
 export const usePlantSelectionStore = defineStore('plantSelection', () => {
   const selectedPlantId = ref(null)
-  const selectedPlantName = ref('All Plants')
+  const selectedPlantName = ref('')
   const hasUserSelected = ref(false)
 
   const hasSelectedPlant = computed(() => hasUserSelected.value)

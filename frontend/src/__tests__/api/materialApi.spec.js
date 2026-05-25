@@ -9,7 +9,7 @@ vi.mock('@/api/axios', () => ({
   }
 }))
 
-import * as materialApi from '@/modules/material/api'
+import * as materialApi from '@/modules/m-material/api'
 import api from '@/api/axios'
 
 describe('Material API', () => {

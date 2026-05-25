@@ -10,7 +10,7 @@
 
       <!-- Page Content -->
       <main class="flex-1 overflow-y-auto p-6 lg:p-8">
-        <router-view />
+        <router-view :key="route.path" />
       </main>
     </div>
   </div>
@@ -21,4 +21,7 @@
 
 <script setup>
 import { AppSidebar, AppTopbar, AppToast } from '@/modules/shared/components'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 </script>

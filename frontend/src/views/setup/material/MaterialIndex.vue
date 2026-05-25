@@ -87,7 +87,7 @@ import { ref, onMounted } from 'vue'
 import DataTable from '@/components/shared/DataTable.vue'
 import MaterialModal from './MaterialModal.vue'
 import MaterialPackagingTab from './MaterialPackagingTab.vue'
-import { useSetupMaterialStore } from '@/modules/material/stores'
+import { useSetupMaterialStore } from '@/modules/m-material/stores'
 import { useToastStore } from '@/stores/toast'
 
 const store           = useSetupMaterialStore()
@@ -114,7 +114,13 @@ const materialColumns = [
   { key: 'updated_at',         label: 'Updated at' }
 ]
 
-onMounted(() => store.fetchMaterials())
+onMounted(async () => {
+  try {
+    await store.fetchMaterials()
+  } catch (error) {
+    console.error('Failed to fetch materials:', error)
+  }
+})
 
 function openModal() {
   if (activeTab.value === 'packaging') { packagingTabRef.value?.openModal(); return }

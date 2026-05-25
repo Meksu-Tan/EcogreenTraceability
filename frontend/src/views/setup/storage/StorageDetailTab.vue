@@ -56,7 +56,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable from '@/components/shared/DataTable.vue'
 import StorageTankModal   from './StorageTankModal.vue'
-import { useSetupStorageStore } from '@/modules/storage/stores'
+import { useSetupStorageStore } from '@/modules/m-storage/stores'
 import { useToastStore } from '@/stores/toast'
 
 defineExpose({ openTankModal })
@@ -80,7 +80,13 @@ const tankColumns = [
   { key: 'created_at', label: 'Created at' },
   { key: 'updated_at', label: 'Updated at' },
 ]
-onMounted(() => store.fetchTanks())
+onMounted(async () => {
+  try {
+    await store.fetchTanks()
+  } catch (error) {
+    console.error('Failed to fetch tanks:', error)
+  }
+})
 
 function openTankModal() { editTank.value = null; showTankModal.value = true }
 

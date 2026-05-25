@@ -1,0 +1,11 @@
+{
+    "name": "TsBlending",
+    "alias": "tsblending",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsBlending\\Providers\\TsBlendingServiceProvider"
+    ],
+    "files": []
+}

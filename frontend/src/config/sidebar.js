@@ -38,23 +38,23 @@ export const sidebarMenu = [
         label: 'RM Entry'
       },
       {
-        path: '/ts-raw/wip-entry',
+        path: '/ts-wip/wip-entry',
         label: 'WIP Entry'
       },
       {
-        path: '/ts-raw/blending',
+        path: '/ts-blending/blending',
         label: 'Blending'
       },
       {
-        path: '/ts-raw/package-entry',
+        path: '/ts-package/package-entry',
         label: 'Package Entry'
       },
       {
-        path: '/ts-raw/shipment-entry',
+        path: '/ts-shipment/shipment-entry',
         label: 'Shipment Entry'
       },
       {
-        path: '/ts-raw/transfer',
+        path: '/ts-transfer/transfer',
         label: 'Transfer'
       }
     ]

@@ -25,7 +25,5 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
-    // All endpoints are defined in their module route files.
-    // See module list above for details.
-});
+// All endpoints are defined in their module route files.
+// See module list above for details.

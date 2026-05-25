@@ -1,5 +1,5 @@
 import RmEntryApi from '@/modules/ts-raw/api'
-import * as SupplierApi from '@/modules/supplier/api'
+import * as SupplierApi from '@/modules/m-supplier/api'
 
 class SupplierRepository {
   async search(query) {
