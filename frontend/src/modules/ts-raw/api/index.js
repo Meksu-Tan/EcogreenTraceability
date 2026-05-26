@@ -8,8 +8,18 @@ export default {
     return response.data
   },
 
+  async getById(id) {
+    const response = await api.get(`${BASE_URL}/${id}`)
+    return response.data
+  },
+
   async create(data) {
     const response = await api.post(BASE_URL, data)
+    return response.data
+  },
+
+  async update(id, data) {
+    const response = await api.put(`${BASE_URL}/${id}`, data)
     return response.data
   },
 
@@ -98,6 +108,35 @@ export default {
 
   async debugFifoStock(params = {}) {
     const response = await api.get(`${BASE_URL}/debug-fifo-stock`, { params })
+    return response.data
+  },
+
+  // Storage and Feed Log endpoints
+  async getStorageLog(params = {}) {
+    const response = await api.get(`${BASE_URL}/storage-log`, { params })
+    return response.data
+  },
+
+  async getFeedLog(params = {}) {
+    const response = await api.get(`${BASE_URL}/feed-log`, { params })
+    return response.data
+  },
+
+  // Transfer endpoints
+  async getTransferList(params = {}) {
+    const response = await api.get(`${BASE_URL}/transfers`, { params })
+    return response.data
+  },
+
+  async deactivateTransfer(id) {
+    const response = await api.delete(`${BASE_URL}/transfers/${id}`)
+    return response.data
+  },
+
+  async getDestTanks(plantId = null) {
+    const response = await api.get(`${BASE_URL}/dest-tanks`, {
+      params: { id_plant: plantId }
+    })
     return response.data
   }
 }

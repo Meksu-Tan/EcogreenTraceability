@@ -45,4 +45,35 @@ interface RmEntryRepositoryInterface
     public function resolvePlantCode($plantId);
     public function buildTraceNo(string $section, string $entryDate, string $warehouse, string $plantCode, int $sequence): string;
     public function traceNoToInt(string $traceNo): int;
+
+    // Storage and Feed Log Methods (moved from ts-transfer)
+    public function getStorageLog($plantId): array;
+    public function getFeedLog($plantId): array;
+    public function debugFeedLog($plantId): array;
+
+    // Transfer Methods (moved from ts-transfer)
+    public function generateTransferNumber($plantId, string $movSeq = '000'): ?string;
+    public function findBalanceByTraceNo(string $traceNo): ?object;
+    public function findTraceByBalanceHeadId(int $balanceHeadId): ?object;
+    public function createTransferBalance(array $data): object;
+    public function createTransferTrace(array $data): object;
+    public function updateSourceBalance(int $balanceId, float $qty): bool;
+    public function updateSourceTrace(int $balanceHeadId, float $qty): bool;
+    public function findTransferById(int $id): ?object;
+    public function deactivateBalance(int $balanceId, string $user): bool;
+    public function deactivateTrace(int $traceId, string $user): bool;
+    public function revertSourceBalance(string $traceNo, float $qty): bool;
+    public function revertSourceTrace(int $balanceHeadId, float $qty): bool;
+    public function getSourceEntries(int $plantId): array;
+    public function getDestTanks(int $plantId): array;
+    public function getTransferList($plantId): array;
+
+    // Transfer Entry (standalone create, matching reference Transfer::post_transferEntry)
+    public function getActiveMaterialsForTransfer(): array;
+    public function generateTransferEntryNo(int $materialId, $plantId): ?string;
+    public function getActiveTanksForTransfer(?int $materialId, $plantId): array;
+    public function getActiveSpecificTanksRundown(int $sloc): array;
+    public function getTotalStockMaterial(int $materialId, int $tankId): float;
+    public function getSupplierMaterial(int $materialId, int $tankId, $plantId): ?object;
+    public function getLockStatus(string $entryDate): bool;
 }

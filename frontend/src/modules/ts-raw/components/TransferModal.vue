@@ -244,7 +244,7 @@
                   <tbody class="divide-y divide-slate-100 bg-white">
                     <tr v-if="materialList.length === 0">
                       <td colspan="4" class="px-4 py-10 text-center text-sm text-slate-400">
-                        Belum ada material — gunakan “Material &amp; Qty”.
+                        Belum ada material — gunakan "Material &amp; Qty".
                       </td>
                     </tr>
                     <tr v-for="(mat, index) in materialList" :key="mat.id" class="transition hover:bg-slate-50/80">
@@ -361,7 +361,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
-import { useTsRawTransferStore } from '@/modules/ts-transfer/stores'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useToastStore } from '@/stores/toast'
 
@@ -372,7 +371,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const store = useTsRawRmEntryStore()
-const transferStore = useTsRawTransferStore()
 const plantSelectionStore = usePlantSelectionStore()
 const toastStore = useToastStore()
 
@@ -405,10 +403,10 @@ const destTanks = computed(() => {
   if (form.value.source_tank) {
     const selectedSourceTank = tanks.value.find(t => t.tank === form.value.source_tank)
     if (selectedSourceTank && selectedSourceTank.id_plant) {
-      return transferStore.destTanks.filter(t => t.id_plant === selectedSourceTank.id_plant)
+      return store.destTanks.filter(t => t.id_plant === selectedSourceTank.id_plant)
     }
   }
-  return transferStore.destTanks
+  return store.destTanks
 })
 const materials = computed(() => store.materials)
 const materialList = computed(() => store.supplierList)
@@ -460,7 +458,7 @@ async function loadTankOptions() {
   const params = { id_plant: plantSelectionStore.selectedPlantId }
   await Promise.all([
     store.fetchTanks(params, true),
-    transferStore.fetchDestTanks(params)
+    store.fetchDestTanks(params)
   ])
 }
 

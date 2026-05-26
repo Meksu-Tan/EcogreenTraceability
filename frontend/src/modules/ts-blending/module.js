@@ -1,3 +1,5 @@
+import { useTsBlendingStore } from './stores'
+
 export default {
   name: 'ts-blending',
   routes: [
@@ -8,5 +10,5 @@ export default {
       meta: { title: 'Blending', requiresAuth: true },
     },
   ],
-  stores: [],
+  stores: [useTsBlendingStore],
 }

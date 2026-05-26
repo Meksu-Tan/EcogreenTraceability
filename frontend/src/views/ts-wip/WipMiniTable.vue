@@ -15,19 +15,6 @@
             <template v-if="col.key === 'to_trace_no' || col.key === 'rundown_trace_no' || col.key === 'trace_no'">
               <span class="font-mono font-bold text-gray-800">{{ row[col.key] || '-' }}</span>
             </template>
-
-            <!-- Trace nos display (from >>> to) -->
-            <template v-else-if="col.key === 'trace_nos_display'">
-              <div class="flex flex-col gap-0.5">
-                <span v-if="!row.trace_nos_display && row.from_trace_nos" v-for="fromNo in splitSpace(row.from_trace_nos)" :key="fromNo" class="font-mono font-bold text-gray-800 whitespace-nowrap">
-                  {{ fromNo }} >>> {{ row.to_trace_no || '-' }}
-                </span>
-                <span v-else-if="row.trace_nos_display" v-for="line in row.trace_nos_display" :key="line" class="font-mono font-bold text-gray-800 whitespace-nowrap">
-                  {{ line }}
-                </span>
-                <span v-else class="text-gray-300">-</span>
-              </div>
-            </template>
             
             <!-- Quantities -->
             <template v-else-if="col.key === 'out_qty'">
@@ -109,11 +96,6 @@ const displayData = computed(() => {
 function splitPipe(val) {
   if (!val) return []
   return String(val).split('|').map(s => s.trim()).filter(Boolean)
-}
-
-function splitSpace(val) {
-  if (!val) return []
-  return String(val).split(/\s+/).filter(Boolean)
 }
 
 function parseNum(val) {

@@ -23,9 +23,11 @@
         <!-- Header -->
         <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 via-green-600 to-green-600 px-6 py-4 sm:px-8">
           <div class="min-w-0">
-            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">RM Entry</p>
+            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">
+              {{ form.mode === 'EDIT' ? 'Edit RM Entry' : 'New RM Entry' }}
+            </p>
             <h3 id="modal-title" class="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
-              Raw Material Entry
+              {{ form.mode === 'EDIT' ? 'Edit Raw Material Entry' : 'Raw Material Entry' }}
             </h3>
           </div>
           <button
@@ -163,7 +165,7 @@
                         class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-white px-2 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-green-200 hover:bg-green-50/50"
                       >
                         <input
-                          v-model="form.id_tank_tail"
+                          v-model="form.id_sloc_tail"
                           type="checkbox"
                           :value="detail.id_tank_tail"
                           class="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
@@ -191,7 +193,7 @@
                     :disabled="!canSubmit || loading"
                     @click="handleSubmit"
                   >
-                    Simpan entri
+                    {{ form.mode === 'EDIT' ? 'Update entri' : 'Simpan entri' }}
                   </button>
                 </div>
                 <div class="flex items-center justify-end gap-3 sm:min-w-[200px]">
@@ -348,7 +350,7 @@
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>{{ loading ? 'Menyimpan…' : 'Simpan RM Entry' }}</span>
+            <span>{{ loading ? 'Menyimpan…' : (form.mode === 'EDIT' ? 'Update RM Entry' : 'Simpan RM Entry') }}</span>
           </button>
         </div>
       </div>
@@ -361,11 +363,16 @@
 import { ref, computed, watch } from 'vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
 import { usePlantSelectionStore } from '@/stores/plant'
+import { useToastStore } from '@/stores/toast'
 
 const props = defineProps({
   isOpen: {
     type: Boolean,
     required: true
+  },
+  editId: {
+    type: Number,
+    default: null
   }
 })
 
@@ -373,6 +380,7 @@ const emit = defineEmits(['close', 'saved'])
 
 const store = useTsRawRmEntryStore()
 const plantSelectionStore = usePlantSelectionStore()
+const toastStore = useToastStore()
 
 // State
 const isSupplierModalOpen = ref(false)
@@ -385,7 +393,7 @@ const form = ref({
   rm_number: '',
   id_material: '',
   id_tank: '',
-  id_tank_tail: [],
+  id_sloc_tail: [],
   material_document: '',
   po_so: '',
   total_qty: 0
@@ -424,7 +432,7 @@ const canSubmit = computed(() => {
          form.value.rm_number &&
          form.value.id_material &&
          form.value.id_tank &&
-         form.value.id_tank_tail.length > 0 &&
+         form.value.id_sloc_tail.length > 0 &&
          supplierList.value.length > 0 &&
          parseFloat(qtyStr) > 0
 })
@@ -441,7 +449,7 @@ async function bootstrap() {
     rm_number: '',
     id_material: '',
     id_tank: '',
-    id_tank_tail: [],
+    id_sloc_tail: [],
     material_document: '',
     po_so: '',
     total_qty: 0
@@ -451,15 +459,78 @@ async function bootstrap() {
 
   try {
     const params = { id_plant: plantSelectionStore.selectedPlantId }
+    
+    // Always fetch tanks and materials first
     await Promise.all([
-      store.generateRmNumber(params),
       store.fetchTanks(params, true),
       store.fetchMaterials()
     ])
-    form.value.rm_number = store.rmNumber || ''
-    form.value.mode = 'ADD'
-    if (!form.value.rm_number) {
-      initError.value = 'Nomor RM tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
+
+    if (props.editId) {
+      // Edit mode — load existing data from backend
+      const res = await store.prepareEdit(props.editId)
+      const editData = res.data || res
+
+      // Normalize id_sloc_tail values to strings for consistent checkbox matching
+      let slocTailValues = editData.id_sloc_tail || []
+      if (!Array.isArray(slocTailValues)) {
+        slocTailValues = [slocTailValues]
+      }
+      const normalizedSlocTail = slocTailValues.map(v => String(v))
+
+      form.value = {
+        mode: 'EDIT',
+        entry_date: editData.entry_date,
+        rm_number: String(editData.rm_number),
+        id_material: Number(editData.id_material),
+        id_tank: editData.sloc_desc || '',
+        id_sloc_tail: [], // Will be matched after fetching tankDetails
+        material_document: editData.material_document || '',
+        po_so: editData.po_so || '',
+        total_qty: parseFloat(editData.total_qty)
+      }
+
+      // Set rmNumber in store for consistency
+      store.rmNumber = form.value.rm_number
+      
+      // Fetch tank details so sub-sloc checkboxes appear
+      if (editData.sloc_desc) {
+        await store.fetchTankDetails(editData.sloc_desc, plantSelectionStore.selectedPlantId)
+        
+        // Match id_sloc_tail values with available tankDetails checkbox values
+        // tankDetails values can be integer (from DB) or prefixed with 's_' (virtual)
+        const matchedTails = []
+        for (const detail of store.tankDetails) {
+          const detailVal = String(detail.id_tank_tail)
+          if (normalizedSlocTail.includes(detailVal)) {
+            matchedTails.push(detail.id_tank_tail)
+          }
+        }
+
+        // If no exact matches found but we have normalizedSlocTail and tankDetails,
+        // try numeric comparison as fallback
+        if (matchedTails.length === 0 && normalizedSlocTail.length > 0 && store.tankDetails.length > 0) {
+          for (const detail of store.tankDetails) {
+            const detailNum = String(detail.id_tank_tail).replace('s_', '')
+            for (const tailVal of normalizedSlocTail) {
+              if (detailNum === tailVal || detail.id_tank_tail === tailVal) {
+                matchedTails.push(detail.id_tank_tail)
+                break
+              }
+            }
+          }
+        }
+
+        form.value.id_sloc_tail = matchedTails
+      }
+    } else {
+      // Add mode
+      await store.generateRmNumber(params)
+      form.value.rm_number = store.rmNumber || ''
+      form.value.mode = 'ADD'
+      if (!form.value.rm_number) {
+        initError.value = 'Nomor RM tidak dihasilkan. Periksa hak akses, id_plant user, dan koneksi database (MySQL).'
+      }
     }
   } catch (error) {
     console.error('Initialization error:', error)
@@ -474,6 +545,7 @@ async function bootstrap() {
   if (form.value.rm_number && !initError.value) {
     try {
       await store.fetchSupplierList(form.value.rm_number)
+      await store.fetchTotalQty(form.value.rm_number)
     } catch (error) {
       console.error('Supplier list load:', error)
       initError.value =
@@ -485,12 +557,12 @@ async function bootstrap() {
 }
 
 async function onTankChange() {
-  form.value.id_tank_tail = []
+  form.value.id_sloc_tail = []
   if (form.value.id_tank) {
     await store.fetchTankDetails(form.value.id_tank, plantSelectionStore.selectedPlantId)
     
     if (store.tankDetails.length === 1) {
-      form.value.id_tank_tail = [store.tankDetails[0].id_tank_tail]
+      form.value.id_sloc_tail = [store.tankDetails[0].id_tank_tail]
     }
     
     if (!plantSelectionStore.selectedPlantId || plantSelectionStore.selectedPlantId == 0) {
@@ -547,7 +619,7 @@ async function handleSubmit() {
   if (!canSubmit.value) return
 
   const checkedDetails = tankDetails.value.filter(detail => 
-    form.value.id_tank_tail.includes(detail.id_tank_tail)
+    form.value.id_sloc_tail.includes(detail.id_tank_tail)
   )
 
   if (checkedDetails.length === 0) return
@@ -555,7 +627,6 @@ async function handleSubmit() {
   const realIdTank = checkedDetails[0].id_sloc
   const realIdTankTail = checkedDetails
     .map(d => d.id_tank_tail)
-    .filter(id => !String(id).startsWith('s_'))
 
   const selectedTankObj = tanks.value.find(t => t.tank === form.value.id_tank)
   const autoPlantId = selectedTankObj ? selectedTankObj.id_plant : 0
@@ -563,20 +634,28 @@ async function handleSubmit() {
   try {
     const data = {
       ...form.value,
+      id_sloc: realIdTank,
       id_tank: realIdTank,
+      id_sloc_tail: realIdTankTail,
       id_tank_tail: realIdTankTail,
       id_plant: plantSelectionStore.selectedPlantId || autoPlantId,
       total_qty: parseFloat(String(totalQty.value ?? '0').replace(/,/g, ''), 10)
     }
 
-    await store.createEntry(data)
+    if (form.value.mode === 'EDIT') {
+      await store.updateEntry(props.editId, data)
+    } else {
+      await store.createEntry(data)
+    }
     emit('saved')
     closeModal()
   } catch (error) {
     console.error('Submit error:', error)
-    if (form.value.entry_no) {
+    const errorMsg = error.response?.data?.message || error.message || 'Gagal menyimpan RM Entry'
+    toastStore.error(errorMsg)
+    if (form.value.rm_number) {
       try {
-        await store.clearTempList(form.value.entry_no)
+        await store.clearTempList(form.value.rm_number)
       } catch (e) {
         console.error('Failed to clear temp list on submit error:', e)
       }
@@ -595,6 +674,9 @@ watch(
     if (open) {
       void bootstrap()
     } else {
+      if (form.value.rm_number) {
+        void store.clearTempList(form.value.rm_number).catch(e => console.error(e))
+      }
       initLoading.value = false
       initError.value = null
       isSupplierModalOpen.value = false

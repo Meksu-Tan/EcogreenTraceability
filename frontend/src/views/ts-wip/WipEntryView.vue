@@ -138,7 +138,7 @@ const EntryForm = defineComponent({
         h('option', { value: '' }, uniqueTanks.value?.length ? '-- Select Sloc --' : '-- No Sloc found for selected plant --'),
         ...(uniqueTanks.value || []).map(t => h('option', { value: t.id_sloc || t.id_tank }, t.tank || t.description || t.id_tank)),
       ])),
-      field('Specific Sloc', h('select', { multiple: true, value: props.form.tankNo || [], onChange: e => props.form.tankNo = Array.from(e.target.selectedOptions).map(o => Number(o.value)), class: inputClass() }, (props.specificTanks?.length ? props.specificTanks : [{ id_sloc_tail: '', tankNo: props.form.tank ? '-- No Specific Sloc found --' : '-- Select Sloc first --' }]).map(t => h('option', { value: t.id_sloc_tail || t.id_tank_tail || '', disabled: !t.id_sloc_tail && !t.id_tank_tail }, t.tankNo)))),
+      field('Specific Sloc', h('select', { multiple: true, size: Math.max(4, props.specificTanks?.length || 1), value: props.form.tankNo || [], onChange: e => props.form.tankNo = Array.from(e.target.selectedOptions).map(o => Number(o.value)), class: inputClass() }, (props.specificTanks?.length ? props.specificTanks : [{ id_sloc_tail: '', tankNo: props.form.tank ? '-- No Specific Sloc found --' : '-- Select Sloc first --' }]).map(t => h('option', { value: t.id_sloc_tail || t.id_tank_tail || '', disabled: !t.id_sloc_tail && !t.id_tank_tail }, t.tankNo)))),
       h('div', { class: 'grid grid-cols-[1fr_auto] gap-3 items-end' }, [
         field(`Current ${props.mode === 'feed' ? 'Feed' : 'Rundown'} (MT)`, h('input', { type: 'number', step: '0.001', value: props.form.currQtf, onInput: e => props.form.currQtf = e.target.value, class: inputClass() })),
         h('button', { type: 'button', onClick: () => emit('fetch-dcs'), class: 'px-4 py-2 text-xs font-bold rounded-md bg-blue-600 text-white hover:bg-blue-700' }, 'Fetch DCS Data'),
@@ -214,14 +214,17 @@ const visibleSections = computed(() => selectedSection.value === 'allSection' ? 
 const runnableSteps = computed(() => wipSections.flatMap(s => s.steps).filter(s => s.type === 'feed' || s.type === 'rundown'))
 
 const feedColumns = [
-  { key: 'trace_nos_display', label: 'Trace No (From >>> To)' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
-  { key: 'sloc', label: 'Sloc' }, { key: 'out_qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Supplier / Batch SAP / Qty' },
+  { key: 'plant_name', label: 'Plant' },
+  { key: 'to_trace_no', label: 'Feed Trace No' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
+  { key: 'sloc', label: 'Sloc' }, { key: 'out_qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Trace No / Supplier / Batch SAP / Out Qty' },
 ]
 const rundownColumns = [
+  { key: 'plant_name', label: 'Plant' },
   { key: 'rundown_trace_no', label: 'WIP Trace No' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
   { key: 'sloc', label: 'Sloc' }, { key: 'in_qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Feed Trace No / Supplier / Batch SAP / In Qty' },
 ]
 const balanceColumns = [
+  { key: 'plant_name', label: 'Plant' },
   { key: 'trace_no', label: 'Trace No' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
   { key: 'sloc', label: 'Sloc' }, { key: 'qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Supplier / Batch' },
 ]
@@ -373,16 +376,10 @@ function autoSelectTank(form, tanks, mode) {
 async function onFeedTankChange() {
   feedForm.tankNo = []
   feedSpecificTanks.value = feedForm.tank ? await fetchSpecificTanks(feedForm.tank) : []
-  if (feedSpecificTanks.value.length) {
-    feedForm.tankNo = feedSpecificTanks.value.map(t => Number(t.id_sloc_tail || t.id_tank_tail))
-  }
 }
 async function onRundownTankChange() {
   rundownForm.tankNo = []
   rundownSpecificTanks.value = rundownForm.tank ? await fetchSpecificTanks(rundownForm.tank) : []
-  if (rundownSpecificTanks.value.length) {
-    rundownForm.tankNo = rundownSpecificTanks.value.map(t => Number(t.id_sloc_tail || t.id_tank_tail))
-  }
 }
 
 async function fetchTanks(type, id) {

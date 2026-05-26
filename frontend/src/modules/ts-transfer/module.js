@@ -1,4 +1,4 @@
-import { useTsRawTransferStore } from './stores'
+import { useTsTransferStore } from './stores'
 
 export default {
   name: 'ts-transfer',
@@ -10,5 +10,5 @@ export default {
       meta: { title: 'Transfer', requiresAuth: true },
     },
   ],
-  stores: [useTsRawTransferStore],
+  stores: [useTsTransferStore],
 }

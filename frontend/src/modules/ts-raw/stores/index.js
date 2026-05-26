@@ -25,6 +25,11 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const rmNumber = ref('')
   const trfNumber = ref('')
   const totalQty = ref('0.000')
+  const storageLogs = ref([])
+  const feedLogs = ref([])
+  // Transfer state (moved from ts-transfer)
+  const transferList = ref([])
+  const destTanks = ref([])
 
   // Getters
   const entriesCount = computed(() => entries.value.length)
@@ -68,6 +73,19 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     }
   }
 
+  async function prepareEdit(id) {
+    loading.value = true
+    try {
+      const response = await rmEntryRepo.getById(id)
+      return response
+    } catch (error) {
+      console.error('Failed to fetch RM entry for edit:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function deactivateEntry(id) {
     loading.value = true
     try {
@@ -77,6 +95,21 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
       return response
     } catch (error) {
       console.error('Failed to deactivate RM entry:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateEntry(id, data) {
+    loading.value = true
+    try {
+      const response = await rmEntryRepo.update(id, data)
+      toastStore.success('RM Entry updated successfully')
+      await fetchEntries()
+      return response
+    } catch (error) {
+      console.error('Failed to update RM entry:', error)
       throw error
     } finally {
       loading.value = false
@@ -282,6 +315,84 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     tankDetails.value = []
   }
 
+  // Storage and Feed Log Actions (moved from ts-transfer)
+  async function fetchStorageLogs(params = {}) {
+    loading.value = true
+    try {
+      const response = await rmEntryRepo.getStorageLog(params.id_plant || 0)
+      storageLogs.value = Array.isArray(response) ? response : []
+    } catch (error) {
+      console.error('Failed to fetch storage logs:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchFeedLogs(params = {}) {
+    loading.value = true
+    try {
+      const response = await rmEntryRepo.getFeedLog(params.id_plant || 0)
+      feedLogs.value = Array.isArray(response) ? response : []
+    } catch (error) {
+      console.error('Failed to fetch feed logs:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Transfer Actions (moved from ts-transfer)
+  async function fetchTransferList(plant = 0) {
+    loading.value = true
+    try {
+      const response = await rmEntryRepo.getTransferList(plant)
+      transferList.value = Array.isArray(response) ? response : []
+    } catch (err) {
+      console.error('Failed to fetch transfer list:', err)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchDestTanks(params = {}) {
+    loading.value = true
+    try {
+      const response = await rmEntryRepo.getDestTanks(params.id_plant || 0)
+      destTanks.value = Array.isArray(response) ? response : []
+    } catch (err) {
+      console.error('Failed to fetch dest tanks:', err)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function performTransfer(data) {
+    loading.value = true
+    try {
+      const response = await transactionRmEntryApi.transfer(data)
+      return response
+    } catch (err) {
+      console.error('Failed to perform transfer:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function deleteTransfer(id) {
+    loading.value = true
+    try {
+      const response = await transactionRmEntryApi.deactivateTransfer(id)
+      return response
+    } catch (err) {
+      console.error('Failed to delete transfer:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // State
     entries,
@@ -295,6 +406,10 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     rmNumber,
     trfNumber,
     totalQty,
+    storageLogs,
+    feedLogs,
+    transferList,
+    destTanks,
 
     // Getters
     entriesCount,
@@ -303,6 +418,8 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     // Actions
     fetchEntries,
     createEntry,
+    updateEntry,
+    prepareEdit,
     deactivateEntry,
     generateRmNumber,
     generateTransferNumber,
@@ -318,7 +435,13 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     fetchTotalQty,
     transferEntry,
     validateStockSynchronization,
-    resetForm
+    resetForm,
+    fetchStorageLogs,
+    fetchFeedLogs,
+    fetchTransferList,
+    fetchDestTanks,
+    performTransfer,
+    deleteTransfer
   }
 })
 

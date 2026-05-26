@@ -138,7 +138,7 @@ class WipEntryService
 
     protected function formatResponse(array $result, string $feature, string $mode): array
     {
-        $response = $result[0]->response ?? '0';
+        $response = $result[0]['response'] ?? $result[0]->response ?? '0';
 
         $messages = [
             '1'  => 'Success ' . $mode . ' ' . $feature,

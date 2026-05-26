@@ -70,10 +70,6 @@ const submitting     = ref(false)
 
 const tankColumns = [
   { key: 'id_plant',   label: 'Plant' },
-  { key: 'code',       label: 'Code' },
-  { key: 'code_2',     label: 'Storage Type 1' },
-  { key: 'code_3',     label: 'Storage Type 2' },
-  { key: 'code_4',     label: 'Supplier' },
   { key: 'description',label: 'Storage Description' },
   { key: 'total_tank', label: 'Total Tank' },
   { key: 'status',     label: 'Status' },

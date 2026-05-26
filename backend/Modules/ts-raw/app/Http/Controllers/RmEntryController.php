@@ -44,6 +44,22 @@ class RmEntryController extends Controller
         }
     }
 
+    public function show($id)
+    {
+        try {
+            $result = $this->rmEntryService->getRmEntryById($id);
+            return response()->json([
+                'success' => true,
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function store(StoreRmEntryRequest $request)
     {
         try {
@@ -56,6 +72,28 @@ class RmEntryController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'RM Entry created successfully',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        try {
+            $data = $request->validated();
+            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $user = Auth::user()?->name ?? 'System';
+
+            $result = $this->rmEntryService->updateRmEntry($id, $data, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'RM Entry updated successfully',
                 'data' => $result
             ]);
         } catch (\Exception $e) {
@@ -479,10 +517,25 @@ class RmEntryController extends Controller
                 ], 422);
             }
 
+            // Handle id_sloc_tail - ensure it's always a JSON array with string values
+            $tankTailJson = null;
+            if (!empty($tankTail)) {
+                if (is_array($tankTail)) {
+                    $tankTailJson = json_encode(array_map('strval', array_values($tankTail)));
+                } else {
+                    $decoded = json_decode($tankTail, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $tankTailJson = json_encode(array_map('strval', array_values($decoded)));
+                    } else {
+                        $tankTailJson = json_encode([(string)$tankTail]);
+                    }
+                }
+            }
+
             $feedData = [
                 'id_material' => $materialId,
                 'id_sloc' => $tankId,
-                'id_sloc_tail' => $tankTail ? json_encode($tankTail) : null,
+                'id_sloc_tail' => $tankTailJson,
                 'balance_plant' => $plantId,
                 'trace_prefixes' => ['1'],
                 'tank_matching' => $tankMatching
@@ -522,6 +575,237 @@ class RmEntryController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $verification
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // Storage and Feed Log Methods (moved from ts-transfer)
+    public function storageLog(Request $request)
+    {
+        try {
+            $plantId = $request->input('id_plant');
+            if ($plantId === '' || $plantId === null) {
+                $plantId = Auth::user()?->id_plant ?? 0;
+            }
+            $data = $this->rmEntryService->getStorageLog($plantId);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function feedLog(Request $request)
+    {
+        try {
+            $plantId = $request->input('id_plant');
+            if ($plantId === '' || $plantId === null) {
+                $plantId = Auth::user()?->id_plant ?? 0;
+            }
+            $data = $this->rmEntryService->getFeedLog($plantId);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function debugFeedLog(Request $request)
+    {
+        try {
+            $plantId = $request->input('id_plant');
+            if ($plantId === '' || $plantId === null) {
+                $plantId = Auth::user()?->id_plant ?? 0;
+            }
+            $data = $this->rmEntryService->debugFeedLog($plantId);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    // Transfer Methods (moved from ts-transfer)
+    public function sourceEntries(Request $request)
+    {
+        try {
+            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+            $entries = BalanceHeader::active()
+                ->rmEntry()
+                ->where('qty', '>', 0)
+                ->where('id_plant', $plantId)
+                ->with(['material', 'tank'])
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id_balance_head' => $item->id_balance_head,
+                        'trace_no' => $item->trace_no,
+                        'material' => $item->material->description ?? 'Unknown',
+                        'tank' => $item->tank->description ?? 'Unknown',
+                        'qty' => $item->qty
+                    ];
+                });
+
+            return response()->json(['success' => true, 'data' => $entries]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function destTanks(Request $request)
+    {
+        try {
+            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+            if ($plantId) {
+                $plant = \Modules\Plant\Models\Plant::find($plantId);
+                if ($plant && $plant->code_3) {
+                    $plantId = $plant->code_3;
+                }
+            }
+            $query = Tank::active()
+                ->feed()
+                ->orderBy('description')
+                ->groupBy('description', 'id_plant');
+            
+            if ($plantId && $plantId !== '0' && $plantId !== 0) {
+                $query->where('id_plant', $plantId);
+            }
+            
+            $tanks = $query->get(['description as tank', 'id_plant']);
+
+            return response()->json(['success' => true, 'data' => $tanks]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function transfers(Request $request)
+    {
+        try {
+            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+            $data = $this->rmEntryService->getTransferList($plantId);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function interPlantTransfer(Request $request)
+    {
+        try {
+            $data = $request->all();
+            $data['id_plant'] = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+            $user = Auth::user()->name;
+
+            $result = $this->rmEntryService->transfer($data, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transfer completed successfully',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function matlDoc(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'mode' => 'required|in:ADD,UPDATE',
+                'id' => 'required|integer',
+                'number' => 'required|string'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
+
+            $mode = $request->input('mode');
+            $id = $request->input('id');
+            $number = $request->input('number');
+            $user = Auth::user()->name ?? 'System';
+
+            if ($mode === 'ADD') {
+                $exists = DB::connection('eudr_ts')->table('t_material_document')
+                    ->where('id_trace_head', $id)
+                    ->exists();
+                if ($exists) {
+                    DB::connection('eudr_ts')->table('t_material_document')
+                        ->where('id_trace_head', $id)
+                        ->update(['material_document' => $number, 'updated_by' => $user]);
+                } else {
+                    DB::connection('eudr_ts')->table('t_material_document')->insert([
+                        'id_trace_head' => $id,
+                        'material_document' => $number,
+                        'created_by' => $user
+                    ]);
+                }
+            } else {
+                DB::connection('eudr_ts')->table('t_material_document')
+                    ->where('id_trace_head', $id)
+                    ->update(['material_document' => $number, 'updated_by' => $user]);
+            }
+
+            return response()->json(['success' => true, 'status' => 1]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function updateSubTank(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'id_head' => 'required|integer',
+                'id_tank_tail' => 'required'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
+
+            $idHead = $request->input('id_head');
+            $idTankTail = $request->input('id_tank_tail');
+
+            // Handle id_tank_tail - ensure it's always a JSON array with string values
+            $tankTailJson = null;
+            if (!empty($idTankTail)) {
+                if (is_array($idTankTail)) {
+                    $tankTailJson = json_encode(array_map('strval', array_values($idTankTail)));
+                } else {
+                    $decoded = json_decode($idTankTail, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $tankTailJson = json_encode(array_map('strval', array_values($decoded)));
+                    } else {
+                        // Single value as string, wrap in array
+                        $tankTailJson = json_encode([(string)$idTankTail]);
+                    }
+                }
+            }
+
+            DB::connection('eudr_ts')->table('t_balance_header')
+                ->where('id_balance_head', $idHead)
+                ->update(['id_sloc_tail' => $tankTailJson]);
+
+            return response()->json(['success' => true, 'status' => 1]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function deactivateTransfer(Request $request, $id)
+    {
+        try {
+            $user = Auth::user()->name;
+            $result = $this->rmEntryService->deactivateTransfer($id, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Transfer deactivated successfully'
             ]);
         } catch (\Exception $e) {
             return response()->json([

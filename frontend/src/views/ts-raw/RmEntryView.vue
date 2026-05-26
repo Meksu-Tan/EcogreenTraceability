@@ -189,7 +189,7 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="transferStore.loading"><td colspan="14" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
+            <tr v-if="loading"><td colspan="14" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
             <tr v-else-if="feedLogsSafe.length === 0"><td colspan="14" class="px-6 py-4 text-center text-gray-500">No feed logs found</td></tr>
             <tr v-for="(log, index) in paginatedFeedLogs" :key="log.id_trace_head" class="hover:bg-gray-50 text-sm">
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageFeed - 1) * itemsPerPage + index + 1 }}</td>
@@ -200,7 +200,11 @@
                 </button>
               </td>
               <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-900 text-right">
-                {{ log.from_trace_no }} >>> {{ log.to_trace_no }}
+                <div class="text-xs leading-tight">
+                  <div v-for="(pair, idx) in (log.trace_pairs_array || [log.from_trace_no + ' >>> ' + log.to_trace_no])" :key="idx">
+                    {{ pair.replace('>>>', ' >>> ') }}
+                  </div>
+                </div>
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ formatDate(log.entry_date) }}</td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ log.material_document || '-' }}</td>
@@ -279,7 +283,8 @@
     <!-- Modals: always mounted (like Bootstrap modals in DOM) — avoids destroy/remount glitches; visibility via :is-open -->
     <RmEntryModal
       :is-open="isCreateModalOpen"
-      @close="isCreateModalOpen = false"
+      :edit-id="editingEntryId"
+      @close="isCreateModalOpen = false; editingEntryId = null"
       @saved="fetchData"
     />
     <TransferModal
@@ -295,16 +300,14 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
-import { useTsRawTransferStore } from '@/modules/ts-transfer/stores'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useSetupPlantStore } from '@/stores/plant'
 import PlantSelector from '@/components/shared/PlantSelector.vue'
 import RmEntryModal from '@/modules/ts-raw/components/RmEntryModal.vue'
-import TransferModal from '@/modules/ts-transfer/components/TransferModal.vue'
+import TransferModal from '@/modules/ts-raw/components/TransferModal.vue'
 import Swal from 'sweetalert2'
 
 const store = useTsRawRmEntryStore()
-const transferStore = useTsRawTransferStore()
 const plantSelectionStore = usePlantSelectionStore()
 
 // State
@@ -312,6 +315,7 @@ const isCreateModalOpen = ref(false)
 const isTransferModalOpen = ref(false)
 const isSlocModalOpen = ref(false)
 const selectedEntry = ref(null)
+const editingEntryId = ref(null)
 
 // Modal Reference
 
@@ -342,7 +346,7 @@ const totalPagesStorage = computed(() => {
 })
 
 const feedLogsSafe = computed(() =>
-  Array.isArray(transferStore.feedLogs) ? transferStore.feedLogs : []
+  Array.isArray(store.feedLogs) ? store.feedLogs : []
 )
 
 const paginatedFeedLogs = computed(() => {
@@ -396,7 +400,7 @@ async function fetchData() {
   currentPageFeed.value = 1
   await Promise.all([
     store.fetchEntries(params),
-    transferStore.fetchFeedLogs(params),
+    store.fetchFeedLogs(params),
     // Prefetch for modals
     store.fetchTanks(params, true),
     store.fetchMaterials(),
@@ -415,7 +419,8 @@ function openTransferModal() {
 }
 
 function openUpdateModal(entry) {
-  console.log('Update entry:', entry)
+  editingEntryId.value = entry.id_balance_head
+  isCreateModalOpen.value = true
 }
 
 function openSlocEdit(entry) {
@@ -459,7 +464,7 @@ async function deactivateTransfer(id) {
 
   if (result.isConfirmed) {
     try {
-      await transferStore.deleteTransfer(id)
+      await store.deleteTransfer(id)
       Swal.fire('Deactivated!', 'Transfer has been deactivated.', 'success')
       fetchData()
     } catch (error) {

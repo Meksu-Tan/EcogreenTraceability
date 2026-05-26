@@ -6,8 +6,18 @@ class RmEntryRepository {
     return res.data?.data ?? res.data ?? res
   }
 
+  async getById(id) {
+    const res = await RmEntryApi.getById(id)
+    return res.data?.data ?? res.data ?? res
+  }
+
   async save(data) {
     const res = await RmEntryApi.create(data)
+    return res.data?.data ?? res.data ?? res
+  }
+
+  async update(id, data) {
+    const res = await RmEntryApi.update(id, data)
     return res.data?.data ?? res.data ?? res
   }
 
@@ -28,6 +38,31 @@ class RmEntryRepository {
 
   async generateBatchCode(params = {}) {
     const res = await RmEntryApi.getBatchCode(params)
+    return res.data?.data ?? res.data ?? res
+  }
+
+  async getStorageLog(plantId) {
+    const res = await RmEntryApi.getStorageLog({ id_plant: plantId })
+    return res.data?.data ?? res.data ?? res
+  }
+
+  async getFeedLog(plantId) {
+    const res = await RmEntryApi.getFeedLog({ id_plant: plantId })
+    return res.data?.data ?? res.data ?? res
+  }
+
+  async getDestTanks(plantId) {
+    const res = await RmEntryApi.getDestTanks(plantId)
+    return res.data?.data ?? res.data ?? res
+  }
+
+  async getTransferList(plantId = 0) {
+    const res = await RmEntryApi.getTransferList({ id_plant: plantId })
+    return res.data?.data ?? res.data ?? res
+  }
+
+  async deactivateTransfer(id) {
+    const res = await RmEntryApi.deactivateTransfer(id)
     return res.data?.data ?? res.data ?? res
   }
 }
