@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\TsBlending\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\TsBlending\Services\BlendingService;
 use Modules\TsBlending\Http\Requests\StoreBlendingRequest;
@@ -24,11 +25,7 @@ class BlendingController extends Controller
         try {
             $data = $this->blendingService->getBlendingList($plantId);
 
-            return response()->json([
-                'status' => 1,
-                'data' => $data,
-                'message' => 'Blending list retrieved successfully'
-            ]);
+            return ApiResponse::success($data, 'Blending list retrieved successfully', 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 0,
@@ -217,6 +214,51 @@ class BlendingController extends Controller
     }
 
     /**
+     * Get all tanks (sloc) for dropdown (like rm-entry)
+     */
+    public function tanks(Request $request): JsonResponse
+    {
+        $plantId = (int) $request->input('id_plant', 0);
+
+        try {
+            $data = $this->blendingService->getTanks($plantId > 0 ? $plantId : null);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get tank details (sub-sloc) for selected sloc (like rm-entry)
+     */
+    public function tankDetails(Request $request, string $tankId): JsonResponse
+    {
+        $plantId = (int) $request->input('id_plant', 0);
+
+        try {
+            $data = $this->blendingService->getTankDetails($tankId, $plantId > 0 ? $plantId : null);
+            return response()->json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get all tanks (m_tank) for dropdown — independent of material
+     */
+    public function allTanks(Request $request): JsonResponse
+    {
+        $plantId = (int) $request->input('id_plant', 0);
+
+        try {
+            $data = $this->blendingService->getAllTanks($plantId);
+            return response()->json(['data' => $data]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Delete blending entry
      */
     public function destroy(Request $request, string $id): JsonResponse
@@ -244,10 +286,7 @@ class BlendingController extends Controller
         $response = $result['response'] ?? null;
 
         if ($response === null) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Unexpected error'
-            ], 500);
+            return ApiResponse::error('Unexpected error', 500);
         }
 
         $status = match ($response) {
@@ -262,11 +301,11 @@ class BlendingController extends Controller
         $message = match ($response) {
             1 => 'Success ' . $mode . ' ' . ucfirst(str_replace('post_', '', $flag)),
             2 => 'Material already exists in blending entry',
-            3 => 'Entry Error',
+            3 => 'Entry Error' . (isset($result['error_detail']) ? ': ' . $result['error_detail'] : ''),
             4 => 'No Blend Material!',
-            6 => 'No Trace found',
+            6 => 'No Trace found' . (isset($result['error_detail']) ? ': ' . $result['error_detail'] : ''),
             99 => 'Period Locked!',
-            default => 'Operation failed',
+            default => 'Operation failed' . (isset($result['message']) ? ': ' . $result['message'] : '') . (isset($result['error_detail']) ? ': ' . $result['error_detail'] : ''),
         };
 
         return response()->json(array_merge(

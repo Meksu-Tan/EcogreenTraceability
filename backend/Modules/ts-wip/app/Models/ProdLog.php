@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\TsWip\Models;
 
 // GAP #10: Add dedicated Models for WIP Entry module

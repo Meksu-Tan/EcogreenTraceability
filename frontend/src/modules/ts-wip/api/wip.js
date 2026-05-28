@@ -52,13 +52,11 @@ export default {
 
   async getNewFeedNumber(feedId, params = {}) {
     const res = await this.getData('get_newFeedNumber', { feedId, ...params })
-    console.log('wipApi.getNewFeedNumber raw res:', res)
     return res.data
   },
 
   async getNewRundownNumber(rundownId, params = {}) {
     const res = await this.getData('get_newRundownNumber', { rundownId, ...params })
-    console.log('wipApi.getNewRundownNumber raw res:', res)
     return res.data
   },
 

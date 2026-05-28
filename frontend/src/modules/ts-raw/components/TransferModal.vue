@@ -139,9 +139,9 @@
                             class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-slate-700 transition hover:border-green-200 hover:bg-green-50/60"
                           >
                             <input
-                              v-model="form.tank_no"
+                              v-model="form.source_tank_id"
                               type="checkbox"
-                              :value="detail.id_tank_tail"
+                              :value="detail.id_sloc"
                               class="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
                             />
                             <span>{{ detail.tankNo }}</span>
@@ -182,9 +182,9 @@
                             class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-slate-700 transition hover:border-green-200 hover:bg-green-50/60"
                           >
                             <input
-                              v-model="form.trf_tank_no"
+                              v-model="form.trf_tank_id"
                               type="checkbox"
-                              :value="detail.id_tank_tail"
+                              :value="detail.id_sloc"
                               class="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
                             />
                             <span>{{ detail.tankNo }}</span>
@@ -385,9 +385,9 @@ const form = ref({
   entry_date: new Date().toISOString().split('T')[0],
   entry_no: '',
   source_tank: '',
-  tank_no: [],
+  source_tank_id: [],
   trf_tank: '',
-  trf_tank_no: [],
+  trf_tank_id: [],
   material_document: ''
 })
 
@@ -427,9 +427,9 @@ const canSubmit = computed(() => {
          form.value.entry_date &&
          form.value.entry_no &&
          form.value.source_tank &&
-         form.value.tank_no.length > 0 &&
+         form.value.source_tank_id.length > 0 &&
          form.value.trf_tank &&
-         form.value.trf_tank_no.length > 0 &&
+         form.value.trf_tank_id.length > 0 &&
          materialList.value.length > 0
 })
 
@@ -480,9 +480,9 @@ async function bootstrap() {
     entry_date: new Date().toISOString().split('T')[0],
     entry_no: '',
     source_tank: '',
-    tank_no: [],
+    source_tank_id: [],
     trf_tank: '',
-    trf_tank_no: [],
+    trf_tank_id: [],
     material_document: ''
   }
   materialForm.value = { id_material: '', qty: '' }
@@ -501,7 +501,7 @@ async function bootstrap() {
       await autoSelectTanksWhenSingle()
     }
   } catch (error) {
-    console.error('Initialization error:', error)
+    toastStore.error('Initialization error:', error)
     initError.value =
       error.response?.data?.message ||
       error.message ||
@@ -514,7 +514,7 @@ async function bootstrap() {
     try {
       await store.fetchSupplierList(form.value.entry_no)
     } catch (error) {
-      console.error('Material temp list load:', error)
+      toastStore.error('Material temp list load:', error)
       initError.value =
         error.response?.data?.message ||
         error.message ||
@@ -524,12 +524,12 @@ async function bootstrap() {
 }
 
 async function onSourceTankChange() {
-  form.value.tank_no = []
+  form.value.source_tank_id = []
   if (form.value.source_tank) {
     await store.fetchTankDetails(form.value.source_tank, plantSelectionStore.selectedPlantId)
     sourceTankDetails.value = [...store.tankDetails]
     if (sourceTankDetails.value.length === 1) {
-      form.value.tank_no = [sourceTankDetails.value[0].id_tank_tail]
+      form.value.source_tank_id = [sourceTankDetails.value[0].id_sloc]
     }
     
     // Automatically set destination feed tank
@@ -550,12 +550,12 @@ async function onSourceTankChange() {
 }
 
 async function onTrfTankChange() {
-  form.value.trf_tank_no = []
+  form.value.trf_tank_id = []
   if (form.value.trf_tank) {
     await store.fetchTankDetails(form.value.trf_tank, plantSelectionStore.selectedPlantId)
     trfTankDetails.value = [...store.tankDetails]
     if (trfTankDetails.value.length === 1) {
-      form.value.trf_tank_no = [trfTankDetails.value[0].id_tank_tail]
+      form.value.trf_tank_id = [trfTankDetails.value[0].id_sloc]
     }
   } else {
     trfTankDetails.value = []
@@ -577,7 +577,7 @@ async function addMaterial() {
     materialForm.value = { id_material: '', qty: '' }
     isMaterialModalOpen.value = false
   } catch (error) {
-    console.error('Add material error:', error)
+    toastStore.error('Add material error:', error)
   }
 }
 
@@ -590,31 +590,7 @@ async function removeMaterial(id) {
 async function handleSubmit() {
   if (!canSubmit.value) return
 
-  // Resolve source tank and details
-  const checkedSourceDetails = sourceTankDetails.value.filter(detail => 
-    form.value.tank_no.includes(detail.id_tank_tail)
-  )
-  // Allow transfer without sub-sloc selection (all sub-slocs)
-  const realSourceTank = checkedSourceDetails.length > 0 
-    ? checkedSourceDetails[0].id_sloc 
-    : (form.value.source_tank ? sourceTankDetails.value[0]?.id_sloc : null)
-  const realSourceTankNo = checkedSourceDetails.length > 0
-    ? checkedSourceDetails.map(d => d.id_tank_tail).filter(id => !String(id).startsWith('s_'))
-    : []  // Empty array means all sub-slocs
-
-  // Resolve transfer (destination) tank and details
-  const checkedTrfDetails = trfTankDetails.value.filter(detail => 
-    form.value.trf_tank_no.includes(detail.id_tank_tail)
-  )
-  // Allow transfer without destination sub-sloc selection
-  const realTrfTank = checkedTrfDetails.length > 0
-    ? checkedTrfDetails[0].id_sloc
-    : (form.value.trf_tank ? trfTankDetails.value[0]?.id_sloc : null)
-  const realTrfTankNo = checkedTrfDetails.length > 0
-    ? checkedTrfDetails.map(d => d.id_tank_tail).filter(id => !String(id).startsWith('s_'))
-    : []  // Empty array means all sub-slocs
-
-  if (!realSourceTank || !realTrfTank) {
+  if (form.value.source_tank_id.length === 0 || form.value.trf_tank_id.length === 0) {
     toastStore.error('Please select both source and destination tanks')
     return
   }
@@ -625,23 +601,23 @@ async function handleSubmit() {
   try {
     await store.transferEntry({
       ...form.value,
-      source_tank: realSourceTank,
-      tank_no: realSourceTankNo,
-      trf_tank: realTrfTank,
-      trf_tank_no: realTrfTankNo,
+      source_tank: form.value.source_tank_id,
+      tank_no: [],
+      trf_tank: form.value.trf_tank_id,
+      trf_tank_no: [],
       id_plant: plantSelectionStore.selectedPlantId || autoPlantId
     })
     emit('saved')
     closeModal()
   } catch (error) {
-    console.error('Submit error:', error)
+    toastStore.error('Submit error:', error)
     const errorMsg = error.response?.data?.message || error.message || 'Transfer failed'
     toastStore.error(errorMsg)
     if (form.value.entry_no) {
       try {
         await store.clearTempList(form.value.entry_no)
       } catch (e) {
-        console.error('Failed to clear temp list on submit error:', e)
+        toastStore.error('Failed to clear temp list on submit error:', e)
       }
     }
     await bootstrap()
@@ -689,7 +665,7 @@ watch(
         }
       }
     } catch (error) {
-      console.error('Plant switch reload:', error)
+      toastStore.error('Plant switch reload:', error)
     }
   }
 )

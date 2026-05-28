@@ -1,21 +1,21 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Storage\Services;
 
-use Modules\Storage\Repositories\Contracts\StorageRepositoryInterface;
+use Modules\Storage\Repositories\Contracts\StorageTankRepositoryInterface;
+use Modules\Storage\Repositories\Contracts\StorageWarehouseRepositoryInterface;
 
 class StorageService
 {
     public function __construct(
-        protected StorageRepositoryInterface $storageRepo
+        protected StorageTankRepositoryInterface $tankRepo,
+        protected StorageWarehouseRepositoryInterface $warehouseRepo
     ) {}
 
-    // Tank
-    public function listTanks(): array { return $this->storageRepo->getAllTanks(); }
+    public function listTanks(): array { return $this->tankRepo->getAllTanks(); }
 
     public function storeTank(array $data): array
     {
-        $result = $this->storageRepo->createTank($data);
+        $result = $this->tankRepo->createTank($data);
         return $result
             ? ['status' => 1, 'message' => 'Storage tank created successfully']
             : ['status' => 0, 'message' => 'Storage tank already exists'];
@@ -23,7 +23,7 @@ class StorageService
 
     public function updateTank(int $id, array $data): array
     {
-        $result = $this->storageRepo->updateTank($id, $data);
+        $result = $this->tankRepo->updateTank($id, $data);
         return $result
             ? ['status' => 1, 'message' => 'Storage tank updated successfully']
             : ['status' => 0, 'message' => 'Failed to update storage tank'];
@@ -31,24 +31,23 @@ class StorageService
 
     public function deactivateTank(int $id, string $user): array
     {
-        return $this->storageRepo->deactivateTank($id, $user)
+        return $this->tankRepo->deactivateTank($id, $user)
             ? ['status' => 1, 'message' => 'Storage tank deactivated']
             : ['status' => 0, 'message' => 'Failed to deactivate'];
     }
 
     public function activateTank(int $id, string $user): array
     {
-        return $this->storageRepo->activateTank($id, $user)
+        return $this->tankRepo->activateTank($id, $user)
             ? ['status' => 1, 'message' => 'Storage tank activated']
             : ['status' => 0, 'message' => 'Failed to activate'];
     }
 
-    // Detail
-    public function listDetails(int $tankId): array { return $this->storageRepo->getDetailsByTank($tankId); }
+    public function listDetails(int $tankId): array { return $this->tankRepo->getDetailsByTank($tankId); }
 
     public function storeDetail(array $data): array
     {
-        $result = $this->storageRepo->createDetail($data);
+        $result = $this->tankRepo->createDetail($data);
         return $result
             ? ['status' => 1, 'message' => 'Storage detail created successfully']
             : ['status' => 0, 'message' => 'TF Number already exists'];
@@ -56,7 +55,7 @@ class StorageService
 
     public function updateDetail(int $id, array $data): array
     {
-        $result = $this->storageRepo->updateDetail($id, $data);
+        $result = $this->tankRepo->updateDetail($id, $data);
         return $result
             ? ['status' => 1, 'message' => 'Storage detail updated successfully']
             : ['status' => 0, 'message' => 'TF Number already exists or record not found'];
@@ -64,24 +63,23 @@ class StorageService
 
     public function deactivateDetail(int $id, string $user): array
     {
-        return $this->storageRepo->deactivateDetail($id, $user)
+        return $this->tankRepo->deactivateDetail($id, $user)
             ? ['status' => 1, 'message' => 'Storage detail deactivated']
             : ['status' => 0, 'message' => 'Failed to deactivate'];
     }
 
     public function activateDetail(int $id, string $user): array
     {
-        return $this->storageRepo->activateDetail($id, $user)
+        return $this->tankRepo->activateDetail($id, $user)
             ? ['status' => 1, 'message' => 'Storage detail activated']
             : ['status' => 0, 'message' => 'Failed to activate'];
     }
 
-    // Warehouse
-    public function listWarehouses(): array { return $this->storageRepo->getAllWarehouses(); }
+    public function listWarehouses(): array { return $this->warehouseRepo->getAllWarehouses(); }
 
     public function storeWarehouse(array $data): array
     {
-        $result = $this->storageRepo->createWarehouse($data);
+        $result = $this->warehouseRepo->createWarehouse($data);
         return $result
             ? ['status' => 1, 'message' => 'Warehouse created successfully']
             : ['status' => 0, 'message' => 'Warehouse already exists'];
@@ -89,7 +87,7 @@ class StorageService
 
     public function updateWarehouse(int $id, array $data): array
     {
-        $result = $this->storageRepo->updateWarehouse($id, $data);
+        $result = $this->warehouseRepo->updateWarehouse($id, $data);
         return $result
             ? ['status' => 1, 'message' => 'Warehouse updated successfully']
             : ['status' => 0, 'message' => 'Failed to update warehouse'];
@@ -97,14 +95,14 @@ class StorageService
 
     public function deactivateWarehouse(int $id, string $user): array
     {
-        return $this->storageRepo->deactivateWarehouse($id, $user)
+        return $this->warehouseRepo->deactivateWarehouse($id, $user)
             ? ['status' => 1, 'message' => 'Warehouse deactivated']
             : ['status' => 0, 'message' => 'Failed to deactivate'];
     }
 
     public function activateWarehouse(int $id, string $user): array
     {
-        return $this->storageRepo->activateWarehouse($id, $user)
+        return $this->warehouseRepo->activateWarehouse($id, $user)
             ? ['status' => 1, 'message' => 'Warehouse activated']
             : ['status' => 0, 'message' => 'Failed to activate'];
     }

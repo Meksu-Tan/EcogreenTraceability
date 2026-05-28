@@ -46,8 +46,9 @@ class RmEntryRepository {
     return res.data?.data ?? res.data ?? res
   }
 
-  async getFeedLog(plantId) {
-    const res = await RmEntryApi.getFeedLog({ id_plant: plantId })
+  async getFeedLog(params = {}) {
+    const queryParams = typeof params === 'object' ? params : { id_plant: params }
+    const res = await RmEntryApi.getFeedLog(queryParams)
     return res.data?.data ?? res.data ?? res
   }
 

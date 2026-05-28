@@ -80,7 +80,7 @@ onMounted(async () => {
   try {
     await store.fetchTanks()
   } catch (error) {
-    console.error('Failed to fetch tanks:', error)
+    toastStore.error('Failed to fetch tanks:', error)
   }
 })
 

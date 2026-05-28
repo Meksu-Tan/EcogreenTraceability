@@ -1,60 +1,57 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\Plant\Repositories;
 
+use Modules\Plant\Models\Plant;
 use Modules\Plant\Repositories\Contracts\PlantRepositoryInterface;
-use Illuminate\Support\Facades\DB;
 
 class PlantRepository implements PlantRepositoryInterface
 {
     public function getAll(): array
     {
-        return DB::select('
-            SELECT id_plant, code, code_2, code_3, description, status,
-                   created_at, created_by, updated_at, updated_by
-            FROM m_plant
-            ORDER BY id_plant ASC
-        ');
+        return Plant::select([
+            'id_plant', 'code', 'code_2', 'code_3', 'description', 'status',
+            'created_at', 'created_by', 'updated_at', 'updated_by',
+        ])
+        ->orderBy('id_plant')
+        ->get()
+        ->toArray();
     }
 
     public function findById(int $id): ?object
     {
-        $result = DB::select('SELECT * FROM m_plant WHERE id_plant = ?', [$id]);
-        return $result[0] ?? null;
+        $model = Plant::find($id);
+        return $model ? (object) $model->toArray() : null;
     }
 
     public function create(array $data): int|bool
     {
-        $exists = DB::select('SELECT COUNT(id_plant) as cnt FROM m_plant WHERE (code_2 = ? OR code_3 = ?) AND status = "1"', [
-            $data['code_2'], $data['code_3']
-        ]);
+        $exists = Plant::where(function ($q) use ($data) {
+            $q->where('code_2', $data['code_2'])
+              ->orWhere('code_3', $data['code_3']);
+        })->where('status', '1')->exists();
 
-        if ($exists[0]->cnt >= 1) {
+        if ($exists) {
             return false;
         }
 
-        $result = DB::insert('
-            INSERT INTO m_plant (code, code_2, code_3, id_tank, description, status, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ', [
-            $data['code'] ?? null,
-            $data['code_2'],
-            $data['code_3'],
-            $data['id_sloc'] ?? 'T000',
-            $data['description'],
-            1,
-            $data['created_by']
+        $model = Plant::create([
+            'code' => $data['code'] ?? null,
+            'code_2' => $data['code_2'],
+            'code_3' => $data['code_3'],
+            'id_tank' => $data['id_sloc'] ?? 'T000',
+            'description' => $data['description'],
+            'status' => 1,
+            'created_by' => $data['created_by'],
         ]);
 
-        if ($result) {
-            $last = DB::select('SELECT id_plant FROM m_plant ORDER BY id_plant DESC LIMIT 1');
-            $id = $last[0]->id_plant;
-            DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        if ($model) {
+            \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
                 'M_PLANT', 'ADD',
-                'ID: ' . $id . ' | CODE: ' . $data['code_2'] . ' / ' . $data['code_3'] . ' | NAME: ' . $data['description'],
+                'ID: ' . $model->id_plant . ' | CODE: ' . $data['code_2'] . ' / ' . $data['code_3'] . ' | NAME: ' . $data['description'],
                 $data['created_by'],
             ]);
-            return (int) $id;
+            return (int) $model->id_plant;
         }
 
         return false;
@@ -62,44 +59,51 @@ class PlantRepository implements PlantRepositoryInterface
 
     public function update(int $id, array $data): bool
     {
-        $old = DB::select('SELECT code_2, code_3, description FROM m_plant WHERE id_plant = ?', [$id]);
-        if (empty($old)) return false;
+        $model = Plant::find($id);
+        if (!$model) {
+            return false;
+        }
 
-        DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_PLANT', 'UPDATE',
-            'ID: ' . $id . ' | CODE: ' . $old[0]->code_2 . ' >> ' . $data['code_2'],
+            'ID: ' . $id . ' | CODE: ' . $model->code_2 . ' >> ' . $data['code_2'],
             $data['updated_by'],
         ]);
 
-        $result = DB::update('
-            UPDATE m_plant
-               SET code = ?, code_2 = ?, code_3 = ?, description = ?, updated_by = ?
-             WHERE id_plant = ?
-        ', [
-            $data['code'] ?? null,
-            $data['code_2'],
-            $data['code_3'],
-            $data['description'],
-            $data['updated_by'],
-            $id,
+        return (bool) $model->update([
+            'code' => $data['code'] ?? null,
+            'code_2' => $data['code_2'],
+            'code_3' => $data['code_3'],
+            'description' => $data['description'],
+            'updated_by' => $data['updated_by'],
         ]);
-
-        return (bool) $result;
     }
 
     public function deactivate(int $id, string $user): bool
     {
-        DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_PLANT', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user,
         ]);
-        return (bool) DB::update('UPDATE m_plant SET status = "0", updated_by = ? WHERE id_plant = ?', [$user, $id]);
+
+        $model = Plant::find($id);
+        if (!$model) {
+            return false;
+        }
+
+        return (bool) $model->update(['status' => '0', 'updated_by' => $user]);
     }
 
     public function activate(int $id, string $user): bool
     {
-        DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_PLANT', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user,
         ]);
-        return (bool) DB::update('UPDATE m_plant SET status = "1", updated_by = ? WHERE id_plant = ?', [$user, $id]);
+
+        $model = Plant::find($id);
+        if (!$model) {
+            return false;
+        }
+
+        return (bool) $model->update(['status' => '1', 'updated_by' => $user]);
     }
 }

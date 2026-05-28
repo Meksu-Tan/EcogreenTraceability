@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
@@ -16,7 +15,7 @@ class Rundown
      */
     public static function generalRundown(array $data): array
     {
-        $connection = $data['id_plant'] ?? 0;
+        $connection = 'eudr_ts';
 
         return DB::connection($connection)->transaction(function () use ($data, $connection) {
 
@@ -47,6 +46,22 @@ class Rundown
                         'init_qty' => $newInitQty,
                         'updated_by' => $data['user'],
                     ]);
+
+                // INSERT TRACE HEADER (represents new inbound flow into existing balance)
+                $idTraceHead = DB::connection($connection)->table('t_trace_header')->insertGetId([
+                    'from_trace_no' => $data['from_trace_no'] ?? null,
+                    'to_trace_no' => $data['trace_no'],
+                    'id_balance_head' => $idHead,
+                    'id_material' => $data['id_material'],
+                    'entry_date' => $data['entry_date'],
+                    'id_sloc' => $data['id_tank'] ?? $data['id_sloc'] ?? 0,
+                    'id_tank_tail' => $data['id_tank_tail'] ?? null,
+                    'in_qty' => $data['in_qty'],
+                    'last_qtf' => $data['last_qtf'] ?? 0,
+                    'curr_qtf' => $data['curr_qtf'] ?? 0,
+                    'id_plant' => $data['id_plant'],
+                    'created_by' => $data['user'],
+                ]);
             } else {
                 // INSERT NEW BALANCE HEADER
                 $idHead = DB::connection($connection)->table('t_balance_header')->insertGetId([
@@ -64,9 +79,25 @@ class Rundown
                     'id_plant' => $data['id_plant'],
                     'created_by' => $data['user'],
                 ]);
+
+                // INSERT TRACE HEADER
+                $idTraceHead = DB::connection($connection)->table('t_trace_header')->insertGetId([
+                    'from_trace_no' => $data['from_trace_no'] ?? null,
+                    'to_trace_no' => $data['trace_no'],
+                    'id_balance_head' => $idHead,
+                    'id_material' => $data['id_material'],
+                    'entry_date' => $data['entry_date'],
+                    'id_sloc' => $data['id_tank'] ?? $data['id_sloc'] ?? 0,
+                    'id_tank_tail' => $data['id_tank_tail'] ?? null,
+                    'in_qty' => $data['in_qty'],
+                    'last_qtf' => $data['last_qtf'] ?? 0,
+                    'curr_qtf' => $data['curr_qtf'] ?? 0,
+                    'id_plant' => $data['id_plant'],
+                    'created_by' => $data['user'],
+                ]);
             }
 
-            // INSERT/UPDATE SUPPLIER ROWS (balance_detail only)
+            // INSERT/UPDATE SUPPLIER ROWS (balance_detail + trace_detail)
             foreach ($data['supplier_rows'] as $row) {
                 $idSupplier = $row['id_supplier'];
                 $batchSap = $row['batch_sap'];
@@ -74,34 +105,19 @@ class Rundown
 
                 if ($qty <= 0) continue;
 
-                // CHECK IF BALANCE DETAIL ALREADY EXISTS FOR THIS SUPPLIER+BATCH
-                $existingTail = DB::connection($connection)->select(
-                    'SELECT id_balance_tail, qty, in_qty, init_qty
-                       FROM t_balance_detail
-                      WHERE id_balance_head = ?
+                // CHECK IF TRACE DETAIL ALREADY EXISTS FOR THIS SUPPLIER+BATCH UNDER THIS TRACE HEAD
+                $existing = DB::connection($connection)->select(
+                    'SELECT id_balance_tail, id_trace_tail, in_qty
+                       FROM t_trace_detail
+                      WHERE status = 1
+                        AND id_trace_head = ?
                         AND id_supplier = ?
                         AND batch_sap = ?
-                        AND status = 1
                       LIMIT 1',
-                    [$idHead, $idSupplier, $batchSap]
+                    [$idTraceHead, $idSupplier, $batchSap]
                 );
 
-                if (!empty($existingTail)) {
-                    // UPDATE EXISTING BALANCE DETAIL
-                    $idTail = $existingTail[0]->id_balance_tail;
-                    $newQty = round($existingTail[0]->qty + $qty, 4);
-                    $newInQty = round($existingTail[0]->in_qty + $qty, 4);
-                    $newInitQty = round($existingTail[0]->init_qty + $qty, 4);
-
-                    DB::connection($connection)->table('t_balance_detail')
-                        ->where('id_balance_tail', $idTail)
-                        ->update([
-                            'qty' => $newQty,
-                            'in_qty' => $newInQty,
-                            'init_qty' => $newInitQty,
-                            'updated_by' => $data['user'],
-                        ]);
-                } else {
+                if (empty($existing)) {
                     // INSERT NEW BALANCE DETAIL
                     $idTail = DB::connection($connection)->table('t_balance_detail')->insertGetId([
                         'id_balance_head' => $idHead,
@@ -119,13 +135,42 @@ class Rundown
                         'id_plant' => $data['id_plant'],
                         'created_by' => $data['user'],
                     ]);
+
+                    // INSERT TRACE DETAIL
+                    DB::connection($connection)->table('t_trace_detail')->insert([
+                        'id_trace_head' => $idTraceHead,
+                        'id_balance_tail' => $idTail,
+                        'id_supplier' => $idSupplier,
+                        'id_material' => $data['id_material'],
+                        'id_sloc' => $data['id_tank'] ?? $data['id_sloc'] ?? 0,
+                        'id_tank_tail' => $data['id_tank_tail'] ?? null,
+                        'in_qty' => $qty,
+                        'batch_sap' => $batchSap,
+                        'id_plant' => $data['id_plant'],
+                        'created_by' => $data['user'],
+                    ]);
+                } else {
+                    // ACCUMULATE INTO EXISTING ROW (multi-feed scenario)
+                    $idTail = $existing[0]->id_balance_tail;
+                    $idTraceTail = $existing[0]->id_trace_tail;
+                    $newQty = round($existing[0]->in_qty + $qty, 4);
+
+                    DB::connection($connection)->update(
+                        'UPDATE t_balance_detail SET qty = ?, in_qty = ?, init_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
+                        [$newQty, $newQty, $newQty, $data['user'], $idTail]
+                    );
+
+                    DB::connection($connection)->update(
+                        'UPDATE t_trace_detail SET in_qty = ?, updated_by = ? WHERE id_trace_tail = ?',
+                        [$newQty, $data['user'], $idTraceTail]
+                    );
                 }
             }
 
             return [
                 'response' => 1,
                 'id_balance_head' => $idHead,
-                'id_trace_head' => null,
+                'id_trace_head' => $idTraceHead,
             ];
         });
     }
@@ -140,7 +185,6 @@ class Rundown
     {
         $targetTotal = self::normalizeNumber($targetTotal);
 
-        // Step 1: sum of raw values
         $total = '0';
         foreach ($rows as $row) {
             $total = bcadd($total, self::normalizeNumber($row['rundownSupplier']), 10);
@@ -148,10 +192,8 @@ class Rundown
 
         if (bccomp($total, '0', 10) === 0) return;
 
-        // Step 2: scaling factor
         $factor = bcdiv($targetTotal, $total, 10);
 
-        // Step 3: apply factor with 4dp rounding
         $newTotal = '0';
         foreach ($rows as &$row) {
             $adjusted = bcmul(self::normalizeNumber($row['rundownSupplier']), $factor, 10);
@@ -162,15 +204,11 @@ class Rundown
         }
         unset($row);
 
-        // Step 4: push rounding remainder into the last row
         $lastIndex = array_key_last($rows);
         $delta = bcsub($targetTotal, $newTotal, 10);
         $rows[$lastIndex]['rundownSupplier'] += round((float) $delta, 4);
     }
 
-    /**
-     * Normalize a number string so bcmath never receives scientific notation.
-     */
     private static function normalizeNumber(mixed $num): string
     {
         if ($num === null) return '0';

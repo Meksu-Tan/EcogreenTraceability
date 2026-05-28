@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Supplier\Services;
 
 use Modules\Supplier\Repositories\Contracts\SupplierRepositoryInterface;

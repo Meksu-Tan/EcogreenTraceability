@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\TsWip\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\TsWip\Services\WipEntryService;
 use Modules\TsWip\Http\Requests\StoreWipEntryRequest;
@@ -29,10 +30,7 @@ class WipEntryController extends Controller
             $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
             $data = $this->wipEntryService->index($plantId);
 
-            return response()->json([
-                'status' => 1,
-                'data'   => $data,
-            ]);
+            return ApiResponse::success($data, 'OK', 200);
         } catch (\Exception $e) {
             return response()->json([
                 'status'  => 0,
@@ -49,7 +47,7 @@ class WipEntryController extends Controller
     {
         try {
             if (!Auth::user()?->can('task-update')) {
-                return response()->json(['status' => 0, 'message' => 'Forbidden'], 403);
+                return ApiResponse::error('Forbidden', 403);
             }
 
             $flag = $request->input('flag');
@@ -82,7 +80,7 @@ class WipEntryController extends Controller
         try {
             // GAP #7: Add permission check for GET/show
             if (!Auth::user()?->can('task-read')) {
-                return response()->json(['status' => 0, 'message' => 'Forbidden'], 403);
+                return ApiResponse::error('Forbidden', 403);
             }
 
             $flag = $request->input('flag', $action);
@@ -215,7 +213,7 @@ class WipEntryController extends Controller
             $plantId,
             $request->input('subgroup')
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleFeedData(Request $request, $plantId): JsonResponse
@@ -225,7 +223,7 @@ class WipEntryController extends Controller
             $request->input('mode', 'LATEST'),
             $plantId
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleRundownData(Request $request, $plantId): JsonResponse
@@ -235,7 +233,7 @@ class WipEntryController extends Controller
             $request->input('mode', 'LATEST'),
             $plantId
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleFeedNewBatch(Request $request, $plantId): JsonResponse
@@ -244,7 +242,7 @@ class WipEntryController extends Controller
             $request->input('feedID'),
             $plantId
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleRundownNewBatch(Request $request, $plantId): JsonResponse
@@ -253,7 +251,7 @@ class WipEntryController extends Controller
             $request->input('rundownID'),
             $plantId
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleFeedLastBatch(Request $request, $plantId): JsonResponse
@@ -262,7 +260,7 @@ class WipEntryController extends Controller
             $request->input('feedID'),
             $plantId
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleRundownLastBatch(Request $request, $plantId): JsonResponse
@@ -271,7 +269,7 @@ class WipEntryController extends Controller
             $request->input('rundownID'),
             $plantId
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleActiveTanksFeed(Request $request, $plantId): JsonResponse
@@ -280,17 +278,7 @@ class WipEntryController extends Controller
             $request->input('feedID'),
             $plantId
         );
-        return response()->json([
-            'status' => 1,
-            'data' => $data,
-            'debug' => [
-                'endpoint' => 'get_cmbActiveTank_trf',
-                'request_id_plant' => $request->input('id_plant'),
-                'controller_plant_id' => $plantId,
-                'feedID' => $request->input('feedID'),
-                'count' => count($data),
-            ],
-        ]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleActiveTanksRundown(Request $request, $plantId): JsonResponse
@@ -300,18 +288,7 @@ class WipEntryController extends Controller
             $plantId,
             $request->input('subgroup')
         );
-        return response()->json([
-            'status' => 1,
-            'data' => $data,
-            'debug' => [
-                'endpoint' => 'get_cmbActiveTank_rundown',
-                'request_id_plant' => $request->input('id_plant'),
-                'controller_plant_id' => $plantId,
-                'rundownID' => $request->input('rundownID'),
-                'subgroup' => $request->input('subgroup'),
-                'count' => count($data),
-            ],
-        ]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleActiveSpecificTanks(Request $request): JsonResponse
@@ -319,15 +296,7 @@ class WipEntryController extends Controller
         $data = $this->wipEntryService->getActiveSpecificTanks(
             (int) $request->input('sloc')
         );
-        return response()->json([
-            'status' => 1,
-            'data' => $data,
-            'debug' => [
-                'endpoint' => 'get_cmbActiveSpecificTank_trf',
-                'sloc' => $request->input('sloc'),
-                'count' => count($data),
-            ],
-        ]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleQuantifierData(Request $request): JsonResponse
@@ -336,7 +305,7 @@ class WipEntryController extends Controller
             $request->input('date'),
             $request->input('tagNumber')
         );
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     // B8: WIP Tree/Dashboard endpoint
@@ -344,7 +313,7 @@ class WipEntryController extends Controller
     {
         $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
         $data = $this->wipEntryService->getWipTree($plantId);
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     // Auto Number Generation endpoints
@@ -352,7 +321,7 @@ class WipEntryController extends Controller
     {
         $feedId = $request->input('feedId');
         $data = $this->wipEntryService->generateNewFeedNumber($feedId, $plantId);
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     protected function handleRundownNewNumber(Request $request, $plantId): JsonResponse
@@ -360,7 +329,7 @@ class WipEntryController extends Controller
         $rundownId = $request->input('rundownId');
         $subgroup = $request->input('subgroup');
         $data = $this->wipEntryService->generateNewRundownNumber($rundownId, $plantId, $subgroup);
-        return response()->json(['status' => 1, 'data' => $data]);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
     /**
@@ -371,7 +340,7 @@ class WipEntryController extends Controller
     {
         try {
             if (!Auth::user()?->can('task-update')) {
-                return response()->json(['status' => 0, 'message' => 'Forbidden'], 403);
+                return ApiResponse::error('Forbidden', 403);
             }
 
             $user = Auth::user()->name ?? 'System';
@@ -383,7 +352,7 @@ class WipEntryController extends Controller
             );
 
             if (!$traceHead) {
-                return response()->json(['status' => 0, 'message' => 'Record not found'], 404);
+                return ApiResponse::error('Record not found', 404);
             }
 
             $traceNo = $traceHead->to_trace_no;

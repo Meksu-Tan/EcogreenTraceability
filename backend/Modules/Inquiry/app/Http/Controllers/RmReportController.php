@@ -1,11 +1,11 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Inquiry\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Inquiry\Services\InquiryService;
+use App\Helpers\ApiResponse;
 
 class RmReportController extends Controller
 {

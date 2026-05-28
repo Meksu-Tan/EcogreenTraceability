@@ -4,9 +4,9 @@
       <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
         <div class="fixed inset-0 z-[1] bg-black/40 backdrop-blur-sm" aria-hidden="true" @click="closeModal" />
         <div class="relative z-[2] mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white text-left shadow-xl">
-          <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-blue-600 to-blue-600 px-6 py-4">
+          <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 to-green-600 px-6 py-4">
             <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100/90">Sloc</p>
+              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">Sloc</p>
               <h3 class="text-lg font-bold text-white">Edit Specific Sloc</h3>
             </div>
             <button type="button" @click="closeModal" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25">
@@ -41,7 +41,7 @@
               <p v-if="errorMsg" class="mt-2 text-sm text-red-600">{{ errorMsg }}</p>
               <div class="mt-6 flex items-center justify-end gap-3">
                 <button type="button" @click="closeModal" class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Cancel</button>
-                <button type="submit" class="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700">Save</button>
+                <button type="submit" class="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-green-700">Save</button>
               </div>
             </form>
           </div>

@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 use Modules\Manufacturer\Http\Controllers\ManufacturerController;
 use Illuminate\Support\Facades\Route;
 

@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\TsRaw\Services;
 
 use Modules\TsRaw\Repositories\Contracts\RmEntryRepositoryInterface;
@@ -254,7 +253,7 @@ class RmEntryService
         $entryDate = $data['entry_date'];
         $idMaterial = (int) $data['id_material'];
         $materialDoc = $data['material_doc'] ?? '';
-        $qty = (float) str_replace(',', '', $data['qty']);
+        $qty = (float) str_replace(',', '', (string)$data['qty']);
         $trfSource = (int) $data['source_sloc'];
         $trfDestination = (int) $data['dest_sloc'];
         $trfSourceTail = $data['source_tails'] ?? [];

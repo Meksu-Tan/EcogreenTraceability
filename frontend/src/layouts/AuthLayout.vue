@@ -10,7 +10,7 @@
       <!-- Logo -->
       <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center w-20 h-20 mb-4 transition-transform hover:scale-105 duration-300">
-          <img src="@/assets/logo.png" alt="Logo" class="w-full h-full object-contain" />
+          <img src="/logo-stacked.jpg" alt="Logo" class="w-full h-full object-contain" />
         </div>
         <h1 class="text-slate-800 text-3xl font-extrabold tracking-tight">EUDR-TS</h1>
         <p class="text-gray-500 text-sm mt-1 font-medium">Enterprise Operations Data System</p>

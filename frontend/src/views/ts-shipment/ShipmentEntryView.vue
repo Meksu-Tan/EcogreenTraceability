@@ -36,7 +36,7 @@ import PlantSelector from '@/components/shared/PlantSelector.vue'
 const plantSelectionStore = usePlantSelectionStore()
 
 function fetchData() {
-  console.log('Fetching Shipment data for plant:', plantSelectionStore.selectedPlantId)
+  // Plant selection changed - data will be refetched
 }
 
 onMounted(() => {

@@ -101,7 +101,7 @@ onMounted(async () => {
     }
     await store.fetchDetails(props.id)
   } catch (error) {
-    console.error('Failed to fetch storage detail data:', error)
+    toastStore.error('Failed to fetch storage detail data:', error)
   }
 })
 

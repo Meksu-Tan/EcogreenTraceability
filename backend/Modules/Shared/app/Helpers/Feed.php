@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
@@ -28,19 +27,47 @@ class Feed
         if ($tankMatching === 'exact') {
             // Exact sloc matching
             if (!empty($feedData['id_sloc'])) {
-                $sql .= ' AND id_sloc = ?';
-                $params[] = $feedData['id_sloc'];
+                $requestedSlocs = [];
+                $decoded = json_decode($feedData['id_sloc'], true);
+                if (is_array($decoded)) {
+                    $requestedSlocs = array_map('strval', $decoded);
+                } else {
+                    $requestedSlocs = [(string)$feedData['id_sloc']];
+                }
+
+                $slocConditions = [];
+                foreach ($requestedSlocs as $slocId) {
+                    $slocConditions[] = '(JSON_CONTAINS(id_sloc, JSON_QUOTE(?)) OR JSON_CONTAINS(id_sloc, ?) OR id_sloc = ?)';
+                    $params[] = $slocId;
+                    $params[] = $slocId;
+                    $params[] = $slocId;
+                }
+                $sql .= ' AND (' . implode(' OR ', $slocConditions) . ')';
             }
         } elseif ($tankMatching === 'flexible') {
             // Flexible sloc matching - try exact first, then same sloc type
             if (!empty($feedData['id_sloc'])) {
-                $sql .= ' AND (id_sloc = ? OR id_sloc IN (
-                    SELECT id_sloc FROM m_sloc
-                    WHERE description = (SELECT description FROM m_sloc WHERE id_sloc = ?)
-                    AND status = 1
-                ))';
-                $params[] = $feedData['id_sloc'];
-                $params[] = $feedData['id_sloc'];
+                $requestedSlocs = [];
+                $decoded = json_decode($feedData['id_sloc'], true);
+                if (is_array($decoded)) {
+                    $requestedSlocs = array_map('strval', $decoded);
+                } else {
+                    $requestedSlocs = [(string)$feedData['id_sloc']];
+                }
+
+                $slocConditions = [];
+                foreach ($requestedSlocs as $slocId) {
+                    $slocConditions[] = '(JSON_CONTAINS(id_sloc, JSON_QUOTE(?)) OR JSON_CONTAINS(id_sloc, ?) OR id_sloc = ? OR id_sloc IN (
+                        SELECT id_sloc FROM m_sloc
+                        WHERE description = (SELECT description FROM m_sloc WHERE id_sloc = ?)
+                        AND status = 1
+                    ))';
+                    $params[] = $slocId;
+                    $params[] = $slocId;
+                    $params[] = $slocId;
+                    $params[] = $slocId;
+                }
+                $sql .= ' AND (' . implode(' OR ', $slocConditions) . ')';
             }
         }
         // 'any' mode - no sloc filtering
@@ -206,8 +233,8 @@ class Feed
                     'id_balance_head' => $idHead,
                     'id_material'     => $feedData['id_material'],
                     'entry_date'      => $feedData['entry_date'],
-                    'id_sloc'         => $feedData['id_sloc'],
-                    'id_sloc_tail'    => $feedData['id_sloc_tail'],
+                    'id_sloc'         => $feedData['id_sloc'] ?? $feedData['id_tank'] ?? 0,
+                    'id_sloc_tail'    => $feedData['id_sloc_tail'] ?? $feedData['id_tank_tail'] ?? null,
                     'out_qty'         => $useQty,
                     'last_qtf'        => $feedData['last_qtf'] ?? 0,
                     'curr_qtf'        => $feedData['qty'],
@@ -296,8 +323,8 @@ class Feed
                         'id_material'     => $feedData['id_material'],
                         'out_qty'         => round($useTailQty, 4),
                         'batch_sap'       => $tail->batch_sap,
-                        'id_sloc'         => $feedData['id_sloc'],
-                        'id_sloc_tail'    => $feedData['id_sloc_tail'],
+                        'id_sloc'         => $feedData['id_sloc'] ?? $feedData['id_tank'] ?? 0,
+                        'id_sloc_tail'    => $feedData['id_sloc_tail'] ?? $feedData['id_tank_tail'] ?? null,
                         'id_plant'        => $feedData['id_plant'],
                         'created_by'      => $feedData['user'],
                         'created_at'      => now(),

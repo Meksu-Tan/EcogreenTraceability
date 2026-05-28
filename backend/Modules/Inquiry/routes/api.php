@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Inquiry\Http\Controllers\StockInquiryController;
 use Modules\Inquiry\Http\Controllers\TsReportController;

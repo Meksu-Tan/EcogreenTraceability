@@ -1,43 +1,62 @@
 import api from '@/api/axios'
 
-const RAW_URL = '/api/v1/transactions/rm-entries'
+const BASE_URL = '/api/v1/transactions/transfers'
 
 export default {
   async getTransferList(plantId = 0) {
-    const response = await api.get(`${RAW_URL}/transfers`, {
+    const response = await api.get(BASE_URL, {
       params: { id_plant: plantId }
     })
     return response.data
   },
 
-  async getSpecificTankRundown(sloc) {
-    const response = await api.get(`${RAW_URL}/tanks/${encodeURIComponent(sloc)}/details`)
-    return response.data
-  },
-
-  async postMatlDocNumber(mode, id, number) {
-    const formData = new FormData()
-    formData.append('mode', mode)
-    formData.append('id', id)
-    formData.append('number', number)
-    const response = await api.post(`${RAW_URL}/matl-doc`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    return response.data
-  },
-
-  async postUpdateEntrySubTank(idHead, idTankTail) {
-    const formData = new FormData()
-    formData.append('id_head', idHead)
-    formData.append('id_tank_tail', idTankTail)
-    const response = await api.post(`${RAW_URL}/update-sub-tank`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+  async store(data) {
+    const response = await api.post(BASE_URL, data)
     return response.data
   },
 
   async deactivateTransfer(id) {
-    const response = await api.delete(`${RAW_URL}/transfers/${id}`)
+    const response = await api.delete(`${BASE_URL}/${id}`)
+    return response.data
+  },
+
+  async getActiveMaterials() {
+    const response = await api.get(`${BASE_URL}/active-materials`)
+    return response.data
+  },
+
+  async getNewEntryNo(params = {}) {
+    const response = await api.get(`${BASE_URL}/new-entry-no`, { params })
+    return response.data
+  },
+
+  async getTotalStock(params = {}) {
+    const response = await api.get(`${BASE_URL}/total-stock`, { params })
+    return response.data
+  },
+
+  async getTanksRundown(params = {}) {
+    const response = await api.get(`${BASE_URL}/tanks-rundown`, { params })
+    return response.data
+  },
+
+  async getSpecificTanksRundown(params = {}) {
+    const response = await api.get(`${BASE_URL}/specific-tanks-rundown`, { params })
+    return response.data
+  },
+
+  async getSupplierCode(params = {}) {
+    const response = await api.get(`${BASE_URL}/supplier-code`, { params })
+    return response.data
+  },
+
+  async postMatlDocNumber(mode, id, number) {
+    const response = await api.post(`${BASE_URL}/matl-doc`, { mode, id, number })
+    return response.data
+  },
+
+  async postUpdateEntrySubTank(idHead, idTankTail) {
+    const response = await api.post(`${BASE_URL}/update-sub-tank`, { idHead, idTankTail })
     return response.data
   }
 }

@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Tank\Http\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -8,6 +7,7 @@ use Modules\Tank\Http\Requests\StoreTankRequest;
 use Modules\Tank\Http\Requests\UpdateTankRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Helpers\ApiResponse;
 
 class TankController extends Controller
 {
@@ -18,7 +18,7 @@ class TankController extends Controller
     public function index(): JsonResponse
     {
         $tanks = $this->tankService->listTanks();
-        return response()->json(['status' => 1, 'data' => $tanks]);
+        return ApiResponse::success($tanks, 'OK', 200);
     }
 
     public function store(StoreTankRequest $request): JsonResponse
@@ -49,6 +49,14 @@ class TankController extends Controller
         $result = ($action === 'activate')
             ? $this->tankService->activateTank($id, $user)
             : $this->tankService->deactivateTank($id, $user);
+
+        return response()->json($result, $result['status'] === 1 ? 200 : 400);
+    }
+
+    public function sync(Request $request): JsonResponse
+    {
+        $user = $request->user()->name ?? 'System';
+        $result = $this->tankService->syncFromExternal($user);
 
         return response()->json($result, $result['status'] === 1 ? 200 : 400);
     }

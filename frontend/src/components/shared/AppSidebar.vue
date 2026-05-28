@@ -6,7 +6,7 @@
     <!-- Brand -->
     <div class="h-16 px-6 flex items-center border-b border-gray-100 gap-3 overflow-hidden whitespace-nowrap">
       <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
-        <img src="@/assets/logo.png" alt="Logo" class="w-full h-full object-contain" />
+        <img src="/logo-stacked.jpg" alt="Logo" class="w-full h-full object-contain" />
       </div>
       <div 
         class="flex flex-col leading-tight transition-all duration-300"

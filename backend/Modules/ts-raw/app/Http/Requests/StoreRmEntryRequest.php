@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\TsRaw\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -14,10 +13,10 @@ class StoreRmEntryRequest extends FormRequest
             'entry_date'        => 'required|date',
             'rm_number'         => 'required|string',
             'id_material'       => 'required|integer',
-            'id_sloc'           => 'required|integer',
-            'id_sloc_tail'      => 'present|array',
-            'id_tank'           => 'nullable|integer',
-            'id_tank_tail'      => 'nullable|array',
+            'id_sloc'           => 'required',
+            'id_sloc_tail'      => 'nullable',
+            'id_tank'           => 'nullable',
+            'id_tank_tail'      => 'nullable',
             'total_qty'         => 'required|numeric|min:0.001',
             'material_document' => 'nullable|string',
             'po_so'             => 'nullable|string',

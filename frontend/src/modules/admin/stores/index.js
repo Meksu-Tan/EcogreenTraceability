@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import adminUsersApi from '../api'
+import { useToastStore } from '@/stores/toast'
 
 export const useAdminUsersStore = defineStore('adminUsers', {
   state: () => ({
@@ -19,7 +20,8 @@ export const useAdminUsersStore = defineStore('adminUsers', {
         }
       } catch (err) {
         this.error = err.response?.data?.message || err.message
-        console.error('Error fetching users:', err)
+        const toastStore = useToastStore()
+        toastStore.error('Error fetching users')
       } finally {
         this.loading = false
       }
@@ -31,7 +33,8 @@ export const useAdminUsersStore = defineStore('adminUsers', {
           this.roles = response.data.data
         }
       } catch (err) {
-        console.error('Error fetching roles:', err)
+        const toastStore = useToastStore()
+        toastStore.error('Error fetching roles')
       }
     },
     async createUser(data) {

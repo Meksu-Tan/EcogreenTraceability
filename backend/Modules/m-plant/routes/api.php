@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 use Modules\Plant\Http\Controllers\PlantController;
 use Modules\Plant\Http\Controllers\AdjustmentController;
 use Modules\Plant\Http\Controllers\QuantifierController;

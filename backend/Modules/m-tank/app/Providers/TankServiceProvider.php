@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Tank\Providers;
 
 use Illuminate\Support\ServiceProvider;

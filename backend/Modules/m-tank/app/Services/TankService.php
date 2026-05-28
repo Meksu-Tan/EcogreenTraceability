@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Tank\Services;
 
 use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
@@ -51,5 +50,60 @@ class TankService
         return $result
             ? ['status' => 1, 'message' => 'Tank activated']
             : ['status' => 0, 'message' => 'Failed to activate tank'];
+    }
+
+    public function syncFromExternal(string $user): array
+    {
+        $url = 'https://172.16.11.101:44302/api/ext/tankfarm-master';
+        $token = env('TANKFARM_API_TOKEN', '267b7f754e1c79a9e8f8fa4394bc4b6867deb1e23bfc7cf2f72da91498a32c20');
+
+        $response = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->withHeaders([
+            'Accept' => 'application/json',
+            'Authorization' => 'Bearer ' . $token
+        ])->post($url, [
+            'plantCodes' => ['1007'],
+            'type' => 'tanks'
+        ]);
+
+        if (!$response->successful()) {
+            return ['status' => 0, 'message' => 'Failed to fetch data from external API'];
+        }
+
+        $data = $response->json();
+        if (!isset($data['success']) || !$data['success'] || !isset($data['data'])) {
+            return ['status' => 0, 'message' => 'Invalid response from external API'];
+        }
+
+        $syncCount = 0;
+        foreach ($data['data'] as $plantData) {
+            $plantCode = $plantData['plantCode'] ?? null;
+            $plantName = $plantData['plantName'] ?? null;
+
+            if (!$plantCode || empty($plantData['tanks'])) continue;
+
+            foreach ($plantData['tanks'] as $tankItem) {
+                $tankNumber = $tankItem['tankNumber'] ?? null;
+                $tankHeight = $tankItem['tankHeight'] ?? 0;
+
+                if (!$tankNumber) continue;
+
+                $updated = $this->tankRepo->syncUpdateOrCreate([
+                    'plant_code' => $plantCode,
+                    'plant_name' => $plantName,
+                    'tank_number' => $tankNumber,
+                    'tank_height' => $tankHeight,
+                ], $user);
+
+                if ($updated) {
+                    $syncCount++;
+                }
+            }
+        }
+
+        if ($syncCount > 0) {
+            return ['status' => 1, 'message' => "Successfully synced {$syncCount} tanks from external API."];
+        } else {
+            return ['status' => 1, 'message' => "All tanks are up to date. No updates needed."];
+        }
     }
 }

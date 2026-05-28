@@ -21,7 +21,7 @@
       <div class="relative px-8 py-10 flex items-center justify-between gap-6 flex-wrap">
         <div class="space-y-2">
           <h4 class="text-white text-2xl font-extrabold tracking-tight">
-            Selamat datang, {{ authStore.user?.name || 'User' }}! 👋
+            Selamat datang, {{ authStore.user?.name || 'User' }}!
           </h4>
           <p class="text-green-50 text-sm font-medium opacity-90">
             Logged in as <span class="bg-white/20 px-2 py-0.5 rounded-md font-bold">{{ firstRole }}</span> &mdash; {{ today }}

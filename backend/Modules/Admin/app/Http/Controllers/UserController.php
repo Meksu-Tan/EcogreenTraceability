@@ -1,13 +1,14 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\Admin\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use Modules\Admin\Http\Requests\StoreUserRequest;
+use Modules\Admin\Http\Requests\UpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -18,23 +19,15 @@ class UserController extends Controller
     {
         // Fetch users along with their roles
         $users = User::with('roles')->orderBy('name')->get();
-        return response()->json([
-            'status' => 1,
-            'data'   => $users,
-        ]);
+        return ApiResponse::success($users, 'OK', 200);
     }
 
     /**
      * POST /api/v1/admin/users
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreUserRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8'],
-            'role'     => ['required', 'string', 'exists:roles,name'],
-        ]);
+        $validated = $request->validated();
 
         $user = User::create([
             'name'     => $validated['name'],
@@ -47,26 +40,16 @@ class UserController extends Controller
         // Eager load roles for return payload
         $user->load('roles');
 
-        return response()->json([
-            'status'  => 1,
-            'message' => 'User berhasil ditambahkan',
-            'data'    => $user,
-        ]);
+        return ApiResponse::success($user, 'User berhasil ditambahkan.', 201);
     }
 
     /**
      * PUT /api/v1/admin/users/{id}
      */
-    public function update(Request $request, $id): JsonResponse
+    public function update(UpdateUserRequest $request, $id): JsonResponse
     {
         $user = User::findOrFail($id);
-
-        $validated = $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-            'password' => ['nullable', 'string', 'min:8'],
-            'role'     => ['required', 'string', 'exists:roles,name'],
-        ]);
+        $validated = $request->validated();
 
         $user->name  = $validated['name'];
         $user->email = $validated['email'];
@@ -82,11 +65,7 @@ class UserController extends Controller
 
         $user->load('roles');
 
-        return response()->json([
-            'status'  => 1,
-            'message' => 'User berhasil diperbarui',
-            'data'    => $user,
-        ]);
+        return ApiResponse::success($user, 'User berhasil diperbarui.', 200);
     }
 
     /**
@@ -98,17 +77,11 @@ class UserController extends Controller
 
         // Optional safety check: Prevent deleting yourself
         if (auth()->id() == $user->id) {
-            return response()->json([
-                'status'  => 0,
-                'message' => 'Tidak dapat menghapus akun Anda sendiri',
-            ], 403);
+            return ApiResponse::error('Tidak dapat menghapus akun Anda sendiri.', 403);
         }
 
         $user->delete();
 
-        return response()->json([
-            'status'  => 1,
-            'message' => 'User berhasil dihapus',
-        ]);
+        return ApiResponse::success(null, 'User berhasil dihapus.', 200);
     }
 }

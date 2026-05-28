@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\Auth\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Spatie\Permission\Models\Role;
@@ -14,10 +15,7 @@ class RolePermissionController extends Controller
      */
     public function roles(): JsonResponse
     {
-        return response()->json([
-            'status' => 1,
-            'data'   => Role::with('permissions')->get(),
-        ]);
+        return ApiResponse::success(Role::with('permissions')->get());
     }
 
     /**
@@ -25,9 +23,6 @@ class RolePermissionController extends Controller
      */
     public function permissions(): JsonResponse
     {
-        return response()->json([
-            'status' => 1,
-            'data'   => Permission::all(),
-        ]);
+        return ApiResponse::success(Permission::all());
     }
 }

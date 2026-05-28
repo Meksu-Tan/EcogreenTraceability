@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 use Modules\Supplier\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 

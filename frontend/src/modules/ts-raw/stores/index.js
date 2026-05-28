@@ -16,6 +16,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   // State
   const entries = ref([])
   const loading = ref(false)
+  const feedLoading = ref(false)
   const tanks = ref([])
   const tankDetails = ref([])
   const materials = ref([])
@@ -330,15 +331,15 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   }
 
   async function fetchFeedLogs(params = {}) {
-    loading.value = true
+    feedLoading.value = true
     try {
-      const response = await rmEntryRepo.getFeedLog(params.id_plant || 0)
+      const response = await rmEntryRepo.getFeedLog(params)
       feedLogs.value = Array.isArray(response) ? response : []
     } catch (error) {
       console.error('Failed to fetch feed logs:', error)
       throw error
     } finally {
-      loading.value = false
+      feedLoading.value = false
     }
   }
 
@@ -397,6 +398,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     // State
     entries,
     loading,
+    feedLoading,
     tanks,
     tankDetails,
     materials,

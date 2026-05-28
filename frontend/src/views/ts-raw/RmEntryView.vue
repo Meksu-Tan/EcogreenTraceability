@@ -189,7 +189,7 @@
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="loading"><td colspan="14" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
+            <tr v-if="feedLoading"><td colspan="14" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
             <tr v-else-if="feedLogsSafe.length === 0"><td colspan="14" class="px-6 py-4 text-center text-gray-500">No feed logs found</td></tr>
             <tr v-for="(log, index) in paginatedFeedLogs" :key="log.id_trace_head" class="hover:bg-gray-50 text-sm">
               <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageFeed - 1) * itemsPerPage + index + 1 }}</td>
@@ -332,6 +332,7 @@ const maxVisiblePages = 5
 
 // Computed
 const loading = computed(() => store.loading)
+const feedLoading = computed(() => store.feedLoading)
 const entries = computed(() => store.entries)
 const hasEntries = computed(() => entries.value.length > 0)
 const filteredEntries = computed(() => entries.value)
@@ -398,6 +399,7 @@ async function fetchData() {
   const params = buildPlantParams()
   currentPageStorage.value = 1
   currentPageFeed.value = 1
+  
   await Promise.all([
     store.fetchEntries(params),
     store.fetchFeedLogs(params),

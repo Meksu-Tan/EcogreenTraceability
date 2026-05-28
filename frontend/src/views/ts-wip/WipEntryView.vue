@@ -92,10 +92,38 @@
       <WipMiniTable :columns="balanceColumns" :data="balanceData" />
     </BaseModal>
     <BaseModal v-model="feedLogModalOpen" :title="feedLogTitle" max-width="1000px">
-      <WipMiniTable :columns="feedColumns" :data="feedLogData" />
+      <div class="space-y-4">
+        <WipMiniTable :columns="feedColumns" :data="paginatedFeedLogData" />
+        <div v-if="totalPagesFeedLog > 1" class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+          <div class="text-xs text-gray-600">
+            Showing {{ (currentPageFeedLog - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageFeedLog * itemsPerPageLog, feedLogData.length) }} of {{ feedLogData.length }} entries
+          </div>
+          <div class="flex gap-1">
+            <button @click="currentPageFeedLog = 1" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
+            <button @click="currentPageFeedLog--" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageFeedLog }} of {{ totalPagesFeedLog }}</span>
+            <button @click="currentPageFeedLog++" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            <button @click="currentPageFeedLog = totalPagesFeedLog" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
+          </div>
+        </div>
+      </div>
     </BaseModal>
     <BaseModal v-model="rundownLogModalOpen" :title="rundownLogTitle" max-width="1000px">
-      <WipMiniTable :columns="rundownColumns" :data="rundownLogData" />
+      <div class="space-y-4">
+        <WipMiniTable :columns="rundownColumns" :data="paginatedRundownLogData" />
+        <div v-if="totalPagesRundownLog > 1" class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+          <div class="text-xs text-gray-600">
+            Showing {{ (currentPageRundownLog - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageRundownLog * itemsPerPageLog, rundownLogData.length) }} of {{ rundownLogData.length }} entries
+          </div>
+          <div class="flex gap-1">
+            <button @click="currentPageRundownLog = 1" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
+            <button @click="currentPageRundownLog--" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageRundownLog }} of {{ totalPagesRundownLog }}</span>
+            <button @click="currentPageRundownLog++" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            <button @click="currentPageRundownLog = totalPagesRundownLog" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
+          </div>
+        </div>
+      </div>
     </BaseModal>
   </div>
 </template>
@@ -138,7 +166,35 @@ const EntryForm = defineComponent({
         h('option', { value: '' }, uniqueTanks.value?.length ? '-- Select Sloc --' : '-- No Sloc found for selected plant --'),
         ...(uniqueTanks.value || []).map(t => h('option', { value: t.id_sloc || t.id_tank }, t.tank || t.description || t.id_tank)),
       ])),
-      field('Specific Sloc', h('select', { multiple: true, size: Math.max(4, props.specificTanks?.length || 1), value: props.form.tankNo || [], onChange: e => props.form.tankNo = Array.from(e.target.selectedOptions).map(o => Number(o.value)), class: inputClass() }, (props.specificTanks?.length ? props.specificTanks : [{ id_sloc_tail: '', tankNo: props.form.tank ? '-- No Specific Sloc found --' : '-- Select Sloc first --' }]).map(t => h('option', { value: t.id_sloc_tail || t.id_tank_tail || '', disabled: !t.id_sloc_tail && !t.id_tank_tail }, t.tankNo)))),
+      field('Specific Sloc', h('div', { class: 'max-h-36 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/80 p-3 shadow-inner' }, [
+        !props.form.tank
+          ? h('p', { class: 'py-2 text-center text-xs italic text-gray-400' }, 'Pilih Sloc terlebih dahulu')
+          : !props.specificTanks?.length
+            ? h('p', { class: 'py-2 text-center text-xs italic text-gray-400' }, 'Tidak ada Specific Sloc ditemukan')
+            : h('div', { class: 'grid grid-cols-2 gap-2 sm:grid-cols-3' },
+                props.specificTanks.map(t => h('label', {
+                  class: 'flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-white px-2 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:border-green-200 hover:bg-green-50/50'
+                }, [
+                  h('input', {
+                    type: 'checkbox',
+                    value: t.id_sloc_tail || t.id_tank_tail,
+                    checked: props.form.tankNo?.includes(t.id_sloc_tail || t.id_tank_tail),
+                    onChange: e => {
+                      const val = t.id_sloc_tail || t.id_tank_tail
+                      if (e.target.checked) {
+                        if (!props.form.tankNo.includes(val)) {
+                          props.form.tankNo.push(val)
+                        }
+                      } else {
+                        props.form.tankNo = props.form.tankNo.filter(v => v !== val)
+                      }
+                    },
+                    class: 'h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500'
+                  }),
+                  h('span', t.tankNo)
+                ]))
+              )
+      ])),
       h('div', { class: 'grid grid-cols-[1fr_auto] gap-3 items-end' }, [
         field(`Current ${props.mode === 'feed' ? 'Feed' : 'Rundown'} (MT)`, h('input', { type: 'number', step: '0.001', value: props.form.currQtf, onInput: e => props.form.currQtf = e.target.value, class: inputClass() })),
         h('button', { type: 'button', onClick: () => emit('fetch-dcs'), class: 'px-4 py-2 text-xs font-bold rounded-md bg-blue-600 text-white hover:bg-blue-700' }, 'Fetch DCS Data'),
@@ -229,6 +285,30 @@ const balanceColumns = [
   { key: 'sloc', label: 'Sloc' }, { key: 'qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Supplier / Batch' },
 ]
 
+// Log Modal Pagination
+const itemsPerPageLog = 10
+const currentPageFeedLog = ref(1)
+const currentPageRundownLog = ref(1)
+
+const paginatedFeedLogData = computed(() => {
+  const start = (currentPageFeedLog.value - 1) * itemsPerPageLog
+  return feedLogData.value.slice(start, start + itemsPerPageLog)
+})
+
+const totalPagesFeedLog = computed(() => {
+  return Math.ceil(feedLogData.value.length / itemsPerPageLog)
+})
+
+const paginatedRundownLogData = computed(() => {
+  const start = (currentPageRundownLog.value - 1) * itemsPerPageLog
+  return rundownLogData.value.slice(start, start + itemsPerPageLog)
+})
+
+const totalPagesRundownLog = computed(() => {
+  return Math.ceil(rundownLogData.value.length / itemsPerPageLog)
+})
+
+
 function stepRows(step) { return step.type === 'feed' ? feedLogs.value[step.id] || [] : normalizeRundownRows(rundownLogs.value[step.id] || []) }
 function normalizeRundownRows(rows) { return rows.map(row => ({ ...row, rundown_trace_no: row.rundown_trace_no || row.to_trace_no })) }
 
@@ -263,7 +343,6 @@ async function openFeedModal(step) {
   autoSelectTank(feedForm, feedTanks.value, 'feed')
   await onFeedTankChange()
   feedDcsStatus.value = `${feedTanks.value.length} Feed Sloc found for plant ${resolvePlantCode()}. ${step.tag ? `DCS tag available: ${step.tag}` : 'No DCS tag configured for this entry.'}`
-  feedForm.batchNo = normalizeTraceNo(await store.generateNewFeedNumber(step.id)) || buildTraceNo('3', step.id)
   const last = await store.fetchFeedLastBatch(step.id)
   applyLast(feedForm, last)
 }
@@ -279,7 +358,6 @@ async function openRundownModal(step) {
   autoSelectTank(rundownForm, rundownTanks.value, 'rundown')
   await onRundownTankChange()
   rundownDcsStatus.value = `${rundownTanks.value.length} WIP Sloc found for plant ${resolvePlantCode()}. ${step.tag ? `DCS tag available: ${step.tag}` : 'No DCS tag configured for this entry.'}`
-  rundownForm.batchNo = normalizeTraceNo(await store.generateNewRundownNumber(step.id)) || buildTraceNo('2', step.id)
   const last = await store.fetchRundownLastBatch(step.id)
   applyLast(rundownForm, last)
 }
@@ -297,27 +375,39 @@ function normalizeTraceNo(value) {
   return value ? String(value) : ''
 }
 
-function buildTraceNo(prefix, id) {
+function buildTraceNo(prefix, id, tank = null) {
   const date = new Date()
   const yy = String(date.getFullYear()).slice(-2)
   const mm = String(date.getMonth() + 1).padStart(2, '0')
   const dd = String(date.getDate()).padStart(2, '0')
   const section = String(id || '000').replace(/\D/g, '').slice(0, 3).padStart(3, '0')
-  const plant = resolvePlantCode().slice(-2).padStart(2, '0')
+  const plant = resolvePlantCode(tank).slice(-2).padStart(2, '0')
   return `${prefix}${yy}${mm}${dd}${section}${plant}01`
 }
 
-function resolvePlantCode() {
-  const id = plantSelectionStore.selectedPlantId
+function resolvePlantCode(tank = null) {
+  let id = plantSelectionStore.selectedPlantId
+  let name = String(plantSelectionStore.selectedPlantName || '').toUpperCase()
+  
+  if (tank && tank.id_plant) {
+    id = tank.id_plant
+    const p = plantStore.plants?.find(x => x.id_plant == id || x.code_3 == id)
+    if (p) {
+      if (p.code_3) return String(p.code_3)
+      if (p.description) name = p.description.toUpperCase()
+    } else {
+      return String(id)
+    }
+  }
+
   if (id && plantStore.plants?.length) {
     const plant = plantStore.plants.find(p => p.id_plant === id)
     if (plant && plant.code_3) return String(plant.code_3)
   }
-  const name = String(plantSelectionStore.selectedPlantName || '').toUpperCase()
   if (name.includes('/')) {
     return name.split('/').pop().trim()
   }
-  const map = { EOMB: '1001', EOB1: '1002', EOB2: '1003', EOB3: '1007' }
+  const map = { EOMB: '1001', EOB1: '1002', EOB2: '1003', EOB5: '1005', EOB3: '1007' }
   const cleanName = name.replace(/[\s-]/g, '')
   if (map[cleanName]) return map[cleanName]
   return id ? String(id) : '0000'
@@ -376,10 +466,26 @@ function autoSelectTank(form, tanks, mode) {
 async function onFeedTankChange() {
   feedForm.tankNo = []
   feedSpecificTanks.value = feedForm.tank ? await fetchSpecificTanks(feedForm.tank) : []
+  if (feedSpecificTanks.value?.length) {
+    feedForm.tankNo = feedSpecificTanks.value.map(t => t.id_sloc_tail || t.id_tank_tail).filter(Boolean)
+  }
+  if (feedModalOpen.value && activeFeedStep) {
+    const selectedTank = feedTanks.value.find(t => (t.id_sloc || t.id_tank) == feedForm.tank)
+    feedForm.batchNo = 'Generating...'
+    feedForm.batchNo = normalizeTraceNo(await store.generateNewFeedNumber(activeFeedStep.id, selectedTank?.id_plant)) || buildTraceNo('3', activeFeedStep.id, selectedTank)
+  }
 }
 async function onRundownTankChange() {
   rundownForm.tankNo = []
   rundownSpecificTanks.value = rundownForm.tank ? await fetchSpecificTanks(rundownForm.tank) : []
+  if (rundownSpecificTanks.value?.length) {
+    rundownForm.tankNo = rundownSpecificTanks.value.map(t => t.id_sloc_tail || t.id_tank_tail).filter(Boolean)
+  }
+  if (rundownModalOpen.value && activeRundownStep) {
+    const selectedTank = rundownTanks.value.find(t => (t.id_sloc || t.id_tank) == rundownForm.tank)
+    rundownForm.batchNo = 'Generating...'
+    rundownForm.batchNo = normalizeTraceNo(await store.generateNewRundownNumber(activeRundownStep.id, selectedTank?.id_plant)) || buildTraceNo('2', activeRundownStep.id, selectedTank)
+  }
 }
 
 async function fetchTanks(type, id) {
@@ -390,7 +496,7 @@ async function fetchTanks(type, id) {
       : await wipApi.getActiveTanksRundown(id, params)
     if (Array.isArray(response) && response.length) return response
   } catch (error) {
-    console.error('Direct WIP sloc fetch failed:', error)
+    toastStore.error('Direct WIP sloc fetch failed:', error)
   }
 
   const primary = type === 'feed'
@@ -422,7 +528,7 @@ async function fetchDcs(step, form, statusRef) {
       toastStore.error('please connect db')
     }
   } catch (error) {
-    console.error('DCS fetch failed:', error)
+    toastStore.error('DCS fetch failed:', error)
     statusRef.value = 'please connect db'
     toastStore.error('please connect db')
   }
@@ -450,25 +556,31 @@ async function openBalanceModal(step) {
 const feedLogModalOpen = ref(false)
 const feedLogTitle = ref('')
 const feedLogData = ref([])
-function openFeedLogModal(step) {
+async function openFeedLogModal(step) {
+  currentPageFeedLog.value = 1
   feedLogTitle.value = `Feed Log - ${step.title}`
   feedLogData.value = feedLogs.value[step.id] || []
   feedLogModalOpen.value = true
+  const res = await store.fetchFeed(step.id, 'LOG')
+  feedLogData.value = res.data || []
 }
 
 const rundownLogModalOpen = ref(false)
 const rundownLogTitle = ref('')
 const rundownLogData = ref([])
-function openRundownLogModal(step) {
+async function openRundownLogModal(step) {
+  currentPageRundownLog.value = 1
   rundownLogTitle.value = `Rundown Log - ${step.title}`
   rundownLogData.value = normalizeRundownRows(rundownLogs.value[step.id] || [])
   rundownLogModalOpen.value = true
+  const res = await store.fetchRundown(step.id, 'LOG')
+  rundownLogData.value = normalizeRundownRows(res.data || [])
 }
 
 async function reloadAll() {
   loading.value = true
   try {
-    await Promise.all(runnableSteps.value.map(step => step.type === 'feed' ? store.fetchFeed(step.id, 'LOG') : store.fetchRundown(step.id, 'LOG')))
+    await Promise.all(runnableSteps.value.map(step => step.type === 'feed' ? store.fetchFeed(step.id, 'LATEST') : store.fetchRundown(step.id, 'LATEST')))
   } finally {
     loading.value = false
   }

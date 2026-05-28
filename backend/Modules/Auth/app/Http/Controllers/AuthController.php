@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\Auth\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\Auth\Http\Requests\LoginRequest;
 use Illuminate\Http\JsonResponse;
@@ -17,28 +18,20 @@ class AuthController extends Controller
     public function login(LoginRequest $request): JsonResponse
     {
         if (!Auth::attempt(['email' => $request->email, 'password' => $request->password, 'isActive' => 1])) {
-            return response()->json([
-                'status'  => 0,
-                'message' => 'Email atau password salah, atau akun Anda tidak aktif.',
-            ], 401);
+            return ApiResponse::error('Email atau password salah, atau akun Anda tidak aktif.', 401);
         }
 
         $user = Auth::user();
         $token = $user->createToken('auth_token')->plainTextToken;
 
-        return response()->json([
-            'status'  => 1,
-            'message' => 'Login berhasil.',
-            'token'   => $token,
-            'data'    => [
-                'id'          => $user->id,
-                'name'        => $user->name,
-                'email'       => $user->email,
-                'id_plant'    => $user->id_plant,
-                'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
-                'permissions' => $user->getAllPermissions()->pluck('name'),
-            ],
-        ]);
+        return ApiResponse::success([
+            'id'          => $user->id,
+            'name'        => $user->name,
+            'email'       => $user->email,
+            'id_plant'    => $user->id_plant,
+            'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+        ], 'Login berhasil.', 200, ['token' => $token]);
     }
 
     /**
@@ -48,10 +41,7 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'status'  => 1,
-            'message' => 'Logout berhasil.',
-        ]);
+        return ApiResponse::success(null, 'Logout berhasil.');
     }
 
     /**
@@ -61,16 +51,13 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
-        return response()->json([
-            'status' => 1,
-            'data'   => [
-                'id'          => $user->id,
-                'name'        => $user->name,
-                'email'       => $user->email,
-                'id_plant'    => $user->id_plant,
-                'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
-                'permissions' => $user->getAllPermissions()->pluck('name'),
-            ],
+        return ApiResponse::success([
+            'id'          => $user->id,
+            'name'        => $user->name,
+            'email'       => $user->email,
+            'id_plant'    => $user->id_plant,
+            'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
+            'permissions' => $user->getAllPermissions()->pluck('name'),
         ]);
     }
 }

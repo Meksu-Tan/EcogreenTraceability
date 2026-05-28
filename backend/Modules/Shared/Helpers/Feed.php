@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
@@ -8,20 +7,9 @@ class Feed
 {
     protected $connection = 'eudr_ts';
 
-    /**
-     * General FIFO feed deduction from balance.
-     *
-     * Returns:
-     *   ['response' => 1, 'trace_head_ids' => [...], 'used_heads' => [...], 'total_out' => float, 'feed_in_details' => [...]]
-     *   ['response' => 3, ...] → insufficient stock
-     *   ['response' => 6, ...] → balance head found but has no active supplier detail rows
-     */
-    /**
-     * Get available quantity for feed transfer (no mutation).
-     */
     public static function getAvailableQty(array $feedData): float
     {
-        $connection = $feedData['id_plant'] ?? 0;
+        $connection = 'eudr_ts';
 
         $sql = 'SELECT id_balance_head, qty, out_qty, trace_no, init_qty
                 FROM t_balance_header
@@ -55,9 +43,8 @@ class Feed
 
     public static function generalFeed(array $feedData): array
     {
-        $connection = $feedData['id_plant'] ?? 0;
+        $connection = 'eudr_ts';
 
-        // Pre-flight: fetch balance heads OUTSIDE the transaction
         $sql = 'SELECT id_balance_head, qty, out_qty, trace_no, init_qty
                 FROM t_balance_header
                 WHERE status = 1
@@ -95,7 +82,6 @@ class Feed
             ];
         }
 
-        // Validate total available stock before opening a transaction
         $totalAvailable = array_sum(array_column($balHeads, 'qty'));
         if (round($totalAvailable, 4) < round($feedData['qty'], 4)) {
             return [
@@ -107,10 +93,10 @@ class Feed
             ];
         }
 
-        // All writes happen inside a single atomic transaction
         return DB::connection($connection)->transaction(function () use ($feedData, $balHeads, $connection) {
 
             $qtyWh = $feedData['qty'];
+            $traceHeadIds = [];
             $usedHeads = [];
             $feedInDetails = [];
             $totalOut = 0;
@@ -140,12 +126,28 @@ class Feed
                 $useQty = round($useQty, 4);
                 $totalOut += $useQty;
 
-                // UPDATE BALANCE HEADER
                 DB::connection($connection)->update(
                     'UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ?',
                     [$newBalance, round($newOutQty, 4), $feedData['user'], $idHead]
                 );
 
+                // CREATE TRACE HEADER (FEED OUT)
+                $traceHeadId = DB::connection($connection)->table('t_trace_header')->insertGetId([
+                    'from_trace_no' => $fromTrace,
+                    'to_trace_no' => $feedData['to_trace_no'],
+                    'id_balance_head' => $idHead,
+                    'id_material' => $feedData['id_material'],
+                    'entry_date' => $feedData['entry_date'],
+                    'id_sloc' => $feedData['id_tank'] ?? $feedData['id_sloc'] ?? 0,
+                    'id_tank_tail' => $feedData['id_tank_tail'] ?? null,
+                    'out_qty' => $useQty,
+                    'last_qtf' => $feedData['last_qtf'] ?? 0,
+                    'curr_qtf' => $feedData['qty'],
+                    'id_plant' => $feedData['id_plant'],
+                    'created_by' => $feedData['user'],
+                ]);
+
+                $traceHeadIds[] = $traceHeadId;
                 $usedHeads[] = [
                     'id_balance_head' => $idHead,
                     'from_trace_no' => $fromTrace,
@@ -205,6 +207,20 @@ class Feed
                         'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
                         [round($newTailQty, 4), round($newTailOut, 4), $feedData['user'], $tail->id_balance_tail]
                     );
+
+                    // CREATE TRACE DETAIL (FEED OUT DETAIL)
+                    DB::connection($connection)->table('t_trace_detail')->insert([
+                        'id_trace_head' => $traceHeadId,
+                        'id_balance_tail' => $tail->id_balance_tail,
+                        'id_supplier' => $tail->id_supplier,
+                        'id_material' => $feedData['id_material'],
+                        'out_qty' => round($useTailQty, 4),
+                        'batch_sap' => $tail->batch_sap,
+                        'id_sloc' => $feedData['id_tank'] ?? $feedData['id_sloc'] ?? 0,
+                        'id_tank_tail' => $feedData['id_tank_tail'] ?? null,
+                        'id_plant' => $feedData['id_plant'],
+                        'created_by' => $feedData['user'],
+                    ]);
                 }
             }
 
@@ -216,7 +232,7 @@ class Feed
 
             return [
                 'response' => 1,
-                'trace_head_ids' => [],
+                'trace_head_ids' => $traceHeadIds,
                 'used_heads' => $usedHeads,
                 'total_out' => $totalOut,
                 'feed_in_details' => array_values($feedInDetails),
@@ -224,12 +240,9 @@ class Feed
         });
     }
 
-    /**
-     * Debug FIFO stock information for analysis
-     */
     public static function debugStock(array $params): array
     {
-        $connection = $params['id_plant'] ?? 0;
+        $connection = 'eudr_ts';
 
         $sql = 'SELECT id_balance_head, qty, out_qty, trace_no, init_qty, id_sloc, id_plant
                 FROM t_balance_header

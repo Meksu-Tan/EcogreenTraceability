@@ -118,7 +118,7 @@ onMounted(async () => {
   try {
     await store.fetchMaterials()
   } catch (error) {
-    console.error('Failed to fetch materials:', error)
+    toastStore.error('Failed to fetch materials:', error)
   }
 })
 

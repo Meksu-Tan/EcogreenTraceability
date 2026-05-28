@@ -10,13 +10,23 @@
           <span class="text-sm font-semibold text-green-600">Tank</span>
         </div>
       </div>
-      <button 
-        id="btn-tambah-tank" 
-        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer" 
-        @click="openModal"
-      >
-        <i class="fas fa-plus"></i> Tambah
-      </button>
+      <div class="flex items-center gap-3">
+        <button 
+          id="btn-sync-tank" 
+          class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer disabled:opacity-50" 
+          @click="onSync"
+          :disabled="syncing"
+        >
+          <i class="fas fa-sync-alt" :class="{'animate-spin': syncing}"></i> {{ syncing ? 'Updating...' : 'Update Data' }}
+        </button>
+        <button 
+          id="btn-tambah-tank" 
+          class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer" 
+          @click="openModal"
+        >
+          <i class="fas fa-plus"></i> Tambah
+        </button>
+      </div>
     </div>
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -100,6 +110,7 @@ const toast      = useToastStore()
 const showModal  = ref(false)
 const editData   = ref(null)
 const submitting = ref(false)
+const syncing    = ref(false)
 
 const columns = [
   { key: 'id',          label: 'ID' },
@@ -115,7 +126,7 @@ onMounted(async () => {
   try {
     await store.fetchTanks()
   } catch (error) {
-    console.error('Failed to fetch tanks:', error)
+    toastStore.error('Failed to fetch tanks:', error)
   }
 })
 
@@ -136,6 +147,22 @@ async function onToggle(row) {
     toast.success(r.message)
   } else {
     toast.error(r.message)
+  }
+}
+
+async function onSync() {
+  syncing.value = true
+  try {
+    const r = await store.syncTanks()
+    if (r.status === 1) {
+      toast.success(r.message)
+    } else {
+      toast.error(r.message)
+    }
+  } catch (error) {
+    toast.error('Failed to sync tanks', error)
+  } finally {
+    syncing.value = false
   }
 }
 

@@ -78,7 +78,7 @@ onMounted(async () => {
   try {
     await store.fetchSuppliers()
   } catch (error) {
-    console.error('Failed to fetch suppliers:', error)
+    toastStore.error('Failed to fetch suppliers:', error)
   }
 })
 

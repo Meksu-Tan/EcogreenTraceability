@@ -1,59 +1,70 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\Tank\Repositories;
 
+use Modules\Tank\Models\Tank;
 use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
-use Illuminate\Support\Facades\DB;
 
 class TankRepository implements TankRepositoryInterface
 {
     public function getAll(): array
     {
-        return DB::connection('eudr_ts')->select('
-            SELECT id_sloc as id, id_plant AS plant_code, plant_name, id_tank AS tank_number, tank_height, status,
-                   created_at, created_by, updated_at, updated_by
-            FROM m_sloc
-            ORDER BY id_sloc ASC
-        ');
+        return Tank::selectRaw('id_sloc as id, id_plant AS plant_code, plant_name, id_tank, id_tank AS tank_number, tank_height, status, created_at, created_by, updated_at, updated_by')
+            ->orderBy('id_sloc')
+            ->get()
+            ->toArray();
     }
 
     public function findById(int $id): ?object
     {
-        $result = DB::connection('eudr_ts')->select('SELECT id_sloc as id, id_plant AS plant_code, plant_name, id_tank AS tank_number, tank_height, status FROM m_sloc WHERE id_sloc = ?', [$id]);
-        return $result[0] ?? null;
+        $model = Tank::find($id);
+        if (!$model) {
+            return null;
+        }
+
+        return (object) [
+            'id' => $model->id_sloc,
+            'plant_code' => $model->id_plant,
+            'plant_name' => $model->plant_name,
+            'tank_number' => $model->id_tank,
+            'tank_height' => $model->tank_height,
+            'status' => $model->status,
+            'created_at' => $model->created_at,
+            'created_by' => $model->created_by,
+            'updated_at' => $model->updated_at,
+            'updated_by' => $model->updated_by,
+        ];
     }
 
     public function create(array $data): int|bool
     {
-        $exists = DB::connection('eudr_ts')->select('SELECT COUNT(id_sloc) as cnt FROM m_sloc WHERE id_tank = ? AND id_plant = ? AND status = "1"', [
-            $data['tank_number'], $data['plant_code']
-        ]);
+        $exists = Tank::where('id_tank', $data['tank_number'])
+            ->where('id_plant', $data['plant_code'])
+            ->where('status', '1')
+            ->exists();
 
-        if ($exists[0]->cnt >= 1) {
+        if ($exists) {
             return false;
         }
 
         $id = $data['id'] ?? null;
         if (!$id) {
-            $maxResult = DB::connection('eudr_ts')->select('SELECT MAX(id_sloc) as max_id FROM m_sloc');
-            $id = ($maxResult[0]->max_id ?? 0) + 1;
+            $maxId = Tank::max('id_sloc') ?? 0;
+            $id = $maxId + 1;
         }
 
-        $result = DB::connection('eudr_ts')->insert('
-            INSERT INTO m_sloc (id_sloc, id_plant, plant_name, id_tank, tank_height, status, created_by, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-        ', [
-            $id,
-            $data['plant_code'],
-            $data['plant_name'],
-            $data['tank_number'],
-            $data['tank_height'],
-            1,
-            $data['created_by'] ?? 'System'
+        $model = Tank::create([
+            'id_sloc' => $id,
+            'id_plant' => $data['plant_code'],
+            'plant_name' => $data['plant_name'],
+            'id_tank' => $data['tank_number'],
+            'tank_height' => $data['tank_height'],
+            'status' => 1,
+            'created_by' => $data['created_by'] ?? 'System',
         ]);
 
-        if ($result) {
-            DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        if ($model) {
+            \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
                 'M_SLOC', 'ADD',
                 'ID: ' . $id . ' | TANK: ' . $data['tank_number'] . ' | PLANT: ' . $data['plant_code'] . ' | HEIGHT: ' . $data['tank_height'],
                 $data['created_by'] ?? 'System',
@@ -66,44 +77,82 @@ class TankRepository implements TankRepositoryInterface
 
     public function update(int $id, array $data): bool
     {
-        $old = DB::connection('eudr_ts')->select('SELECT id_plant AS plant_code, id_tank AS tank_number, tank_height FROM m_sloc WHERE id_sloc = ?', [$id]);
-        if (empty($old)) return false;
+        $model = Tank::find($id);
+        if (!$model) {
+            return false;
+        }
 
-        DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_SLOC', 'UPDATE',
-            'ID: ' . $id . ' | TANK: ' . $old[0]->tank_number . ' >> ' . $data['tank_number'],
+            'ID: ' . $id . ' | TANK: ' . $model->id_tank . ' >> ' . $data['tank_number'],
             $data['updated_by'] ?? 'System',
         ]);
 
-        $result = DB::connection('eudr_ts')->update('
-            UPDATE m_sloc
-               SET id_plant = ?, plant_name = ?, id_tank = ?, tank_height = ?, updated_by = ?, updated_at = NOW()
-             WHERE id_sloc = ?
-        ', [
-            $data['plant_code'],
-            $data['plant_name'],
-            $data['tank_number'],
-            $data['tank_height'],
-            $data['updated_by'] ?? 'System',
-            $id,
+        return (bool) $model->update([
+            'id_plant' => $data['plant_code'],
+            'plant_name' => $data['plant_name'],
+            'id_tank' => $data['tank_number'],
+            'tank_height' => $data['tank_height'],
+            'updated_by' => $data['updated_by'] ?? 'System',
         ]);
-
-        return (bool) $result;
     }
 
     public function deactivate(int $id, string $user): bool
     {
-        DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_SLOC', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user,
         ]);
-        return (bool) DB::connection('eudr_ts')->update('UPDATE m_sloc SET status = "0", updated_by = ?, updated_at = NOW() WHERE id_sloc = ?', [$user, $id]);
+
+        $model = Tank::find($id);
+        if (!$model) {
+            return false;
+        }
+
+        return (bool) $model->update(['status' => '0', 'updated_by' => $user]);
     }
 
     public function activate(int $id, string $user): bool
     {
-        DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
+        \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_SLOC', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user,
         ]);
-        return (bool) DB::connection('eudr_ts')->update('UPDATE m_sloc SET status = "1", updated_by = ?, updated_at = NOW() WHERE id_sloc = ?', [$user, $id]);
+
+        $model = Tank::find($id);
+        if (!$model) {
+            return false;
+        }
+
+        return (bool) $model->update(['status' => '1', 'updated_by' => $user]);
+    }
+
+    public function syncUpdateOrCreate(array $data, string $user): bool
+    {
+        $existing = Tank::where('id_tank', $data['tank_number'])
+            ->where('id_plant', $data['plant_code'])
+            ->first();
+
+        if ($existing) {
+            if ($existing->plant_name != $data['plant_name'] || $existing->tank_height != $data['tank_height']) {
+                $existing->update([
+                    'plant_name' => $data['plant_name'],
+                    'tank_height' => $data['tank_height'],
+                    'updated_by' => $user,
+                ]);
+                return true;
+            }
+            return false;
+        } else {
+            $maxId = Tank::max('id_sloc') ?? 0;
+            Tank::create([
+                'id_sloc' => $maxId + 1,
+                'id_plant' => $data['plant_code'],
+                'plant_name' => $data['plant_name'],
+                'id_tank' => $data['tank_number'],
+                'tank_height' => $data['tank_height'],
+                'status' => '1',
+                'created_by' => $user,
+            ]);
+            return true;
+        }
     }
 }

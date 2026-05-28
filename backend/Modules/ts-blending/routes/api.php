@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\TsBlending\Http\Controllers\BlendingController;
 
@@ -16,5 +15,9 @@ Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
         Route::get('material-list', [BlendingController::class, 'materialList']);
         Route::get('active-tanks-rundown', [BlendingController::class, 'activeTanksRundown']);
         Route::get('active-specific-tanks-rundown', [BlendingController::class, 'activeSpecificTanksRundown']);
+
+        Route::get('tanks', [BlendingController::class, 'tanks']);
+        Route::get('tanks/{tankId}/details', [BlendingController::class, 'tankDetails']);
+        Route::get('all-tanks', [BlendingController::class, 'allTanks']);
     });
 });

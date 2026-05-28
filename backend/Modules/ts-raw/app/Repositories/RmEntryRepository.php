@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\TsRaw\Repositories;
 
 use Modules\TsRaw\Repositories\Contracts\RmEntryRepositoryInterface;
@@ -62,6 +61,15 @@ class RmEntryRepository implements RmEntryRepositoryInterface
         $inClause = implode(',', array_map('intval', $idTankStorageIds));
         $filterPlant = $allPlants ? 0 : $resolvedPlant;
 
+        $slocConditions = [];
+        $slocConditions[] = "id_sloc IN ($inClause)";
+        foreach ($idTankStorageIds as $slocId) {
+            $slocConditions[] = "JSON_CONTAINS(id_sloc, JSON_QUOTE('" . $slocId . "'))";
+            $slocConditions[] = "JSON_CONTAINS(id_sloc, '" . $slocId . "')";
+            
+        }
+        $slocFilterSql = '(' . implode(' OR ', $slocConditions) . ')';
+
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         // Main RM List Query - use subquery approach for unique trace_no
@@ -74,7 +82,8 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                     bh.created_by, bh.created_at,
                     CONCAT(m.code, ' :: ', m.description) AS material,
                     bh.init_qty,
-                    sl.description AS sloc_description,
+                    MIN(sl.description) AS sloc_description,
+                    GROUP_CONCAT(DISTINCT sl.id_tank ORDER BY sl.id_tank ASC SEPARATOR ' & ') AS sloc_tank_number,
                     bh.entry_date,
                     f.material_document, f.po_so, f.id_trace_head,
                     FORMAT(bs.supplier_qty,3) AS balance_supplier,
@@ -87,7 +96,7 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                           AND SUBSTRING(trace_no,1,1) = '1'
                           AND SUBSTRING(trace_no,8,3) = '000'
                           AND (id_plant = ? OR ? = 0)
-                          AND (id_sloc IN ($inClause) OR (id_sloc IS NULL AND id_tank IN (
+                          AND ($slocFilterSql OR (id_sloc IS NULL AND id_tank IN (
                                SELECT mt.id_tank FROM m_tank mt
                                JOIN m_sloc ms ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci
                                              AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci
@@ -96,7 +105,13 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                         ORDER BY id_balance_head DESC
                     ) bh
                     INNER JOIN m_material m ON bh.id_material = m.id_material AND m.type = ?
-                    LEFT JOIN m_sloc sl ON ((bh.id_sloc = sl.id_sloc) OR (bh.id_sloc IS NULL AND bh.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = sl.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = sl.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))) AND sl.status = 1
+                    LEFT JOIN m_sloc sl ON (
+                         (bh.id_sloc = sl.id_sloc)
+                         OR JSON_CONTAINS(bh.id_sloc, JSON_QUOTE(CAST(sl.id_sloc AS CHAR)))
+                         OR JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS CHAR))
+                         
+                         OR (bh.id_sloc IS NULL AND bh.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = sl.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = sl.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))
+                    ) AND sl.status = 1
                     LEFT JOIN (
                         SELECT f.id_balance_head, MAX(g.material_document) AS material_document,
                                MAX(g.po_so) AS po_so, MAX(f.id_trace_head) AS id_trace_head
@@ -109,6 +124,7 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                         FROM t_balance_detail WHERE status = 1 GROUP BY id_balance_head
                     ) bs ON bs.id_balance_head = bh.id_balance_head
                     LEFT JOIN m_plant p ON bh.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+                    GROUP BY bh.id_balance_head
                     ORDER BY bh.id_balance_head DESC
                     LIMIT 100";
 
@@ -162,25 +178,10 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                     $r->id_balance_detail = '';
                 }
 
-                // Format tf_number from id_tank_tail_raw (JSON array)
+                // Format tf_number: description | id_tank
                 $r->tf_number = $r->sloc_description;
-                if (!empty($r->id_tank_tail_raw) && $r->id_tank_tail_raw !== '[]') {
-                    $slocTailArray = json_decode($r->id_tank_tail_raw, true);
-                    if (is_array($slocTailArray) && !empty($slocTailArray)) {
-                        // Get tf_number from m_sloc_detail for each id_sloc_tail
-                        $placeholders = implode(',', array_fill(0, count($slocTailArray), '?'));
-                        $tfNumbers = DB::connection('eudr_ts')->select(
-                            "SELECT tf_number FROM m_sloc_detail
-                             WHERE id_sloc_tail IN ($placeholders) AND status = 1
-                             ORDER BY tf_number ASC",
-                            $slocTailArray
-                        );
-
-                        if (!empty($tfNumbers)) {
-                            $tfNumberArray = array_column($tfNumbers, 'tf_number');
-                            $r->tf_number = $r->sloc_description . ' | ' . implode(' & ', $tfNumberArray);
-                        }
-                    }
+                if (!empty($r->sloc_tank_number)) {
+                    $r->tf_number = $r->sloc_description . ' | ' . $r->sloc_tank_number;
                 }
 
                 // Calculate traced status based on out_qty in balance_detail
@@ -524,29 +525,35 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                     ->update($updateData);
             }
 
-            // Update sloc_tail if provided
-            if (isset($data['id_sloc_tail'])) {
-                // Handle id_sloc_tail - ensure it's always a JSON array
-                $tankTailVal = null;
-                if (!empty($data['id_sloc_tail'])) {
-                    if (is_array($data['id_sloc_tail'])) {
-                        // Convert all values to strings and ensure they're properly formatted
-                        $tankTailVal = json_encode(array_map('strval', array_values($data['id_sloc_tail'])));
+            // Update sloc if provided (serialize array/JSON)
+            if (isset($data['id_sloc'])) {
+                $slocVal = null;
+                if (!empty($data['id_sloc'])) {
+                    if (is_array($data['id_sloc'])) {
+                        $slocVal = json_encode(array_map('strval', array_values($data['id_sloc'])));
                     } else {
-                        // If it's a string, try to decode it first in case it's already JSON
-                        $decoded = json_decode($data['id_sloc_tail'], true);
+                        $decoded = json_decode($data['id_sloc'], true);
                         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                            $tankTailVal = json_encode(array_map('strval', array_values($decoded)));
+                            $slocVal = json_encode(array_map('strval', array_values($decoded)));
                         } else {
-                            // Single value as string, wrap in array
-                            $tankTailVal = json_encode([(string)$data['id_sloc_tail']]);
+                            $slocVal = json_encode([(string)$data['id_sloc']]);
                         }
                     }
                 }
                 DB::connection('eudr_ts')->table('t_balance_header')
                     ->where('id_balance_head', $id)
                     ->update([
-                        'id_sloc_tail' => $tankTailVal,
+                        'id_sloc' => $slocVal,
+                        'updated_by' => $user
+                    ]);
+            }
+
+            // Update sloc_tail if provided (set to null since id_sloc_tail is no longer used)
+            if (isset($data['id_sloc_tail'])) {
+                DB::connection('eudr_ts')->table('t_balance_header')
+                    ->where('id_balance_head', $id)
+                    ->update([
+                        'id_sloc_tail' => null,
                         'updated_by' => $user
                     ]);
             }
@@ -606,31 +613,28 @@ class RmEntryRepository implements RmEntryRepositoryInterface
 
             Rundown::adjustRundownToTotal($supplierRows, $qty);
 
-            // Handle id_sloc_tail - ensure it's always a JSON array
-            $tankTailVal = null;
-            if (!empty($data['id_sloc_tail'])) {
-                if (is_array($data['id_sloc_tail'])) {
-                    // Convert all values to strings and ensure they're properly formatted
-                    $tankTailVal = json_encode(array_map('strval', array_values($data['id_sloc_tail'])));
+            $slocVal = null;
+            if (!empty($data['id_sloc'])) {
+                if (is_array($data['id_sloc'])) {
+                    $slocVal = json_encode(array_map('strval', array_values($data['id_sloc'])));
                 } else {
-                    // If it's a string, try to decode it first in case it's already JSON
-                    $decoded = json_decode($data['id_sloc_tail'], true);
+                    $decoded = json_decode($data['id_sloc'], true);
                     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                        $tankTailVal = json_encode(array_map('strval', array_values($decoded)));
+                        $slocVal = json_encode(array_map('strval', array_values($decoded)));
                     } else {
-                        // Single value as string, wrap in array
-                        $tankTailVal = json_encode([(string)$data['id_sloc_tail']]);
+                        $slocVal = json_encode([(string)$data['id_sloc']]);
                     }
                 }
             }
+
             $rundownResult = Rundown::generalRundown([
                 'user' => $user,
                 'entry_date' => $data['entry_date'],
                 'from_trace_no' => null,
                 'trace_no' => $entry_no,
                 'id_material' => $data['id_material'],
-                'id_sloc' => $data['id_sloc'] ?? $data['id_tank'] ?? null,
-                'id_sloc_tail' => $tankTailVal,
+                'id_sloc' => $slocVal,
+                'id_sloc_tail' => null,
                 'in_qty' => $qty,
                 'last_qtf' => 0,
                 'curr_qtf' => $qty,
@@ -674,34 +678,42 @@ class RmEntryRepository implements RmEntryRepositoryInterface
         try {
             $entry_no = $data['entry_no'];
             $curr_entryDate = $data['entry_date'];
-            $id_tankSource = $data['source_tank'];
-            $id_tank = $data['trf_tank'];
+            $id_tankSource = is_array($data['source_tank']) ? $data['source_tank'] : [$data['source_tank']];
+            $id_tank = is_array($data['trf_tank']) ? $data['trf_tank'] : [$data['trf_tank']];
             $materialDoc = $data['material_document'] ?? null;
             $id_tankSourceNo = $data['tank_no'] ?? [];
             $id_tankNo = $data['trf_tank_no'] ?? [];
             $idPlant = $this->resolvePlantCode($data['id_plant'] ?? 0);
 
-            $id_tankSourceNo_val = !empty($id_tankSourceNo) ? (is_array($id_tankSourceNo) ? json_encode(array_values($id_tankSourceNo)) : $id_tankSourceNo) : null;
-            $id_tankNo_val = !empty($id_tankNo) ? (is_array($id_tankNo) ? json_encode(array_values($id_tankNo)) : $id_tankNo) : null;
+            $id_tankSource_json = json_encode(array_map('strval', array_values($id_tankSource)));
+            $id_tank_json = json_encode(array_map('strval', array_values($id_tank)));
 
-            $srcTankRec = DB::connection('eudr_ts')->select(
-                'SELECT id_tank AS code, description, id_plant FROM m_sloc WHERE id_sloc = ? AND status = 1 LIMIT 1',
-                [$id_tankSource]
-            );
-            $tgtTankRec = DB::connection('eudr_ts')->select(
-                'SELECT id_tank AS code FROM m_sloc WHERE id_sloc = ? AND status = 1 LIMIT 1',
-                [$id_tank]
-            );
+            $srcTankRec = DB::connection('eudr_ts')->table('m_sloc')
+                ->select('id_tank AS code', 'description', 'id_plant')
+                ->whereIn('id_sloc', $id_tankSource)
+                ->where('status', 1)
+                ->get();
+            $tgtTankRec = DB::connection('eudr_ts')->table('m_sloc')
+                ->select('id_tank AS code')
+                ->whereIn('id_sloc', $id_tank)
+                ->where('status', 1)
+                ->get();
 
-            if (empty($srcTankRec) || empty($tgtTankRec)) {
+            if ($srcTankRec->isEmpty() || $tgtTankRec->isEmpty()) {
                 throw new Exception('Invalid tank selection');
             }
 
-            $targetTankCode = $tgtTankRec[0]->code;
-            $isStorageTank = (str_contains(strtoupper($srcTankRec[0]->description), 'STORAGE'));
+            $targetTankCode = $tgtTankRec->first()->code;
+            $isStorageTank = false;
+            foreach ($srcTankRec as $rec) {
+                if (str_contains(strtoupper($rec->description), 'STORAGE')) {
+                    $isStorageTank = true;
+                    break;
+                }
+            }
             $balancePlant = $idPlant;
-            if (!$balancePlant && !empty($srcTankRec[0]->id_plant)) {
-                $balancePlant = $srcTankRec[0]->id_plant;
+            if (!$balancePlant && !empty($srcTankRec->first()->id_plant)) {
+                $balancePlant = $srcTankRec->first()->id_plant;
             }
 
             $datTempMaterial = $this->getTempData($entry_no);
@@ -722,8 +734,8 @@ class RmEntryRepository implements RmEntryRepositoryInterface
 
                 $feedParams = [
                     'id_material' => $id_material,
-                    'id_sloc' => $id_tankSource,
-                    'id_sloc_tail' => $id_tankSourceNo_val,
+                    'id_sloc' => $id_tankSource_json,
+                    'id_sloc_tail' => null,
                     'balance_plant' => $balancePlant,
                     'trace_prefixes' => ['1'],
                     'tank_matching' => 'flexible',
@@ -769,62 +781,66 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                     throw new Exception('Feed failed: ' . ($feedResult['response'] == 3 ? 'Insufficient stock' : 'Unknown error'));
                 }
 
-                foreach ($feedResult['used_heads'] as $used) {
-                    $entryFeedNo_in = $this->buildTraceNo('3', $batch_entryDate, '000', $batch_idPlant, $feedSequence);
-                    $feedSequence += 2;
+                // Aggregate supplier proportions from t_trace_detail for this transfer
+                $supplierRows = DB::connection('eudr_ts')->select(
+                    'SELECT id_supplier, batch_sap, SUM(out_qty) AS rundownSupplier
+                       FROM t_trace_detail
+                      WHERE status = 1
+                        AND id_trace_head IN (
+                            SELECT id_trace_head
+                              FROM t_trace_header
+                             WHERE status = 1
+                               AND to_trace_no = ?
+                        )
+                      GROUP BY id_supplier, batch_sap',
+                    [$this->traceNoToInt($entryTrfNo_in)]
+                );
 
-                    $in_qty = $used['qty_used'];
-                    $headDetails = $used['feed_in_details'] ?? [];
-                    if (empty($headDetails) && count($feedResult['used_heads']) === 1) {
-                        $headDetails = $feedResult['feed_in_details'] ?? [];
-                    }
+                if (empty($supplierRows)) {
+                    throw new Exception(
+                        'Supplier breakdown kosong untuk transfer ' . number_format($out_qty, 3) .
+                        ' MT. Pastikan RM entry memiliki data supplier aktif.'
+                    );
+                }
 
-                    $supplierRows = [];
-                    foreach ($headDetails as $d) {
-                        if (($d['qty'] ?? 0) <= 0) continue;
-                        $supplierRows[] = [
-                            'id_supplier' => $d['id_supplier'],
-                            'batch_sap' => $d['batch_sap'],
-                            'rundownSupplier' => round((float) $d['qty'], 4),
-                        ];
-                    }
+                $supplierRowsFormatted = [];
+                foreach ($supplierRows as $r) {
+                    $supplierRowsFormatted[] = [
+                        'id_supplier'     => $r->id_supplier,
+                        'batch_sap'       => $r->batch_sap,
+                        'rundownSupplier' => (float) $r->rundownSupplier,
+                    ];
+                }
 
-                    if (empty($supplierRows)) {
-                        throw new Exception(
-                            'Supplier breakdown kosong untuk transfer ' . number_format($in_qty, 3) .
-                            ' MT. Pastikan RM entry memiliki data supplier aktif.'
-                        );
-                    }
+                Rundown::adjustRundownToTotal($supplierRowsFormatted, $out_qty);
 
-                    Rundown::adjustRundownToTotal($supplierRows, $in_qty);
+                // Call Rundown once with the original entry_no (no loops)
+                $rundownResult = Rundown::generalRundown([
+                    'user' => $user,
+                    'entry_date' => $curr_entryDate,
+                    'trace_no' => $this->traceNoToInt($entry_no),
+                    'from_trace_no' => $this->traceNoToInt($entryTrfNo_in),
+                    'id_material' => $id_material,
+                    'id_sloc' => $id_tank_json,
+                    'id_sloc_tail' => null,
+                    'id_plant' => $idPlant,
+                    'in_qty' => $out_qty,
+                    'last_qtf' => 0,
+                    'curr_qtf' => $out_qty,
+                    'supplier_rows' => $supplierRowsFormatted,
+                ]);
 
-                    $rundownResult = Rundown::generalRundown([
-                        'user' => $user,
-                        'entry_date' => $curr_entryDate,
-                        'trace_no' => $this->traceNoToInt($entryFeedNo_in),
-                        'from_trace_no' => $this->traceNoToInt($entryTrfNo_in),
-                        'id_material' => $id_material,
-                        'id_sloc' => $id_tank,
-                        'id_sloc_tail' => $id_tankNo_val,
-                        'id_plant' => $idPlant,
-                        'in_qty' => $in_qty,
-                        'last_qtf' => 0,
-                        'curr_qtf' => $in_qty,
-                        'supplier_rows' => $supplierRows,
+                if (($rundownResult['response'] ?? 0) != 1) {
+                    throw new Exception('Rundown failed for feed tank');
+                }
+
+                if (!empty($materialDoc)) {
+                    DB::connection('eudr_ts')->table('t_material_document')->insert([
+                        'id_trace_head' => $rundownResult['id_trace_head'],
+                        'material_document' => $materialDoc,
+                        'created_by' => $user,
+                        'created_at' => now(),
                     ]);
-
-                    if (($rundownResult['response'] ?? 0) != 1) {
-                        throw new Exception('Rundown failed for feed tank');
-                    }
-
-                    if (!empty($materialDoc)) {
-                        DB::connection('eudr_ts')->table('t_material_document')->insert([
-                            'id_trace_head' => $rundownResult['id_trace_head'],
-                            'material_document' => $materialDoc,
-                            'created_by' => $user,
-                            'created_at' => now(),
-                        ]);
-                    }
                 }
             }
 
@@ -1019,28 +1035,26 @@ class RmEntryRepository implements RmEntryRepositoryInterface
         $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date,
                          a.from_trace_no, a.to_trace_no,
                          c.code AS material_code, c.description AS material_name,
-                         d.description AS tank_description,
-                         d.id_sloc AS main_sloc_id,
-                         a.id_sloc_tail AS trace_sloc_tail, a.id_tank_tail AS trace_tank_tail,
-                         bh.id_sloc_tail AS balance_sloc_tail,
+                         MIN(d.description) AS tank_description,
+                         GROUP_CONCAT(DISTINCT d.id_tank ORDER BY d.id_tank ASC SEPARATOR ' & ') AS tank_numbers,
+                         MIN(d.id_sloc) AS main_sloc_id,
                          FORMAT(a.in_qty, 3) AS in_qty,
                          FORMAT(a.out_qty, 3) AS out_qty,
                          a.created_by, a.created_at,
-                         md.material_document, md.po_so, p.code AS plant_code,
-                         (
-                            SELECT GROUP_CONCAT(h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & ')
-                            FROM m_sloc_detail h
-                            WHERE h.status = 1
-                              AND FIND_IN_SET(h.id_sloc_tail, REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(bh.id_sloc_tail, a.id_sloc_tail, a.id_tank_tail, '[]'), '[', ''), ']', ''), '\"', ''), ' ', '')) > 0
-                         ) AS sub_slocs
+                         md.material_document, md.po_so, p.code AS plant_code
                     FROM t_trace_header a
                     JOIN m_material c ON a.id_material = c.id_material
-                    JOIN m_sloc d ON (a.id_sloc = d.id_sloc) OR (a.id_sloc IS NULL AND a.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = d.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = d.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))
+                    LEFT JOIN m_sloc d ON (
+                          (a.id_sloc = d.id_sloc)
+                          OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))
+                          OR JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR))
+                          
+                     )
                     LEFT JOIN t_balance_header bh ON a.id_balance_head = bh.id_balance_head
                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
                     LEFT JOIN m_plant p ON d.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                    WHERE a.status = 1
-                     AND d.description LIKE '%Storage%'
+                     AND (d.description IS NULL OR d.description LIKE '%Storage%')
                      AND (CAST(? AS CHAR) = '0' OR CAST(d.id_plant AS CHAR) = CAST(? AS CHAR))
                    GROUP BY a.id_trace_head
                    ORDER BY a.id_trace_head DESC";
@@ -1048,13 +1062,12 @@ class RmEntryRepository implements RmEntryRepositoryInterface
         $results = DB::connection('eudr_ts')->select($query, [$plantId, $plantId]);
 
         foreach ($results as &$row) {
-            $subSlocs = $row->sub_slocs ?? '';
-            if (!empty($subSlocs)) {
-                $row->tank_name = $row->tank_description . ' | ' . $subSlocs;
+            if (!empty($row->tank_numbers)) {
+                $row->tank_name = $row->tank_description . ' | ' . $row->tank_numbers;
             } else {
                 $row->tank_name = $row->tank_description;
             }
-            unset($row->sub_slocs);
+            unset($row->tank_numbers);
         }
 
         return $results;
@@ -1148,45 +1161,44 @@ class RmEntryRepository implements RmEntryRepositoryInterface
         DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $query = "SELECT
-                         a.id_balance_head,
-                         MIN(a.id_trace_head) as id_trace_head,
-                         a.entry_date,
-                         a.to_trace_no,
-                         COALESCE(GROUP_CONCAT(DISTINCT th.from_trace_no ORDER BY th.from_trace_no ASC SEPARATOR ', '), a.from_trace_no) as from_trace_no_agg,
-                         c.code AS material_code, c.description AS material_name,
-                         d.description AS tank_description,
-                         d.id_sloc AS main_sloc_id,
-                         FORMAT(SUM(a.in_qty), 3) AS in_qty,
-                         FORMAT(SUM(a.out_qty), 3) AS out_qty,
-                         MIN(a.created_by) AS created_by,
-                         MIN(a.created_at) AS created_at,
-                         md.material_document, md.po_so, p.code AS plant_code,
-                         (
-                            SELECT GROUP_CONCAT(h.tf_number ORDER BY h.tf_number ASC SEPARATOR ' & ')
-                            FROM m_sloc_detail h
-                            WHERE h.status = 1
-                              AND FIND_IN_SET(h.id_sloc_tail, REPLACE(REPLACE(REPLACE(REPLACE(COALESCE(bh.id_sloc_tail, a.id_sloc_tail, a.id_tank_tail, '[]'), '[', ''), ']', ''), '\"', ''), ' ', '')) > 0
-                         ) AS sub_slocs
-                    FROM t_trace_header a
-                    LEFT JOIN t_trace_header th ON a.from_trace_no = th.to_trace_no
-                    JOIN m_material c ON a.id_material = c.id_material
-                    JOIN m_sloc d ON (a.id_sloc = d.id_sloc) OR (a.id_sloc IS NULL AND a.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = d.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = d.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))
-                    LEFT JOIN t_balance_header bh ON a.id_balance_head = bh.id_balance_head
-                    LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
-                    LEFT JOIN m_plant p ON d.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
-                   WHERE a.status = 1
-                     AND d.description LIKE CONCAT('%', ?, '%')
-                     AND (CAST(? AS CHAR) = '0' OR CAST(d.id_plant AS CHAR) = CAST(? AS CHAR))
-                   GROUP BY a.id_balance_head, a.to_trace_no, a.entry_date, c.code, c.description,
-                            d.description, d.id_sloc, md.material_document, md.po_so, p.code
-                   ORDER BY MIN(a.id_trace_head) DESC";
+                          a.id_balance_head,
+                          MIN(a.id_trace_head) as id_trace_head,
+                          a.entry_date,
+                          a.to_trace_no,
+                          COALESCE(GROUP_CONCAT(DISTINCT th.from_trace_no ORDER BY th.from_trace_no ASC SEPARATOR ', '), a.from_trace_no) as from_trace_no_agg,
+                          c.code AS material_code, c.description AS material_name,
+                          MIN(d.description) AS tank_description,
+                          GROUP_CONCAT(DISTINCT d.id_tank ORDER BY d.id_tank ASC SEPARATOR ' & ') AS tank_numbers,
+                          MIN(d.id_sloc) AS main_sloc_id,
+                          FORMAT(MAX(a.in_qty), 3) AS in_qty,
+                          FORMAT(MAX(a.out_qty), 3) AS out_qty,
+                          MIN(a.created_by) AS created_by,
+                          MIN(a.created_at) AS created_at,
+                          md.material_document, md.po_so, p.code AS plant_code
+                     FROM t_trace_header a
+                     LEFT JOIN t_trace_header th ON a.from_trace_no = th.to_trace_no
+                     JOIN m_material c ON a.id_material = c.id_material
+                     LEFT JOIN m_sloc d ON (
+                          (a.id_sloc = d.id_sloc)
+                          OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))
+                          OR JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR))
+                          
+                     )
+                     LEFT JOIN t_balance_header bh ON a.id_balance_head = bh.id_balance_head
+                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
+                     LEFT JOIN m_plant p ON d.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+                    WHERE a.status = 1
+                      AND (d.description IS NULL OR d.description LIKE CONCAT('%', ?, '%'))
+                      AND (CAST(? AS CHAR) = '0' OR CAST(d.id_plant AS CHAR) = CAST(? AS CHAR))
+                    GROUP BY a.id_balance_head, a.to_trace_no, a.entry_date, c.code, c.description,
+                             md.material_document, md.po_so, p.code
+                    ORDER BY MIN(a.id_trace_head) DESC";
 
         $results = DB::connection('eudr_ts')->select($query, [$tankType, $plantId, $plantId]);
 
         foreach ($results as &$row) {
-            $subSlocs = $row->sub_slocs ?? '';
-            if (!empty($subSlocs)) {
-                $row->tank_name = $row->tank_description . ' | ' . $subSlocs;
+            if (!empty($row->tank_numbers)) {
+                $row->tank_name = $row->tank_description . ' | ' . $row->tank_numbers;
             } else {
                 $row->tank_name = $row->tank_description;
             }
@@ -1201,7 +1213,7 @@ class RmEntryRepository implements RmEntryRepositoryInterface
                 $row->trace_pairs_array = [];
             }
             $row->from_trace_no = $row->from_trace_no_agg;
-            unset($row->sub_slocs);
+            unset($row->tank_numbers);
             unset($row->from_trace_no_agg);
         }
 

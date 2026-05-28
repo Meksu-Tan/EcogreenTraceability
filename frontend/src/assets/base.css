@@ -1,39 +1,64 @@
-/* color palette from <https://github.com/vuejs/theme> */
+/* ============================================================
+   ECOGREEN OLEOCHEMICALS — Design Tokens
+   Imported from design system
+   ============================================================ */
+
+/* ── Google Fonts (from design system) ────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Montserrat:wght@400;500;600;700;800&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap');
+
+/* ── Color Palette from Design System ──────────────────────── */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-white-soft: #f8f8f8;
-  --vt-c-white-mute: #f2f2f2;
+  /* Primary greens */
+  --color-green-900: #1C3220;
+  --color-green-800: #1E5C20;
+  --color-green-700: #2A8030;
+  --color-green-600: #339935;
+  --color-green-500: #42B240;
+  --color-green-400: #65C463;
+  --color-green-300: #90D58E;
+  --color-green-200: #BDE8BC;
+  --color-green-100: #E2F6E2;
+  --color-green-50: #F3FBF3;
 
-  --vt-c-black: #181818;
-  --vt-c-black-soft: #222222;
-  --vt-c-black-mute: #282828;
+  /* Accent amber */
+  --color-amber-700: #9A5E1A;
+  --color-amber-500: #C8873A;
+  --color-amber-300: #E8B878;
+  --color-amber-100: #FDF3E3;
 
-  --vt-c-indigo: #2c3e50;
+  /* Neutrals */
+  --color-neutral-950: #0F1410;
+  --color-neutral-900: #1C2420;
+  --color-neutral-800: #2E3730;
+  --color-neutral-700: #445048;
+  --color-neutral-600: #5A6860;
+  --color-neutral-500: #768078;
+  --color-neutral-400: #97A49C;
+  --color-neutral-300: #B8C4BC;
+  --color-neutral-200: #D4DDD8;
+  --color-neutral-100: #EBF0EC;
+  --color-neutral-50: #F7F4EF;
+  --color-white: #FFFFFF;
 
-  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
-  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
-  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
-  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
+  /* Semantic colors */
+  --color-success: #2E7D32;
+  --color-warning: #E65100;
+  --color-error: #C62828;
+  --color-info: #01579B;
 
-  --vt-c-text-light-1: var(--vt-c-indigo);
-  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
-  --vt-c-text-dark-1: var(--vt-c-white);
-  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
-}
+  /* Semantic tokens */
+  --color-background: var(--color-white);
+  --color-background-soft: var(--color-neutral-50);
+  --color-background-mute: var(--color-green-100);
+  --color-border: var(--color-neutral-200);
+  --color-border-hover: var(--color-neutral-300);
+  --color-heading: var(--color-neutral-900);
+  --color-text: var(--color-neutral-900);
 
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-white-soft);
-  --color-background-mute: var(--vt-c-white-mute);
-
-  --color-border: var(--vt-c-divider-light-2);
-  --color-border-hover: var(--vt-c-divider-light-1);
-
-  --color-heading: var(--vt-c-text-light-1);
-  --color-text: var(--vt-c-text-light-1);
-
-  --section-gap: 160px;
+  /* Typography */
+  --font-display: 'Montserrat', sans-serif;
+  --font-body: 'Source Sans 3', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -66,20 +91,8 @@ body {
     color 0.5s,
     background-color 0.5s;
   line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
-  font-size: 15px;
+  font-family: var(--font-body);
+  font-size: 16px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

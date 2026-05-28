@@ -51,7 +51,7 @@ onMounted(async () => {
     await store.fetchPackagings()
     await store.fetchSourceProducts()
   } catch (error) {
-    console.error('Failed to fetch packaging data:', error)
+    toastStore.error('Failed to fetch packaging data:', error)
   }
 })
 

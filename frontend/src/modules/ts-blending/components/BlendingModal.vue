@@ -60,6 +60,8 @@
                 </div>
               </div>
 
+
+
               <!-- Row 2: Material + Tank -->
               <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
                 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:gap-6">
@@ -85,28 +87,32 @@
                       class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
                     >
                       <option value="">- Select Tank -</option>
-                      <option v-for="tank in blendingStore.activeTanks" :key="tank.id_tank" :value="tank.id_tank">
+                      <option v-for="tank in blendingStore.allTanks" :key="tank.id_tank" :value="tank.id_tank">
                         {{ tank.tank || tank.description }}
                       </option>
                     </select>
                   </div>
                   <div class="space-y-1.5">
                     <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Specific Storage Location</label>
-                    <div class="max-h-32 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
-                      <div v-if="specificTanks.length === 0" class="px-2 py-1 text-xs text-slate-400">No specific sloc</div>
-                      <label
-                        v-for="tank in specificTanks"
-                        :key="tank.id_tank_tail"
-                        class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer rounded"
-                      >
-                        <input
-                          type="checkbox"
-                          :value="String(tank.id_tank_tail)"
-                          v-model="selectedTankTails"
-                          class="h-3.5 w-3.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span class="text-xs text-slate-700">{{ tank.tankNo || tank.tf_number }}</span>
-                      </label>
+                    <div class="max-h-32 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-inner">
+                      <div v-if="specificTanks.length === 0" class="px-2 py-2 text-center text-xs text-slate-400 italic">
+                        {{ form.id_tank ? 'No specific sloc' : 'Select a tank first' }}
+                      </div>
+                      <div v-else class="grid grid-cols-2 gap-1.5">
+                        <label
+                          v-for="tank in specificTanks"
+                          :key="tank.id_tank_tail"
+                          class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-white px-2 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-green-200 hover:bg-green-50/50"
+                        >
+                          <input
+                            type="checkbox"
+                            :value="String(tank.id_tank_tail)"
+                            v-model="selectedTankTails"
+                            class="h-3.5 w-3.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
+                          />
+                          <span>{{ tank.tankNo || tank.tf_number }}</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -188,13 +194,14 @@
     :mode="mode"
     :id-head="form.idHead"
     :id-tank="form.id_tank"
+    :id-plant="activePlantId"
     @success="onSourceMaterialInserted"
   />
 </template>
 
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
 import { useTsBlendingStore } from '../stores'
 import BlendingSourceMaterialModal from './BlendingSourceMaterialModal.vue'
 
@@ -205,6 +212,7 @@ const props = defineProps({
 const emit = defineEmits(['update:isOpen', 'success'])
 
 const plantSelectionStore = usePlantSelectionStore()
+const setupPlantStore = useSetupPlantStore()
 const blendingStore = useTsBlendingStore()
 
 const mode = 'ADD'
@@ -212,6 +220,21 @@ const formError = ref(null)
 const isSourceModalOpen = ref(false)
 const selectedTankTails = ref([])
 const specificTanks = ref([])
+
+const isAllPlant = computed(() => plantSelectionStore.selectedPlantId === null)
+
+const activePlantId = computed(() => {
+  if (!isAllPlant.value) {
+    return plantSelectionStore.selectedPlantId
+  }
+  if (form.id_tank) {
+    const tank = blendingStore.allTanks.find(t => String(t.id_tank) === String(form.id_tank))
+    if (tank && tank.id_plant) {
+      return tank.id_plant
+    }
+  }
+  return 0
+})
 
 const form = reactive({
   entry_no: '',
@@ -229,12 +252,13 @@ const formattedTotalQty = computed(() => {
 
 async function bootstrap() {
   formError.value = null
-  const plantId = plantSelectionStore.selectedPlantId
+  const plantId = activePlantId.value
 
   try {
     // Load all needed data
     await Promise.all([
       blendingStore.fetchActiveMaterials(),
+      blendingStore.fetchAllTanks({ id_plant: plantSelectionStore.selectedPlantId || 0 })
     ])
 
     // Clear form for ADD mode
@@ -254,7 +278,7 @@ async function bootstrap() {
 }
 
 async function onMaterialChange() {
-  const plantId = plantSelectionStore.selectedPlantId
+  const plantId = activePlantId.value
 
   if (!form.id_material) return
 
@@ -268,16 +292,18 @@ async function onMaterialChange() {
       form.entry_no = entryResponse.data[0].entryNo
     }
 
-    // Load tanks for this material
+    // Auto-select matching tank from allTanks if available
     await blendingStore.fetchActiveTanksRundown({
       idMaterial: form.id_material,
-      id_plant: plantId
+      id_plant: plantSelectionStore.selectedPlantId || 0
     })
-
-    // Auto-select first tank
     if (blendingStore.activeTanks.length > 0) {
-      form.id_tank = blendingStore.activeTanks[0].id_tank
-      await onTankChange()
+      const matchingTankId = blendingStore.activeTanks[0].id_tank
+      const found = blendingStore.allTanks.find(t => Number(t.id_tank) === Number(matchingTankId))
+      if (found) {
+        form.id_tank = found.id_tank
+        await onTankChange()
+      }
     }
 
     // Load material list for this entry
@@ -289,21 +315,39 @@ async function onMaterialChange() {
 }
 
 async function onTankChange() {
+  if (form.id_material && form.id_tank) {
+    try {
+      const entryResponse = await blendingStore.fetchNewEntryNo({
+        id_plant: activePlantId.value,
+        id_material: form.id_material
+      })
+      if (entryResponse?.data?.[0]?.entryNo) {
+        form.entry_no = entryResponse.data[0].entryNo
+      }
+    } catch (e) {}
+  }
+
   if (form.id_tank) {
     try {
       const response = await blendingStore.fetchActiveSpecificTanksRundown({ sloc: form.id_tank })
       specificTanks.value = response?.data || []
+      if (specificTanks.value.length === 1) {
+        selectedTankTails.value = [String(specificTanks.value[0].id_tank_tail)]
+      } else {
+        selectedTankTails.value = []
+      }
     } catch (err) {
       specificTanks.value = []
     }
   } else {
     specificTanks.value = []
+    selectedTankTails.value = []
   }
 }
 
 async function refreshMaterialList() {
   if (!form.entry_no) return
-  const plantId = plantSelectionStore.selectedPlantId
+  const plantId = activePlantId.value
   await blendingStore.fetchMaterialList({
     mode: mode,
     entryNo: form.entry_no,
@@ -313,7 +357,7 @@ async function refreshMaterialList() {
 
 async function refreshTotalQty() {
   if (!form.entry_no) return
-  const plantId = plantSelectionStore.selectedPlantId
+  const plantId = activePlantId.value
   await blendingStore.fetchTotalQtyMaterial({
     mode: mode,
     entryNo: form.entry_no,
@@ -347,7 +391,7 @@ async function removeMaterial(item) {
 
 async function handleSubmit() {
   formError.value = null
-  const plantId = plantSelectionStore.selectedPlantId
+  const plantId = activePlantId.value
 
   if (blendingStore.materialList.length === 0) {
     formError.value = 'No source materials added'

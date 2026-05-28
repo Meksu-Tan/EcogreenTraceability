@@ -11,6 +11,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
   const activeMaterials = ref([])
   const activeTanks = ref([])
   const activeSpecificTanks = ref([])
+  const tanks = ref([])
+  const tankDetails = ref([])
+  const allTanks = ref([])
   const currentEntryNo = ref('')
   const totalStock = ref(0)
   const totalQty = ref(0)
@@ -51,7 +54,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       currentEntryNo.value = response?.data?.[0]?.entryNo || ''
       return response
     } catch (err) {
-      console.error('Failed to generate entry no:', err)
+      toastStore.error('Failed to generate entry no:', err)
       throw err
     }
   }
@@ -107,6 +110,39 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       return response
     } catch (err) {
       console.error('Failed to fetch specific tanks:', err)
+      throw err
+    }
+  }
+
+  async function fetchTanks(params = {}) {
+    try {
+      const response = await blendingApi.getTanks(params)
+      tanks.value = response?.data || []
+      return response
+    } catch (err) {
+      console.error('Failed to fetch tanks:', err)
+      throw err
+    }
+  }
+
+  async function fetchTankDetails(tankId, params = {}) {
+    try {
+      const response = await blendingApi.getTankDetails(tankId, params)
+      tankDetails.value = response?.data || []
+      return response
+    } catch (err) {
+      console.error('Failed to fetch tank details:', err)
+      throw err
+    }
+  }
+
+  async function fetchAllTanks(params = {}) {
+    try {
+      const response = await blendingApi.getAllTanks(params)
+      allTanks.value = response?.data || []
+      return response
+    } catch (err) {
+      console.error('Failed to fetch all tanks:', err)
       throw err
     }
   }
@@ -237,6 +273,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     activeMaterials,
     activeTanks,
     activeSpecificTanks,
+    tanks,
+    tankDetails,
+    allTanks,
     currentEntryNo,
     totalStock,
     totalQty,
@@ -251,6 +290,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     fetchMaterialList,
     fetchActiveTanksRundown,
     fetchActiveSpecificTanksRundown,
+    fetchTanks,
+    fetchTankDetails,
+    fetchAllTanks,
     addMaterialToBlending,
     executeBlending,
     deleteBlendingMaterial,

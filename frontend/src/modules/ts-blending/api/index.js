@@ -51,5 +51,20 @@ export default {
   async getActiveSpecificTanksRundown(params = {}) {
     const response = await api.get(`${BASE_URL}/active-specific-tanks-rundown`, { params })
     return response.data
+  },
+
+  async getTanks(params = {}) {
+    const response = await api.get(`${BASE_URL}/tanks`, { params })
+    return response.data
+  },
+
+  async getTankDetails(tankId, params = {}) {
+    const response = await api.get(`${BASE_URL}/tanks/${tankId}/details`, { params })
+    return response.data
+  },
+
+  async getAllTanks(params = {}) {
+    const response = await api.get(`${BASE_URL}/all-tanks`, { params })
+    return response.data
   }
 }

@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\TsRaw\Http\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -14,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Helpers\ApiResponse;
 
 class RmEntryController extends Controller
 {
@@ -205,26 +205,17 @@ class RmEntryController extends Controller
                 $tanksQuery->where('id_plant', $plantId);
             }
             $tanks = $tanksQuery->get();
-            $tankIds = $tanks->pluck('id_sloc')->toArray();
 
-            $details = TankDetail::active()
-                ->whereIn('id_sloc', $tankIds)
-                ->orderBy('tf_number')
-                ->get(['id_sloc_tail as id_tank_tail', 'tf_number as tankNo', 'id_sloc']);
-
-            $detailsSlocIds = $details->pluck('id_sloc')->toArray();
-            $virtualDetails = [];
+            $result = [];
             foreach ($tanks as $tank) {
-                if (!in_array($tank->id_sloc, $detailsSlocIds) && !empty($tank->id_tank)) {
-                    $virtualDetails[] = [
-                        'id_tank_tail' => 's_' . $tank->id_sloc,
+                if (!empty($tank->id_tank)) {
+                    $result[] = [
+                        'id_tank_tail' => $tank->id_sloc, // compatible with frontend id_tank_tail expecting individual tank identifier
                         'tankNo' => $tank->id_tank,
                         'id_sloc' => $tank->id_sloc
                     ];
                 }
             }
-
-            $result = array_merge($details->toArray(), $virtualDetails);
 
             usort($result, function($a, $b) {
                 return strcmp($a['tankNo'], $b['tankNo']);
@@ -412,8 +403,8 @@ class RmEntryController extends Controller
         $validator = Validator::make($request->all(), [
             'entry_date' => 'required|date',
             'entry_no' => 'required|string',
-            'source_tank' => 'required|integer',
-            'trf_tank' => 'required|integer',
+            'source_tank' => 'required',
+            'trf_tank' => 'required',
             'tank_no' => 'present|array',
             'trf_tank_no' => 'present|array',
             'material_document' => 'nullable|string',

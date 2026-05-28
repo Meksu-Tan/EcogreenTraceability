@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Manufacturer\Http\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -8,6 +7,7 @@ use Modules\Manufacturer\Http\Requests\StoreManufacturerRequest;
 use Modules\Manufacturer\Http\Requests\UpdateManufacturerRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Helpers\ApiResponse;
 
 class ManufacturerController extends Controller
 {
@@ -17,12 +17,12 @@ class ManufacturerController extends Controller
 
     public function index(): JsonResponse
     {
-        return response()->json(['status' => 1, 'data' => $this->manufacturerService->listManufacturers()]);
+        return ApiResponse::success($this->manufacturerService->listManufacturers(), 'OK', 200);
     }
 
     public function active(): JsonResponse
     {
-        return response()->json(['status' => 1, 'data' => $this->manufacturerService->getActiveManufacturers()]);
+        return ApiResponse::success($this->manufacturerService->getActiveManufacturers(), 'OK', 200);
     }
 
     public function store(StoreManufacturerRequest $request): JsonResponse

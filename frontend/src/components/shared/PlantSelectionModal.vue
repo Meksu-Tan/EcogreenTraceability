@@ -116,10 +116,10 @@ defineExpose({ open, close })
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 10px;
+  background: var(--color-neutral-200);
+  border-radius: var(--radius-xl);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: var(--color-neutral-300);
 }
 </style>

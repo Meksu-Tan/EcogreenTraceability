@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\TsBlending\Services;
 
 use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
@@ -25,31 +24,37 @@ class BlendingService
 
     public function generateEntryNo(int $materialId, int $plantId): ?string
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->generateBlendingEntryNo($materialId, $plantId);
     }
 
     public function getTotalStockMaterial(int $materialId, int $plantId): float
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->getTotalStockMaterial($materialId, $plantId);
     }
 
     public function getTotalQtyMaterial(string $mode, string $entryNo, ?int $idHead, int $plantId): float
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->getTotalQtyMaterial($mode, $entryNo, $idHead, $plantId);
     }
 
     public function getMaterialList(string $mode, string $entryNo, ?int $idHead, int $plantId)
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->getMaterialList($mode, $entryNo, $idHead, $plantId);
     }
 
     public function getBlendingList(int $plantId)
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->getBlendingList($plantId);
     }
 
     public function getActiveTanksRundown(int $materialId, int $plantId)
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->getActiveTanksRundown($materialId, $plantId);
     }
 
@@ -58,11 +63,30 @@ class BlendingService
         return $this->blendingRepo->getActiveSpecificTanksRundown($sloc);
     }
 
+    public function getTanks(?int $plantId = null)
+    {
+        $plantId = $plantId ? (int) $this->resolvePlantCode($plantId) : null;
+        return $this->blendingRepo->getTanks($plantId);
+    }
+
+    public function getTankDetails(string $tankDescription, ?int $plantId = null)
+    {
+        $plantId = $plantId ? (int) $this->resolvePlantCode($plantId) : null;
+        return $this->blendingRepo->getTankDetails($tankDescription, $plantId);
+    }
+
+    public function getAllTanks(int $plantId)
+    {
+        $plantId = (int) $this->resolvePlantCode($plantId);
+        return $this->blendingRepo->getAllTanks($plantId);
+    }
+
     public function addMaterialToBlending(string $user, array $data, int $plantId): array
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         $entryNo = $data['entryNo'];
         $idMaterial = $data['idMaterialSource'];
-        $qty = (float) str_replace(',', '', $data['qty']);
+        $qty = (float) str_replace(',', '', (string)$data['qty']);
         $idTank = $data['idTank'];
         $mode = $data['mode'];
 
@@ -97,11 +121,12 @@ class BlendingService
 
     public function executeBlending(string $user, array $data, int $plantId): array
     {
+        $plantId = (int) $this->resolvePlantCode($plantId);
         $entryNo = $data['entry_no'];
         $entryDate = $data['entry_date'];
         $idMaterial = $data['id_material'];
         $materialDoc = $data['material_doc'];
-        $totalQty = (float) str_replace(',', '', $data['qty']);
+        $totalQty = (float) str_replace(',', '', (string)$data['qty']);
         $id_tank_tail = $data['tankNo'] ?? [];
         $id_tank_tail_json = json_encode($id_tank_tail);
 
@@ -127,10 +152,11 @@ class BlendingService
 
         try {
             DB::connection('eudr_ts')->beginTransaction();
+            DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
             // Feed each material from temporary
             foreach ($datMaterial as $row) {
-                $qtySource = (float) str_replace(',', '', $row->qty);
+                $qtySource = (float) str_replace(',', '', (string)$row->qty);
                 if ($qtySource <= 0) continue;
 
                 $feedResult = Feed::generalFeed([
@@ -148,7 +174,15 @@ class BlendingService
 
                 if ($feedResult['response'] != 1) {
                     DB::connection('eudr_ts')->rollBack();
-                    return ['response' => $feedResult['response']];
+                    \Log::error('Blending execute: Feed failed', [
+                        'entryNo' => $entryNo,
+                        'id_material' => $row->id_material,
+                        'feedResult' => $feedResult
+                    ]);
+                    return [
+                        'response' => $feedResult['response'],
+                        'error_detail' => 'Feed failed for material ' . $row->id_material . ' (code ' . $feedResult['response'] . ')'
+                    ];
                 }
             }
 
@@ -219,7 +253,12 @@ class BlendingService
 
             if (empty($supplierRows)) {
                 DB::connection('eudr_ts')->rollBack();
-                return ['response' => 6];
+                \Log::error('Blending execute: No supplier rows found', [
+                    'entryNo' => $entryNo,
+                    'feed_entry_no' => $feed_entry_no,
+                    'datTraceHead' => $datTraceHead
+                ]);
+                return ['response' => 6, 'error_detail' => 'No supplier rows found in trace header details'];
             }
 
             $supplierRows = array_values($supplierRows);
@@ -235,7 +274,11 @@ class BlendingService
 
             if (!isset($datTank[0]->id_tank)) {
                 DB::connection('eudr_ts')->rollBack();
-                return ['response' => 6];
+                \Log::error('Blending execute: Target tank not found', [
+                    'idMaterial' => $idMaterial,
+                    'plantId' => $plantId
+                ]);
+                return ['response' => 6, 'error_detail' => 'Target tank not found for material ' . $idMaterial];
             }
 
             $id_tank = $datTank[0]->id_tank;
@@ -259,7 +302,11 @@ class BlendingService
 
             if ($rundownResult['response'] != 1) {
                 DB::connection('eudr_ts')->rollBack();
-                return ['response' => 3];
+                \Log::error('Blending execute: Rundown failed', [
+                    'entryNo' => $entryNo,
+                    'rundownResult' => $rundownResult
+                ]);
+                return ['response' => 3, 'error_detail' => 'Rundown execution failed: status ' . $rundownResult['response']];
             }
 
             // Create material document
@@ -270,8 +317,12 @@ class BlendingService
 
             DB::connection('eudr_ts')->commit();
             return ['response' => 1];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::connection('eudr_ts')->rollBack();
+            \Log::error('Blending execute exception', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return ['response' => 0, 'message' => $e->getMessage()];
         }
     }

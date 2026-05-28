@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\Plant\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\Plant\Services\PlantService;
 use Modules\Plant\Http\Requests\StorePlantRequest;
@@ -18,7 +19,7 @@ class PlantController extends Controller
     public function index(): JsonResponse
     {
         $plants = $this->plantService->listPlants();
-        return response()->json(['status' => 1, 'data' => $plants]);
+        return ApiResponse::success($plants, 'OK', 200);
     }
 
     public function store(StorePlantRequest $request): JsonResponse
@@ -28,7 +29,9 @@ class PlantController extends Controller
             'created_by' => $request->user()->name ?? 'System'
         ]));
 
-        return response()->json($result, $result['status'] === 1 ? 201 : 400);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Plant created.', 201)
+            : ApiResponse::error('Failed to create plant.', 400);
     }
 
     public function update(UpdatePlantRequest $request, int $id): JsonResponse
@@ -38,7 +41,9 @@ class PlantController extends Controller
             'updated_by' => $request->user()->name ?? 'System'
         ]));
 
-        return response()->json($result, $result['status'] === 1 ? 200 : 400);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Plant updated.', 200)
+            : ApiResponse::error('Failed to update plant.', 400);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -50,6 +55,8 @@ class PlantController extends Controller
             ? $this->plantService->activatePlant($id, $user)
             : $this->plantService->deactivatePlant($id, $user);
 
-        return response()->json($result, $result['status'] === 1 ? 200 : 400);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Plant ' . ($action === 'activate' ? 'activated.' : 'deactivated.'), 200)
+            : ApiResponse::error('Failed to ' . $action . ' plant.', 400);
     }
 }

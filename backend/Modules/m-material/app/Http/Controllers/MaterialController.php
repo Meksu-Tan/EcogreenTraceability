@@ -1,7 +1,8 @@
-<?php
+<?php declare(strict_types=1);
 
 namespace Modules\Material\Http\Controllers;
 
+use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\Material\Http\Requests\StoreMaterialRequest;
 use Modules\Material\Http\Requests\UpdateMaterialRequest;
@@ -25,10 +26,7 @@ class MaterialController extends Controller
      */
     public function index(): JsonResponse
     {
-        return response()->json([
-            'status' => 1,
-            'data'   => $this->materialService->listMaterials(),
-        ]);
+        return ApiResponse::success($this->materialService->listMaterials(), 'OK', 200);
     }
 
     /**
@@ -40,7 +38,9 @@ class MaterialController extends Controller
             'created_by' => $request->user()->name,
         ]);
         $result = $this->materialService->storeMaterial($data);
-        return response()->json($result, $result['status'] === 1 ? 201 : 422);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Material created.', 201)
+            : ApiResponse::error('Failed to create material.', 422);
     }
 
     /**
@@ -52,7 +52,9 @@ class MaterialController extends Controller
             'updated_by' => $request->user()->name,
         ]);
         $result = $this->materialService->updateMaterial($id, $data);
-        return response()->json($result, $result['status'] === 1 ? 200 : 422);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Material updated.', 200)
+            : ApiResponse::error('Failed to update material.', 422);
     }
 
     /**
@@ -68,7 +70,9 @@ class MaterialController extends Controller
             ? $this->materialService->activateMaterial($id, $user)
             : $this->materialService->deactivateMaterial($id, $user);
 
-        return response()->json($result);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Material ' . ($action === 'activate' ? 'activated.' : 'deactivated.'), 200)
+            : ApiResponse::error('Failed to ' . $action . ' material.', 422);
     }
 
     // -----------------------------------------------------------------------
@@ -80,10 +84,7 @@ class MaterialController extends Controller
      */
     public function indexPackaging(): JsonResponse
     {
-        return response()->json([
-            'status' => 1,
-            'data'   => $this->materialService->listPackagings(),
-        ]);
+        return ApiResponse::success($this->materialService->listPackagings(), 'OK', 200);
     }
 
     /**
@@ -91,10 +92,7 @@ class MaterialController extends Controller
      */
     public function sourceProducts(): JsonResponse
     {
-        return response()->json([
-            'status' => 1,
-            'data'   => $this->materialService->getActiveSourceProducts(),
-        ]);
+        return ApiResponse::success($this->materialService->getActiveSourceProducts(), 'OK', 200);
     }
 
     /**
@@ -106,7 +104,9 @@ class MaterialController extends Controller
             'created_by' => $request->user()->name,
         ]);
         $result = $this->materialService->storePackaging($data);
-        return response()->json($result, $result['status'] === 1 ? 201 : 422);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Packaging created.', 201)
+            : ApiResponse::error('Failed to create packaging.', 422);
     }
 
     /**
@@ -118,7 +118,9 @@ class MaterialController extends Controller
             'updated_by' => $request->user()->name,
         ]);
         $result = $this->materialService->updatePackaging($id, $data);
-        return response()->json($result);
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Packaging updated.', 200)
+            : ApiResponse::error('Failed to update packaging.', 422);
     }
 
     /**
@@ -131,6 +133,9 @@ class MaterialController extends Controller
         $result = $action === 'activate'
             ? $this->materialService->activatePackaging($id, $user)
             : $this->materialService->deactivatePackaging($id, $user);
-        return response()->json($result);
+
+        return $result['status'] === 1
+            ? ApiResponse::success($result, 'Packaging ' . ($action === 'activate' ? 'activated.' : 'deactivated.'), 200)
+            : ApiResponse::error('Failed to ' . $action . ' packaging.', 422);
     }
 }

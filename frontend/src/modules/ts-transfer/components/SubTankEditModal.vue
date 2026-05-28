@@ -4,9 +4,9 @@
       <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
         <div class="fixed inset-0 z-[1] bg-black/40 backdrop-blur-sm" aria-hidden="true" @click="closeModal" />
         <div class="relative z-[2] mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white text-left shadow-xl">
-          <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-blue-600 to-blue-600 px-6 py-4">
+          <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 to-green-600 px-6 py-4">
             <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100/90">Sloc</p>
+              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">Sloc</p>
               <h3 class="text-lg font-bold text-white">Assign Specific Sloc (Sub Tank)</h3>
             </div>
             <button type="button" @click="closeModal" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25">
@@ -41,7 +41,7 @@
               <p v-if="errorMsg" class="mt-2 text-sm text-red-600">{{ errorMsg }}</p>
               <div class="mt-6 flex items-center justify-end gap-3">
                 <button type="button" @click="closeModal" class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Cancel</button>
-                <button type="submit" :disabled="loading" class="rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:bg-slate-300">
+                <button type="submit" :disabled="loading" class="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-green-700 disabled:bg-slate-300">
                   <svg v-if="loading" class="animate-spin -ml-1 mr-2 h-4 w-4 inline" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -60,6 +60,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useTsTransferStore } from '../stores'
+import transferApi from '../api'
 
 const props = defineProps({
   isOpen: Boolean,
@@ -82,11 +83,11 @@ const errorMsg = ref('')
 async function bootstrap() {
   errorMsg.value = ''
   loadingTanks.value = true
-  selectedTails.value = [...props.idTankTail.map(String)]
+  selectedTails.value = props.idTankTail.map(String)
 
   try {
-    await transferStore.fetchSpecificTankRundown(props.idTank)
-    availableTanks.value = [...transferStore.specificTanks]
+    const response = await transferApi.getSpecificTanksRundown({ sloc: props.idTank })
+    availableTanks.value = response?.data || []
 
     if (availableTanks.value.length === 1) {
       selectedTails.value = [String(availableTanks.value[0].id_sloc_tail)]

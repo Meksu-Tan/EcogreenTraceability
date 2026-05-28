@@ -65,6 +65,7 @@
             <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Entry Date</th>
             <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Matl Doc</th>
             <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trace No</th>
+            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Plant</th>
             <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
             <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Blending Source</th>
             <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Sloc</th>
@@ -108,6 +109,7 @@
               </button>
             </td>
             <td class="px-3 py-3 whitespace-nowrap text-center font-mono text-gray-900">{{ item.trace_no }}</td>
+            <td class="px-3 py-3 whitespace-nowrap text-center text-gray-900">{{ item.plant_name || '-' }}</td>
             <td class="px-3 py-3 text-gray-900">{{ item.material }}</td>
             <td class="px-3 py-3 text-xs">
               <template v-if="item.from_trace_no">
@@ -135,7 +137,7 @@
                 <span
                   v-for="(sup, si) in (typeof item.supplier === 'string' ? item.supplier.split('|') : [item.supplier])"
                   :key="si"
-                  class="badge badge-primary inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-blue-600 text-white text-[10px] font-medium"
+                  class="badge badge-primary inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-green-600 text-white text-[10px] font-medium"
                 >{{ sup.trim() }}</span>
               </template>
             </td>
@@ -171,7 +173,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, reactive } from 'vue'
+import { ref, onMounted, watch, reactive, computed } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsBlendingStore } from '@/modules/ts-blending/stores'
 import PlantSelector from '@/components/shared/PlantSelector.vue'
@@ -181,6 +183,8 @@ import SubTankEditModal from '@/modules/ts-blending/components/SubTankEditModal.
 
 const plantSelectionStore = usePlantSelectionStore()
 const blendingStore = useTsBlendingStore()
+
+const isAllPlant = computed(() => plantSelectionStore.selectedPlantId === null)
 
 const isModalOpen = ref(false)
 const isMatlDocModalOpen = ref(false)

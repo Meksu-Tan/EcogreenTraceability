@@ -62,7 +62,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return res
     } catch (error) {
-      console.error('Failed to load WIP page:', error)
+      toastStore.error('Failed to load WIP page:', error)
       return null
     } finally {
       loading.value = false
@@ -74,9 +74,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const res = await wipApi.getFeed(feedId, mode, { id_plant: plantId.value })
       const data = res.data || []
       feedLatest.value[feedId] = data
-      if (mode === 'LOG') {
-        feedLogs.value[feedId] = data
-      }
+      feedLogs.value[feedId] = data
       return res
     } catch (error) {
       console.error('Fetch feed error:', error)
@@ -89,9 +87,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const res = await wipApi.getRundown(rundownId, mode, { id_plant: plantId.value })
       const data = res.data || []
       rundownLatest.value[rundownId] = data
-      if (mode === 'LOG') {
-        rundownLogs.value[rundownId] = data
-      }
+      rundownLogs.value[rundownId] = data
       return res
     } catch (error) {
       console.error('Fetch rundown error:', error)
@@ -105,7 +101,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       balanceData.value = res.data || []
       return res
     } catch (error) {
-      console.error('Fetch balance error:', error)
+      toastStore.error('Fetch balance error:', error)
       return { data: [] }
     }
   }
@@ -115,7 +111,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const data = await wipApi.getFeedNewBatchNumber(feedID, { id_plant: plantId.value })
       return data
     } catch (error) {
-      console.error('Fetch feed batch number error:', error)
+      toastStore.error('Fetch feed batch number error:', error)
       return null
     }
   }
@@ -125,7 +121,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const data = await wipApi.getRundownNewBatchNumber(rundownID, { id_plant: plantId.value })
       return data
     } catch (error) {
-      console.error('Fetch rundown batch number error:', error)
+      toastStore.error('Fetch rundown batch number error:', error)
       return null
     }
   }
@@ -133,10 +129,9 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   async function generateNewFeedNumber(feedId) {
     try {
       const data = await wipApi.getNewFeedNumber(feedId, { id_plant: plantId.value })
-      console.log('generateNewFeedNumber store call data:', data)
       return data
     } catch (error) {
-      console.error('Generate new feed number error:', error)
+      toastStore.error('Generate new feed number error')
       return null
     }
   }
@@ -144,10 +139,9 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   async function generateNewRundownNumber(rundownId, subgroup = null) {
     try {
       const data = await wipApi.getNewRundownNumber(rundownId, { id_plant: plantId.value, subgroup })
-      console.log('generateNewRundownNumber store call data:', data)
       return data
     } catch (error) {
-      console.error('Generate new rundown number error:', error)
+      toastStore.error('Generate new rundown number error')
       return null
     }
   }
@@ -158,7 +152,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const data = await wipApi.getFeedLastBatch(feedID, { id_plant: plantId.value })
       return data
     } catch (error) {
-      console.error('Fetch feed last batch error:', error)
+      toastStore.error('Fetch feed last batch error:', error)
       return []
     }
   }
@@ -168,7 +162,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const data = await wipApi.getRundownLastBatch(rundownID, { id_plant: plantId.value })
       return data
     } catch (error) {
-      console.error('Fetch rundown last batch error:', error)
+      toastStore.error('Fetch rundown last batch error:', error)
       return []
     }
   }
@@ -179,7 +173,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       activeTanksFeed.value = Array.isArray(data) ? data : []
       return activeTanksFeed.value
     } catch (error) {
-      console.error('Fetch active tanks feed error:', error)
+      toastStore.error('Fetch active tanks feed error:', error)
       return []
     }
   }
@@ -190,7 +184,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       activeTanksRundown.value = Array.isArray(data) ? data : []
       return activeTanksRundown.value
     } catch (error) {
-      console.error('Fetch active tanks rundown error:', error)
+      toastStore.error('Fetch active tanks rundown error:', error)
       return []
     }
   }
@@ -201,7 +195,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       activeSpecificTanks.value = Array.isArray(data) ? data : []
       return activeSpecificTanks.value
     } catch (error) {
-      console.error('Fetch active specific tanks error:', error)
+      toastStore.error('Fetch active specific tanks error:', error)
       return []
     }
   }
@@ -212,7 +206,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const data = await wipApi.getQuantifierData(date, tagNumber)
       return data
     } catch (error) {
-      console.error('Fetch quantifier data error:', error)
+      toastStore.error('Fetch quantifier data error:', error)
       throw error
     }
   }
@@ -235,7 +229,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
 
       const tagNumber = quantifierTags[feedId]
       if (!tagNumber) {
-        console.warn('No quantifier tag for feed:', feedId)
+        toastStore.info('No quantifier tag available for this feed')
         return null
       }
 
@@ -248,7 +242,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return null
     } catch (error) {
-      console.error('Auto-fill quantifier error:', error)
+      toastStore.error('Auto-fill quantifier error:', error)
       return null
     }
   }
@@ -266,11 +260,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
         toastStore.success(res.message || 'Feed saved successfully')
         await fetchFeed(data.feed_id, 'LOG')
       } else {
-        console.error('Failed to save feed:', res.message)
+        toastStore.error('Failed to save feed:', res.message)
       }
       return res
     } catch (error) {
-      console.error('Failed to save feed:', error)
+      toastStore.error('Failed to save feed:', error)
       throw error
     } finally {
       loading.value = false
@@ -290,11 +284,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
         toastStore.success(res.message || 'Rundown saved successfully')
         await fetchRundown(data.rundown_id, 'LOG')
       } else {
-        console.error('Failed to save rundown:', res.message)
+        toastStore.error('Failed to save rundown:', res.message)
       }
       return res
     } catch (error) {
-      console.error('Failed to save rundown:', error)
+      toastStore.error('Failed to save rundown:', error)
       throw error
     } finally {
       loading.value = false
@@ -313,11 +307,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
         toastStore.success(res.message || 'Feed cancelled')
         await fetchFeed(feedId, 'LOG')
       } else {
-        console.error('Failed to cancel feed:', res.message)
+        toastStore.error('Failed to cancel feed:', res.message)
       }
       return res
     } catch (error) {
-      console.error('Failed to cancel feed:', error)
+      toastStore.error('Failed to cancel feed:', error)
       throw error
     } finally {
       loading.value = false
@@ -336,11 +330,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
         toastStore.success(res.message || 'Rundown cancelled')
         await fetchRundown(rundownId, 'LOG')
       } else {
-        console.error('Failed to cancel rundown:', res.message)
+        toastStore.error('Failed to cancel rundown:', res.message)
       }
       return res
     } catch (error) {
-      console.error('Failed to cancel rundown:', error)
+      toastStore.error('Failed to cancel rundown:', error)
       throw error
     } finally {
       loading.value = false
@@ -358,11 +352,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       if (res.status === 1) {
         toastStore.success(res.message || 'Material document saved')
       } else {
-        console.error('Failed to save material document:', res.message)
+        toastStore.error('Failed to save material document:', res.message)
       }
       return res
     } catch (error) {
-      console.error('Failed to save material document:', error)
+      toastStore.error('Failed to save material document:', error)
       throw error
     }
   }
@@ -377,11 +371,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       if (res.status === 1) {
         toastStore.success('Sub-tank updated')
       } else {
-        console.error('Failed to update sub-tank:', res.message)
+        toastStore.error('Failed to update sub-tank:', res.message)
       }
       return res
     } catch (error) {
-      console.error('Failed to update sub-tank:', error)
+      toastStore.error('Failed to update sub-tank:', error)
       throw error
     }
   }

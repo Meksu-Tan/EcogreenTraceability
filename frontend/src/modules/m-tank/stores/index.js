@@ -34,8 +34,14 @@ export const useSetupTankStore = defineStore('setupTank', () => {
     return r.data
   }
 
+  async function syncTanks() {
+    const r = await tankApi.syncTanks()
+    if (r.data.status === 1) await fetchTanks()
+    return r.data
+  }
+
   return {
     tanks, loading,
-    fetchTanks, createTank, editTank, toggleTank
+    fetchTanks, createTank, editTank, toggleTank, syncTanks
   }
 })

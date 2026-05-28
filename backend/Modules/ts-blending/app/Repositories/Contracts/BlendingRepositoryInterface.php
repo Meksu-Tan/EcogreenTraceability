@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\TsBlending\Repositories\Contracts;
 
 use Illuminate\Support\Collection;
@@ -47,6 +46,21 @@ interface BlendingRepositoryInterface
     public function getActiveSpecificTanksRundown(int $sloc): Collection;
 
     /**
+     * Get all tanks (sloc) for dropdown (like rm-entry)
+     */
+    public function getTanks(?int $plantId = null): Collection;
+
+    /**
+     * Get tank details (sub-sloc) for selected sloc (like rm-entry)
+     */
+    public function getTankDetails(string $tankDescription, ?int $plantId = null): Collection;
+
+    /**
+     * Get all active m_tank records for a plant (independent of material)
+     */
+    public function getAllTanks(int $plantId): Collection;
+
+    /**
      * Add material to blending entry (temporary storage)
      */
     public function addBlendingEntryMaterial(string $user, string $entryNo, int $idMaterial, float $qty, int $idTank, int $plantId): array;
@@ -64,7 +78,7 @@ interface BlendingRepositoryInterface
     /**
      * Create material document number
      */
-    public function createMaterialDocument(string $user, int $idTraceHead, string $materialDoc, string $mode): array;
+    public function createMaterialDocument(string $user, int $idTraceHead, ?string $materialDoc, string $mode): array;
 
     /**
      * Deactivate blending entry

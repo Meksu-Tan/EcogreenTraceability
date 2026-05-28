@@ -62,7 +62,6 @@
 
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsBlendingStore } from '../stores'
 
 const props = defineProps({
@@ -71,12 +70,12 @@ const props = defineProps({
   mode: { type: String, default: 'ADD' },
   idHead: { type: [String, Number], default: null },
   idTank: { type: [String, Number], default: null },
-  idMaterial: { type: [String, Number], default: null }
+  idMaterial: { type: [String, Number], default: null },
+  idPlant: { type: [String, Number], default: 0 }
 })
 
 const emit = defineEmits(['update:isOpen', 'success'])
 
-const plantSelectionStore = usePlantSelectionStore()
 const blendingStore = useTsBlendingStore()
 
 const form = reactive({
@@ -102,17 +101,16 @@ function closeModal() {
 
 async function onMaterialChange() {
   if (form.idMaterialSource) {
-    const plantId = plantSelectionStore.selectedPlantId
     await blendingStore.fetchTotalStockMaterial({
       idMaterial: form.idMaterialSource,
-      id_plant: plantId
+      id_plant: props.idPlant
     })
   }
 }
 
 async function handleInsert() {
   errorMsg.value = ''
-  const plantId = plantSelectionStore.selectedPlantId
+  const plantId = props.idPlant
 
   if (!form.idMaterialSource || !form.qty) {
     errorMsg.value = 'Select material and enter qty'

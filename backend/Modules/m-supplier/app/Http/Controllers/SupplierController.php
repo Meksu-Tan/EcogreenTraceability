@@ -1,5 +1,4 @@
-<?php
-
+<?php declare(strict_types=1);
 namespace Modules\Supplier\Http\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -8,6 +7,7 @@ use Modules\Supplier\Http\Requests\UpdateSupplierRequest;
 use Modules\Supplier\Services\SupplierService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Helpers\ApiResponse;
 
 class SupplierController extends Controller
 {
@@ -17,12 +17,12 @@ class SupplierController extends Controller
 
     public function index(): JsonResponse
     {
-        return response()->json(['status' => 1, 'data' => $this->supplierService->listSuppliers()]);
+        return ApiResponse::success($this->supplierService->listSuppliers(), 'OK', 200);
     }
 
     public function active(): JsonResponse
     {
-        return response()->json(['status' => 1, 'data' => $this->supplierService->getActiveSuppliers()]);
+        return ApiResponse::success($this->supplierService->getActiveSuppliers(), 'OK', 200);
     }
 
     public function store(StoreSupplierRequest $request): JsonResponse
