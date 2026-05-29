@@ -11,6 +11,10 @@ class TsRawServiceProvider extends ServiceProvider
             \Modules\TsRaw\Repositories\Contracts\RmEntryRepositoryInterface::class,
             \Modules\TsRaw\Repositories\RmEntryRepository::class
         );
+        $this->app->singleton(
+            \Modules\TsRaw\Services\Contracts\RmEntryServiceInterface::class,
+            \Modules\TsRaw\Services\RmEntryService::class
+        );
     }
 
     public function boot(): void

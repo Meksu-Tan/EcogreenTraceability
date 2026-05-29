@@ -9,7 +9,9 @@ use Modules\Plant\Models\Plant;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
-class RmEntryService
+use Modules\TsRaw\Services\Contracts\RmEntryServiceInterface;
+
+class RmEntryService implements RmEntryServiceInterface
 {
     public function __construct(
         protected RmEntryRepositoryInterface $rmEntryRepo
@@ -502,6 +504,183 @@ class RmEntryService
             $connection->rollBack();
             throw $e;
         }
+    }
+
+    public function getStorageTanks($plantId): array
+    {
+        if ($plantId) {
+            if (is_numeric($plantId)) {
+                $plant = Plant::find($plantId);
+                if ($plant && $plant->code_3) {
+                    $plantId = $plant->code_3;
+                }
+            }
+        }
+
+        $query = \Modules\Tank\Models\Tank::active()->storage();
+
+        if ($plantId) {
+            $query->where('id_plant', $plantId);
+        }
+
+        return $query->orderBy('description')
+            ->groupBy('description', 'id_plant')
+            ->get(['description as tank', 'id_plant'])
+            ->toArray();
+    }
+
+    public function getSpecificTankDetails($tankId, $plantId): array
+    {
+        if ($plantId) {
+            if (is_numeric($plantId)) {
+                $plant = Plant::find($plantId);
+                if ($plant && $plant->code_3) {
+                    $plantId = $plant->code_3;
+                }
+            }
+        }
+
+        $tanksQuery = \Modules\Tank\Models\Tank::active()->where('description', $tankId);
+        if ($plantId) {
+            $tanksQuery->where('id_plant', $plantId);
+        }
+        $tanks = $tanksQuery->get();
+
+        $result = [];
+        foreach ($tanks as $tank) {
+            if (!empty($tank->id_tank)) {
+                $result[] = [
+                    'id_tank_tail' => $tank->id_sloc,
+                    'tankNo' => $tank->id_tank,
+                    'id_sloc' => $tank->id_sloc
+                ];
+            }
+        }
+
+        usort($result, function($a, $b) {
+            return strcmp($a['tankNo'], $b['tankNo']);
+        });
+
+        return $result;
+    }
+
+    public function getRmMaterials(): array
+    {
+        return \Modules\Material\Models\Material::where('status', 1)
+            ->where('type', 'RM')
+            ->orderBy('code')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id_material' => $item->id_material,
+                    'material' => strtoupper($item->description) . ' (' . $item->code . ' / ' . $item->type . ' / Feed: ' . $item->qtf_feed . ' / Rundown: ' . $item->qtf_rundown . ')'
+                ];
+            })
+            ->toArray();
+    }
+
+    public function searchSuppliersList(string $search): array
+    {
+        return \Modules\Supplier\Models\Supplier::where('status', 1)
+            ->where('description', 'like', '%' . $search . '%')
+            ->orderBy('description')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id_supplier,
+                    'text' => $item->code . ' :: ' . $item->description
+                ];
+            })
+            ->toArray();
+    }
+
+    public function getSourceEntriesList($plantId): array
+    {
+        return BalanceHeader::active()
+            ->rmEntry()
+            ->where('qty', '>', 0)
+            ->where('id_plant', $plantId)
+            ->with(['material', 'tank'])
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id_balance_head' => $item->id_balance_head,
+                    'trace_no' => $item->trace_no,
+                    'material' => $item->material->description ?? 'Unknown',
+                    'tank' => $item->tank->description ?? 'Unknown',
+                    'qty' => $item->qty
+                ];
+            })
+            ->toArray();
+    }
+
+    public function getDestTanksList($plantId): array
+    {
+        if ($plantId) {
+            $plant = Plant::find($plantId);
+            if ($plant && $plant->code_3) {
+                $plantId = $plant->code_3;
+            }
+        }
+        $query = \Modules\Tank\Models\Tank::active()
+            ->feed()
+            ->orderBy('description')
+            ->groupBy('description', 'id_plant');
+        
+        if ($plantId && $plantId !== '0' && $plantId !== 0) {
+            $query->where('id_plant', $plantId);
+        }
+        
+        return $query->get(['description as tank', 'id_plant'])->toArray();
+    }
+
+    public function saveMatlDoc(string $mode, int $id, string $number, string $user): array
+    {
+        if ($mode === 'ADD') {
+            $exists = DB::connection('eudr_ts')->table('t_material_document')
+                ->where('id_trace_head', $id)
+                ->exists();
+            if ($exists) {
+                DB::connection('eudr_ts')->table('t_material_document')
+                    ->where('id_trace_head', $id)
+                    ->update(['material_document' => $number, 'updated_by' => $user]);
+            } else {
+                DB::connection('eudr_ts')->table('t_material_document')->insert([
+                    'id_trace_head' => $id,
+                    'material_document' => $number,
+                    'created_by' => $user
+                ]);
+            }
+        } else {
+            DB::connection('eudr_ts')->table('t_material_document')
+                ->where('id_trace_head', $id)
+                ->update(['material_document' => $number, 'updated_by' => $user]);
+        }
+
+        return ['success' => true, 'status' => 1];
+    }
+
+    public function updateSubTankSlocTail(int $idHead, $idTankTail): array
+    {
+        $tankTailJson = null;
+        if (!empty($idTankTail)) {
+            if (is_array($idTankTail)) {
+                $tankTailJson = json_encode(array_map('strval', array_values($idTankTail)));
+            } else {
+                $decoded = json_decode($idTankTail, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $tankTailJson = json_encode(array_map('strval', array_values($decoded)));
+                } else {
+                    $tankTailJson = json_encode([(string)$idTankTail]);
+                }
+            }
+        }
+
+        DB::connection('eudr_ts')->table('t_balance_header')
+            ->where('id_balance_head', $idHead)
+            ->update(['id_sloc_tail' => $tankTailJson]);
+
+        return ['success' => true, 'status' => 1];
     }
 
     protected function resolvePlantCode($plantId)

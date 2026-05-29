@@ -13,7 +13,7 @@ vi.mock('@/modules/m-plant/api', () => ({
   getPlants: vi.fn().mockResolvedValue({ data: { data: [] } }),
 }))
 
-import WipEntryView from '@/views/ts-wip/WipEntryView.vue'
+import WipEntryView from '@/modules/ts-wip/views/WipEntryView.vue'
 
 describe('WipEntryView', () => {
   beforeEach(() => {

@@ -3,7 +3,9 @@ namespace Modules\Admin\Services;
 
 use Modules\Admin\Repositories\Contracts\AdminRepositoryInterface;
 
-class AdminService
+use Modules\Admin\Services\Contracts\AdminServiceInterface;
+
+class AdminService implements AdminServiceInterface
 {
     public function __construct(
         protected AdminRepositoryInterface $adminRepository
@@ -27,6 +29,11 @@ class AdminService
     public function deleteUser(int $id): bool
     {
         return $this->adminRepository->deleteUser($id);
+    }
+
+    public function findUserById(int $id): ?object
+    {
+        return $this->adminRepository->findUserById($id);
     }
 
     public function listRoles(): array

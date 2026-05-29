@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 return [
 
@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'tankfarm' => [
+        'url' => env('TANKFARM_API_URL', 'https://172.16.11.101:44302/api/ext/tankfarm-master'),
+        'token' => env('TANKFARM_API_TOKEN'),
+    ],
+
 ];
+

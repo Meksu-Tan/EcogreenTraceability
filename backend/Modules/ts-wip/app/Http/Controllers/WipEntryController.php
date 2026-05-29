@@ -4,7 +4,7 @@ namespace Modules\TsWip\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use Modules\TsWip\Services\WipEntryService;
+use Modules\TsWip\Services\Contracts\WipEntryServiceInterface;
 use Modules\TsWip\Http\Requests\StoreWipEntryRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,7 +15,7 @@ class WipEntryController extends Controller
 {
     protected $wipEntryService;
 
-    public function __construct(WipEntryService $wipEntryService)
+    public function __construct(WipEntryServiceInterface $wipEntryService)
     {
         $this->wipEntryService = $wipEntryService;
     }

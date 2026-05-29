@@ -6,19 +6,21 @@ use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\Admin\Http\Requests\StoreUserRequest;
 use Modules\Admin\Http\Requests\UpdateUserRequest;
-use App\Models\User;
+use Modules\Admin\Services\Contracts\AdminServiceInterface;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
+    public function __construct(
+        protected AdminServiceInterface $adminService
+    ) {}
+
     /**
      * GET /api/v1/admin/users
      */
     public function index(): JsonResponse
     {
-        // Fetch users along with their roles
-        $users = User::with('roles')->orderBy('name')->get();
+        $users = $this->adminService->listUsers();
         return ApiResponse::success($users, 'OK', 200);
     }
 
@@ -27,19 +29,7 @@ class UserController extends Controller
      */
     public function store(StoreUserRequest $request): JsonResponse
     {
-        $validated = $request->validated();
-
-        $user = User::create([
-            'name'     => $validated['name'],
-            'email'    => $validated['email'],
-            'password' => Hash::make($validated['password']),
-        ]);
-
-        $user->assignRole($validated['role']);
-
-        // Eager load roles for return payload
-        $user->load('roles');
-
+        $user = $this->adminService->createUser($request->validated());
         return ApiResponse::success($user, 'User berhasil ditambahkan.', 201);
     }
 
@@ -48,23 +38,12 @@ class UserController extends Controller
      */
     public function update(UpdateUserRequest $request, $id): JsonResponse
     {
-        $user = User::findOrFail($id);
-        $validated = $request->validated();
-
-        $user->name  = $validated['name'];
-        $user->email = $validated['email'];
-
-        if (!empty($validated['password'])) {
-            $user->password = Hash::make($validated['password']);
+        $success = $this->adminService->updateUser((int)$id, $request->validated());
+        if (!$success) {
+            return ApiResponse::error('User tidak ditemukan.', 404);
         }
 
-        $user->save();
-
-        // Sync roles (replaces any old roles with the new one)
-        $user->syncRoles([$validated['role']]);
-
-        $user->load('roles');
-
+        $user = $this->adminService->findUserById((int)$id);
         return ApiResponse::success($user, 'User berhasil diperbarui.', 200);
     }
 
@@ -73,15 +52,16 @@ class UserController extends Controller
      */
     public function destroy($id): JsonResponse
     {
-        $user = User::findOrFail($id);
+        $user = $this->adminService->findUserById((int)$id);
+        if (!$user) {
+            return ApiResponse::error('User tidak ditemukan.', 404);
+        }
 
-        // Optional safety check: Prevent deleting yourself
         if (auth()->id() == $user->id) {
             return ApiResponse::error('Tidak dapat menghapus akun Anda sendiri.', 403);
         }
 
-        $user->delete();
-
+        $this->adminService->deleteUser((int)$id);
         return ApiResponse::success(null, 'User berhasil dihapus.', 200);
     }
 }

@@ -20,7 +20,9 @@
 </template>
 
 <script setup>
-import { AppSidebar, AppTopbar, AppToast } from '@/modules/shared/components'
+import AppSidebar from '@/modules/shared/components/AppSidebar.vue'
+import AppTopbar from '@/modules/shared/components/AppTopbar.vue'
+import AppToast from '@/modules/shared/components/AppToast.vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()

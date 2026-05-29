@@ -167,6 +167,12 @@ class Feed
                 );
 
                 if (count($balTails) === 0) {
+                    \Log::warning('Feed::generalFeed - No balance details for balance header', [
+                        'id_balance_head' => $idHead,
+                        'trace_no' => $fromTrace,
+                        'qty' => $head->qty,
+                        'out_qty' => $head->out_qty
+                    ]);
                     throw new \RuntimeException(
                         'Feed::generalFeed - id_balance_head=' . $idHead .
                         ' (trace_no=' . $fromTrace . ') has qty > 0 but NO active t_balance_detail rows.'

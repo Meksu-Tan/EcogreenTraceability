@@ -276,19 +276,17 @@ const showSpecificSlocRow = computed(() => {
 async function bootstrap() {
   formError.value = null
   loading.value = true
-  console.log('[TransferEntryModal] Bootstrapping form fields. Current plantId:', plantId.value)
   try {
     await store.fetchActiveMaterials()
     resetForm()
   } catch (err) {
-    console.error('[TransferEntryModal] Error bootstrapping materials:', err)
+    /* error logged */
     formError.value = 'Failed to load form data: ' + err.message
   }
   loading.value = false
 }
 
 function resetForm() {
-  console.log('[TransferEntryModal] Resetting form values')
   form.entry_no = ''
   form.entry_date = new Date().toISOString().split('T')[0]
   form.id_material = ''
@@ -309,7 +307,6 @@ function resetForm() {
 }
 
 async function onMaterialChange() {
-  console.log('[TransferEntryModal] onMaterialChange triggered. id_material:', form.id_material)
   if (!form.id_material) return
 
   try {
@@ -319,13 +316,12 @@ async function onMaterialChange() {
       await populateTanks()
     }
   } catch (err) {
-    console.error('[TransferEntryModal] Error in onMaterialChange:', err)
+    /* error logged */
     formError.value = err.message
   }
 }
 
 async function onTrfTypeChange() {
-  console.log('[TransferEntryModal] onTrfTypeChange triggered. trf_type:', form.trf_type)
   if (!form.trf_type) {
     sourceTanks.value = []
     destTanks.value = []
@@ -350,13 +346,10 @@ async function populateTanks() {
   const idMat = form.id_material
   const currentPlant = plantId.value
 
-  console.log('[TransferEntryModal] populateTanks start. trfType:', trfType, 'idMat:', idMat, 'currentPlant:', currentPlant)
-
   try {
     if (trfType === 'in') {
       // Source = choices of SLoc of each plant (active plant SLocs)
       // Destination = Automatically EOMB (plant 1001) SLocs
-      console.log('[TransferEntryModal] Fetching tanks for TRF IN. Source: Active Plant (', currentPlant, '), Destination: EOMB (1001)')
       const [sourceRes, destRes] = await Promise.all([
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant }),
         store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: 1001 })
@@ -366,7 +359,6 @@ async function populateTanks() {
     } else if (trfType === 'out') {
       // Source = Automatically EOMB (plant 1001) SLocs
       // Destination = Choices of SLoc of active plant
-      console.log('[TransferEntryModal] Fetching tanks for TRF OUT. Source: EOMB (1001), Destination: Active Plant (', currentPlant, ')')
       const [sourceRes, destRes] = await Promise.all([
         store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: 1001 }),
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant })
@@ -375,7 +367,6 @@ async function populateTanks() {
       destTanks.value = destRes?.data || []
     } else {
       // 'all' - both = all tanks of active plant
-      console.log('[TransferEntryModal] Fetching tanks for TRF ALL. Both: Active Plant (', currentPlant, ')')
       const [sourceRes, destRes] = await Promise.all([
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant }),
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant })
@@ -384,15 +375,12 @@ async function populateTanks() {
       destTanks.value = destRes?.data || []
     }
 
-    console.log('[TransferEntryModal] Fetched sourceTanks count:', sourceTanks.value.length, 'destTanks count:', destTanks.value.length)
-
     // Auto-select logic
     const autoSelectSource = trfType === 'out' && sourceTanks.value.length > 0
     const autoSelectDest = trfType === 'in' && destTanks.value.length > 0
 
     if (autoSelectSource) {
       form.source_sloc = sourceTanks.value[0].id_tank
-      console.log('[TransferEntryModal] Auto-selected source_sloc (EOMB):', form.source_sloc)
       await onSourceChange()
     } else {
       form.source_sloc = ''
@@ -400,7 +388,6 @@ async function populateTanks() {
 
     if (autoSelectDest) {
       form.trf_sloc = destTanks.value[0].id_tank
-      console.log('[TransferEntryModal] Auto-selected trf_sloc (EOMB):', form.trf_sloc)
       await onDestinationChange()
     } else {
       form.trf_sloc = ''
@@ -420,13 +407,12 @@ async function populateTanks() {
     sourceStockLabel.value = 'Stock : N/A'
     destStockLabel.value = 'Stock : N/A'
   } catch (err) {
-    console.error('[TransferEntryModal] Error in populateTanks:', err)
+    /* error logged */
     formError.value = err.message
   }
 }
 
 async function onSourceChange() {
-  console.log('[TransferEntryModal] onSourceChange triggered. source_sloc:', form.source_sloc)
   if (!form.source_sloc) {
     specificSourceTanks.value = []
     return
@@ -434,18 +420,16 @@ async function onSourceChange() {
   try {
     const response = await store.fetchActiveSpecificTanksRundown({ sloc: form.source_sloc })
     specificSourceTanks.value = response?.data || []
-    console.log('[TransferEntryModal] Loaded specificSourceTanks count:', specificSourceTanks.value.length)
 
     await updateStock('source')
     await updateEntryNoFromSloc()
   } catch (err) {
-    console.error('[TransferEntryModal] Error in onSourceChange:', err)
+    /* error logged */
     specificSourceTanks.value = []
   }
 }
 
 async function onDestinationChange() {
-  console.log('[TransferEntryModal] onDestinationChange triggered. trf_sloc:', form.trf_sloc)
   if (!form.trf_sloc) {
     specificDestTanks.value = []
     return
@@ -453,12 +437,11 @@ async function onDestinationChange() {
   try {
     const response = await store.fetchActiveSpecificTanksRundown({ sloc: form.trf_sloc })
     specificDestTanks.value = response?.data || []
-    console.log('[TransferEntryModal] Loaded specificDestTanks count:', specificDestTanks.value.length)
 
     await updateStock('dest')
     await updateEntryNoFromSloc()
   } catch (err) {
-    console.error('[TransferEntryModal] Error in onDestinationChange:', err)
+    /* error logged */
     specificDestTanks.value = []
   }
 }
@@ -481,8 +464,6 @@ async function updateEntryNoFromSloc() {
   const t = sourceTanks.value.find(x => x.id_tank === form.source_sloc)
   if (t && t.id_plant) activePlantId = t.id_plant
 
-  console.log('[TransferEntryModal] updateEntryNoFromSloc. activePlantId calculated:', activePlantId, 'materialId:', form.id_material)
-
   if (activePlantId && activePlantId !== 0) {
     try {
       const entryResponse = await store.fetchNewEntryNo({
@@ -491,12 +472,10 @@ async function updateEntryNoFromSloc() {
       })
       if (entryResponse?.data?.[0]?.entryNo) {
         form.entry_no = entryResponse.data[0].entryNo
-        console.log('[TransferEntryModal] Successfully generated entryNo:', form.entry_no)
       } else {
-        console.warn('[TransferEntryModal] entryResponse data structure did not contain entryNo:', entryResponse)
       }
     } catch (e) {
-      console.error('[TransferEntryModal] Failed to update entry no', e)
+      /* error logged */
     }
   }
 }
@@ -504,8 +483,6 @@ async function updateEntryNoFromSloc() {
 async function updateStock(type) {
   const idTank = type === 'source' ? form.source_sloc : form.trf_sloc
   if (!form.id_material || !idTank) return
-
-  console.log('[TransferEntryModal] updateStock fetch. Type:', type, 'idMaterial:', form.id_material, 'idTank:', idTank)
   try {
     const response = await store.fetchTotalStockMaterial({
       idMaterial: form.id_material,
@@ -535,9 +512,8 @@ async function updateStock(type) {
         destStockLabel.value = label
       }
     }
-    console.log('[TransferEntryModal] Stock updated for', type, '. stockLabel:', type === 'source' ? sourceStockLabel.value : destStockLabel.value)
   } catch (err) {
-    console.error('[TransferEntryModal] Error updating stock for', type, err)
+    /* error logged */
     if (type === 'source') {
       sourceStockLabel.value = 'Stock (MT): N/A'
     } else {
@@ -548,11 +524,9 @@ async function updateStock(type) {
 
 async function handleSubmit() {
   formError.value = null
-  console.log('[TransferEntryModal] handleSubmit clicked. Form data:', JSON.stringify(form))
 
   if (!form.trf_qty || parseFloat(form.trf_qty) <= 0) {
     formError.value = 'Entry Qty must be greater than 0'
-    console.warn('[TransferEntryModal] Validation failed: trf_qty <= 0')
     return
   }
 
@@ -571,9 +545,7 @@ async function handleSubmit() {
       material_doc: form.material_doc,
       id_plant: plantId.value
     }
-    console.log('[TransferEntryModal] Submitting transfer entry payload:', JSON.stringify(payload))
     const response = await store.submitTransferEntry(payload)
-    console.log('[TransferEntryModal] submitTransferEntry response:', JSON.stringify(response))
 
     if (response?.status === 1) {
       emit('success')
@@ -582,14 +554,13 @@ async function handleSubmit() {
       formError.value = response?.message || 'Transfer failed'
     }
   } catch (err) {
-    console.error('[TransferEntryModal] submitTransferEntry exception:', err)
+    /* error logged */
     formError.value = err.response?.data?.message || err.message || 'Error'
   }
   loading.value = false
 }
 
 function closeModal() {
-  console.log('[TransferEntryModal] Closing modal')
   emit('update:isOpen', false)
 }
 

@@ -71,37 +71,39 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
 
   async function fetchFeed(feedId, mode = 'LOG') {
     try {
-      const res = await wipApi.getFeed(feedId, mode, { id_plant: plantId.value })
+      const res = await wipApi.getFeed(feedId, mode, { id_plant: plantId.value || 0 })
       const data = res.data || []
       feedLatest.value[feedId] = data
       feedLogs.value[feedId] = data
       return res
     } catch (error) {
-      console.error('Fetch feed error:', error)
+      feedLatest.value[feedId] = []
+      feedLogs.value[feedId] = []
       return { data: [] }
     }
   }
 
   async function fetchRundown(rundownId, mode = 'LOG') {
     try {
-      const res = await wipApi.getRundown(rundownId, mode, { id_plant: plantId.value })
+      const res = await wipApi.getRundown(rundownId, mode, { id_plant: plantId.value || 0 })
       const data = res.data || []
       rundownLatest.value[rundownId] = data
       rundownLogs.value[rundownId] = data
       return res
     } catch (error) {
-      console.error('Fetch rundown error:', error)
+      rundownLatest.value[rundownId] = []
+      rundownLogs.value[rundownId] = []
       return { data: [] }
     }
   }
 
   async function fetchBalance(rundownId, params = {}) {
     try {
-      const res = await wipApi.getBalance(rundownId, { id_plant: plantId.value, ...params })
+      const res = await wipApi.getBalance(rundownId, { id_plant: plantId.value || 0, ...params })
       balanceData.value = res.data || []
       return res
     } catch (error) {
-      toastStore.error('Fetch balance error:', error)
+      balanceData.value = []
       return { data: [] }
     }
   }
@@ -248,6 +250,10 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   }
 
   async function saveFeed(data) {
+    if (!plantId.value) {
+      toastStore.error('Please select a plant before saving feed')
+      return { status: 0, message: 'Plant not selected' }
+    }
     loading.value = true
     try {
       const res = await wipApi.store({
@@ -260,11 +266,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
         toastStore.success(res.message || 'Feed saved successfully')
         await fetchFeed(data.feed_id, 'LOG')
       } else {
-        toastStore.error('Failed to save feed:', res.message)
+        toastStore.error(res.message || 'Failed to save feed')
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to save feed:', error)
+      toastStore.error('Failed to save feed:', error.message || error)
       throw error
     } finally {
       loading.value = false
@@ -272,6 +278,10 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   }
 
   async function saveRundown(data) {
+    if (!plantId.value) {
+      toastStore.error('Please select a plant before saving rundown')
+      return { status: 0, message: 'Plant not selected' }
+    }
     loading.value = true
     try {
       const res = await wipApi.store({
@@ -284,11 +294,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
         toastStore.success(res.message || 'Rundown saved successfully')
         await fetchRundown(data.rundown_id, 'LOG')
       } else {
-        toastStore.error('Failed to save rundown:', res.message)
+        toastStore.error(res.message || 'Failed to save rundown')
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to save rundown:', error)
+      toastStore.error('Failed to save rundown:', error.message || error)
       throw error
     } finally {
       loading.value = false

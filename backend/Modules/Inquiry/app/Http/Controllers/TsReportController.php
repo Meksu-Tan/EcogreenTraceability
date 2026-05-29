@@ -18,6 +18,6 @@ class TsReportController extends Controller
         $filters = $request->only(['plant_id', 'tank_id', 'storage_id']);
         $result = $this->inquiryService->getTsReport($filters);
 
-        return response()->json($result);
+        return ApiResponse::success($result);
     }
 }

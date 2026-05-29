@@ -27,10 +27,7 @@ class BlendingController extends Controller
 
             return ApiResponse::success($data, 'Blending list retrieved successfully', 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to retrieve blending list: ' . $e->getMessage()
-            ], 500);
+            return ApiResponse::error('Failed to retrieve blending list: ' . $e->getMessage(), 500);
         }
     }
 
@@ -85,19 +82,13 @@ class BlendingController extends Controller
                 $result = ['response' => $success ? 1 : 0];
 
             } else {
-                return response()->json([
-                    'status' => 0,
-                    'message' => 'Unknown flag: ' . $flag
-                ], 400);
+                return ApiResponse::error('Unknown flag: ' . $flag, 400);
             }
 
             return $this->buildResponse($result, $flag, $mode, $request);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Blending operation failed: ' . $e->getMessage()
-            ], 500);
+            return ApiResponse::error('Blending operation failed: ' . $e->getMessage(), 500);
         }
     }
 
@@ -108,9 +99,9 @@ class BlendingController extends Controller
     {
         try {
             $data = $this->blendingService->getActiveMaterials();
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -124,9 +115,9 @@ class BlendingController extends Controller
 
         try {
             $entryNo = $this->blendingService->generateEntryNo($materialId, $plantId);
-            return response()->json(['data' => [['entryNo' => $entryNo]]]);
+            return ApiResponse::success([['entryNo' => $entryNo]]);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -140,9 +131,9 @@ class BlendingController extends Controller
 
         try {
             $total = $this->blendingService->getTotalStockMaterial($materialId, $plantId);
-            return response()->json(['data' => [['total' => number_format($total, 3)]]]);
+            return ApiResponse::success([['total' => number_format($total, 3)]]);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -158,9 +149,9 @@ class BlendingController extends Controller
 
         try {
             $total = $this->blendingService->getTotalQtyMaterial($mode, $entryNo, $idHead ? (int) $idHead : null, $plantId);
-            return response()->json(['data' => [['total' => number_format($total, 3)]]]);
+            return ApiResponse::success([['total' => number_format($total, 3)]]);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -176,9 +167,9 @@ class BlendingController extends Controller
 
         try {
             $data = $this->blendingService->getMaterialList($mode, $entryNo, $idHead ? (int) $idHead : null, $plantId);
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -192,9 +183,9 @@ class BlendingController extends Controller
 
         try {
             $data = $this->blendingService->getActiveTanksRundown($materialId, $plantId);
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -207,9 +198,9 @@ class BlendingController extends Controller
 
         try {
             $data = $this->blendingService->getActiveSpecificTanksRundown($sloc);
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -222,9 +213,9 @@ class BlendingController extends Controller
 
         try {
             $data = $this->blendingService->getTanks($plantId > 0 ? $plantId : null);
-            return response()->json(['success' => true, 'data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -237,9 +228,9 @@ class BlendingController extends Controller
 
         try {
             $data = $this->blendingService->getTankDetails($tankId, $plantId > 0 ? $plantId : null);
-            return response()->json(['success' => true, 'data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -252,9 +243,9 @@ class BlendingController extends Controller
 
         try {
             $data = $this->blendingService->getAllTanks($plantId);
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -271,10 +262,7 @@ class BlendingController extends Controller
             return $this->buildResponse($result, 'delete', 'delete', $request);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Delete failed: ' . $e->getMessage()
-            ], 500);
+            return ApiResponse::error('Delete failed: ' . $e->getMessage(), 500);
         }
     }
 
@@ -308,9 +296,8 @@ class BlendingController extends Controller
             default => 'Operation failed' . (isset($result['message']) ? ': ' . $result['message'] : '') . (isset($result['error_detail']) ? ': ' . $result['error_detail'] : ''),
         };
 
-        return response()->json(array_merge(
-            ['status' => $status, 'message' => $message],
-            $status === 1 && $flag === 'post_blendingEntryMaterial' ? [
+        if ($status === 1) {
+            $extra = $flag === 'post_blendingEntryMaterial' ? [
                 'mode' => $mode,
                 'idMaterial' => $request->input('idMaterial'),
                 'entryDate' => $request->input('entryDate'),
@@ -318,7 +305,9 @@ class BlendingController extends Controller
                 'idHead' => $request->input('idHead'),
                 'materialDoc' => $request->input('materialDoc'),
                 'idTank' => $request->input('idTank'),
-            ] : []
-        ));
+            ] : [];
+            return ApiResponse::success(null, $message, 200, $extra);
+        }
+        return ApiResponse::error($message, 422);
     }
 }

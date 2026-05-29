@@ -1,4 +1,7 @@
+<template>
+  <ManufacturerIndex />
+</template>
+
 <script setup>
-import ManufacturerSetupView from '@/views/setup/manufacturer/ManufacturerSetupView.vue'
+import ManufacturerIndex from './ManufacturerIndex.vue'
 </script>
-<template><ManufacturerSetupView /></template>

@@ -1,4 +1,7 @@
+<template>
+  <MaterialIndex />
+</template>
+
 <script setup>
-import MaterialSetupView from '@/views/setup/material/MaterialSetupView.vue'
+import MaterialIndex from './MaterialIndex.vue'
 </script>
-<template><MaterialSetupView /></template>

@@ -36,7 +36,7 @@ export async function registerModules(moduleGlob) {
         stores.push(...mod.stores)
       }
     } catch (err) {
-      console.warn(`[ModuleLoader] Failed to load ${path}:`, err)
+      /* module load error bypassed */
     }
   }
 

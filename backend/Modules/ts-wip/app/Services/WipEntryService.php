@@ -4,7 +4,9 @@ namespace Modules\TsWip\Services;
 use Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface;
 use Illuminate\Support\Facades\Auth;
 
-class WipEntryService
+use Modules\TsWip\Services\Contracts\WipEntryServiceInterface;
+
+class WipEntryService implements WipEntryServiceInterface
 {
     public function __construct(
         protected WipEntryRepositoryInterface $wipEntryRepo
@@ -142,13 +144,13 @@ class WipEntryService
         $messages = [
             '1'  => 'Success ' . $mode . ' ' . $feature,
             '0'  => 'Failed ' . $mode . ' ' . $feature,
-            '2'  => $feature . ' already exists',
-            '3'  => $feature . ' Not Enough Reserve!',
-            '4'  => $feature . ' Feed N/A!',
+            '2'  => $feature . ' already exists - Duplicate entry for the same date, tank, and material',
+            '3'  => $feature . ' Not Enough Reserve! - Insufficient balance available for this operation',
+            '4'  => $feature . ' Feed N/A! - Required feed trace not found for this date',
             '5'  => $feature . ' Feed Qty undefined!',
-            '6'  => $feature . ' No Supplier Traced!',
-            '7'  => $feature . ' Double Trace no!',
-            '99' => $feature . ' Period Locked!',
+            '6'  => $feature . ' No Supplier Traced! - No supplier details available for the feed',
+            '7'  => $feature . ' Double Trace no! - Duplicate trace number detected',
+            '99' => $feature . ' Period Locked! - This period is locked and cannot be modified',
         ];
 
         return [

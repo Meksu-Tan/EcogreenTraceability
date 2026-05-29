@@ -1,4 +1,7 @@
+<template>
+  <StorageIndex />
+</template>
+
 <script setup>
-import StorageSetupView from '@/views/setup/storage/StorageSetupView.vue'
+import StorageIndex from './StorageIndex.vue'
 </script>
-<template><StorageSetupView /></template>

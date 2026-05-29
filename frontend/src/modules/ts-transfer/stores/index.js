@@ -35,7 +35,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
       const response = await transferApi.getActiveMaterials()
       activeMaterials.value = response?.data || []
     } catch (err) {
-      console.error('Failed to fetch active materials:', err)
+      toastStore.error('Failed to fetch active materials:')
     }
   }
 
@@ -56,7 +56,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
       totalStock.value = parseFloat(response?.data?.[0]?.total || 0)
       return response
     } catch (err) {
-      console.error('Failed to fetch total stock:', err)
+      toastStore.error('Failed to fetch total stock:')
       throw err
     }
   }
@@ -67,7 +67,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
       activeTanks.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch tanks:', err)
+      toastStore.error('Failed to fetch tanks:')
       throw err
     }
   }
@@ -78,7 +78,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
       activeSpecificTanks.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch specific tanks:', err)
+      toastStore.error('Failed to fetch specific tanks:')
       throw err
     }
   }
@@ -89,7 +89,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
       supplierCode.value = response?.data?.[0] || null
       return response
     } catch (err) {
-      console.error('Failed to fetch supplier code:', err)
+      toastStore.error('Failed to fetch supplier code:')
       throw err
     }
   }

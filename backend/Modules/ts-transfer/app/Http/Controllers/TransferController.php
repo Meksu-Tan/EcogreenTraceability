@@ -24,10 +24,7 @@ class TransferController extends Controller
 
             return ApiResponse::success($data, 'Transfer list retrieved successfully', 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Failed to retrieve transfer list: ' . $e->getMessage()
-            ], 500);
+            return ApiResponse::error('Failed to retrieve transfer list: ' . $e->getMessage(), 500);
         }
     }
 
@@ -58,10 +55,7 @@ class TransferController extends Controller
             return $this->buildResponse($result, $flag, $mode);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Transfer operation failed: ' . $e->getMessage()
-            ], 500);
+            return ApiResponse::error('Transfer operation failed: ' . $e->getMessage(), 500);
         }
     }
 
@@ -88,10 +82,7 @@ class TransferController extends Controller
             $result = $this->transferService->deactivateTransfer($id, $user);
             return $this->buildResponse($result, 'delete', 'delete');
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => 'Delete failed: ' . $e->getMessage()
-            ], 500);
+            return ApiResponse::error('Delete failed: ' . $e->getMessage(), 500);
         }
     }
 
@@ -99,9 +90,9 @@ class TransferController extends Controller
     {
         try {
             $data = $this->transferService->getActiveMaterials();
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -112,9 +103,9 @@ class TransferController extends Controller
 
         try {
             $entryNo = $this->transferService->generateEntryNo($materialId, $plantId);
-            return response()->json(['data' => [['entryNo' => $entryNo]]]);
+            return ApiResponse::success([['entryNo' => $entryNo]]);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -127,9 +118,9 @@ class TransferController extends Controller
 
         try {
             $data = $this->transferService->getActiveTanksRundown($materialId, $plantId);
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -139,9 +130,9 @@ class TransferController extends Controller
 
         try {
             $data = $this->transferService->getActiveSpecificTanksRundown($sloc);
-            return response()->json(['data' => $data]);
+            return ApiResponse::success($data);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -153,9 +144,9 @@ class TransferController extends Controller
 
         try {
             $total = $this->transferService->getTotalStockMaterial($materialId, $tankId, $plantId);
-            return response()->json(['data' => [['total' => number_format($total, 3)]]]);
+            return ApiResponse::success([['total' => number_format($total, 3)]]);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -174,10 +165,7 @@ class TransferController extends Controller
             );
             return $this->buildResponse($result, $flag, $mode);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => $e->getMessage()
-            ], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -195,10 +183,7 @@ class TransferController extends Controller
             );
             return $this->buildResponse($result, $flag, $mode);
         } catch (\Exception $e) {
-            return response()->json([
-                'status' => 0,
-                'message' => $e->getMessage()
-            ], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -210,9 +195,9 @@ class TransferController extends Controller
 
         try {
             $result = $this->transferService->getUpdateSupplierMaterial($materialId, $tankId, $plantId);
-            return response()->json(['data' => $result ? [$result] : []]);
+            return ApiResponse::success($result ? [$result] : []);
         } catch (\Exception $e) {
-            return response()->json(['status' => 0, 'message' => $e->getMessage()], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -250,6 +235,9 @@ class TransferController extends Controller
             default => $result['message'] ?? 'Operation failed',
         };
 
-        return response()->json(['status' => $status, 'message' => $message]);
+        if ($status === 1) {
+            return ApiResponse::success(null, $message);
+        }
+        return ApiResponse::error($message, 422);
     }
 }

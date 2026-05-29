@@ -54,8 +54,8 @@ class TankService
 
     public function syncFromExternal(string $user): array
     {
-        $url = 'https://172.16.11.101:44302/api/ext/tankfarm-master';
-        $token = env('TANKFARM_API_TOKEN', '267b7f754e1c79a9e8f8fa4394bc4b6867deb1e23bfc7cf2f72da91498a32c20');
+        $url = config('services.tankfarm.url');
+        $token = config('services.tankfarm.token');
 
         $response = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->withHeaders([
             'Accept' => 'application/json',

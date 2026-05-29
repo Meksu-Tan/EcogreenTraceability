@@ -1,404 +1,142 @@
 <?php declare(strict_types=1);
+
 namespace Modules\TsRaw\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Modules\TsRaw\Services\RmEntryService;
+use Modules\TsRaw\Services\Contracts\RmEntryServiceInterface;
 use Modules\TsRaw\Http\Requests\StoreRmEntryRequest;
 use Modules\TsRaw\Http\Requests\StoreSupplierTempRequest;
-use Modules\Tank\Models\Tank;
-use Modules\Tank\Models\TankDetail;
-use Modules\Material\Models\Material;
-use Modules\Supplier\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\DB;
 use App\Helpers\ApiResponse;
+use Illuminate\Http\JsonResponse;
 
 class RmEntryController extends Controller
 {
-    protected $rmEntryService;
+    public function __construct(
+        protected RmEntryServiceInterface $rmEntryService
+    ) {}
 
-    public function __construct(RmEntryService $rmEntryService)
+    public function index(Request $request): JsonResponse
     {
-        $this->rmEntryService = $rmEntryService;
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $data = $this->rmEntryService->getRmList($plantId);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
-    public function index(Request $request)
+    public function show($id): JsonResponse
     {
-        try {
-            $plantId = $request->has('id_plant')
-                ? $request->input('id_plant')
-                : (Auth::user()?->id_plant ?? 0);
-            $data = $this->rmEntryService->getRmList($plantId);
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $result = $this->rmEntryService->getRmEntryById($id);
+        return ApiResponse::success($result, 'OK', 200);
     }
 
-    public function show($id)
+    public function store(StoreRmEntryRequest $request): JsonResponse
     {
-        try {
-            $result = $this->rmEntryService->getRmEntryById($id);
-            return response()->json([
-                'success' => true,
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $data = $request->validated();
+        $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $user = Auth::user()?->name ?? 'System';
+
+        $result = $this->rmEntryService->saveRmEntry($data, $user);
+        return ApiResponse::success($result, 'RM Entry created successfully', 201);
     }
 
-    public function store(StoreRmEntryRequest $request)
+    public function update(Request $request, $id): JsonResponse
     {
-        try {
-            $data = $request->validated();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            $user = Auth::user()?->name ?? 'System';
+        $data = $request->all();
+        $user = Auth::user()?->name ?? 'System';
 
-            $result = $this->rmEntryService->saveRmEntry($data, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'RM Entry created successfully',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $result = $this->rmEntryService->updateRmEntry((int)$id, $data, $user);
+        return ApiResponse::success($result, 'RM Entry updated successfully', 200);
     }
 
-    public function update(Request $request, $id)
+    public function destroy($id): JsonResponse
     {
-        try {
-            $data = $request->validated();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            $user = Auth::user()?->name ?? 'System';
-
-            $result = $this->rmEntryService->updateRmEntry($id, $data, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'RM Entry updated successfully',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $user = Auth::user()?->name ?? 'System';
+        $result = $this->rmEntryService->deactivateRmEntry((int)$id, $user);
+        return ApiResponse::success($result, 'RM Entry deactivated successfully', 200);
     }
 
-    public function destroy($id)
+    public function newNumber(Request $request): JsonResponse
     {
-        try {
-            $user = Auth::user()?->name ?? 'System';
-            $result = $this->rmEntryService->deactivateRmEntry($id, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'RM Entry deactivated successfully'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $rmNumber = $this->rmEntryService->generateRmNumber($plantId);
+        return ApiResponse::success(['rm_number' => $rmNumber], 'OK', 200);
     }
 
-    public function newNumber(Request $request)
+    public function tanks(Request $request): JsonResponse
     {
-        try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            $tankDesc = $request->input('tank_desc');
-
-            if ($plantId == 0 && $tankDesc) {
-                $tank = Tank::where('description', $tankDesc)->first();
-                if ($tank) {
-                    $plantId = $tank->id_plant;
-                }
-            }
-
-            $rmNumber = $this->rmEntryService->generateRmNumber($plantId);
-
-            return response()->json([
-                'success' => true,
-                'data' => ['rm_number' => $rmNumber]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $tanks = $this->rmEntryService->getStorageTanks($plantId);
+        return ApiResponse::success($tanks, 'OK', 200);
     }
 
-    public function tanks(Request $request)
+    public function tankDetails(Request $request, $tankId): JsonResponse
     {
-        try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            if ($plantId) {
-                if (is_numeric($plantId)) {
-                    $plant = \Modules\Plant\Models\Plant::find($plantId);
-                    if ($plant && $plant->code_3) {
-                        $plantId = $plant->code_3;
-                    }
-                }
-            }
-
-            $query = Tank::active()->storage();
-
-            if ($plantId) {
-                $query->where('id_plant', $plantId);
-            }
-
-            $tanks = $query->orderBy('description')
-                ->groupBy('description', 'id_plant')
-                ->get(['description as tank', 'id_plant']);
-
-            return response()->json([
-                'success' => true,
-                'data' => $tanks
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $plantId = $request->input('id_plant');
+        $details = $this->rmEntryService->getSpecificTankDetails($tankId, $plantId);
+        return ApiResponse::success($details, 'OK', 200);
     }
 
-    public function tankDetails(Request $request, $tankId)
+    public function materials(): JsonResponse
     {
-        try {
-            $plantId = $request->input('id_plant');
-            if ($plantId === '' || $plantId === null) {
-                $plantId = Auth::user()?->id_plant ?? 0;
-            }
-            if ($plantId) {
-                if (is_numeric($plantId)) {
-                    $plant = \Modules\Plant\Models\Plant::find($plantId);
-                    if ($plant && $plant->code_3) {
-                        $plantId = $plant->code_3;
-                    }
-                }
-            }
-
-            $tanksQuery = Tank::active()->where('description', $tankId);
-            if ($plantId) {
-                $tanksQuery->where('id_plant', $plantId);
-            }
-            $tanks = $tanksQuery->get();
-
-            $result = [];
-            foreach ($tanks as $tank) {
-                if (!empty($tank->id_tank)) {
-                    $result[] = [
-                        'id_tank_tail' => $tank->id_sloc, // compatible with frontend id_tank_tail expecting individual tank identifier
-                        'tankNo' => $tank->id_tank,
-                        'id_sloc' => $tank->id_sloc
-                    ];
-                }
-            }
-
-            usort($result, function($a, $b) {
-                return strcmp($a['tankNo'], $b['tankNo']);
-            });
-
-            return response()->json([
-                'success' => true,
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $materials = $this->rmEntryService->getRmMaterials();
+        return ApiResponse::success($materials, 'OK', 200);
     }
 
-    public function materials()
+    public function searchSuppliers(Request $request): JsonResponse
     {
-        try {
-            $materials = Material::where('status', 1)
-                ->where('type', 'RM')
-                ->orderBy('code')
-                ->get()
-                ->map(function ($item) {
-                    return [
-                        'id_material' => $item->id_material,
-                        'material' => strtoupper($item->description) . ' (' . $item->code . ' / ' . $item->type . ' / Feed: ' . $item->qtf_feed . ' / Rundown: ' . $item->qtf_rundown . ')'
-                    ];
-                });
-
-            return response()->json([
-                'success' => true,
-                'data' => $materials
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $search = $request->input('q') ?? '';
+        $suppliers = $this->rmEntryService->searchSuppliersList($search);
+        return ApiResponse::success($suppliers);
     }
 
-    public function searchSuppliers(Request $request)
+    public function batchCode(Request $request): JsonResponse
     {
-        try {
-            $search = $request->input('q', '');
-
-            $suppliers = Supplier::where('status', 1)
-                ->where('description', 'like', '%' . $search . '%')
-                ->orderBy('description')
-                ->get()
-                ->map(function ($item) {
-                    return [
-                        'id' => $item->id_supplier,
-                        'text' => $item->code . ' :: ' . $item->description
-                    ];
-                });
-
-            return response()->json($suppliers);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $supplierId = $request->input('id_supplier');
+        $batchCode = $this->rmEntryService->generateBatchCode($supplierId);
+        return ApiResponse::success(['batch_code' => $batchCode], 'OK', 200);
     }
 
-    public function batchCode(Request $request)
+    public function addSupplier(StoreSupplierTempRequest $request): JsonResponse
     {
-        try {
-            $supplierId = $request->input('id_supplier');
-            $batchCode = $this->rmEntryService->generateBatchCode($supplierId);
+        $data = $request->validated();
+        $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $user = Auth::user()?->name ?? 'System';
 
-            return response()->json([
-                'success' => true,
-                'data' => ['batch_code' => $batchCode]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $result = $this->rmEntryService->addSupplierTemp($data, $user);
+        return ApiResponse::success($result, 'Supplier added successfully', 200);
     }
 
-    public function addSupplier(StoreSupplierTempRequest $request)
+    public function supplierList(Request $request): JsonResponse
     {
-        try {
-            $data = $request->validated();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            $user = Auth::user()?->name ?? 'System';
-
-            $result = $this->rmEntryService->addSupplierTemp($data, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Supplier added successfully',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $entryNo = $request->input('entry_no') ?? '';
+        $data = $this->rmEntryService->getSupplierList($entryNo);
+        return ApiResponse::success($data, 'OK', 200);
     }
 
-    public function supplierList(Request $request)
+    public function deleteSupplier($id): JsonResponse
     {
-        try {
-            $entryNo = $request->input('entry_no');
-            $data = $this->rmEntryService->getSupplierList($entryNo);
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $user = Auth::user()?->name ?? 'System';
+        $this->rmEntryService->deleteSupplierTemp((int)$id, $user);
+        return ApiResponse::success(null, 'Supplier deleted successfully', 200);
     }
 
-    public function deleteSupplier($id)
+    public function clearTempSuppliers($entryNo): JsonResponse
     {
-        try {
-            $user = Auth::user()?->name ?? 'System';
-            $this->rmEntryService->deleteSupplierTemp($id, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Supplier deleted successfully'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $user = Auth::user()?->name ?? 'System';
+        $this->rmEntryService->clearTempData($entryNo, $user);
+        return ApiResponse::success(null, 'Temp suppliers cleared successfully', 200);
     }
 
-    public function clearTempSuppliers($entryNo)
+    public function totalQty(Request $request): JsonResponse
     {
-        try {
-            $user = Auth::user()?->name ?? 'System';
-            // The service will call the repository to clear all temp data for the entry
-            $repo = app()->make(\Modules\TsRaw\Repositories\RmEntryRepository::class);
-            $repo->clearTempData($entryNo, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Temp suppliers cleared successfully'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $entryNo = $request->input('entry_no') ?? '';
+        $total = $this->rmEntryService->getTotalQtyTemp($entryNo);
+        return ApiResponse::success(['total' => number_format($total, 3)], 'OK', 200);
     }
 
-    public function totalQty(Request $request)
-    {
-        try {
-            $entryNo = $request->input('entry_no');
-            $total = $this->rmEntryService->getTotalQtyTemp($entryNo);
-
-            return response()->json([
-                'success' => true,
-                'data' => ['total' => number_format($total, 3)]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function transfer(Request $request)
+    public function transfer(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'entry_date' => 'required|date',
@@ -411,398 +149,186 @@ class RmEntryController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+            return ApiResponse::error('Validation error', 422, $validator->errors()->toArray());
         }
 
-        try {
-            $data = $request->all();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            $user = Auth::user()?->name ?? 'System';
+        $data = $request->all();
+        $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $user = Auth::user()?->name ?? 'System';
 
-            $result = $this->rmEntryService->saveRmTrfEntry($data, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'RM Transfer processed successfully',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $result = $this->rmEntryService->saveRmTrfEntry($data, $user);
+        return ApiResponse::success($result, 'RM Transfer processed successfully', 200);
     }
 
-    public function transferNumber(Request $request)
+    public function transferNumber(Request $request): JsonResponse
     {
-        try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            $tankDesc = $request->input('tank_desc');
-
-            if ($plantId == 0 && $tankDesc) {
-                $tank = Tank::where('description', $tankDesc)->first();
-                if ($tank) {
-                    $plantId = $tank->id_plant;
-                }
-            }
-
-            $rmNumber = $this->rmEntryService->generateTransferNumber($plantId);
-
-            return response()->json([
-                'success' => true,
-                'data' => ['rm_number' => $rmNumber]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $rmNumber = $this->rmEntryService->generateTransferNumber($plantId);
+        return ApiResponse::success(['rm_number' => $rmNumber], 'OK', 200);
     }
 
-    public function checkStockSync(Request $request)
+    public function checkStockSync(Request $request): JsonResponse
     {
-        try {
-            $entryNo = $request->input('entry_no');
-            $materialId = $request->input('id_material');
+        $entryNo = $request->input('entry_no');
+        $materialId = $request->input('id_material') ? (int)$request->input('id_material') : null;
 
-            if (!$entryNo) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Entry number is required'
-                ], 422);
-            }
-
-            $syncStatus = $this->rmEntryService->checkStockSynchronization($entryNo, $materialId);
-
-            return response()->json([
-                'success' => true,
-                'data' => $syncStatus
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+        if (!$entryNo) {
+            return ApiResponse::error('Entry number is required', 422);
         }
+
+        $syncStatus = $this->rmEntryService->checkStockSynchronization($entryNo, $materialId);
+        return ApiResponse::success($syncStatus, 'OK', 200);
     }
 
-    public function debugFifoStock(Request $request)
+    public function debugFifoStock(Request $request): JsonResponse
     {
-        try {
-            $materialId = $request->input('id_material');
-            $tankId = $request->input('id_tank');
-            $tankTail = $request->input('id_tank_tail');
-            $plantId = $request->input('id_plant');
-            $tankMatching = $request->input('tank_matching', 'flexible');
+        $materialId = $request->input('id_material');
+        $tankId = $request->input('id_tank');
+        $tankTail = $request->input('id_tank_tail');
+        $plantId = $request->input('id_plant');
+        $tankMatching = $request->input('tank_matching', 'flexible');
 
-            if (!$materialId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Material ID is required'
-                ], 422);
-            }
-
-            // Handle id_sloc_tail - ensure it's always a JSON array with string values
-            $tankTailJson = null;
-            if (!empty($tankTail)) {
-                if (is_array($tankTail)) {
-                    $tankTailJson = json_encode(array_map('strval', array_values($tankTail)));
-                } else {
-                    $decoded = json_decode($tankTail, true);
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                        $tankTailJson = json_encode(array_map('strval', array_values($decoded)));
-                    } else {
-                        $tankTailJson = json_encode([(string)$tankTail]);
-                    }
-                }
-            }
-
-            $feedData = [
-                'id_material' => $materialId,
-                'id_sloc' => $tankId,
-                'id_sloc_tail' => $tankTailJson,
-                'balance_plant' => $plantId,
-                'trace_prefixes' => ['1'],
-                'tank_matching' => $tankMatching
-            ];
-
-            $fifoDetails = \Modules\Shared\Helpers\Feed::getDetailedFifoStock($feedData);
-
-            return response()->json([
-                'success' => true,
-                'data' => $fifoDetails
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+        if (!$materialId) {
+            return ApiResponse::error('Material ID is required', 422);
         }
-    }
 
-    public function verifySeparateEntries(Request $request)
-    {
-        try {
-            $materialId = $request->input('id_material');
-            $tankId = $request->input('id_tank');
-            $plantId = $request->input('id_plant');
-            $hoursBack = $request->input('hours_back', 24);
-
-            if (!$materialId || !$tankId || !$plantId) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Material ID, Tank ID, and Plant ID are required'
-                ], 422);
-            }
-
-            $verification = $this->rmEntryService->verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack);
-
-            return response()->json([
-                'success' => true,
-                'data' => $verification
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    // Storage and Feed Log Methods (moved from ts-transfer)
-    public function storageLog(Request $request)
-    {
-        try {
-            $plantId = $request->input('id_plant');
-            if ($plantId === '' || $plantId === null) {
-                $plantId = Auth::user()?->id_plant ?? 0;
-            }
-            $data = $this->rmEntryService->getStorageLog($plantId);
-            return response()->json(['success' => true, 'data' => $data]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function feedLog(Request $request)
-    {
-        try {
-            $plantId = $request->input('id_plant');
-            if ($plantId === '' || $plantId === null) {
-                $plantId = Auth::user()?->id_plant ?? 0;
-            }
-            $data = $this->rmEntryService->getFeedLog($plantId);
-            return response()->json(['success' => true, 'data' => $data]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function debugFeedLog(Request $request)
-    {
-        try {
-            $plantId = $request->input('id_plant');
-            if ($plantId === '' || $plantId === null) {
-                $plantId = Auth::user()?->id_plant ?? 0;
-            }
-            $data = $this->rmEntryService->debugFeedLog($plantId);
-            return response()->json(['success' => true, 'data' => $data]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    // Transfer Methods (moved from ts-transfer)
-    public function sourceEntries(Request $request)
-    {
-        try {
-            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
-            $entries = BalanceHeader::active()
-                ->rmEntry()
-                ->where('qty', '>', 0)
-                ->where('id_plant', $plantId)
-                ->with(['material', 'tank'])
-                ->get()
-                ->map(function ($item) {
-                    return [
-                        'id_balance_head' => $item->id_balance_head,
-                        'trace_no' => $item->trace_no,
-                        'material' => $item->material->description ?? 'Unknown',
-                        'tank' => $item->tank->description ?? 'Unknown',
-                        'qty' => $item->qty
-                    ];
-                });
-
-            return response()->json(['success' => true, 'data' => $entries]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function destTanks(Request $request)
-    {
-        try {
-            $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
-            if ($plantId) {
-                $plant = \Modules\Plant\Models\Plant::find($plantId);
-                if ($plant && $plant->code_3) {
-                    $plantId = $plant->code_3;
-                }
-            }
-            $query = Tank::active()
-                ->feed()
-                ->orderBy('description')
-                ->groupBy('description', 'id_plant');
-            
-            if ($plantId && $plantId !== '0' && $plantId !== 0) {
-                $query->where('id_plant', $plantId);
-            }
-            
-            $tanks = $query->get(['description as tank', 'id_plant']);
-
-            return response()->json(['success' => true, 'data' => $tanks]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function transfers(Request $request)
-    {
-        try {
-            $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-            $data = $this->rmEntryService->getTransferList($plantId);
-            return response()->json(['success' => true, 'data' => $data]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function interPlantTransfer(Request $request)
-    {
-        try {
-            $data = $request->all();
-            $data['id_plant'] = $request->input('id_plant', Auth::user()->id_plant ?? 0);
-            $user = Auth::user()->name;
-
-            $result = $this->rmEntryService->transfer($data, $user);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Transfer completed successfully',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function matlDoc(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'mode' => 'required|in:ADD,UPDATE',
-                'id' => 'required|integer',
-                'number' => 'required|string'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-            }
-
-            $mode = $request->input('mode');
-            $id = $request->input('id');
-            $number = $request->input('number');
-            $user = Auth::user()->name ?? 'System';
-
-            if ($mode === 'ADD') {
-                $exists = DB::connection('eudr_ts')->table('t_material_document')
-                    ->where('id_trace_head', $id)
-                    ->exists();
-                if ($exists) {
-                    DB::connection('eudr_ts')->table('t_material_document')
-                        ->where('id_trace_head', $id)
-                        ->update(['material_document' => $number, 'updated_by' => $user]);
-                } else {
-                    DB::connection('eudr_ts')->table('t_material_document')->insert([
-                        'id_trace_head' => $id,
-                        'material_document' => $number,
-                        'created_by' => $user
-                    ]);
-                }
+        $tankTailJson = null;
+        if (!empty($tankTail)) {
+            if (is_array($tankTail)) {
+                $tankTailJson = json_encode(array_map('strval', array_values($tankTail)));
             } else {
-                DB::connection('eudr_ts')->table('t_material_document')
-                    ->where('id_trace_head', $id)
-                    ->update(['material_document' => $number, 'updated_by' => $user]);
-            }
-
-            return response()->json(['success' => true, 'status' => 1]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
-    }
-
-    public function updateSubTank(Request $request)
-    {
-        try {
-            $validator = Validator::make($request->all(), [
-                'id_head' => 'required|integer',
-                'id_tank_tail' => 'required'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-            }
-
-            $idHead = $request->input('id_head');
-            $idTankTail = $request->input('id_tank_tail');
-
-            // Handle id_tank_tail - ensure it's always a JSON array with string values
-            $tankTailJson = null;
-            if (!empty($idTankTail)) {
-                if (is_array($idTankTail)) {
-                    $tankTailJson = json_encode(array_map('strval', array_values($idTankTail)));
+                $decoded = json_decode($tankTail, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $tankTailJson = json_encode(array_map('strval', array_values($decoded)));
                 } else {
-                    $decoded = json_decode($idTankTail, true);
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                        $tankTailJson = json_encode(array_map('strval', array_values($decoded)));
-                    } else {
-                        // Single value as string, wrap in array
-                        $tankTailJson = json_encode([(string)$idTankTail]);
-                    }
+                    $tankTailJson = json_encode([(string)$tankTail]);
                 }
             }
-
-            DB::connection('eudr_ts')->table('t_balance_header')
-                ->where('id_balance_head', $idHead)
-                ->update(['id_sloc_tail' => $tankTailJson]);
-
-            return response()->json(['success' => true, 'status' => 1]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+
+        $feedData = [
+            'id_material' => (int)$materialId,
+            'id_sloc' => $tankId,
+            'id_sloc_tail' => $tankTailJson,
+            'balance_plant' => $plantId,
+            'trace_prefixes' => ['1'],
+            'tank_matching' => $tankMatching
+        ];
+
+        $fifoDetails = \Modules\Shared\Helpers\Feed::getDetailedFifoStock($feedData);
+        return ApiResponse::success($fifoDetails, 'OK', 200);
     }
 
-    public function deactivateTransfer(Request $request, $id)
+    public function verifySeparateEntries(Request $request): JsonResponse
     {
-        try {
-            $user = Auth::user()->name;
-            $result = $this->rmEntryService->deactivateTransfer($id, $user);
+        $materialId = (int)$request->input('id_material');
+        $tankId = (int)$request->input('id_tank');
+        $plantId = (int)$request->input('id_plant');
+        $hoursBack = (int)$request->input('hours_back', 24);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Transfer deactivated successfully'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+        if (!$materialId || !$tankId || !$plantId) {
+            return ApiResponse::error('Material ID, Tank ID, and Plant ID are required', 422);
         }
+
+        $verification = $this->rmEntryService->verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack);
+        return ApiResponse::success($verification, 'OK', 200);
+    }
+
+    public function storageLog(Request $request): JsonResponse
+    {
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $data = $this->rmEntryService->getStorageLog($plantId);
+        return ApiResponse::success($data, 'OK', 200);
+    }
+
+    public function feedLog(Request $request): JsonResponse
+    {
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $data = $this->rmEntryService->getFeedLog($plantId);
+        return ApiResponse::success($data, 'OK', 200);
+    }
+
+    public function debugFeedLog(Request $request): JsonResponse
+    {
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $data = $this->rmEntryService->debugFeedLog($plantId);
+        return ApiResponse::success($data, 'OK', 200);
+    }
+
+    public function sourceEntries(Request $request): JsonResponse
+    {
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+        $entries = $this->rmEntryService->getSourceEntriesList($plantId);
+        return ApiResponse::success($entries, 'OK', 200);
+    }
+
+    public function destTanks(Request $request): JsonResponse
+    {
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+        $tanks = $this->rmEntryService->getDestTanksList($plantId);
+        return ApiResponse::success($tanks, 'OK', 200);
+    }
+
+    public function transfers(Request $request): JsonResponse
+    {
+        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $data = $this->rmEntryService->getTransferList($plantId);
+        return ApiResponse::success($data, 'OK', 200);
+    }
+
+    public function interPlantTransfer(Request $request): JsonResponse
+    {
+        $data = $request->all();
+        $data['id_plant'] = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+        $user = Auth::user()->name;
+
+        $result = $this->rmEntryService->transfer($data, $user);
+        return ApiResponse::success($result, 'Transfer completed successfully', 200);
+    }
+
+    public function matlDoc(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'mode' => 'required|in:ADD,UPDATE',
+            'id' => 'required|integer',
+            'number' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return ApiResponse::error('Validation error', 422, $validator->errors()->toArray());
+        }
+
+        $mode = $request->input('mode');
+        $id = (int)$request->input('id');
+        $number = $request->input('number');
+        $user = Auth::user()->name ?? 'System';
+
+        $result = $this->rmEntryService->saveMatlDoc($mode, $id, $number, $user);
+        return ApiResponse::success($result, 'Material Document saved successfully', 200);
+    }
+
+    public function updateSubTank(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'id_head' => 'required|integer',
+            'id_tank_tail' => 'required'
+        ]);
+
+        if ($validator->fails()) {
+            return ApiResponse::error('Validation error', 422, $validator->errors()->toArray());
+        }
+
+        $idHead = (int)$request->input('id_head');
+        $idTankTail = $request->input('id_tank_tail');
+
+        $result = $this->rmEntryService->updateSubTankSlocTail($idHead, $idTankTail);
+        return ApiResponse::success($result, 'Sub Tank updated successfully', 200);
+    }
+
+    public function deactivateTransfer(Request $request, $id): JsonResponse
+    {
+        $user = Auth::user()->name;
+        $result = $this->rmEntryService->deactivateTransfer((int)$id, $user);
+        return ApiResponse::success($result, 'Transfer deactivated successfully', 200);
     }
 }

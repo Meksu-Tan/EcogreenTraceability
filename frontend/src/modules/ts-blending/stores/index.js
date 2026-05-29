@@ -43,7 +43,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       activeMaterials.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch active materials:', err)
+      toastStore.error('Failed to fetch active materials:')
       throw err
     }
   }
@@ -65,7 +65,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       totalStock.value = parseFloat(response?.data?.[0]?.total || 0)
       return response
     } catch (err) {
-      console.error('Failed to fetch total stock:', err)
+      toastStore.error('Failed to fetch total stock:')
       throw err
     }
   }
@@ -76,7 +76,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       totalQty.value = parseFloat(response?.data?.[0]?.total || 0)
       return response
     } catch (err) {
-      console.error('Failed to fetch total qty:', err)
+      toastStore.error('Failed to fetch total qty:')
       throw err
     }
   }
@@ -87,7 +87,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       materialList.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch material list:', err)
+      toastStore.error('Failed to fetch material list:')
       throw err
     }
   }
@@ -98,7 +98,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       activeTanks.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch active tanks:', err)
+      toastStore.error('Failed to fetch active tanks:')
       throw err
     }
   }
@@ -109,7 +109,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       activeSpecificTanks.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch specific tanks:', err)
+      toastStore.error('Failed to fetch specific tanks:')
       throw err
     }
   }
@@ -120,7 +120,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       tanks.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch tanks:', err)
+      toastStore.error('Failed to fetch tanks:')
       throw err
     }
   }
@@ -131,7 +131,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       tankDetails.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch tank details:', err)
+      toastStore.error('Failed to fetch tank details:')
       throw err
     }
   }
@@ -142,7 +142,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       allTanks.value = response?.data || []
       return response
     } catch (err) {
-      console.error('Failed to fetch all tanks:', err)
+      toastStore.error('Failed to fetch all tanks:')
       throw err
     }
   }

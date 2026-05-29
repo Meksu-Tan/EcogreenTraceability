@@ -18,6 +18,6 @@ class RmReportController extends Controller
         $filters = $request->only(['plant_id', 'supplier_id', 'material_id', 'date_from', 'date_to']);
         $result = $this->inquiryService->getRmReport($filters);
 
-        return response()->json($result);
+        return ApiResponse::success($result);
     }
 }

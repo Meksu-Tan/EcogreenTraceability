@@ -1,4 +1,7 @@
+<template>
+  <SupplierIndex />
+</template>
+
 <script setup>
-import SupplierSetupView from '@/views/setup/supplier/SupplierSetupView.vue'
+import SupplierIndex from './SupplierIndex.vue'
 </script>
-<template><SupplierSetupView /></template>

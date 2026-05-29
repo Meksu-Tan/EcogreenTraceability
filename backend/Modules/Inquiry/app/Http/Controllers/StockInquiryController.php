@@ -18,13 +18,13 @@ class StockInquiryController extends Controller
         $filters = $request->only(['plant_id', 'material_id', 'storage_id', 'date_from', 'date_to']);
         $result = $this->inquiryService->getStockList($filters);
 
-        return response()->json($result);
+        return ApiResponse::success($result);
     }
 
     public function show($id): JsonResponse
     {
         $result = $this->inquiryService->getStockDetail((int) $id);
 
-        return response()->json($result);
+        return ApiResponse::success($result);
     }
 }
