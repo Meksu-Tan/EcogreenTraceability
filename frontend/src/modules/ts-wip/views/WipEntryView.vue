@@ -19,7 +19,7 @@
           <option v-for="section in wipSections" :key="section.key" :value="section.key">- {{ section.title }} -</option>
         </select>
         <button @click="reloadAll" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-          <i class="fas fa-sync" :class="{ 'animate-spin': loading }"></i> Sync Data
+          <Icon icon="ri:loader-4-line" :class="{ 'animate-spin': loading }" class="w-4 h-4" /> Sync Data
         </button>
         <div class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">
           QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
@@ -29,7 +29,7 @@
 
     <div v-if="loading" class="flex justify-center py-24">
       <div class="flex flex-col items-center gap-3">
-        <i class="fas fa-circle-notch animate-spin text-3xl text-green-600"></i>
+        <Icon icon="ri:loader-4-line" class="w-8 h-8 animate-spin text-green-600" />
         <span class="text-xs font-medium text-gray-500">Loading WIP entry sections...</span>
       </div>
     </div>
@@ -42,9 +42,9 @@
         <div class="p-4 space-y-4">
           <template v-for="(step, index) in section.steps" :key="step.key">
             <div v-if="step.type === 'label'" class="flex items-center justify-center gap-4 rounded-md border border-slate-200 bg-slate-700 px-4 py-3 text-white">
-              <i class="fas" :class="step.icon"></i>
+              <Icon :icon="step.icon" class="w-4 h-4" />
               <span class="text-sm font-bold tracking-wide">{{ step.label }}</span>
-              <i class="fas" :class="step.icon"></i>
+              <Icon :icon="step.icon" class="w-4 h-4" />
             </div>
             <div v-else class="border border-gray-100 rounded-lg overflow-hidden">
               <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 text-center">
@@ -53,19 +53,19 @@
               <div class="p-6">
                 <div class="flex flex-wrap justify-end gap-2 mb-4">
                   <button v-if="step.type === 'feed'" @click="openFeedModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <i class="fa fa-edit mr-1"></i> {{ step.button }}
+                    <Icon icon="ri:edit-line" class="w-3 h-3 mr-1" /> {{ step.button }}
                   </button>
                   <button v-else @click="openRundownModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <i class="fa fa-edit mr-1"></i> {{ step.button }}
+                    <Icon icon="ri:edit-line" class="w-3 h-3 mr-1" /> {{ step.button }}
                   </button>
                   <button @click="openBalanceModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <i class="fa fa-bars mr-1"></i> View Balance Per Batches
+                    <Icon icon="ri:list-check-2" class="w-3 h-3 mr-1" /> View Balance Per Batches
                   </button>
                   <button v-if="step.type === 'feed'" @click="openFeedLogModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <i class="fa fa-bars mr-1"></i> View Feed Logs
+                    <Icon icon="ri:list-check-2" class="w-3 h-3 mr-1" /> View Feed Logs
                   </button>
                   <button v-else @click="openRundownLogModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <i class="fa fa-bars mr-1"></i> View Rundown Logs
+                    <Icon icon="ri:list-check-2" class="w-3 h-3 mr-1" /> View Rundown Logs
                   </button>
                 </div>
                 <div class="mb-2 text-sm font-medium text-gray-700">LATEST LOG OF {{ step.title }}</div>
@@ -73,7 +73,7 @@
               </div>
             </div>
             <div v-if="index < section.steps.length - 1 && step.type !== 'label'" class="flex items-center justify-center text-slate-500">
-              <i class="fas fa-arrow-down text-xl"></i>
+              <Icon icon="ri:arrow-down-line" class="w-5 h-5" />
             </div>
           </template>
         </div>
@@ -130,6 +130,7 @@
 
 <script setup>
 import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
+import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
 import { useTsWipEntryStore } from '@/modules/ts-wip/stores/wip'
@@ -253,7 +254,7 @@ const wipSections = [
 ]
 
 function section(key, title, steps) { return { key, title, steps } }
-function label(label) { return { type: 'label', key: label, label, icon: label.startsWith('END') ? 'fa-flag-checkered' : 'fa-arrow-down' } }
+function label(label) { return { type: 'label', key: label, label, icon: label.startsWith('END') ? 'ri:flag-checkered-line' : 'ri:arrow-down-line' } }
 function feed(title, id, tag = null) { return { type: 'feed', key: `feed-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
 function rundown(title, id, tag = null) { return { type: 'rundown', key: `rundown-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
 

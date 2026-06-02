@@ -7,7 +7,7 @@
           <div class="flex items-center gap-2 mt-1">
             <span class="text-sm text-gray-500">Lokasi:</span>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-              <i class="fas fa-industry mr-1.5 opacity-70"></i>
+              <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3 opacity-70" />
               {{ plantSelectionStore.selectedPlantName }}
             </span>
           </div>
@@ -19,7 +19,7 @@
         @click="openTransferModal"
         class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
       >
-        <i class="fas fa-plus"></i>
+        <Icon icon="ri:add-line" class="w-4 h-4" />
         New Transfer Entry
       </button>
     </div>
@@ -27,7 +27,7 @@
     <!-- Warning -->
     <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
       <p class="text-sm text-red-700">
-        <i class="fas fa-exclamation-triangle mr-2"></i>
+        <Icon icon="ri:alert-line" class="w-4 h-4 mr-2" />
         QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
       </p>
     </div>
@@ -44,7 +44,7 @@
     <!-- Error State -->
     <div v-else-if="transferStore.error" class="rounded-lg border border-red-200 bg-red-50 p-4">
       <div class="flex">
-        <div class="flex-shrink-0"><i class="fas fa-exclamation-circle text-red-400"></i></div>
+        <div class="flex-shrink-0"><Icon icon="ri:error-warning-line" class="w-5 h-5 text-red-400" /></div>
         <div class="ml-3">
           <h3 class="text-sm font-medium text-red-800">Error loading data</h3>
           <p class="mt-2 text-sm text-red-700">{{ transferStore.error }}</p>
@@ -82,8 +82,8 @@
                   class="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
                   title="De-Activate"
                 >
-                  <i v-if="deactivatingId !== trf.id_balance_head" class="fas fa-trash"></i>
-                  <i v-else class="fas fa-spinner fa-spin"></i>
+                  <Icon v-if="deactivatingId !== trf.id_balance_head" icon="ri:delete-bin-line" class="w-4 h-4" />
+                  <Icon v-else icon="ri:loader-4-line" class="w-4 h-4 animate-spin" />
                 </button>
               </td>
               <td class="px-3 py-3 whitespace-nowrap text-center text-sm text-gray-900">{{ formatDate(trf.entry_date) }}</td>
@@ -121,7 +121,7 @@
             </tr>
             <tr v-if="transferStore.transferList.length === 0">
               <td colspan="11" class="px-6 py-12 text-center text-sm text-gray-500">
-                <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+                <Icon icon="ri:inbox-2-line" class="w-10 h-10 text-gray-300 mb-3" />
                 <p>Belum ada data transfer</p>
               </td>
             </tr>
@@ -149,7 +149,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
+import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsTransferStore } from '@/modules/ts-transfer/stores'
 import { useToastStore } from '@/stores/toast'
@@ -228,9 +229,5 @@ async function deactivateTransfer(trf) {
 
 watch(() => plantSelectionStore.selectedPlantId, () => {
   fetchData()
-})
-
-onMounted(() => {
-  fetchData()
-})
+}, { immediate: true })
 </script>

@@ -3,8 +3,9 @@ namespace Modules\Storage\Services;
 
 use Modules\Storage\Repositories\Contracts\StorageTankRepositoryInterface;
 use Modules\Storage\Repositories\Contracts\StorageWarehouseRepositoryInterface;
+use Modules\Storage\Services\Contracts\StorageServiceInterface;
 
-class StorageService
+class StorageService implements StorageServiceInterface
 {
     public function __construct(
         protected StorageTankRepositoryInterface $tankRepo,

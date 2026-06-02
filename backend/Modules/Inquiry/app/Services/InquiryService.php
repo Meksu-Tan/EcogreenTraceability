@@ -2,8 +2,9 @@
 namespace Modules\Inquiry\Services;
 
 use Modules\Inquiry\Repositories\Contracts\InquiryRepositoryInterface;
+use Modules\Inquiry\Services\Contracts\InquiryServiceInterface;
 
-class InquiryService
+class InquiryService implements InquiryServiceInterface
 {
     public function __construct(
         protected InquiryRepositoryInterface $inquiryRepository

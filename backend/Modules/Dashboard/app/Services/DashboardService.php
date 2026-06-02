@@ -2,8 +2,9 @@
 namespace Modules\Dashboard\Services;
 
 use Modules\Dashboard\Repositories\Contracts\DashboardRepositoryInterface;
+use Modules\Dashboard\Services\Contracts\DashboardServiceInterface;
 
-class DashboardService
+class DashboardService implements DashboardServiceInterface
 {
     public function __construct(
         protected DashboardRepositoryInterface $dashboardRepository

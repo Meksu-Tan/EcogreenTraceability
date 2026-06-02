@@ -8,7 +8,7 @@
           <div class="flex items-center gap-2 mt-1">
             <span class="text-sm text-gray-500">Lokasi:</span>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-              <i class="fas fa-industry mr-1.5 opacity-70"></i>
+              <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3 opacity-70" />
               {{ plantSelectionStore.selectedPlantName }}
             </span>
           </div>
@@ -23,7 +23,7 @@
           @click="openCreateModal"
           class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
         >
-          <i class="fas fa-plus"></i>
+          <Icon icon="ri:add-line" class="w-4 h-4" />
           New RM Entry
         </button>
         <button
@@ -31,7 +31,7 @@
           @click="openTransferModal"
           class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
         >
-          <i class="fas fa-arrow-right"></i>
+          <Icon icon="ri:arrow-right-line" class="w-4 h-4" />
           Transfer to Feed Tank
         </button>
         <div class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold flex items-center">
@@ -76,10 +76,10 @@
               <td class="px-4 py-3 whitespace-nowrap">
                 <div class="flex gap-2">
                   <button @click="deactivateEntry(entry.id_balance_head)" :disabled="entry.traced !== 'N/A'" class="text-red-600 hover:text-red-900 disabled:text-gray-400">
-                    <i class="fas fa-trash"></i>
+                    <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
                   </button>
                   <button @click="openUpdateModal(entry)" class="text-green-600 hover:text-green-900">
-                    <i class="fas fa-edit"></i>
+                    <Icon icon="ri:edit-line" class="w-4 h-4" />
                   </button>
                 </div>
               </td>
@@ -100,8 +100,8 @@
                 </div>
               </td>
               <td class="px-4 py-3 text-center">
-                <i v-if="entry.status == 1" class="fas fa-check text-green-500" title="Active"></i>
-                <i v-else class="fas fa-times text-red-500" title="Inactive"></i>
+                <Icon v-if="entry.status == 1" icon="ri:check-line" class="w-4 h-4 text-green-500" title="Active" />
+                <Icon v-else icon="ri:close-line" class="w-4 h-4 text-red-500" title="Inactive" />
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ entry.created_at }}</td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ entry.created_by }}</td>
@@ -121,7 +121,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="First Page"
           >
-            <i class="fas fa-angle-double-left"></i>
+            <Icon icon="ri:arrow-left-double-line" class="w-4 h-4" />
           </button>
           <button
             @click="currentPageStorage--"
@@ -129,7 +129,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Previous Page"
           >
-            <i class="fas fa-chevron-left"></i>
+            <Icon icon="ri:arrow-left-s-line" class="w-4 h-4" />
           </button>
           <div class="flex gap-1">
             <button
@@ -148,7 +148,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Next Page"
           >
-            <i class="fas fa-chevron-right"></i>
+            <Icon icon="ri:arrow-right-s-line" class="w-4 h-4" />
           </button>
           <button
             @click="currentPageStorage = totalPagesStorage"
@@ -156,7 +156,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Last Page"
           >
-            <i class="fas fa-angle-double-right"></i>
+            <Icon icon="ri:arrow-right-double-line" class="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -196,7 +196,7 @@
               <td v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 whitespace-nowrap text-gray-600 font-semibold">{{ log.plant_code || '-' }}</td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <button @click="deactivateTransfer(log.id_trace_head)" class="text-red-600 hover:text-red-900">
-                  <i class="fas fa-trash"></i>
+                  <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
                 </button>
               </td>
               <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-900 text-right">
@@ -219,7 +219,7 @@
                 </div>
               </td>
               <td class="px-4 py-3 text-center">
-                <i class="fas fa-check text-green-500" title="Active"></i>
+                <Icon icon="ri:check-line" class="w-4 h-4 text-green-500" title="Active" />
               </td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ log.created_at }}</td>
               <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ log.created_by }}</td>
@@ -239,7 +239,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="First Page"
           >
-            <i class="fas fa-angle-double-left"></i>
+            <Icon icon="ri:arrow-left-double-line" class="w-4 h-4" />
           </button>
           <button
             @click="currentPageFeed--"
@@ -247,7 +247,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Previous Page"
           >
-            <i class="fas fa-chevron-left"></i>
+            <Icon icon="ri:arrow-left-s-line" class="w-4 h-4" />
           </button>
           <div class="flex gap-1">
             <button
@@ -266,7 +266,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Next Page"
           >
-            <i class="fas fa-chevron-right"></i>
+            <Icon icon="ri:arrow-right-s-line" class="w-4 h-4" />
           </button>
           <button
             @click="currentPageFeed = totalPagesFeed"
@@ -274,7 +274,7 @@
             class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Last Page"
           >
-            <i class="fas fa-angle-double-right"></i>
+            <Icon icon="ri:arrow-right-double-line" class="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -299,6 +299,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { Icon } from '@iconify/vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
 import { usePlantSelectionStore } from '@/stores/plant'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
@@ -316,9 +317,8 @@ const isSlocModalOpen = ref(false)
 const selectedEntry = ref(null)
 const editingEntryId = ref(null)
 
-// Load data on mount
-onMounted(async () => {
-  await fetchData()
+onMounted(() => {
+  fetchData()
 })
 
 // Pagination State
@@ -476,8 +476,4 @@ function formatSuppliers(supplierString) {
   if (!supplierString) return '-'
   return supplierString.split(' | ').join('\n')
 }
-
-onMounted(() => {
-  fetchData()
-})
 </script>

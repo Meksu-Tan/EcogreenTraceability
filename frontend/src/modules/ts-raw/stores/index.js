@@ -3,9 +3,15 @@ import { ref, computed } from 'vue'
 import { RmEntryRepository, TankRepository, MaterialRepository, SupplierRepository } from '@/repositories'
 import transactionRmEntryApi from '../api'
 import { useToastStore } from '@/stores/toast'
+import { registerCacheResetCallback } from '@/stores/plant'
 
 export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const toastStore = useToastStore()
+
+  // Register cache reset callback for plant change scenarios
+  registerCacheResetCallback(() => {
+    resetCache()
+  })
 
   // Repository instances
   const rmEntryRepo = RmEntryRepository
@@ -310,7 +316,19 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     trfNumber.value = ''
     supplierList.value = []
     totalQty.value = '0.000'
+  }
+
+  function resetCache() {
+    // Reset all cached data for plant change scenarios
+    tanks.value = []
     tankDetails.value = []
+    materials.value = []
+    suppliers.value = []
+    entries.value = []
+    feedLogs.value = []
+    storageLogs.value = []
+    transferList.value = []
+    destTanks.value = []
   }
 
   // Storage and Feed Log Actions (moved from ts-transfer)
@@ -432,6 +450,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     transferEntry,
     validateStockSynchronization,
     resetForm,
+    resetCache,
     fetchStorageLogs,
     fetchFeedLogs,
     fetchTransferList,

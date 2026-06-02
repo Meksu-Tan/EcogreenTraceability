@@ -2,8 +2,9 @@
 namespace Modules\Tank\Services;
 
 use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
+use Modules\Tank\Services\Contracts\TankServiceInterface;
 
-class TankService
+class TankService implements TankServiceInterface
 {
     public function __construct(
         protected TankRepositoryInterface $tankRepo

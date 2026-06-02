@@ -1,0 +1,1 @@
+export { useSetupPlantStore } from './plantStore'

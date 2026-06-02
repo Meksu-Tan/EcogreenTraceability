@@ -2,8 +2,9 @@
 namespace Modules\Supplier\Services;
 
 use Modules\Supplier\Repositories\Contracts\SupplierRepositoryInterface;
+use Modules\Supplier\Services\Contracts\SupplierServiceInterface;
 
-class SupplierService
+class SupplierService implements SupplierServiceInterface
 {
     public function __construct(
         protected SupplierRepositoryInterface $supplierRepo

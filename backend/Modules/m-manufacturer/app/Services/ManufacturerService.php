@@ -2,8 +2,9 @@
 namespace Modules\Manufacturer\Services;
 
 use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;
+use Modules\Manufacturer\Services\Contracts\ManufacturerServiceInterface;
 
-class ManufacturerService
+class ManufacturerService implements ManufacturerServiceInterface
 {
     public function __construct(
         protected ManufacturerRepositoryInterface $manufacturerRepo

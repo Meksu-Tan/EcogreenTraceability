@@ -2,8 +2,9 @@
 namespace Modules\Plant\Services;
 
 use Modules\Plant\Repositories\Contracts\PlantRepositoryInterface;
+use Modules\Plant\Services\Contracts\PlantServiceInterface;
 
-class PlantService
+class PlantService implements PlantServiceInterface
 {
     public function __construct(
         protected PlantRepositoryInterface $plantRepo

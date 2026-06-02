@@ -2,13 +2,14 @@
 namespace Modules\TsTransfer\Services;
 
 use Modules\TsTransfer\Repositories\Contracts\TransferRepositoryInterface;
+use Modules\TsTransfer\Services\Contracts\TransferServiceInterface;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
 use Modules\Plant\Models\Plant;
 use Exception;
 use Illuminate\Support\Facades\DB;
 
-class TransferService
+class TransferService implements TransferServiceInterface
 {
     public function __construct(
         protected TransferRepositoryInterface $transferRepo

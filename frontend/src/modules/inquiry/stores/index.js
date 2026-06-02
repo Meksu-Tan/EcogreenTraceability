@@ -1,0 +1,1 @@
+export { useInquiryStore } from './inquiryStore'

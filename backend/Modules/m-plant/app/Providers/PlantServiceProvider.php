@@ -2,15 +2,17 @@
 namespace Modules\Plant\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Plant\Repositories\Contracts\PlantRepositoryInterface;
+use Modules\Plant\Repositories\PlantRepository;
+use Modules\Plant\Services\Contracts\PlantServiceInterface;
+use Modules\Plant\Services\PlantService;
 
 class PlantServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(
-            \Modules\Plant\Repositories\Contracts\PlantRepositoryInterface::class,
-            \Modules\Plant\Repositories\PlantRepository::class
-        );
+        $this->app->bind(PlantRepositoryInterface::class, PlantRepository::class);
+        $this->app->singleton(PlantServiceInterface::class, PlantService::class);
     }
 
     public function boot(): void

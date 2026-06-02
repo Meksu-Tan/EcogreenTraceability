@@ -25,6 +25,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle network errors (no response)
+    if (!error.response) {
+      const message = error.code === 'ECONNABORTED'
+        ? 'Request timeout. Please check your connection.'
+        : 'Network error. Please check your connection and try again.'
+      console.error('Network Error:', message)
+      // Reject with structured error for callers to handle
+      return Promise.reject(new Error(message))
+    }
+
     if (error.response?.status === 401 && window.location.pathname !== '/login') {
       localStorage.removeItem('auth_token')
       import('@/router')

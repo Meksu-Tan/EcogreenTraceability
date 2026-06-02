@@ -6,8 +6,8 @@
           <h1 class="text-2xl font-bold text-gray-800">Blending</h1>
           <div class="flex items-center gap-2 mt-1">
             <span class="text-sm text-gray-500">Lokasi:</span>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-              <i class="fas fa-industry mr-1.5 opacity-70"></i>
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+              <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3" />
               {{ plantSelectionStore.selectedPlantName }}
             </span>
           </div>
@@ -17,27 +17,24 @@
       </div>
       <button
         @click="openBlendingModal"
-        class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
       >
-        <i class="fas fa-plus"></i>
+        <Icon icon="ri:add-line" class="w-4 h-4" />
         New Blending Entry
       </button>
     </div>
 
     <!-- Warning -->
     <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-      <p class="text-sm text-red-700">
-        <i class="fas fa-exclamation-triangle mr-2"></i>
+      <p class="text-sm text-red-700 flex items-center gap-2">
+        <Icon icon="ri:error-warning-line" class="w-4 h-4" />
         QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
       </p>
     </div>
 
     <!-- Loading State -->
     <div v-if="blendingStore.loading" class="flex items-center justify-center py-12">
-      <svg class="h-8 w-8 animate-spin text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-      </svg>
+      <Icon icon="ri:loader-4-line" class="w-8 h-8 animate-spin text-green-500" />
       <span class="ml-3 text-sm text-gray-600">Memuat data...</span>
     </div>
 
@@ -45,7 +42,7 @@
     <div v-else-if="blendingStore.error" class="rounded-lg border border-red-200 bg-red-50 p-4">
       <div class="flex">
         <div class="flex-shrink-0">
-          <i class="fas fa-exclamation-circle text-red-400"></i>
+          <Icon icon="ri:error-warning-line" class="w-5 h-5 text-red-400" />
         </div>
         <div class="ml-3">
           <h3 class="text-sm font-medium text-red-800">Error loading data</h3>
@@ -85,7 +82,7 @@
                 class="text-red-500 hover:text-red-700 text-sm"
                 title="De-Activate"
               >
-                <i class="fas fa-trash"></i>
+                <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
               </button>
             </td>
             <td class="px-3 py-3 whitespace-nowrap text-center text-gray-900">{{ item.entry_date }}</td>
@@ -97,7 +94,7 @@
                   class="text-yellow-600 hover:text-yellow-800 ml-1 text-xs"
                   title="Edit"
                 >
-                  <i class="fas fa-pen"></i>
+                  <Icon icon="ri:edit-line" class="w-3 h-3" />
                 </button>
               </span>
               <button
@@ -105,7 +102,7 @@
                 @click="openMatlDocAdd(item)"
                 class="inline-flex items-center gap-1 rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 hover:bg-yellow-200"
               >
-                Add Doc No
+                <Icon icon="ri:add-line" class="w-3 h-3" /> Add Doc No
               </button>
             </td>
             <td class="px-3 py-3 whitespace-nowrap text-center font-mono text-gray-900">{{ item.trace_no }}</td>
@@ -137,14 +134,14 @@
                 <span
                   v-for="(sup, si) in (typeof item.supplier === 'string' ? item.supplier.split('|') : [item.supplier])"
                   :key="si"
-                  class="badge badge-primary inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-green-600 text-white text-[10px] font-medium"
+                  class="badge badge-primary inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-green-500 text-white text-[10px] font-medium"
                 >{{ sup.trim() }}</span>
               </template>
             </td>
           </tr>
           <tr v-if="blendingStore.blendingList.length === 0">
             <td colspan="12" class="px-6 py-12 text-center text-sm text-gray-500">
-              <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+              <Icon icon="ri:inbox-2-line" class="w-10 h-10 text-gray-300 mb-3" />
               <p>Belum ada data blending</p>
             </td>
           </tr>
@@ -173,7 +170,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, reactive, computed } from 'vue'
+import { ref, watch, reactive, computed } from 'vue'
+import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsBlendingStore } from '@/modules/ts-blending/stores'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
@@ -265,6 +263,5 @@ async function deactivateBlending(item) {
   }
 }
 
-watch(() => plantSelectionStore.selectedPlantId, () => { fetchData() })
-onMounted(() => { fetchData() })
+watch(() => plantSelectionStore.selectedPlantId, () => { fetchData() }, { immediate: true })
 </script>

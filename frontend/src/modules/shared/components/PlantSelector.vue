@@ -5,13 +5,13 @@
       class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-green-300 transition-all shadow-sm group"
     >
       <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
-        <i class="fas fa-sync-alt text-xs"></i>
+        <Icon icon="ri:swap-line" class="text-xs" />
       </div>
       <div class="text-left">
         <span class="block text-[10px] text-gray-500 uppercase font-bold tracking-wider leading-none">Switch Plant</span>
         <span class="block text-sm font-bold text-gray-700 truncate max-w-[150px]">{{ plantSelectionStore.selectedPlantName || 'Select Plant' }}</span>
       </div>
-      <i class="fas fa-chevron-down text-gray-400 text-[10px] ml-2"></i>
+      <Icon icon="ri:arrow-down-s-line" class="text-gray-400 text-[10px] ml-2" />
     </button>
 
     <!-- Dropdown Menu -->
@@ -27,10 +27,10 @@
           :class="plantSelectionStore.selectedPlantId === null ? 'bg-green-50 text-green-700' : 'text-gray-600'"
         >
           <div class="flex items-center gap-3">
-            <i class="fas fa-globe text-xs opacity-50"></i>
+            <Icon icon="ri:global-line" class="text-xs opacity-50" />
             <span class="text-sm font-semibold">Semua Plant</span>
           </div>
-          <i v-if="plantSelectionStore.selectedPlantId === null" class="fas fa-check text-[10px]"></i>
+          <Icon v-if="plantSelectionStore.selectedPlantId === null" icon="ri:check-line" class="text-[10px]" />
         </button>
 
         <!-- List -->
@@ -42,10 +42,10 @@
           :class="plantSelectionStore.selectedPlantId === plant.id_plant ? 'bg-green-50 text-green-700' : 'text-gray-600'"
         >
           <div class="flex items-center gap-3">
-            <i class="fas fa-factory text-xs opacity-50"></i>
+            <Icon icon="ri:building-4-line" class="text-xs opacity-50" />
             <span class="text-sm font-semibold">{{ plant.description }}</span>
           </div>
-          <i v-if="plantSelectionStore.selectedPlantId === plant.id_plant" class="fas fa-check text-[10px]"></i>
+          <Icon v-if="plantSelectionStore.selectedPlantId === plant.id_plant" icon="ri:check-line" class="text-[10px]" />
         </button>
       </div>
     </div>
@@ -54,6 +54,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useSetupPlantStore } from '@/stores/plant'
 
@@ -71,7 +72,7 @@ async function selectPlant(id, name) {
 }
 
 // Close dropdown on click outside
-function handleClickOutside(e) {
+const handleClickOutside = (e) => {
   if (dropdownRef.value && !dropdownRef.value.contains(e.target)) {
     isOpen.value = false
   }

@@ -2,13 +2,14 @@
 namespace Modules\TsBlending\Services;
 
 use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
+use Modules\TsBlending\Services\Contracts\BlendingServiceInterface;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
 use Modules\Plant\Models\Plant;
 use Exception;
 use Illuminate\Support\Facades\DB;
 
-class BlendingService
+class BlendingService implements BlendingServiceInterface
 {
     protected $movSeq = '000';
     protected $typeBlending = '8';

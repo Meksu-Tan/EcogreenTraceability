@@ -2,15 +2,17 @@
 namespace Modules\Tank\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
+use Modules\Tank\Repositories\TankRepository;
+use Modules\Tank\Services\Contracts\TankServiceInterface;
+use Modules\Tank\Services\TankService;
 
 class TankServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(
-            \Modules\Tank\Repositories\Contracts\TankRepositoryInterface::class,
-            \Modules\Tank\Repositories\TankRepository::class
-        );
+        $this->app->bind(TankRepositoryInterface::class, TankRepository::class);
+        $this->app->singleton(TankServiceInterface::class, TankService::class);
     }
 
     public function boot(): void

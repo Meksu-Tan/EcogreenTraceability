@@ -2,8 +2,9 @@
 namespace Modules\Material\Services;
 
 use Modules\Material\Repositories\Contracts\MaterialRepositoryInterface;
+use Modules\Material\Services\Contracts\MaterialServiceInterface;
 
-class MaterialService
+class MaterialService implements MaterialServiceInterface
 {
     public function __construct(
         protected MaterialRepositoryInterface $materialRepo
