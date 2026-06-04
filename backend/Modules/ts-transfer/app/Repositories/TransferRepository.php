@@ -2,6 +2,8 @@
 namespace Modules\TsTransfer\Repositories;
 
 use Modules\TsTransfer\Repositories\Contracts\TransferRepositoryInterface;
+use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Services\AuditService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -315,22 +317,8 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function getLockStatus(string $entryDate): bool
     {
-        $lockDateTime = new \DateTime($entryDate);
-        $lockYear = $lockDateTime->format('Y');
-        $lockMonth = $lockDateTime->format('m');
-
-        $result = DB::connection($this->connection)->select(
-            'SELECT lock_status
-               FROM t_report_pspa_head
-              WHERE status = 1
-                AND YEAR(period) = ?
-                AND MONTH(period) = ?
-              UNION ALL
-              SELECT "0" AS lock_status',
-            [$lockYear, $lockMonth]
-        );
-
-        return ($result[0]->lock_status ?? 0) == 1;
+        // Use shared PeriodLockService for consistent date lock mechanism
+        return PeriodLockService::isLocked($entryDate);
     }
 
     public function getUpdateSupplierMaterial(int $idMaterial, int $idTank, int $plantId): ?object
@@ -452,6 +440,11 @@ class TransferRepository implements TransferRepositoryInterface
             do {
                 $this->logTransaction('TRANSFER_ENTRY', 'DE-ACTIVATE',
                     'IdBalHead: ' . $idHead . ' | Status: 1 >> 0', $user);
+
+                // Also use AuditService for structured logging
+                AuditService::log('TRANSFER', 'DELETE',
+                    'Deactivating transfer | IdBalHead: ' . $idHead . ' | IdTraceHead: ' . $idTraceHead,
+                    $user, ['id_balance_head' => $idHead, 'id_trace_head' => $idTraceHead]);
 
                 DB::connection($this->connection)->update(
                     'UPDATE t_balance_detail SET status = "0", updated_by = ? WHERE id_balance_head = ?',

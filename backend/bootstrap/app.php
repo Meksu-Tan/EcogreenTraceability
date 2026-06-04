@@ -11,6 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // $middleware->statefulApi(); // Removed to use stateless token auth
+
+        // Register Plant Context Middleware aliases
+        $middleware->alias([
+            'plant.context' => \Modules\Shared\Http\Middleware\PlantContextMiddleware::class,
+            'plant.scope' => \Modules\Shared\Http\Middleware\PlantScopeMiddleware::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

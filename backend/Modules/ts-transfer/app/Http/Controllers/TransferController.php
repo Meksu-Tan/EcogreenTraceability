@@ -6,6 +6,7 @@ use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\TsTransfer\Services\TransferService;
 use Modules\TsTransfer\Http\Requests\StoreTransferRequest;
+use Modules\Shared\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -80,8 +81,15 @@ class TransferController extends Controller
 
         try {
             $result = $this->transferService->deactivateTransfer($id, $user);
+
+            // Audit log for delete operation
+            if ($result['response'] === 1) {
+                AuditService::log('TRANSFER', 'DELETE', 'Transfer deactivated | ID: ' . $id, $user);
+            }
+
             return $this->buildResponse($result, 'delete', 'delete');
         } catch (\Exception $e) {
+            AuditService::log('TRANSFER', 'DELETE_ERROR', 'Transfer delete failed | ID: ' . $id . ' | Error: ' . $e->getMessage(), $user);
             return ApiResponse::error('Delete failed: ' . $e->getMessage(), 500);
         }
     }
@@ -198,6 +206,144 @@ class TransferController extends Controller
             return ApiResponse::success($result ? [$result] : []);
         } catch (\Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    // ========== APPROVAL WORKFLOW ENDPOINTS ==========
+
+    /**
+     * Submit transfer for approval.
+     */
+    public function submitForApproval(Request $request): JsonResponse
+    {
+        $user = $request->user()->name ?? 'system';
+        $idBalanceHead = $request->input('id_balance_head');
+
+        if (!$idBalanceHead) {
+            return ApiResponse::error('id_balance_head is required', 422);
+        }
+
+        try {
+            $result = $this->transferService->submitForApproval($idBalanceHead, $user);
+
+            if ($result['response'] === 1) {
+                return ApiResponse::success(null, $result['message'] ?? 'Transfer submitted for approval');
+            }
+            return ApiResponse::error($result['message'] ?? 'Failed to submit', 422);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Submit failed: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Approve a transfer.
+     */
+    public function approveTransfer(Request $request): JsonResponse
+    {
+        $user = $request->user()->name ?? 'system';
+        $idBalanceHead = $request->input('id_balance_head');
+        $notes = $request->input('notes');
+
+        if (!$idBalanceHead) {
+            return ApiResponse::error('id_balance_head is required', 422);
+        }
+
+        try {
+            $result = $this->transferService->approveTransfer($idBalanceHead, $user, $notes);
+
+            if ($result['response'] === 1) {
+                return ApiResponse::success(null, $result['message'] ?? 'Transfer approved');
+            }
+            return ApiResponse::error($result['message'] ?? 'Failed to approve', 422);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Approve failed: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Reject a transfer.
+     */
+    public function rejectTransfer(Request $request): JsonResponse
+    {
+        $user = $request->user()->name ?? 'system';
+        $idBalanceHead = $request->input('id_balance_head');
+        $reason = $request->input('reason', '');
+
+        if (!$idBalanceHead) {
+            return ApiResponse::error('id_balance_head is required', 422);
+        }
+
+        if (empty($reason)) {
+            return ApiResponse::error('Rejection reason is required', 422);
+        }
+
+        try {
+            $result = $this->transferService->rejectTransfer($idBalanceHead, $user, $reason);
+
+            if ($result['response'] === 1) {
+                return ApiResponse::success(null, $result['message'] ?? 'Transfer rejected');
+            }
+            return ApiResponse::error($result['message'] ?? 'Failed to reject', 422);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Reject failed: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Cancel a transfer.
+     */
+    public function cancelTransfer(Request $request): JsonResponse
+    {
+        $user = $request->user()->name ?? 'system';
+        $idBalanceHead = $request->input('id_balance_head');
+
+        if (!$idBalanceHead) {
+            return ApiResponse::error('id_balance_head is required', 422);
+        }
+
+        try {
+            $result = $this->transferService->cancelTransfer($idBalanceHead, $user);
+
+            if ($result['response'] === 1) {
+                return ApiResponse::success(null, $result['message'] ?? 'Transfer cancelled');
+            }
+            return ApiResponse::error($result['message'] ?? 'Failed to cancel', 422);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Cancel failed: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get pending approvals list.
+     */
+    public function pendingApprovals(Request $request): JsonResponse
+    {
+        $plantId = (int) $request->input('id_plant', 0);
+
+        try {
+            $data = $this->transferService->getPendingApprovals($plantId);
+            return ApiResponse::success($data, 'Pending approvals retrieved successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve pending approvals: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get approval history.
+     */
+    public function approvalHistory(Request $request): JsonResponse
+    {
+        $idBalanceHead = $request->input('id_balance_head');
+
+        if (!$idBalanceHead) {
+            return ApiResponse::error('id_balance_head is required', 422);
+        }
+
+        try {
+            $data = $this->transferService->getApprovalHistory($idBalanceHead);
+            return ApiResponse::success($data, 'Approval history retrieved successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve approval history: ' . $e->getMessage(), 500);
         }
     }
 

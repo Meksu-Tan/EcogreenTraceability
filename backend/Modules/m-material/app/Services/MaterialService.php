@@ -10,9 +10,9 @@ class MaterialService implements MaterialServiceInterface
         protected MaterialRepositoryInterface $materialRepo
     ) {}
 
-    public function listMaterials(): array
+    public function listMaterials(?string $type = null): array
     {
-        return $this->materialRepo->getAll();
+        return $this->materialRepo->getAll($type);
     }
 
     public function storeMaterial(array $data): array

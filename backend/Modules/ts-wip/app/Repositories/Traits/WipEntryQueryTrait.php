@@ -716,29 +716,8 @@ trait WipEntryQueryTrait
 
     public function checkPeriodLock(string $date): bool
     {
-        $lockYear = date('Y', strtotime($date));
-        $lockMonth = date('m', strtotime($date));
-
-        try {
-            $rows = DB::connection('eudr_ts')->select('
-                SELECT lock_status FROM m_period_lock
-                 WHERE status = 1 AND YEAR(period) = ? AND MONTH(period) = ?
-                 UNION ALL
-                SELECT "0" AS lock_status
-            ', [$lockYear, $lockMonth]);
-
-            return ($rows[0]->lock_status ?? '0') === '1';
-        } catch (\Illuminate\Database\QueryException $e) {
-            if (str_contains($e->getMessage(), "doesn't exist")) {
-                \Log::warning('checkPeriodLock - m_period_lock table does not exist, assuming period is not locked', [
-                    'date' => $date,
-                    'year' => $lockYear,
-                    'month' => $lockMonth
-                ]);
-                return false;
-            }
-            throw $e;
-        }
+        // Use shared PeriodLockService for consistent date lock mechanism
+        return \Modules\Shared\Services\PeriodLockService::isLocked($date);
     }
 
     protected function mapSectionToMaterialId(string $sectionId, string $type = 'feed'): ?int

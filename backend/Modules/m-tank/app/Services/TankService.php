@@ -58,21 +58,25 @@ class TankService implements TankServiceInterface
         $url = config('services.tankfarm.url');
         $token = config('services.tankfarm.token');
 
-        $response = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->withHeaders([
-            'Accept' => 'application/json',
-            'Authorization' => 'Bearer ' . $token
-        ])->post($url, [
-            'plantCodes' => ['1007'],
-            'type' => 'tanks'
-        ]);
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(10)->withOptions(['verify' => false])->withHeaders([
+                'Accept' => 'application/json',
+                'Authorization' => 'Bearer ' . $token
+            ])->post($url, [
+                'plantCodes' => ['1007'],
+                'type' => 'tanks'
+            ]);
 
-        if (!$response->successful()) {
-            return ['status' => 0, 'message' => 'Failed to fetch data from external API'];
-        }
+            if (!$response->successful()) {
+                return ['status' => 0, 'message' => 'Failed to fetch data from external API.'];
+            }
 
-        $data = $response->json();
-        if (!isset($data['success']) || !$data['success'] || !isset($data['data'])) {
-            return ['status' => 0, 'message' => 'Invalid response from external API'];
+            $data = $response->json();
+            if (!isset($data['success']) || !$data['success'] || !isset($data['data'])) {
+                return ['status' => 0, 'message' => 'Invalid response from external API.'];
+            }
+        } catch (\Exception $e) {
+            return ['status' => 0, 'message' => 'Connection failed: ' . $e->getMessage()];
         }
 
         $syncCount = 0;
@@ -104,7 +108,7 @@ class TankService implements TankServiceInterface
         if ($syncCount > 0) {
             return ['status' => 1, 'message' => "Successfully synced {$syncCount} tanks from external API."];
         } else {
-            return ['status' => 1, 'message' => "All tanks are up to date. No updates needed."];
+            return ['status' => 2, 'message' => "All tanks are up to date. No updates needed."];
         }
     }
 }

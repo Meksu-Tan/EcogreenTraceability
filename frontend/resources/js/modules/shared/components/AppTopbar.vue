@@ -4,10 +4,10 @@
     <div class="flex items-center gap-4">
       <button
         @click="uiStore.toggleSidebar()"
-        class="w-10 h-10 flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+        class="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 rounded-lg transition-all"
         title="Toggle Sidebar"
       >
-        <Icon :icon="uiStore.isSidebarCollapsed ? 'ri:indent' : 'ri:outdent'" class="w-5 h-5" />
+        <Icon icon="ri:menu-line" class="w-5 h-5 text-white" />
       </button>
       <div class="text-white text-lg font-bold tracking-tight transition-all duration-300">
         {{ pageTitle }}
@@ -15,6 +15,9 @@
     </div>
 
     <div class="flex items-center gap-4">
+      <!-- Theme Switcher -->
+      <ThemeSwitcher />
+
       <!-- User info + dropdown -->
       <div class="relative" ref="dropdownRef">
         <div
@@ -22,8 +25,8 @@
           @click="showDropdown = !showDropdown"
         >
           <div class="hidden sm:block text-right">
-            <div class="text-white text-xs font-medium opacity-80">Welcome,</div>
             <div class="text-white text-sm font-bold leading-tight">{{ authStore.user?.name }}</div>
+            <div class="text-white/80 text-[11px] font-medium tracking-wide uppercase">{{ firstRole }}</div>
           </div>
           <div class="w-9 h-9 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-white text-sm font-bold backdrop-blur-sm group-hover:bg-white/30 transition-all">
             {{ userInitial }}
@@ -42,13 +45,13 @@
         >
           <div
             v-if="showDropdown"
-            class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden"
+            class="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-100 dark:border-slate-700 z-50 overflow-hidden"
           >
-            <div class="px-4 py-2 border-b border-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <div class="px-4 py-2 border-b border-gray-50 dark:border-slate-700 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
               Account Settings
             </div>
             <div
-              class="flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 cursor-pointer font-semibold transition-colors"
+              class="flex items-center gap-3 px-4 py-3 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer font-semibold transition-colors"
               @click="handleLogout"
             >
               <Icon icon="ri:logout-box-r-line" />
@@ -63,6 +66,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import ThemeSwitcher from '@/modules/shared/components/ThemeSwitcher.vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
@@ -79,6 +83,7 @@ const showDropdown = ref(false)
 const dropdownRef  = ref(null)
 
 const userInitial = computed(() => (authStore.user?.name || 'U').charAt(0).toUpperCase())
+const firstRole   = computed(() => authStore.roles?.[0] || '')
 
 const pageTitle = computed(() => {
   const map = {

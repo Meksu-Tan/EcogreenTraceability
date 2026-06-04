@@ -15,4 +15,12 @@ interface TransferServiceInterface
     public function deactivateTransfer(string $id, string $user): array;
     public function executeTransfer(string $user, array $data, int $plantId): array;
     public function executeTransferWithAdjustment(string $user, array $data, int $plantId): array;
+
+    // ========== APPROVAL WORKFLOW METHODS ==========
+    public function submitForApproval(string $idBalanceHead, string $user): array;
+    public function approveTransfer(string $idBalanceHead, string $user, ?string $notes = null): array;
+    public function rejectTransfer(string $idBalanceHead, string $user, string $reason): array;
+    public function cancelTransfer(string $idBalanceHead, string $user): array;
+    public function getPendingApprovals(int $plantId = 0): array;
+    public function getApprovalHistory(string $idBalanceHead): array;
 }

@@ -72,7 +72,7 @@ async function selectPlant(id, name) {
 }
 
 // Close dropdown on click outside
-function handleClickOutside(e) {
+const handleClickOutside = (e) => {
   if (dropdownRef.value && !dropdownRef.value.contains(e.target)) {
     isOpen.value = false
   }

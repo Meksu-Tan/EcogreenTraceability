@@ -42,10 +42,22 @@
         <div class="p-4 space-y-4">
           <template v-for="(step, index) in section.steps" :key="step.key">
             <div v-if="step.type === 'label'" class="flex items-center justify-center gap-4 rounded-md border border-slate-200 bg-slate-700 px-4 py-3 text-white">
-              <Icon :icon="step.icon.startsWith('fa-flag') ? 'ri:flag-checkered-line' : 'ri:arrow-down-line'" class="w-4 h-4" />
+              <Icon :icon="step.icon" class="w-4 h-4" />
               <span class="text-sm font-bold tracking-wide">{{ step.label }}</span>
-              <Icon :icon="step.icon.startsWith('fa-flag') ? 'ri:flag-checkered-line' : 'ri:arrow-down-line'" class="w-4 h-4" />
+              <Icon :icon="step.icon" class="w-4 h-4" />
             </div>
+             <div v-else-if="step.type === 'mode'" class="flex justify-start px-2 py-2">
+               <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm">
+                 <span class="text-[11px] font-bold tracking-widest text-slate-500 uppercase">Mode</span>
+                 <select 
+                   :value="step.currentValue" 
+                   @change="onModeChange(`selectedMode${step.sectionKey}`, $event.target.value)" 
+                   class="min-w-[240px] px-3 py-1.5 text-xs font-bold text-slate-700 bg-gray-50 border border-gray-300 rounded focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none cursor-pointer"
+                 >
+                   <option v-for="opt in step.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                 </select>
+               </div>
+             </div>
             <div v-else class="border border-gray-100 rounded-lg overflow-hidden">
               <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 text-center">
                 <h3 class="text-lg font-bold text-gray-800">{{ step.title }}</h3>
@@ -72,7 +84,7 @@
                 <WipMiniTable :columns="step.type === 'feed' ? feedColumns : rundownColumns" :data="stepRows(step)" />
               </div>
             </div>
-            <div v-if="index < section.steps.length - 1 && step.type !== 'label'" class="flex items-center justify-center text-slate-500">
+            <div v-if="index < section.steps.length - 1 && step.type !== 'label' && step.type !== 'mode'" class="flex items-center justify-center text-slate-500">
               <Icon icon="ri:arrow-down-line" class="w-5 h-5" />
             </div>
           </template>
@@ -89,7 +101,21 @@
     </BaseModal>
 
     <BaseModal v-model="balanceModalOpen" :title="balanceTitle" max-width="1000px">
-      <WipMiniTable :columns="balanceColumns" :data="balanceData" />
+      <div class="space-y-4">
+        <WipMiniTable :columns="balanceColumns" :data="paginatedBalanceData" />
+        <div v-if="totalPagesBalance > 1" class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+          <div class="text-xs text-gray-600">
+            Showing {{ (currentPageBalance - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageBalance * itemsPerPageLog, balanceData.length) }} of {{ balanceData.length }} entries
+          </div>
+          <div class="flex gap-1">
+            <button @click="currentPageBalance = 1" :disabled="currentPageBalance === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
+            <button @click="currentPageBalance--" :disabled="currentPageBalance === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageBalance }} of {{ totalPagesBalance }}</span>
+            <button @click="currentPageBalance++" :disabled="currentPageBalance === totalPagesBalance" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            <button @click="currentPageBalance = totalPagesBalance" :disabled="currentPageBalance === totalPagesBalance" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
+          </div>
+        </div>
+      </div>
     </BaseModal>
     <BaseModal v-model="feedLogModalOpen" :title="feedLogTitle" max-width="1000px">
       <div class="space-y-4">
@@ -99,11 +125,11 @@
             Showing {{ (currentPageFeedLog - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageFeedLog * itemsPerPageLog, feedLogData.length) }} of {{ feedLogData.length }} entries
           </div>
           <div class="flex gap-1">
-            <button @click="currentPageFeedLog = 1" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
-            <button @click="currentPageFeedLog--" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <button @click="currentPageFeedLog = 1" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
+            <button @click="currentPageFeedLog--" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
             <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageFeedLog }} of {{ totalPagesFeedLog }}</span>
-            <button @click="currentPageFeedLog++" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-            <button @click="currentPageFeedLog = totalPagesFeedLog" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
+            <button @click="currentPageFeedLog++" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            <button @click="currentPageFeedLog = totalPagesFeedLog" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
           </div>
         </div>
       </div>
@@ -116,11 +142,11 @@
             Showing {{ (currentPageRundownLog - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageRundownLog * itemsPerPageLog, rundownLogData.length) }} of {{ rundownLogData.length }} entries
           </div>
           <div class="flex gap-1">
-            <button @click="currentPageRundownLog = 1" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
-            <button @click="currentPageRundownLog--" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+            <button @click="currentPageRundownLog = 1" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
+            <button @click="currentPageRundownLog--" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
             <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageRundownLog }} of {{ totalPagesRundownLog }}</span>
-            <button @click="currentPageRundownLog++" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-            <button @click="currentPageRundownLog = totalPagesRundownLog" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
+            <button @click="currentPageRundownLog++" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            <button @click="currentPageRundownLog = totalPagesRundownLog" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
           </div>
         </div>
       </div>
@@ -129,7 +155,7 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { storeToRefs } from 'pinia'
 import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
@@ -212,7 +238,9 @@ function inputClass(readonly = false) {
   return `w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-green-500 focus:border-green-500 ${readonly ? 'bg-gray-50 text-gray-500' : ''}`
 }
 
-const wipSections = [
+const MODE_WARNING = 'WARNING: DO NOT ENTRY SEVERAL MODES AT THE SAME TIME! ( MUST FINISH FEED & RUNDOWN ENTRY PER ONE MODE )'
+
+const wipSectionsBase = [
   section('section101', 'Section 101/102', [
     label('START OF SECTION 101/102'), feed('CPKO FEEDS (101 FT0113)', '001', '101_FT0113'), label('PROCESS OF SECTION 101/102'),
     rundown('DA-OIL RUNDOWNS (102 FT0109)', '011', '102_FT0109'), rundown('PKFAD RUNDOWNS (102 FT0129)', '021', '102_FT0129'), label('END OF SECTION 101/102'),
@@ -226,13 +254,6 @@ const wipSections = [
     rundown('BDME RUNDOWNS', '023'), rundown('UME RUNDOWNS (104 F0110)', '033', '104_F0110'), rundown('ME28 RUNDOWNS (104 F0332)', '043', '104_F0332'),
     rundown('ECONOATE 665 RUNDOWNS', '053'), rundown('ME80 RUNDOWNS', '063'), label('END OF SECTION 104'),
   ]),
-  section('section105', 'Section 105', [
-    label('START OF SECTION 105'), feed('ME80 FEEDS', '006-02'), label('PROCESS OF SECTION 105'),
-    rundown('CFA80 RUNDOWNS', '026'), label('END OF SECTION 105'),
-  ]),
-  section('section106', 'Section 106/114', [
-    label('START OF SECTION 106/114'), rundown('FA12/99 RUNDOWNS', '078'), rundown('FA14/99 RUNDOWNS', '088'), label('END OF SECTION 106/114'),
-  ]),
   section('section110', 'Section 110', [
     label('START OF SECTION 110'), feed('TREATED-GLY FEEDS (110 F0107)', '004', '110_F0107'), label('PROCESS OF SECTION 110'),
     rundown('CRUDE-GLY RUNDOWNS (110 F0108)', '014', '110_F0108'), label('END OF SECTION 110'),
@@ -241,13 +262,7 @@ const wipSections = [
     label('START OF SECTION 111/116'), feed('CRUDE-GLY FEEDS (111 F0118 + 116 FC01)', '007', '111_F0118_116_FC01'), label('PROCESS OF SECTION 111/116'),
     rundown('GLYCERINE RUNDOWNS', '017'), label('END OF SECTION 111/116'),
   ]),
-  section('section112', 'Section 112/114', [
-    label('START OF SECTION 112/114'), feed('MODE FA24 FEEDS (112 F0109)', '009-01', '112_F0109'), label('PROCESS OF SECTION 112/114'),
-    feed('MODE FA14LRR FEEDS (112 F0109)', '009-02', '112_F0109'), feed('MODE FA18LRR FEEDS (112 F0109)', '009-03', '112_F0109'), feed('MODE ECOROL WAX FEEDS (112 F0109)', '009-04', '112_F0109'),
-    rundown('CFA28 RUNDOWNS (112 F0139)', '069', '112_F0139'), rundown('FA12/99 RUNDOWNS (112 F0235)', '039', '112_F0235'), rundown('FA14LRR RUNDOWNS (112 F0224)', '079', '112_F0224'),
-    rundown('FA14/99 RUNDOWNS (112 F0224)', '059', '112_F0224'), rundown('FA18/99 RUNDOWNS (112 F0235)', '029', '112_F0235'), rundown('FA18LRR RUNDOWNS (112 F0235)', '049', '112_F0235'),
-    rundown('ECOROL WAX RUNDOWNS (112 F0224)', '019', '112_F0224'), label('END OF SECTION 112/114'),
-  ]),
+
   section('section302', 'Section 302', [
     label('START OF SECTION 302'), rundown('WME RUNDOWNS', '015'), label('PROCESS OF SECTION 302'), rundown('ME28-302 RUNDOWNS (302V04)', '025'), label('END OF SECTION 302'),
   ]),
@@ -257,6 +272,153 @@ function section(key, title, steps) { return { key, title, steps } }
 function label(label) { return { type: 'label', key: label, label, icon: label.startsWith('END') ? 'ri:flag-checkered-line' : 'ri:arrow-down-line' } }
 function feed(title, id, tag = null) { return { type: 'feed', key: `feed-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
 function rundown(title, id, tag = null) { return { type: 'rundown', key: `rundown-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
+function modeSwitch(sectionKey, currentValue, options) {
+  return {
+    type: 'mode',
+    key: `mode-switch-${sectionKey}`,
+    sectionKey,
+    currentValue,
+    options,
+    warning: MODE_WARNING,
+  }
+}
+
+const selectedMode105 = ref('mode-105-1')
+const selectedMode106 = ref('mode-106-1')
+const selectedMode112 = ref('mode-112-1')
+
+const section105Steps = computed(() => {
+  const header = label('START OF SECTION 105')
+  const process = label('PROCESS OF SECTION 105')
+  const end = label('END OF SECTION 105')
+  const switcher = modeSwitch('105', selectedMode105.value, [
+    { value: 'mode-105-1', label: '- Mode LONG-CHAIN -' },
+    { value: 'mode-105-2', label: '- Mode SHORT-CHAIN -' },
+  ])
+  if (selectedMode105.value === 'mode-105-1') {
+    return [
+      header,
+      switcher,
+      feed('ME28 FEEDS (105 FQ104)', '006-01', '105_FQ104'),
+      process,
+      rundown('CFA28 RUNDOWNS (105 FQ808)', '016', '105_FQ808'),
+      end,
+    ]
+  }
+  return [
+    header,
+    switcher,
+    feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104'),
+    process,
+    rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808'),
+    end,
+  ]
+})
+
+const section106Steps = computed(() => {
+  const header = label('START OF SECTION 106/114')
+  const process = label('PROCESS OF SECTION 106/114')
+  const end = label('END OF SECTION 106/114')
+  const switcher = modeSwitch('106', selectedMode106.value, [
+    { value: 'mode-106-1', label: '- Mode ECOROL 24 -' },
+    { value: 'mode-106-2', label: '- Mode ECOROL 12/14 -' },
+  ])
+  const common = [
+    feed('CFA28 FEEDS (106 F0115)', '008', '106_F0115'),
+    rundown('ECOROL-WAX RUNDOWNS (106 F0245)', '018', '106_F0245'),
+    rundown('LEFA RUNDOWNS (106 F0167)', '028', '106_F0167'),
+  ]
+  if (selectedMode106.value === 'mode-106-1') {
+    return [
+      header,
+      switcher,
+      ...common,
+      rundown('FA24 RUNDOWNS (106 F0134)', '038', '106_F0134'),
+      rundown('FA16/99 RUNDOWNS (106 F0231)', '048', '106_F0231'),
+      rundown('FA18lrr RUNDOWNS (106 F0112)', '058', '106_F0112'),
+      end,
+    ]
+  }
+  return [
+    header,
+    switcher,
+    ...common,
+    rundown('FA12/99 RUNDOWNS (106 F0134)', '078', '106_F0134'),
+    rundown('FA14/99 RUNDOWNS (106 F0231)', '088', '106_F0231'),
+    end,
+  ]
+})
+
+const section112Steps = computed(() => {
+  const header = label('START OF SECTION 112/114')
+  const process = label('PROCESS OF SECTION 112/114')
+  const end = label('END OF SECTION 112/114')
+  const switcher = modeSwitch('112', selectedMode112.value, [
+    { value: 'mode-112-1', label: '- Mode ECOROL WAX 106/114 -' },
+    { value: 'mode-112-2', label: '- Mode FA24 106/114 -' },
+    { value: 'mode-112-3', label: '- Mode FA18lrr 106/114 -' },
+    { value: 'mode-112-4', label: '- Mode FA14lrr 112/114 -' },
+    { value: 'mode-112-5', label: '- Mode FA18lrr 112/114 -' },
+  ])
+  
+  if (selectedMode112.value === 'mode-112-1') {
+    return [
+      header,
+      switcher,
+      feed('ECOROL WAX FEEDS (112 F0109)', '009-04', '112_F0109'),
+      process,
+      rundown('ECOROL-WAX RUNDOWNS (106 F0245)', '018', '106_F0245'),
+      end,
+    ]
+  } else if (selectedMode112.value === 'mode-112-2') {
+    return [
+      header,
+      switcher,
+      feed('FA24 FEEDS (112 F0109)', '009-01', '112_F0109'),
+      process,
+      rundown('FA24 RUNDOWNS (106 F0134)', '038', '106_F0134'),
+      end,
+    ]
+  } else if (selectedMode112.value === 'mode-112-3') {
+    return [
+      header,
+      switcher,
+      feed('FA18lrr FEEDS (112 F0109)', '009-03', '112_F0109'),
+      process,
+      rundown('FA18lrr RUNDOWNS (106 F0112)', '058', '106_F0112'),
+      end,
+    ]
+  } else if (selectedMode112.value === 'mode-112-4') {
+    return [
+      header,
+      switcher,
+      feed('FA14lrr FEEDS (112 F0109)', '009-02', '112_F0109'),
+      process,
+      rundown('CFA28 RUNDOWNS (112 F0139)', '069', '112_F0139'),
+      rundown('FA14/99 RUNDOWNS (112 F0224)', '059', '112_F0224'),
+      end,
+    ]
+  } else {
+    return [
+      header,
+      switcher,
+      feed('FA18lrr FEEDS (112 F0109)', '009-03', '112_F0109'),
+      process,
+      rundown('CFA28 RUNDOWNS (112 F0139)', '069', '112_F0139'),
+      rundown('FA18/99 RUNDOWNS (112 F0235)', '029', '112_F0235'),
+      rundown('ECOROL WAX RUNDOWNS (112 F0224)', '019', '112_F0224'),
+      end,
+    ]
+  }
+})
+
+const wipSections = computed(() => {
+  const result = [...wipSectionsBase]
+  result.splice(3, 0, section('section105', 'Section 105', section105Steps.value))
+  result.splice(4, 0, section('section106', 'Section 106/114', section106Steps.value))
+  result.splice(7, 0, section('section112', 'Section 112/114', section112Steps.value))
+  return result
+})
 
 const plantSelectionStore = usePlantSelectionStore()
 const plantStore = useSetupPlantStore()
@@ -267,8 +429,28 @@ const loading = ref(false)
 const storeLoading = ref(false)
 const selectedSection = ref('allSection')
 
-const visibleSections = computed(() => selectedSection.value === 'allSection' ? wipSections : wipSections.filter(s => s.key === selectedSection.value))
-const runnableSteps = computed(() => wipSections.flatMap(s => s.steps).filter(s => s.type === 'feed' || s.type === 'rundown'))
+const visibleSections = computed(() => selectedSection.value === 'allSection' ? wipSections.value : wipSections.value.filter(s => s.key === selectedSection.value))
+const runnableSteps = computed(() => wipSections.value.flatMap(s => s.steps).filter(s => s.type === 'feed' || s.type === 'rundown'))
+
+function onModeChange(target, value) {
+  if (target === 'selectedMode105') selectedMode105.value = value
+  else if (target === 'selectedMode106') selectedMode106.value = value
+  else if (target === 'selectedMode112') selectedMode112.value = value
+}
+
+async function reloadStepsForSection(sectionKey) {
+  const target = wipSections.value.find(s => s.key === sectionKey)
+  if (!target) return
+  const steps = target.steps.filter(s => s.type === 'feed' || s.type === 'rundown')
+  await Promise.all(steps.map(step => step.type === 'feed'
+    ? store.fetchFeed(step.id, 'LATEST')
+    : store.fetchRundown(step.id, 'LATEST'),
+  ))
+}
+
+watch(selectedMode105, () => reloadStepsForSection('section105'))
+watch(selectedMode106, () => reloadStepsForSection('section106'))
+watch(selectedMode112, () => reloadStepsForSection('section112'))
 
 const feedColumns = [
   { key: 'plant_name', label: 'Plant' },
@@ -287,9 +469,19 @@ const balanceColumns = [
 ]
 
 // Log Modal Pagination
-const itemsPerPageLog = 10
+const itemsPerPageLog = 5
 const currentPageFeedLog = ref(1)
 const currentPageRundownLog = ref(1)
+const currentPageBalance = ref(1)
+
+const paginatedBalanceData = computed(() => {
+  const start = (currentPageBalance.value - 1) * itemsPerPageLog
+  return balanceData.value.slice(start, start + itemsPerPageLog)
+})
+
+const totalPagesBalance = computed(() => {
+  return Math.ceil(balanceData.value.length / itemsPerPageLog)
+})
 
 const paginatedFeedLogData = computed(() => {
   const start = (currentPageFeedLog.value - 1) * itemsPerPageLog
@@ -310,7 +502,10 @@ const totalPagesRundownLog = computed(() => {
 })
 
 
-function stepRows(step) { return step.type === 'feed' ? feedLogs.value[step.id] || [] : normalizeRundownRows(rundownLogs.value[step.id] || []) }
+function stepRows(step) {
+  const rows = step.type === 'feed' ? feedLogs.value[step.id] || [] : normalizeRundownRows(rundownLogs.value[step.id] || [])
+  return rows.slice(0, 1)
+}
 function normalizeRundownRows(rows) { return rows.map(row => ({ ...row, rundown_trace_no: row.rundown_trace_no || row.to_trace_no })) }
 
 const feedModalOpen = ref(false)
@@ -548,6 +743,7 @@ const balanceModalOpen = ref(false)
 const balanceData = ref([])
 const balanceTitle = ref('Balance Detail')
 async function openBalanceModal(step) {
+  currentPageBalance.value = 1
   balanceTitle.value = `Balance Detail - ${step.title}`
   const res = await store.fetchBalance(step.id)
   balanceData.value = res?.data || []

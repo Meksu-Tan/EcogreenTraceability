@@ -1,0 +1,11 @@
+{
+    "name": "TraceBackward",
+    "alias": "tracebackward",
+    "description": "Backward Trace - Trace materials back to origin/suppliers",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TraceBackward\\Providers\\TraceBackwardServiceProvider"
+    ],
+    "files": []
+}

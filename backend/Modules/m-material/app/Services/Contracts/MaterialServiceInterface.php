@@ -3,7 +3,7 @@ namespace Modules\Material\Services\Contracts;
 
 interface MaterialServiceInterface
 {
-    public function listMaterials(): array;
+    public function listMaterials(?string $type = null): array;
     public function storeMaterial(array $data): array;
     public function updateMaterial(int $id, array $data): array;
     public function deactivateMaterial(int $id, string $user): array;

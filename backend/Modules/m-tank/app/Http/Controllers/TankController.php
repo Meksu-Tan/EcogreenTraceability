@@ -58,6 +58,6 @@ class TankController extends Controller
         $user = $request->user()->name ?? 'System';
         $result = $this->tankService->syncFromExternal($user);
 
-        return response()->json($result, $result['status'] === 1 ? 200 : 400);
+        return response()->json($result, in_array($result['status'], [1, 2]) ? 200 : 400);
     }
 }

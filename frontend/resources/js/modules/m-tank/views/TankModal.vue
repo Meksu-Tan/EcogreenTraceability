@@ -13,7 +13,7 @@
         v-model="form.id"
         type="number"
         placeholder="Biarkan kosong untuk auto-generate"
-        class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none border-gray-300 bg-white"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
       />
     </div>
 
@@ -24,7 +24,7 @@
           id="tank-plant-select"
           v-model="form.plant_code"
           @change="onPlantChange"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none border-gray-300 bg-white"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.plant_code ? 'border-red-300 bg-red-50' : 'border-gray-300'"
         >
           <option value="">Pilih Plant</option>
@@ -42,7 +42,7 @@
           v-model="form.plant_name"
           type="text"
           placeholder="Nama Plant"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.plant_name ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.plant_name" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.plant_name }}</div>
@@ -57,7 +57,7 @@
           v-model="form.tank_number"
           type="text"
           placeholder="e.g. 210T01"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.tank_number ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.tank_number" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.tank_number }}</div>
@@ -71,7 +71,7 @@
           type="number"
           step="0.01"
           placeholder="e.g. 1460.00"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.tank_height ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.tank_height" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.tank_height }}</div>

@@ -31,4 +31,5 @@ interface RmEntryServiceInterface
     public function deactivateTransfer($id, $user);
     public function getDestTanksList($plantId): array;
     public function searchSuppliersList(string $search): array;
+    public function clearTempData($entryNo, $user);
 }

@@ -16,5 +16,12 @@
     "TsTransfer": true,
     "TsBlending": true,
     "TsPackage": true,
-    "TsShipment": true
+    "TsShipment": true,
+    "TsStock": true,
+    "TsTsreport": true,
+    "TsRmreport": true,
+    "TraceForward": true,
+    "TraceBackward": true,
+    "Adjustment": true,
+    "Quantifier": true
 }

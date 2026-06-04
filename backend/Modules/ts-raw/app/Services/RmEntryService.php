@@ -693,4 +693,9 @@ class RmEntryService implements RmEntryServiceInterface
         }
         return $plantId;
     }
+
+    public function clearTempData($entryNo, $user)
+    {
+        return $this->rmEntryRepo->clearTempData($entryNo, $user);
+    }
 }

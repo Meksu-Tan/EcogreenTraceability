@@ -1,6 +1,6 @@
 import api from '@/api/axios'
 
-export const getMaterials        = ()        => api.get('/api/v1/materials')
+export const getMaterials        = (params = {}) => api.get('/api/v1/materials', { params })
 export const storeMaterial       = (data)    => api.post('/api/v1/materials', data)
 export const updateMaterial      = (id, data)=> api.put(`/api/v1/materials/${id}`, data)
 export const deactivateMaterial  = (id)      => api.delete(`/api/v1/materials/${id}?action=deactivate`)

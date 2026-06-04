@@ -1,0 +1,11 @@
+{
+    "name": "TraceForward",
+    "alias": "traceforward",
+    "description": "Forward Trace - Track materials forward through production",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TraceForward\\Providers\\TraceForwardServiceProvider"
+    ],
+    "files": []
+}

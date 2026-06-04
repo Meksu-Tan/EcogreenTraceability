@@ -17,4 +17,10 @@ class MaterialModuleTest extends TestCase
         $response = $this->postJson('/api/v1/materials', []);
         $response->assertStatus(401);
     }
+
+    public function test_material_index_with_type_filter_requires_authentication(): void
+    {
+        $response = $this->getJson('/api/v1/materials?type=RM');
+        $response->assertStatus(401);
+    }
 }

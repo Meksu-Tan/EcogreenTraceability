@@ -1,12 +1,10 @@
 <?php declare(strict_types=1);
+
 use Illuminate\Support\Facades\Route;
-use Modules\Inquiry\Http\Controllers\StockInquiryController;
-use Modules\Inquiry\Http\Controllers\TsReportController;
-use Modules\Inquiry\Http\Controllers\RmReportController;
 
 Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
-    Route::get('inquiries/stock', [StockInquiryController::class, 'index']);
-    Route::get('inquiries/stock/{id}', [StockInquiryController::class, 'show']);
-    Route::get('inquiries/ts-report', [TsReportController::class, 'index']);
-    Route::get('inquiries/rm-report', [RmReportController::class, 'index']);
+    // Inquiry routes have been moved to dedicated modules:
+    // - ts-stock: /api/v1/transactions/stock
+    // - ts-tsreport: /api/v1/transactions/ts-report
+    // - ts-rmreport: /api/v1/transactions/rm-report
 });

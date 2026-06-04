@@ -9,7 +9,7 @@
             <span class="text-sm text-gray-500">Lokasi:</span>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
               <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3 opacity-70" />
-              {{ plantSelectionStore.selectedPlantName }}
+              {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
             </span>
           </div>
         </div>
@@ -317,9 +317,8 @@ const isSlocModalOpen = ref(false)
 const selectedEntry = ref(null)
 const editingEntryId = ref(null)
 
-// Load data on mount
-onMounted(async () => {
-  await fetchData()
+onMounted(() => {
+  fetchData()
 })
 
 // Pagination State
@@ -477,8 +476,4 @@ function formatSuppliers(supplierString) {
   if (!supplierString) return '-'
   return supplierString.split(' | ').join('\n')
 }
-
-onMounted(() => {
-  fetchData()
-})
 </script>

@@ -552,7 +552,7 @@ trait RmEntryTransferTrait
                 AND a.id_material = ?
                 AND b.id_sloc = ?
                 AND a.qty > 0.0001
-              ORDER BY a.id_balance_tail ASC
+              ORDER BY b.created_at ASC, a.id_balance_tail ASC
               LIMIT 1',
             [$materialId, $tankId]
         );

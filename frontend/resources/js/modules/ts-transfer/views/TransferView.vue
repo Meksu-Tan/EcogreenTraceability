@@ -8,7 +8,7 @@
             <span class="text-sm text-gray-500">Lokasi:</span>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
               <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3 opacity-70" />
-              {{ plantSelectionStore.selectedPlantName }}
+              {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
             </span>
           </div>
         </div>
@@ -149,7 +149,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsTransferStore } from '@/modules/ts-transfer/stores'
@@ -229,9 +229,5 @@ async function deactivateTransfer(trf) {
 
 watch(() => plantSelectionStore.selectedPlantId, () => {
   fetchData()
-})
-
-onMounted(() => {
-  fetchData()
-})
+}, { immediate: true })
 </script>

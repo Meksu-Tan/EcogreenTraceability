@@ -44,7 +44,7 @@
             <td :colspan="columns.length + 2" class="px-6 py-12 text-center">
               <div class="flex flex-col items-center gap-3">
                 <Icon icon="ri:loader-4-line" class="animate-spin text-2xl text-green-600" />
-                <span class="text-sm font-medium text-gray-500 tracking-wide">Loading data...</span>
+                <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Loading data...</span>
               </div>
             </td>
           </tr>
@@ -52,7 +52,7 @@
             <td :colspan="columns.length + 2" class="px-6 py-12 text-center">
               <div class="flex flex-col items-center gap-3">
                 <Icon icon="ri:inbox-2-line" class="text-4xl text-gray-200" />
-                <span class="text-sm font-medium text-gray-400">Tidak ada data ditemukan</span>
+                <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tidak ada data ditemukan</span>
               </div>
             </td>
           </tr>

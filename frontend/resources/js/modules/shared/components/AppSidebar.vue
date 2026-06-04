@@ -1,10 +1,10 @@
 <template>
   <aside
-    class="bg-white border-r border-gray-200 min-h-screen flex flex-col flex-shrink-0 z-50 transition-all duration-300 ease-in-out"
-    :class="uiStore.isSidebarCollapsed ? 'w-20' : 'w-64'"
+    class="bg-white dark:bg-slate-900 h-screen flex flex-col flex-shrink-0 z-50 transition-all duration-300 ease-in-out border-r border-gray-200 dark:border-slate-800 fixed top-0 left-0"
+    :class="uiStore.isSidebarCollapsed ? '-translate-x-full w-0 opacity-0 !border-none overflow-hidden' : 'translate-x-0 w-64'"
   >
     <!-- Brand -->
-    <div class="h-16 px-6 flex items-center border-b border-gray-100 gap-3 overflow-hidden whitespace-nowrap">
+    <div class="h-16 px-6 flex items-center border-b border-gray-100 dark:border-slate-800 gap-3 overflow-hidden whitespace-nowrap">
       <div class="w-10 h-10 flex items-center justify-center flex-shrink-0">
         <img src="@/assets/logo.png" alt="Logo" class="w-full h-full object-contain" />
       </div>
@@ -12,21 +12,21 @@
         class="flex flex-col leading-tight transition-all duration-300"
         :class="uiStore.isSidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'"
       >
-        <span class="text-slate-800 text-base font-bold tracking-tight">EUDR-TS</span>
-        <span class="text-gray-400 text-[10px] font-medium uppercase">EO Trace System</span>
+        <span class="text-slate-800 dark:text-slate-200 text-base font-bold tracking-tight">EUDR-TS</span>
+        <span class="text-gray-400 dark:text-gray-500 text-[10px] font-medium uppercase">EO Trace System</span>
       </div>
     </div>
 
     <!-- Navigation -->
     <nav class="flex-1 py-4 overflow-y-auto overflow-x-hidden">
-      <ul class="space-y-1 px-3">
+      <ul class="space-y-2 px-3">
         <!-- Dynamic Menu Groups -->
         <template v-for="group in sidebarMenu" :key="group.id">
           <!-- Group Label -->
           <li
-            class="px-3 py-2 text-[10px] font-extrabold text-gray-400 uppercase tracking-widest transition-all duration-300 overflow-hidden whitespace-nowrap"
+            class="px-4 py-2 text-[11px] font-extrabold text-gray-400 uppercase tracking-widest transition-all duration-300 overflow-hidden whitespace-nowrap"
             :class="[
-              group.id !== 'main' ? 'mt-6 mb-1' : '',
+              group.id !== 'main' ? 'mt-8 mb-2' : 'mt-2 mb-2',
               uiStore.isSidebarCollapsed ? 'opacity-0 h-0 py-0 mt-0 mb-0' : 'opacity-100'
             ]"
           >
@@ -38,18 +38,18 @@
             <li v-for="item in group.items" :key="item.path">
               <RouterLink :to="item.path" custom v-slot="{ navigate, isActive }">
                 <div
-                  class="group flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all overflow-hidden whitespace-nowrap"
+                  class="group flex items-center gap-4 px-4 py-3 rounded-lg cursor-pointer transition-all overflow-hidden whitespace-nowrap"
                   :class="[
-                    isActive ? 'bg-green-50 text-green-600 font-bold shadow-sm shadow-green-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-green-600',
+                    isActive ? 'bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 font-bold shadow-sm shadow-green-100/50 dark:shadow-none' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-green-600 dark:hover:text-green-400',
                     uiStore.isSidebarCollapsed ? 'justify-center px-0' : ''
                   ]"
-                  @click="navigate"
+                  @click="() => { navigate(); uiStore.closeSidebar(); }"
                   :title="uiStore.isSidebarCollapsed ? item.label : ''"
                 >
                   <Icon
                     :icon="item.icon"
                     class="w-5 h-5 text-center text-sm flex-shrink-0"
-                    :class="isActive ? 'text-green-600' : 'text-slate-400 group-hover:text-green-600'"
+                    :class="isActive ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-green-600 dark:group-hover:text-green-400'"
                   />
                   <span
                     class="text-sm transition-all duration-300"
@@ -61,67 +61,12 @@
               </RouterLink>
             </li>
           </template>
-
-          <!-- Collapsible Group (with children) -->
-          <li v-if="group.children">
-            <div
-              class="flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all text-slate-600 hover:bg-slate-50 hover:text-green-600 overflow-hidden whitespace-nowrap"
-              :class="[
-                openGroups[group.id] ? 'bg-slate-50/50 text-green-600 font-bold' : '',
-                uiStore.isSidebarCollapsed ? 'justify-center px-0' : ''
-              ]"
-              @click="uiStore.isSidebarCollapsed ? uiStore.toggleSidebar() : toggleGroup(group.id)"
-              :title="uiStore.isSidebarCollapsed ? group.label : ''"
-            >
-              <div class="flex items-center gap-3">
-                <Icon
-                  :icon="group.icon"
-                  class="w-5 h-5 text-center text-sm flex-shrink-0"
-                  :class="[openGroups[group.id] ? 'text-green-600' : 'text-slate-400']"
-                />
-                <span
-                  class="text-sm transition-all duration-300"
-                  :class="uiStore.isSidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'"
-                >
-                  {{ group.label }}
-                </span>
-              </div>
-              <Icon
-                v-if="!uiStore.isSidebarCollapsed"
-                icon="ri:arrow-right-s-line"
-                class="text-[10px] transition-transform duration-200"
-                :class="{ 'rotate-90': openGroups[group.id] }"
-              />
-            </div>
-
-            <!-- Children Items -->
-            <div
-              v-show="openGroups[group.id] && !uiStore.isSidebarCollapsed"
-              class="mt-1 space-y-1 ml-4 border-l border-gray-100 transition-all duration-300"
-            >
-              <RouterLink
-                v-for="child in group.children"
-                :key="child.path"
-                :to="child.path"
-                custom
-                v-slot="{ navigate, isActive }"
-              >
-                <div
-                  class="flex items-center gap-3 px-4 py-2 rounded-r-lg cursor-pointer text-sm transition-all overflow-hidden whitespace-nowrap"
-                  :class="isActive ? 'text-green-600 font-bold bg-green-50 border-l-2 border-green-600 -ml-[2px]' : 'text-slate-500 hover:text-green-600 hover:bg-slate-50'"
-                  @click="navigate"
-                >
-                  {{ child.label }}
-                </div>
-              </RouterLink>
-            </div>
-          </li>
         </template>
       </ul>
     </nav>
 
     <!-- Sidebar footer user -->
-    <div class="p-4 border-t border-gray-100 overflow-hidden">
+    <div class="p-4 border-t border-gray-100 dark:border-slate-800 overflow-hidden">
       <div
         class="flex items-center gap-3 transition-all duration-300"
         :class="uiStore.isSidebarCollapsed ? 'justify-center' : ''"
@@ -133,10 +78,10 @@
           class="min-w-0 transition-all duration-300"
           :class="uiStore.isSidebarCollapsed ? 'opacity-0 w-0' : 'opacity-100'"
         >
-          <div class="text-slate-800 text-sm font-bold truncate">
+          <div class="text-slate-800 dark:text-slate-200 text-sm font-bold truncate">
             {{ authStore.user?.name || 'User' }}
           </div>
-          <div class="text-gray-400 text-[11px] font-medium truncate">
+          <div class="text-gray-400 dark:text-gray-500 text-[11px] font-medium truncate">
             {{ firstRole }}
           </div>
         </div>
@@ -146,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
@@ -155,20 +100,6 @@ import { sidebarMenu } from '@/config/sidebar'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
-
-// Initialize all groups as open by default
-const openGroups = ref(
-  sidebarMenu.reduce((acc, group) => {
-    if (group.children) {
-      acc[group.id] = true
-    }
-    return acc
-  }, {})
-)
-
-function toggleGroup(key) {
-  openGroups.value[key] = !openGroups.value[key]
-}
 
 const userInitial = computed(() => (authStore.user?.name || 'U').charAt(0).toUpperCase())
 const firstRole = computed(() => authStore.roles?.[0] || '')

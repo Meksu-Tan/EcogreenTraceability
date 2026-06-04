@@ -8,18 +8,21 @@ use Modules\Material\Repositories\Contracts\MaterialRepositoryInterface;
 
 class MaterialRepository implements MaterialRepositoryInterface
 {
-    public function getAll(): array
+    public function getAll(?string $type = null): array
     {
-        return Material::selectRaw('
+        $query = Material::selectRaw('
             id_material, code, code_noneudr, description, status,
             created_at, created_by, updated_at, updated_by,
             type, FORMAT(yield, 1) AS yield,
             qtf_feed, qtf_rundown, id_feed, id_rundown,
             status_packaging, code_matl_supplier
-        ')
-        ->orderBy('description')
-        ->get()
-        ->toArray();
+        ');
+
+        if (!empty($type)) {
+            $query->where('type', $type);
+        }
+
+        return $query->orderBy('description')->get()->toArray();
     }
 
     public function findById(int $id): ?object

@@ -11,6 +11,7 @@
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
+        "maatwebsite/excel": "^3.1",
         "nwidart/laravel-modules": "*",
         "spatie/laravel-permission": "^6.25"
     },
@@ -43,6 +44,13 @@
             "Modules\\TsPackage\\": "Modules/ts-package/app/",
             "Modules\\TsShipment\\": "Modules/ts-shipment/app/",
             "Modules\\Inquiry\\": "Modules/Inquiry/app/",
+            "Modules\\TsStock\\": "Modules/ts-stock/app/",
+            "Modules\\TsTsreport\\": "Modules/ts-tsreport/app/",
+            "Modules\\TsRmreport\\": "Modules/ts-rmreport/app/",
+            "Modules\\TraceForward\\": "Modules/trace-forward/app/",
+            "Modules\\TraceBackward\\": "Modules/trace-backward/app/",
+            "Modules\\Adjustment\\": "Modules/m-adjustment/app/",
+            "Modules\\Quantifier\\": "Modules/m-quantifier/app/",
             "Database\\Factories\\": [
                 "database/factories/",
                 "Modules/Admin/database/factories/",

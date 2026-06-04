@@ -8,7 +8,7 @@
             <span class="text-sm text-gray-500">Lokasi:</span>
             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
               <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3" />
-              {{ plantSelectionStore.selectedPlantName }}
+              {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
             </span>
           </div>
         </div>
@@ -170,7 +170,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, reactive, computed } from 'vue'
+import { ref, watch, reactive, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsBlendingStore } from '@/modules/ts-blending/stores'
@@ -263,6 +263,5 @@ async function deactivateBlending(item) {
   }
 }
 
-watch(() => plantSelectionStore.selectedPlantId, () => { fetchData() })
-onMounted(() => { fetchData() })
+watch(() => plantSelectionStore.selectedPlantId, () => { fetchData() }, { immediate: true })
 </script>

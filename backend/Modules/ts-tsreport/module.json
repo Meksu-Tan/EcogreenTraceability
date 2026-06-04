@@ -1,0 +1,11 @@
+{
+    "name": "TsTsreport",
+    "alias": "tstsreport",
+    "description": "TS Tank Storage Report",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsTsreport\\Providers\\TsTsreportServiceProvider"
+    ],
+    "files": []
+}

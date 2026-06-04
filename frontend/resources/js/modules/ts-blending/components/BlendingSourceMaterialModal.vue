@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <Teleport to="body">
     <div v-show="isOpen" class="fixed inset-0 z-[110] overflow-y-auto" role="dialog" aria-modal="true" :aria-hidden="!isOpen">
       <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
@@ -45,7 +45,7 @@
                 </div>
               </div>
               <div class="mt-6 flex items-center justify-end gap-3">
-                <button type="button" @click="closeModal" class="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                <button type="button" @click="closeModal" class="rounded-xl border border-slate-200 bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-200">
                   Cancel
                 </button>
                 <button type="submit" class="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-green-700">
@@ -96,6 +96,9 @@ const stockDisplay = computed(() => {
 })
 
 function closeModal() {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
+  }
   emit('update:isOpen', false)
 }
 
@@ -145,6 +148,9 @@ async function handleInsert() {
 }
 
 watch(() => props.isOpen, (val) => {
+  if (!val && document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
+  }
   if (val) {
     form.idMaterialSource = ''
     form.qty = ''

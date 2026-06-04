@@ -3,8 +3,11 @@ namespace Modules\TsTransfer\Services;
 
 use Modules\TsTransfer\Repositories\Contracts\TransferRepositoryInterface;
 use Modules\TsTransfer\Services\Contracts\TransferServiceInterface;
+use Modules\TsTransfer\Services\TransferApprovalService;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
+use Modules\Shared\Services\AuditService;
+use Modules\Shared\Services\PeriodLockService;
 use Modules\Plant\Models\Plant;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 class TransferService implements TransferServiceInterface
 {
     public function __construct(
-        protected TransferRepositoryInterface $transferRepo
+        protected TransferRepositoryInterface $transferRepo,
+        protected TransferApprovalService $approvalService = new TransferApprovalService()
     ) {}
 
     public function getActiveMaterials()
@@ -66,7 +70,65 @@ class TransferService implements TransferServiceInterface
 
     public function deactivateTransfer(string $id, string $user): array
     {
+        // Check approval status before deactivating
+        $idTmp = explode("|", $id);
+        $idHead = trim($idTmp[0]);
+
+        if (!$this->approvalService->canDelete($idHead)) {
+            return ['response' => 5, 'message' => 'Transfer cannot be deleted in current approval status'];
+        }
+
         return $this->transferRepo->deactivateTransfer($id, $user);
+    }
+
+    // ========== APPROVAL WORKFLOW METHODS ==========
+
+    /**
+     * Submit transfer for approval.
+     */
+    public function submitForApproval(string $idBalanceHead, string $user): array
+    {
+        return $this->approvalService->submit($idBalanceHead, $user);
+    }
+
+    /**
+     * Approve a transfer.
+     */
+    public function approveTransfer(string $idBalanceHead, string $user, ?string $notes = null): array
+    {
+        return $this->approvalService->approve($idBalanceHead, $user, $notes);
+    }
+
+    /**
+     * Reject a transfer.
+     */
+    public function rejectTransfer(string $idBalanceHead, string $user, string $reason): array
+    {
+        return $this->approvalService->reject($idBalanceHead, $user, $reason);
+    }
+
+    /**
+     * Cancel a transfer.
+     */
+    public function cancelTransfer(string $idBalanceHead, string $user): array
+    {
+        return $this->approvalService->cancel($idBalanceHead, $user);
+    }
+
+    /**
+     * Get pending approvals.
+     */
+    public function getPendingApprovals(int $plantId = 0): array
+    {
+        return $this->approvalService->getPendingApprovals($plantId);
+    }
+
+    /**
+     * Get approval history.
+     */
+    public function getApprovalHistory(string $idBalanceHead): array
+    {
+        return $this->approvalService->getApprovalHistory($idBalanceHead);
     }
 
     public function executeTransfer(string $user, array $data, int $plantId): array
@@ -270,9 +332,14 @@ class TransferService implements TransferServiceInterface
                     }
                 }
 
+                // Audit log for successful transfer
+                AuditService::logTransfer('CREATE', $data, $user, 1);
+
                 return ['response' => 1];
             });
         } catch (Exception $e) {
+            // Audit log for failed transfer
+            AuditService::logTransfer('CREATE', $data, $user, 0);
             return ['response' => 0, 'message' => $e->getMessage()];
         }
     }
@@ -370,8 +437,21 @@ class TransferService implements TransferServiceInterface
                     ]);
                 });
             } catch (Exception $e) {
+                // Audit log for failed adjustment
+                AuditService::logAdjustment('CREATE', [
+                    'entry_no' => $adjEntryNo,
+                    'id_material' => $idMaterial,
+                    'qty' => $shortQty,
+                    'before_adjust' => 0,
+                    'after_adjust' => $shortQty,
+                ], $user, 0);
                 return ['response' => 0, 'message' => 'Adjustment failed: ' . $e->getMessage()];
             }
+        } else {
+            // Log when no adjustment was needed
+            AuditService::log('TRANSFER', 'AUTO_ADJUST_CHECK',
+                'No adjustment needed | Material: ' . $idMaterial . ' | CurrentStock: ' . $currentStock . ' | Requested: ' . $trfQty,
+                $user);
         }
 
         // Retry the transfer after adjustment

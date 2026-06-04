@@ -1,0 +1,11 @@
+{
+    "name": "TsRmreport",
+    "alias": "tsrmreport",
+    "description": "TS Raw Material Report",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsRmreport\\Providers\\TsRmreportServiceProvider"
+    ],
+    "files": []
+}

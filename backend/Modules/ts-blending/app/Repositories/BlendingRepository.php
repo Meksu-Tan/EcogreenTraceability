@@ -3,6 +3,7 @@
 namespace Modules\TsBlending\Repositories;
 
 use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
+use Modules\Shared\Services\PeriodLockService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -367,22 +368,8 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function getLockStatus(string $entryDate): bool
     {
-        $lockDateTime = new \DateTime($entryDate);
-        $lockYear = $lockDateTime->format('Y');
-        $lockMonth = $lockDateTime->format('m');
-
-        $result = DB::connection($this->connection)->select(
-            'SELECT lock_status
-               FROM t_report_pspa_head
-              WHERE status = 1
-                AND YEAR(period) = ?
-                AND MONTH(period) = ?
-              UNION ALL
-              SELECT "0" AS lock_status',
-            [$lockYear, $lockMonth]
-        );
-
-        return $result[0]->lock_status == 1;
+        // Use shared PeriodLockService for consistent date lock mechanism
+        return PeriodLockService::isLocked($entryDate);
     }
 
     public function createMaterialDocument(string $user, int $idTraceHead, ?string $materialDoc, string $mode): array
@@ -446,18 +433,9 @@ class BlendingRepository implements BlendingRepositoryInterface
         }
 
         $curr_entryDate = $entryDate[0]->entry_date;
-        $lockDateTime = new \DateTime($curr_entryDate);
-        $lockYear = $lockDateTime->format('Y');
-        $lockMonth = $lockDateTime->format('m');
 
-        $datLock = DB::connection($this->connection)->select(
-            'SELECT lock_status FROM t_report_pspa_head
-              WHERE status = 1 AND YEAR(period) = ? AND MONTH(period) = ?
-              UNION ALL SELECT "0" AS lock_status',
-            [$lockYear, $lockMonth]
-        );
-
-        if ($datLock[0]->lock_status == 1) {
+        // Use shared PeriodLockService for consistent date lock mechanism
+        if (PeriodLockService::isLocked($curr_entryDate)) {
             return ['response' => 99];
         }
 

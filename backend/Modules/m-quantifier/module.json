@@ -1,0 +1,11 @@
+{
+    "name": "Quantifier",
+    "alias": "quantifier",
+    "description": "Quantifier / DCS Tag Number Configuration",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Quantifier\\Providers\\QuantifierServiceProvider"
+    ],
+    "files": []
+}

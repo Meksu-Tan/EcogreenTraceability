@@ -13,7 +13,7 @@
           v-model="form.code"
           type="text"
           placeholder="e.g. P01"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none border-gray-300 bg-white"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
         />
       </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
@@ -24,7 +24,7 @@
           v-model="form.code_2"
           type="text"
           placeholder="e.g. 1001"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.code_2 ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.code_2" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code_2 }}</div>
@@ -36,7 +36,7 @@
           v-model="form.code_3"
           type="text"
           placeholder="e.g. EOMB"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.code_3 ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.code_3" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code_3 }}</div>
@@ -48,7 +48,7 @@
         id="plant-description"
         v-model="form.description"
         type="text"
-        class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
         :class="errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
       />
       <div v-if="errors.description" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.description }}</div>

@@ -39,6 +39,25 @@ const ecoTheme = {
   },
 }
 
+const ecoDarkTheme = {
+  dark: true,
+  colors: {
+    primary:          '#65C463',  // lighter green legible on dark
+    'primary-darken-1': '#42B240',
+    secondary:        '#90D58E',
+    accent:           '#E8B878',
+    error:            '#EF9A9A',
+    warning:          '#FFCC80',
+    info:             '#81D4FA',
+    success:          '#A5D6A7',
+    background:       '#0F1410',
+    surface:          '#1C2420',
+    'on-primary':     '#0D3B22',
+    'on-background':  '#E2F6E2',
+    'on-surface':     '#D4DDD8',
+  },
+}
+
 export default createVuetify({
   components,
   directives,
@@ -46,6 +65,7 @@ export default createVuetify({
     defaultTheme: 'eco',
     themes: {
       eco: ecoTheme,
+      ecoDark: ecoDarkTheme,
     },
   },
   defaults: {

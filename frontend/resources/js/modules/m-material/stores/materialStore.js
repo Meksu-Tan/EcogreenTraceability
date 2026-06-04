@@ -11,6 +11,9 @@ export const useMaterialStore = defineStore('moduleMaterial', () => {
     try {
       const res = await MaterialApi.getMaterials()
       items.value = res.data ?? res ?? []
+    } catch (error) {
+      console.error('Failed to fetch materials:', error)
+      items.value = []
     } finally {
       loading.value = false
     }

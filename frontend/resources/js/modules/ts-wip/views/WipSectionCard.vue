@@ -27,7 +27,7 @@
           <button @click="$emit('entry-feed')" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg transition-all flex items-center gap-1 cursor-pointer">
             <Icon icon="ri:add-line" class="w-3 h-3" /> Entry Feed
           </button>
-          <button @click="$emit('view-feed-log')" class="px-3 py-1.5 text-xs font-bold text-gray-600 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-all flex items-center gap-1 cursor-pointer">
+          <button @click="$emit('view-feed-log')" class="px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-all flex items-center gap-1 cursor-pointer">
             <Icon icon="ri:history-line" class="w-3 h-3" /> Log Feed
           </button>
         </template>
@@ -40,7 +40,7 @@
           <button @click="$emit('view-balance')" class="px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-all flex items-center gap-1 cursor-pointer">
             <Icon icon="ri:swap-line" class="w-3 h-3" /> Balance
           </button>
-          <button @click="$emit('view-rundown-log')" class="px-3 py-1.5 text-xs font-bold text-gray-600 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-all flex items-center gap-1 cursor-pointer">
+          <button @click="$emit('view-rundown-log')" class="px-3 py-1.5 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg transition-all flex items-center gap-1 cursor-pointer">
             <Icon icon="ri:history-line" class="w-3 h-3" /> Log Rundown
           </button>
         </template>

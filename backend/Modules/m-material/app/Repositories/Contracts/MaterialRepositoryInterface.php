@@ -3,7 +3,7 @@ namespace Modules\Material\Repositories\Contracts;
 
 interface MaterialRepositoryInterface
 {
-    public function getAll(): array;
+    public function getAll(?string $type = null): array;
     public function findById(int $id): ?object;
     public function create(array $data): bool;
     public function update(int $id, array $data): bool;

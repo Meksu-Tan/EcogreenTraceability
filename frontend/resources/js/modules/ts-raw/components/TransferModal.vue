@@ -1,8 +1,16 @@
-<template>
+﻿<template>
   <Teleport to="body">
-  <div
-    v-show="isOpen"
-    class="fixed inset-0 z-[100] overflow-y-auto"
+    <Transition
+      enter-active-class="transition duration-300 ease-out"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-show="isOpen"
+        class="fixed inset-0 z-[100] overflow-y-auto"
     aria-labelledby="modal-title"
     role="dialog"
     aria-modal="true"
@@ -10,7 +18,7 @@
   >
     <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
       <div
-        class="fixed inset-0 z-[1] bg-white/[0.14] backdrop-blur-2xl backdrop-saturate-150 transition-opacity duration-300"
+        class="fixed inset-0 z-[1] bg-black/50 backdrop-blur-sm transition-opacity duration-300"
         aria-hidden="true"
         @click="closeModal"
       />
@@ -108,7 +116,7 @@
                 </div>
               </div>
 
-              <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
                 <div class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 sm:p-5">
                   <h4 class="mb-4 flex items-center gap-2 border-b border-slate-200/80 pb-2 text-xs font-bold uppercase tracking-wide text-slate-700">
                     <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-green-600 text-[10px] text-white">1</span>
@@ -271,7 +279,7 @@
         <!-- Material (nested) -->
         <div v-if="isMaterialModalOpen" class="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6">
           <div
-            class="absolute inset-0 bg-white/25 backdrop-blur-md"
+            class="absolute inset-0 bg-black/40 backdrop-blur-sm"
             aria-hidden="true"
             @click="isMaterialModalOpen = false"
           />
@@ -312,7 +320,7 @@
               <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                  class="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-200"
                   @click="isMaterialModalOpen = false"
                 >
                   Batal
@@ -335,7 +343,7 @@
           <button
             type="button"
             @click="closeModal"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            class="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-200"
           >
             Tutup
           </button>
@@ -355,7 +363,8 @@
       </div>
     </div>
   </div>
-  </Teleport>
+  </Transition>
+</Teleport>
 </template>
 
 <script setup>
@@ -626,6 +635,9 @@ async function handleSubmit() {
 }
 
 function closeModal() {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
+  }
   emit('close')
 }
 
@@ -635,6 +647,9 @@ watch(
     if (open) {
       void bootstrap()
     } else {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur()
+      }
       initLoading.value = false
       initError.value = null
       isMaterialModalOpen.value = false

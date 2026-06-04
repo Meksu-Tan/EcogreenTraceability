@@ -23,10 +23,12 @@ class MaterialController extends Controller
 
     /**
      * GET /api/v1/materials
+     * Optional ?type=RM|WIP|... filter
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        return ApiResponse::success($this->materialService->listMaterials(), 'OK', 200);
+        $type = $request->query('type');
+        return ApiResponse::success($this->materialService->listMaterials($type), 'OK', 200);
     }
 
     /**

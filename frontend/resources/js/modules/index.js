@@ -27,6 +27,13 @@ export const MODULES = {
   admin:            () => import('./admin/module'),
   inquiry:          () => import('./inquiry/module'),
   shared:           () => import('./shared/module'),
+  'ts-stock':       () => import('./ts-stock/module'),
+  'ts-tsreport':    () => import('./ts-tsreport/module'),
+  'ts-rmreport':    () => import('./ts-rmreport/module'),
+  'trace-forward':  () => import('./trace-forward/module'),
+  'trace-backward': () => import('./trace-backward/module'),
+  'm-adjustment':   () => import('./m-adjustment/module'),
+  'm-quantifier':   () => import('./m-quantifier/module'),
 }
 
 export const MODULE_NAMES = Object.keys(MODULES)

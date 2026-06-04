@@ -13,7 +13,7 @@
           id="wh-id-batch"
           v-model="form.id_batch"
           type="text"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.id_batch ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.id_batch" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.id_batch }}</div>
@@ -25,7 +25,7 @@
           id="wh-code"
           v-model="form.code"
           type="text"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.code ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.code" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code }}</div>
@@ -37,7 +37,7 @@
           id="wh-description"
           v-model="form.description"
           type="text"
-          class="w-full px-3 py-2 border rounded-md text-sm transition-all focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
           :class="errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
         />
         <div v-if="errors.description" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.description }}</div>

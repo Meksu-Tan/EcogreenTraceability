@@ -1,5 +1,25 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Semantic Theme Tokens (GAP-014) ───────────────────────── */
+@theme {
+  --color-success: #2E7D32;
+  --color-success-soft: #D9EDD0;
+  --color-success-text: #1B5E20;
+  --color-info: #01579B;
+  --color-info-soft: #CFFAFE;
+  --color-info-text: #155E75;
+  --color-warning: #E65100;
+  --color-warning-soft: #FDF3E3;
+  --color-warning-text: #9A5E1A;
+  --color-danger: #C62828;
+  --color-danger-soft: #FECDD3;
+  --color-danger-text: #9F1239;
+  --color-neutral-soft: #E0F2FE;
+  --color-neutral-text: #1E40AF;
+}
+
 /* ── Typography & Base Styles ─────────────────────────────── */
 :root {
   /* Font Families */
@@ -70,6 +90,112 @@
 body {
   font-family: var(--font-sans);
   @apply bg-[#F7F4EF] text-slate-600 antialiased;
+}
+
+html.dark body {
+  @apply bg-[#0F1410] text-slate-300;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* ── Class-based dark mode bridge ─────────────────────────────
+   Many legacy views predate dark variants and use fixed light
+   utility classes. These scoped overrides let the app-wide theme
+   switch cover cards, tables, modals, forms, and page backgrounds. */
+html.dark .bg-white {
+  background-color: #0f172a !important;
+}
+
+html.dark .bg-slate-50,
+html.dark .bg-gray-50,
+html.dark .bg-gray-50\/30,
+html.dark .bg-gray-50\/80,
+html.dark .bg-\[\#fafdfb\] {
+  background-color: #111827 !important;
+}
+
+html.dark .bg-slate-100,
+html.dark .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-slate-50:hover {
+  background-color: #1e293b !important;
+}
+
+html.dark .hover\:bg-green-50:hover,
+html.dark .hover\:bg-green-50\/50:hover {
+  background-color: rgba(20, 83, 45, 0.35) !important;
+}
+
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-gray-900,
+html.dark .text-gray-800 {
+  color: #e5e7eb !important;
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-gray-500,
+html.dark .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+html.dark .border-white,
+html.dark .border-gray-50,
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-300,
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #334155 !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  color: #e5e7eb;
+  background-color: #0f172a;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b;
+}
+
+html.dark .disabled\:bg-slate-100:disabled,
+html.dark .bg-gray-100.cursor-not-allowed {
+  background-color: #1e293b !important;
+}
+
+html.dark .shadow-slate-200\/60,
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl,
+html.dark .shadow-2xl {
+  --tw-shadow-color: rgba(0, 0, 0, 0.35) !important;
 }
 
 /* ── Ecogreen Brand Color Overrides ────────────────────────── */

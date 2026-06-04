@@ -1,0 +1,11 @@
+{
+    "name": "TsStock",
+    "alias": "tsstock",
+    "description": "TS Stock On-Hand Inquiry",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsStock\\Providers\\TsStockServiceProvider"
+    ],
+    "files": []
+}

@@ -10,7 +10,8 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./resources/js', import.meta.url))
+      '@': fileURLToPath(new URL('./resources/js', import.meta.url)),
+      '@core': fileURLToPath(new URL('./../../materio-vuetify-vuejs-laravel-admin-template-v3.4.0/javascript-version/starter-kit/resources/js/@core', import.meta.url))
     },
     extensions: ['.js', '.json', '.jsx', '.mjs', '.ts', '.tsx', '.vue']
   },

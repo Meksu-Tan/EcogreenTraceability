@@ -16,5 +16,15 @@ Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
         Route::post('matl-doc', [TransferController::class, 'matlDocNumber']);
         Route::post('update-sub-tank', [TransferController::class, 'updateEntrySubTank']);
         Route::get('supplier-code', [TransferController::class, 'supplierMaterialCode']);
+
+        // Approval Workflow Routes
+        Route::prefix('approval')->group(function () {
+            Route::get('pending', [TransferController::class, 'pendingApprovals']);
+            Route::post('submit', [TransferController::class, 'submitForApproval']);
+            Route::post('approve', [TransferController::class, 'approveTransfer']);
+            Route::post('reject', [TransferController::class, 'rejectTransfer']);
+            Route::post('cancel', [TransferController::class, 'cancelTransfer']);
+            Route::get('history', [TransferController::class, 'approvalHistory']);
+        });
     });
 });
