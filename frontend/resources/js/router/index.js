@@ -1,4 +1,4 @@
-import { createAppRouter } from '@/core/router'
+import { createAppRouter } from '../core/router/index.js'
 
 const moduleGlob = import.meta.glob('../modules/*/module.js', { eager: true })
 
