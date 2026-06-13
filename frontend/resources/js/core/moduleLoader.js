@@ -59,7 +59,7 @@ export function getRegisteredStores() {
  * Call from main.js before creating the Pinia instance.
  */
 export function registerModuleStores(pinia) {
-  const moduleGlob = import.meta.glob('@/modules/*/module.js', { eager: true })
+  const moduleGlob = import.meta.glob('../modules/*/module.js', { eager: true })
 
   for (const [, mod] of Object.entries(moduleGlob)) {
     const manifest = mod.default || mod

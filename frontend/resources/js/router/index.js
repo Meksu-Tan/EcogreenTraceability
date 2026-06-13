@@ -1,6 +1,6 @@
 import { createAppRouter } from '@/core/router'
 
-const moduleGlob = import.meta.glob('@/modules/*/module.js', { eager: true })
+const moduleGlob = import.meta.glob('../modules/*/module.js', { eager: true })
 
 const moduleRoutes = []
 
