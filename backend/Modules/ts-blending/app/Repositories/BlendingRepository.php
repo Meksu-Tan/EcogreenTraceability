@@ -41,10 +41,6 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function getActiveMaterials(): Collection
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         return collect(DB::connection($this->connection)->select(
             'SELECT a.id_material, CONCAT(UPPER(a.description), " (", a.code, ")") AS material
                FROM m_material a
@@ -90,9 +86,9 @@ class BlendingRepository implements BlendingRepositoryInterface
                             FROM m_material b WHERE b.status = 1) b
                  ON a.code = b.code
                LEFT JOIN (SELECT c.id_material, c.qty
-                            FROM m_tank cc
+                            FROM m_sloc cc
                             LEFT JOIN t_balance_header c
-                              ON c.id_tank = cc.id_tank
+                              ON c.id_sloc = cc.id_sloc
                            WHERE c.status = 1
                              AND cc.status = 1
                              AND (SUBSTRING(c.trace_no,1,1) IN (1,2,7,8,9))
@@ -167,7 +163,7 @@ class BlendingRepository implements BlendingRepositoryInterface
     {
         $query = 'SELECT id_sloc AS id_tank, description AS tank, id_plant
                     FROM m_sloc
-                   WHERE status = 1';
+                   WHERE status = 1 AND description IS NOT NULL AND description != ""';
         $params = [];
 
         if ($plantId && $plantId > 0) {
@@ -176,10 +172,6 @@ class BlendingRepository implements BlendingRepositoryInterface
         }
 
         $query .= ' ORDER BY description ASC, id_sloc ASC';
-
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
 
         $result = collect(DB::connection($this->connection)->select($query, $params));
         
@@ -191,9 +183,8 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function getTankDetails(string $tankDescription, ?int $plantId = null): Collection
     {
-        $query = 'SELECT sd.id_sloc_tail AS id_tank_tail, sd.tf_number AS tankNo
+        $query = 'SELECT s.id_sloc AS id_tank_tail, s.description AS tankNo
                     FROM m_sloc s
-                    LEFT JOIN m_sloc_detail sd ON s.id_sloc = sd.id_sloc AND sd.status = 1
                    WHERE s.status = 1
                      AND s.description = ?';
         $params = [$tankDescription];
@@ -203,19 +194,16 @@ class BlendingRepository implements BlendingRepositoryInterface
             $params[] = $plantId;
         }
 
-        $query .= ' ORDER BY sd.tf_number ASC';
+        $query .= ' ORDER BY s.description ASC';
 
         return collect(DB::connection($this->connection)->select($query, $params));
     }
 
-    public function getBlendingList(int $plantId): Collection
+    public function getBlendingList(int $plantId, int $page = 1, int $perPage = 5): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
-        return collect(DB::connection($this->connection)->select(
-            'SELECT a.entry_date, b.material_document, a.id_tank, a.id_tank_tail,
+        $offset = ($page - 1) * $perPage;
+        $result = collect(DB::connection($this->connection)->select(
+            'SELECT a.entry_date, b.material_document, a.id_sloc,
                     CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(a.qty,3) AS qty,
                     FORMAT(a.init_qty,3) AS init_qty, a.id_balance_head AS idHead,
                     CONCAT(c.description, " (", c.code, ")") AS material,
@@ -225,9 +213,13 @@ class BlendingRepository implements BlendingRepositoryInterface
                         SEPARATOR " | ") AS supplier,
                     CAST(b.from_trace_no AS CHAR) AS from_trace_no, b.id_trace_head AS idTraceHead,
                     b.is_last_row, b.next_process,
-                    COALESCE(
-                        GROUP_CONCAT(DISTINCT COALESCE(h_sloc.id_tank, h.tf_number) ORDER BY COALESCE(h_sloc.id_tank, h.tf_number) ASC SEPARATOR " & "),
-                        d.description
+                    CONCAT(
+                        COALESCE(d.description, ""),
+                        IF(
+                            GROUP_CONCAT(DISTINCT COALESCE(h_sloc.description, h.description) ORDER BY COALESCE(h_sloc.description, h.description) ASC SEPARATOR " & ") IS NULL,
+                            "",
+                            CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(h_sloc.description, h.description) ORDER BY COALESCE(h_sloc.description, h.description) ASC SEPARATOR " & "))
+                        )
                     ) AS sloc,
                     FORMAT(ROUND(ee.init_qty,4),3) as balance_supplier
                FROM t_balance_header a
@@ -259,19 +251,19 @@ class BlendingRepository implements BlendingRepositoryInterface
                       AND SUBSTRING(b.from_trace_no,1,1) = 8
                ) b ON a.id_balance_head = b.id_balance_head
                LEFT JOIN m_material c ON c.id_material = a.id_material
-               LEFT JOIN m_tank d ON d.id_tank = a.id_tank AND d.id_plant = a.id_plant
-               LEFT JOIN m_plant p ON a.id_plant = p.code_3 AND p.status = 1
-               LEFT JOIN t_balance_detail e ON a.id_balance_head = e.id_balance_head
-               LEFT JOIN (
-                   SELECT ee1.trace_no, SUM(ee2.init_qty) AS init_qty
-                     FROM t_balance_header ee1
-                     LEFT JOIN t_balance_detail ee2 ON ee1.id_balance_head = ee2.id_balance_head
-                    WHERE ee1.status = 1
-                    GROUP BY ee1.trace_no
-               ) ee ON a.trace_no = ee.trace_no
-               LEFT JOIN m_supplier f ON e.id_supplier = f.id_supplier
-               LEFT JOIN m_tank_detail h ON JSON_CONTAINS(IF(JSON_VALID(a.id_tank_tail), a.id_tank_tail, \'[]\'), JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
-               LEFT JOIN m_sloc h_sloc ON JSON_CONTAINS(IF(JSON_VALID(a.id_tank_tail), a.id_tank_tail, \'[]\'), JSON_QUOTE(CONCAT("S", CAST(h_sloc.id_sloc AS CHAR))))
+                LEFT JOIN m_sloc d ON (d.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))))) AND d.id_plant = a.id_plant COLLATE utf8mb4_unicode_ci
+                LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci AND p.status = 1
+                LEFT JOIN t_balance_detail e ON a.id_balance_head = e.id_balance_head
+                LEFT JOIN (
+                    SELECT ee1.trace_no, SUM(ee2.init_qty) AS init_qty
+                      FROM t_balance_header ee1
+                      LEFT JOIN t_balance_detail ee2 ON ee1.id_balance_head = ee2.id_balance_head
+                     WHERE ee1.status = 1
+                     GROUP BY ee1.trace_no
+                ) ee ON a.trace_no = ee.trace_no
+                LEFT JOIN m_supplier f ON e.id_supplier = f.id_supplier
+                LEFT JOIN m_sloc h ON (h.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(h.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(h.id_sloc AS CHAR))))))
+                LEFT JOIN m_sloc h_sloc ON (h_sloc.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(h_sloc.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(h_sloc.id_sloc AS CHAR))))))
               WHERE a.status = 1
                 AND SUBSTRING(a.trace_no,1,1) = 8
                 AND (a.id_plant = ? OR ? = 0)
@@ -279,36 +271,32 @@ class BlendingRepository implements BlendingRepositoryInterface
               ORDER BY a.trace_no DESC',
             [$plantId, $plantId]
         ));
+
+        $total = $result->count();
+        $sliced = $result->slice($offset, $perPage)->values();
+
+        return ['data' => $sliced, 'total' => $total];
     }
 
     public function getActiveTanksRundown(int $materialId, int $plantId): Collection
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         return collect(DB::connection($this->connection)->select(
-            'SELECT b.id_tank, b.description AS tank
+            'SELECT b.id_sloc AS id_tank, b.description AS tank
                FROM m_material a
-               LEFT JOIN m_tank b ON a.type = b.code_2 AND b.status = 1 AND b.id_plant = ?
+               LEFT JOIN m_sloc b ON a.type = b.code_2 COLLATE utf8mb4_unicode_ci AND b.status = 1 AND b.id_plant = ?
               WHERE a.status = 1
                 AND a.id_material = ?
-              GROUP BY b.id_tank',
+              GROUP BY b.id_sloc',
             [$plantId, $materialId]
         ));
     }
 
     public function getAllTanks(int $plantId): Collection
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
-        $query = 'SELECT a.id_tank,
-                         COALESCE(s.description, a.description) AS tank,
+        $query = 'SELECT a.id_sloc AS id_tank,
+                         a.description AS tank,
                          a.id_plant
-                    FROM m_tank a
-                    LEFT JOIN m_sloc s ON a.id_tank = s.id_tank AND s.status = 1
+                    FROM m_sloc a
                    WHERE a.status = 1';
         $params = [];
 
@@ -317,7 +305,7 @@ class BlendingRepository implements BlendingRepositoryInterface
             $params[] = $plantId;
         }
 
-        $query .= ' ORDER BY COALESCE(s.description, a.description) ASC';
+        $query .= ' ORDER BY a.description ASC';
 
         $result = collect(DB::connection($this->connection)->select($query, $params));
         
@@ -329,7 +317,7 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function getActiveSpecificTanksRundown(int $sloc): Collection
     {
-        $tank = DB::connection($this->connection)->select('SELECT description, id_plant FROM m_tank WHERE id_tank = ?', [$sloc]);
+        $tank = DB::connection($this->connection)->select('SELECT description, id_plant FROM m_sloc WHERE id_sloc = ?', [$sloc]);
         if (empty($tank)) {
             return collect([]);
         }
@@ -337,12 +325,12 @@ class BlendingRepository implements BlendingRepositoryInterface
         $plantId = $tank[0]->id_plant;
 
         return collect(DB::connection($this->connection)->select(
-            'SELECT id_sloc AS id_sloc_tail, CONCAT("S", id_sloc) AS id_tank_tail, id_tank AS tankNo
+            'SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo
                FROM m_sloc
               WHERE status = 1
                 AND description = ?
                 AND id_plant = ?
-              ORDER BY id_tank ASC',
+              ORDER BY id_sloc ASC',
             [$formattedName, $plantId]
         ));
     }
@@ -531,7 +519,7 @@ class BlendingRepository implements BlendingRepositoryInterface
         $jsonTails = json_encode(array_values(array_unique($tails)));
 
         $row = DB::connection($this->connection)->selectOne(
-            'SELECT id_tank_tail, trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
+            'SELECT trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
             [$idHead]
         );
 
@@ -540,16 +528,16 @@ class BlendingRepository implements BlendingRepositoryInterface
         }
 
         DB::connection($this->connection)->update(
-            'UPDATE t_balance_header SET id_tank_tail = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
+            'UPDATE t_balance_header SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
         );
         DB::connection($this->connection)->update(
-            'UPDATE t_trace_header SET id_tank_tail = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
+            'UPDATE t_trace_header SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
         );
         DB::connection($this->connection)->update(
-            'UPDATE t_balance_detail SET id_tank_tail = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
+            'UPDATE t_balance_detail SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
         );
 
         $this->logTransaction('T_BALANCE_HEAD', 'UPDATE_SUBTANK',

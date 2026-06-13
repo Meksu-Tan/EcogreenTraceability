@@ -3,6 +3,7 @@
 namespace Modules\Adjustment\Repositories;
 
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
+use Modules\Shared\Helpers\QuantityDistributionHelper;
 use Modules\Shared\Repositories\Traits\PlantFilterTrait;
 use Modules\Shared\Services\PlantContextService;
 use Illuminate\Support\Facades\DB;
@@ -18,12 +19,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
     //  Existing
     // ═══════════════════════════════════════════════════════════
 
-    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip'): array
+    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
 
         $whxColumns = $adjType === 'wh'
@@ -42,7 +39,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $sql = "
             SELECT a.entry_date, CAST(a.adjust_no AS CHAR) AS adjust_no,
                    CONCAT(b.code, ' :: ', b.description) AS material,
-                   a.id_tank,
+                   a.id_sloc,
                    CAST(c.trace_no AS CHAR) AS trace_no,
                    CONCAT('Qty: ', a.before_adjust, ' >>> ', a.after_adjust, ' MT') AS adjustment,
                    a.id_adjust_head,
@@ -50,9 +47,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                       FORMAT(d.before_adjust,3), ' >>> ', FORMAT(d.after_adjust,3), ' MT') SEPARATOR ' | ') AS supplier,
                    a.created_by, a.created_at, a.status, a.after_adjust,
                    CONCAT(g.description,
-                      IF(GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', ') IS NULL,
+                      IF(GROUP_CONCAT(DISTINCT h.description ORDER BY h.description ASC SEPARATOR ', ') IS NULL,
                           '',
-                          CONCAT(' | ', GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', '))
+                          CONCAT(' | ', GROUP_CONCAT(DISTINCT h.description ORDER BY h.description ASC SEPARATOR ', '))
                       )
                    ) AS sloc,
                    IF(c.qty IS NOT NULL AND a.after_adjust <> c.qty, 0, 1) AS adjust_flag,
@@ -76,8 +73,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     LEFT JOIN t_material_document ff ON f.id_trace_head = ff.id_trace_head AND ff.status = 1
                    WHERE f.status = 1
               ) f ON a.adjust_no = f.to_trace_no
-              LEFT JOIN m_tank g ON g.id_tank = a.id_tank
-              LEFT JOIN m_tank_detail h ON JSON_CONTAINS(COALESCE(c.id_tank_tail,'[]'), JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
+              LEFT JOIN m_sloc g ON g.id_sloc = a.id_sloc
+              LEFT JOIN m_sloc h ON c.id_sloc = h.id_sloc
               {$whxJoin}
              WHERE a.status IN (1, 2, 3, 4)
                AND SUBSTRING(a.adjust_no, 1, 1) = '9'
@@ -231,8 +228,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'id_adjust_head' => $headerId,
             'id_supplier' => $data['id_supplier'],
             'id_material' => $data['id_material'],
-            'id_tank' => $data['id_tank'],
-            'id_tank_tail' => $data['id_tank_tail'] ?? null,
+            'id_sloc' => $data['id_tank'],
             'batch_sap' => $data['batch_sap'] ?? '',
             'before_adjust' => $data['before_adjust'] ?? 0,
             'after_adjust' => $data['after_adjust'] ?? 0,
@@ -275,6 +271,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             ->where('id_balance_head', $header->id_balance_head)
             ->where('status', 1)
             ->update([
+                // TODO [TD-3]: raw SQL — refactor ke Query Builder saat architecture sprint
                 'qty' => DB::raw('after_adjust'),
                 'updated_by' => $header->approved_by ?? 'system',
             ]);
@@ -353,16 +350,16 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
     {
         $resolved = PlantContextService::resolvePlantId($plantId);
         
-        $sql = 'SELECT a.id_tank, a.description AS tank
-                  FROM m_tank a
-                 WHERE a.status = 1';
+        $sql = 'SELECT a.id_sloc AS id_tank, a.description AS tank
+                  FROM m_sloc a
+                 WHERE a.status = 1 AND a.description IS NOT NULL AND a.description != ""';
         $bindings = [];
-        
+
         if ($resolved !== null) {
             $sql .= ' AND a.id_plant = ?';
             $bindings[] = $resolved;
         }
-        
+
         $sql .= ' ORDER BY a.description ASC';
         
         return DB::connection($this->connection)->select($sql, $bindings);
@@ -371,11 +368,11 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
     public function getActiveSpecificTanks(int $sloc): array
     {
         return DB::connection($this->connection)->select(
-            'SELECT a.id_tank_tail, a.tf_number AS tankNo
-               FROM m_tank_detail a
+            'SELECT a.id_sloc AS id_tank_tail, a.id_tank AS tankNo
+               FROM m_sloc a
               WHERE a.status = 1
-                AND a.id_tank = ?
-              ORDER BY a.tf_number ASC',
+                AND a.id_sloc = ?
+              ORDER BY a.description ASC',
             [$sloc]
         );
     }
@@ -423,7 +420,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                FROM t_balance_detail b
                JOIN m_supplier a ON a.id_supplier = b.id_supplier
               WHERE b.id_material = ?
-                AND b.id_tank = ?
+                AND b.id_sloc = ?
                 AND b.qty > 0
                 AND a.status = 1
               GROUP BY a.id_supplier, a.description, a.code
@@ -438,7 +435,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT b.batch_sap, SUM(b.qty) AS qty, MIN(b.created_at) AS first_created
                FROM t_balance_detail b
               WHERE b.id_material = ?
-                AND b.id_tank = ?
+                AND b.id_sloc = ?
                 AND b.id_supplier = ?
                 AND b.qty > 0
                 AND b.status = 1
@@ -472,9 +469,6 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $batchId = $matl->id_rundown;
         $batchMapping = $batchMoveType . $batchEntryDate . $batchId . $lastTwoDigitIdPlant;
 
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
         $datBatch = DB::connection($this->connection)->select(
             'SELECT a.adjust_no, COUNT(a.adjust_no) AS flag
                FROM (SELECT a.adjust_no
@@ -501,7 +495,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                      FROM m_material c
                      LEFT JOIN t_balance_header a ON c.id_material = a.id_material
                      LEFT JOIN t_trace_header b ON a.id_balance_head = b.id_balance_head AND b.status = 1 AND b.out_qty = 0
-                    WHERE a.status = 1 AND a.id_tank = ?
+                    WHERE a.status = 1 AND a.id_sloc = ?
                ) a ON b.code = a.code
               WHERE b.id_material = ? AND b.status = 1
               ORDER BY a.entry_date DESC, a.id_balance_head DESC
@@ -512,9 +506,6 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         if (count($datBal) === 0) return [['response' => 4]];
 
         /* ── Get total balance ── */
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
         $datTotalBal = DB::connection($this->connection)->select(
             'SELECT SUM(a.qty) AS total_qty
                FROM m_material b
@@ -522,7 +513,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                    SELECT a.code, b.qty
                      FROM m_material a
                      LEFT JOIN t_balance_header b ON a.id_material = b.id_material AND b.status = 1
-                    WHERE a.status = 1 AND b.id_tank = ?
+                    WHERE a.status = 1 AND b.id_sloc = ?
                ) a ON b.code = a.code
               WHERE b.id_material = ? AND b.status = 1
               LIMIT 1',
@@ -651,7 +642,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 AND a.status = 1
                 AND b.status = 1
                 AND b.out_qty = 0
-                AND a.qty > "0.0001"',
+                AND a.qty > 0.0001',
             [$idTraceHead]
         );
 
@@ -715,7 +706,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'out_qty' => 0,
                 'before_adjust' => $beforeAdjustDet,
                 'after_adjust' => $afterAdjustDet,
-                'id_tank' => $idTank,
+                'id_sloc' => $idTank,
                 'id_plant' => $idPlant,
                 'created_by' => $user,
             ]);
@@ -1145,9 +1136,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $idMaterial = (int) ($data['id_material'] ?? 0);
         $materialDoc = $data['material_doc'] ?? null;
         $mode = $data['mode'] ?? 'ADD';
-        $idTankTail = $data['id_tank_tail'] ?? [];
-
-        /* ── Check supplier temp ── */
+        $idTankTail = [];
+        $idTankTailJson = '[]';
         $suppliers = DB::connection($this->connection)->select(
             'SELECT id_supplier, qty AS qty_tail, batch_sap FROM t_balance_temporary WHERE entry_no = ?',
             [$entryNo]
@@ -1172,8 +1162,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             $idHead = DB::connection($this->connection)->table('t_balance_header')->insertGetId([
                 'trace_no' => $newEntryNo,
                 'id_material' => $idMaterial,
-                'id_tank' => $idTank,
-                'id_tank_tail' => $idTankTailJson,
+                'id_sloc' => $idTank,
                 'entry_date' => $entryDate,
                 'qty' => $qty,
                 'in_qty' => $qty,
@@ -1201,8 +1190,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'adjust_no' => $newEntryNo,
                 'id_balance_head' => $idHead,
                 'id_material' => $idMaterial,
-                'id_tank' => $idTank,
-                'id_tank_tail' => $idTankTailJson,
+                'id_sloc' => $idTank,
                 'in_qty' => $qty,
                 'before_adjust' => 0,
                 'after_adjust' => $qty,
@@ -1587,32 +1575,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     private function adjustAmtToTotal(array &$dataPerHead, float $targetTotal): void
     {
-        // Flatten all items
-        $allItems = [];
-        foreach ($dataPerHead as $head) {
-            foreach ($head as $item) {
-                $allItems[] = &$item;
-            }
-        }
-        unset($item);
-
-        $total = array_sum(array_column($allItems, 'qty'));
-        if ($total == 0) return;
-
-        $factor = $targetTotal / $total;
-        $newTotal = 0.0;
-        $lastIdx = array_key_last($allItems);
-
-        foreach ($allItems as $idx => &$item) {
-            $item['qty'] = round($item['qty'] * $factor, 4);
-            $newTotal += $item['qty'];
-        }
-
-        // Adjust rounding error on last item
-        if ($lastIdx !== null) {
-            $delta = round($targetTotal - $newTotal, 4);
-            $allItems[$lastIdx]['qty'] += $delta;
-        }
+        $flat = $dataPerHead['det'] ?? [];
+        $dataPerHead['det'] = QuantityDistributionHelper::adjustToTotal($flat, $targetTotal, 'qty');
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1649,7 +1613,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         return DB::connection($this->connection)->select(
             'SELECT a.*, b.description AS tank_name, c.description AS material_name
                FROM t_report_pspa_detail a
-               LEFT JOIN m_tank b ON a.id_tank = b.id_tank
+               LEFT JOIN m_sloc b ON a.id_sloc = b.id_sloc
                LEFT JOIN m_material c ON a.id_material = c.id_material
               WHERE a.id_pspa_head = ? AND a.status = 1
               ORDER BY a.id_pspa_detail ASC',
@@ -1726,21 +1690,21 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
         // Get details and calculate on-hand from t_balance
         return DB::connection($this->connection)->select(
-            'SELECT a.id_pspa_detail, a.id_tank, a.id_material,
+            'SELECT a.id_pspa_detail, a.id_sloc, a.id_material,
                     b.description AS tank_name, c.description AS material_name,
                     a.physical_stock, a.book_stock,
                     IFNULL(d.on_hand, 0) AS system_on_hand,
                     (IFNULL(d.on_hand, 0) - a.physical_stock) AS variance
                FROM t_report_pspa_detail a
-               LEFT JOIN m_tank b ON a.id_tank = b.id_tank
+               LEFT JOIN m_sloc b ON a.id_sloc = b.id_sloc
                LEFT JOIN m_material c ON a.id_material = c.id_material
                LEFT JOIN (
-                   SELECT b.id_tank, b.id_material, SUM(b.qty) AS on_hand
+                   SELECT b.id_sloc, b.id_material, SUM(b.qty) AS on_hand
                      FROM t_balance_header a
                      JOIN t_balance_detail b ON a.id_balance_head = b.id_balance_head
                     WHERE a.status = 1 AND b.status = 1
-                    GROUP BY b.id_tank, b.id_material
-               ) d ON a.id_tank = d.id_tank AND a.id_material = d.id_material
+                    GROUP BY b.id_sloc, b.id_material
+               ) d ON a.id_sloc = d.id_sloc AND a.id_material = d.id_material
               WHERE a.id_pspa_head = ? AND a.status = 1
               ORDER BY b.description, c.description',
             [$idHead]
@@ -1811,7 +1775,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     END AS status_label
                FROM t_adjustment_header a
                LEFT JOIN m_material c ON a.id_material = c.id_material
-               LEFT JOIN m_tank g ON a.id_tank = g.id_tank
+               LEFT JOIN m_sloc g ON a.id_sloc = g.id_sloc
               WHERE a.status IN (1, 2)
                 AND a.id_plant = ?
                ORDER BY a.id_adjust_head DESC
@@ -1839,7 +1803,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                            WHEN 9 THEN "CANCELLED"
                            ELSE "UNKNOWN"
                        END AS status_label,
-                       a.entry_date, a.id_material, a.id_tank
+                       a.entry_date, a.id_material, a.id_sloc AS id_tank
                   FROM t_adjustment_header a
                  WHERE ' . ($adjustNo ? 'a.adjust_no = ?' : 'a.id_adjust_head = ?') . '
                  LIMIT 1';

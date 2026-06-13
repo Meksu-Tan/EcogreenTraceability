@@ -41,10 +41,6 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function getActiveMaterials(): Collection
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         return collect(DB::connection($this->connection)->select(
             'SELECT a.id_material, CONCAT(UPPER(a.description), " (", a.code, " - ", a.type, ")") AS material
                FROM m_material a
@@ -109,42 +105,73 @@ class TransferRepository implements TransferRepositoryInterface
         return (float) ($result[0]->total ?? 0);
     }
 
-    public function getTransferList(int $plantId): Collection
+    public function getTransferList(int $plantId, int $page = 1, int $perPage = 5): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
+        $offset = ($page - 1) * $perPage;
+        $totalResult = DB::connection($this->connection)->select(
+            'SELECT COUNT(DISTINCT a.trace_no) AS total
+               FROM t_balance_header a
+               LEFT JOIN t_trace_header b ON a.id_balance_head = b.id_balance_head AND b.status = 1 AND SUBSTRING(b.to_trace_no,1,1) = 7 AND SUBSTRING(b.from_trace_no,1,1) = 7
+               LEFT JOIN t_trace_header th_from ON th_from.to_trace_no = b.from_trace_no AND th_from.status = 1
+               LEFT JOIN m_sloc t_from ON t_from.id_sloc = th_from.id_sloc
+              WHERE a.status = 1
+                AND SUBSTRING(a.trace_no,1,1) = 7
+                AND (t_from.id_plant = ? OR a.id_plant = ? OR ? = 0)',
+            [$plantId, $plantId, $plantId]
+        );
+        $total = $totalResult[0]->total ?? 0;
+
+        $idsResult = DB::connection($this->connection)->select(
+            'SELECT DISTINCT a.id_balance_head, a.trace_no
+               FROM t_balance_header a
+               LEFT JOIN t_trace_header b ON a.id_balance_head = b.id_balance_head AND b.status = 1 AND SUBSTRING(b.to_trace_no,1,1) = 7 AND SUBSTRING(b.from_trace_no,1,1) = 7
+               LEFT JOIN t_trace_header th_from ON th_from.to_trace_no = b.from_trace_no AND th_from.status = 1
+               LEFT JOIN m_sloc t_from ON t_from.id_sloc = th_from.id_sloc
+              WHERE a.status = 1
+                AND SUBSTRING(a.trace_no,1,1) = 7
+                AND (t_from.id_plant = ? OR a.id_plant = ? OR ? = 0)
+              ORDER BY a.trace_no DESC
+              LIMIT ? OFFSET ?',
+            [$plantId, $plantId, $plantId, $perPage, $offset]
         );
 
+        if (empty($idsResult)) {
+            return ['data' => [], 'total' => $total];
+        }
+
+        $idList = array_map(function($row) { return $row->id_balance_head; }, $idsResult);
+        $idBindings = implode(',', array_fill(0, count($idList), '?'));
+
         $result = collect(DB::connection($this->connection)->select(
-            'SELECT a.entry_date, b.material_document,
+            "SELECT a.entry_date, b.material_document,
                     th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_tank,
                     t_from.description AS from_sloc_name,
-                    GROUP_CONCAT(DISTINCT h_from.tf_number ORDER BY h_from.tf_number SEPARATOR ", ") AS from_tf_number,
+                    GROUP_CONCAT(DISTINCT h_from.id_tank ORDER BY h_from.id_tank SEPARATOR ', ') AS from_tf_number,
                     t_to.description AS to_sloc_name,
-                    GROUP_CONCAT(DISTINCT h_to.tf_number ORDER BY h_to.tf_number SEPARATOR ", ") AS to_tf_number,
+                    GROUP_CONCAT(DISTINCT h_to.id_tank ORDER BY h_to.id_tank SEPARATOR ', ') AS to_tf_number,
                     CAST(a.trace_no AS CHAR) AS trace_no,
                     FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty,
                     a.id_balance_head AS idHead,
-                    CONCAT(c.description, " (", c.code, ")") AS material,
+                    CONCAT(c.description, ' (', c.code, ')') AS material,
                     CASE SUBSTRING(a.trace_no, 11, 2)
-                        WHEN "01" THEN "EOMB"
-                        WHEN "02" THEN "EOB1"
-                        WHEN "03" THEN "EOB2"
-                        WHEN "05" THEN "EOB5"
-                        WHEN "07" THEN "EOB3"
+                        WHEN '01' THEN 'EOMB'
+                        WHEN '02' THEN 'EOB1'
+                        WHEN '03' THEN 'EOB2'
+                        WHEN '05' THEN 'EOB5'
+                        WHEN '07' THEN 'EOB3'
                         ELSE p.code_2
                     END AS plant_name,
                     SUBSTRING(a.trace_no, 11, 2) AS plant_code_from_trace,
                     b.id_trace_head AS idTraceHead, b.is_last_row, b.next_process,
                     FORMAT(ROUND(a.in_qty,3),3) AS in_qty, FORMAT(ROUND(a.out_qty,3),3) AS out_qty,
-                    GROUP_CONCAT(DISTINCT CONCAT(f.description, " / ", e.batch_sap,
-                        " / Qty : ", ROUND(e.init_qty,3), " MT / Qty : ", ROUND(e.qty,3), " MT")
-                        SEPARATOR " | ") AS supplier,
+                    GROUP_CONCAT(DISTINCT CONCAT(f.description, ' / ', e.batch_sap,
+                        ' / Qty : ', ROUND(e.init_qty,3), ' MT / Qty : ', ROUND(e.qty,3), ' MT')
+                        SEPARATOR ' | ') AS supplier,
                     IF(ABS(COALESCE(bs.init_qty,0) - a.init_qty) > 0.005, FORMAT(COALESCE(bs.init_qty,0),3), FORMAT(a.init_qty,3)) AS balance_supplier,
                     CONCAT(
-                        COALESCE(GROUP_CONCAT(DISTINCT h_from.tf_number ORDER BY h_from.tf_number SEPARATOR " & "), t_from.description, ""),
-                        " >>> ",
-                        COALESCE(GROUP_CONCAT(DISTINCT h_to.tf_number ORDER BY h_to.tf_number SEPARATOR " & "), t_to.description, "")
+                        COALESCE(GROUP_CONCAT(DISTINCT h_from.description ORDER BY h_from.description SEPARATOR ' & '), t_from.description, ''),
+                        ' >>> ',
+                        COALESCE(GROUP_CONCAT(DISTINCT h_to.description ORDER BY h_to.description SEPARATOR ' & '), t_to.description, '')
                     ) AS raw_sloc,
                     t_from.description AS raw_from_desc,
                     t_to.description AS raw_to_desc,
@@ -179,9 +206,9 @@ class TransferRepository implements TransferRepositoryInterface
                  ON a.id_balance_head = b.id_balance_head
                LEFT JOIN m_material c ON c.id_material = a.id_material
                LEFT JOIN t_trace_header th_from ON th_from.to_trace_no = b.from_trace_no AND th_from.status = 1
-               LEFT JOIN m_tank t_to ON t_to.id_tank = a.id_tank
-               LEFT JOIN m_tank t_from ON t_from.id_tank = th_from.id_sloc
-               LEFT JOIN m_plant p ON (t_from.id_plant = p.code_3 OR (t_from.id_plant IS NULL AND SUBSTRING(a.trace_no, 11, 2) = RIGHT(p.code_3, 2))) AND p.status = 1
+               LEFT JOIN m_sloc t_to ON (t_to.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(t_to.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(t_to.id_sloc AS CHAR))))))
+               LEFT JOIN m_sloc t_from ON (t_from.id_sloc = th_from.id_sloc OR (JSON_VALID(th_from.id_sloc) AND (JSON_CONTAINS(th_from.id_sloc, CAST(t_from.id_sloc AS CHAR)) OR JSON_CONTAINS(th_from.id_sloc, JSON_QUOTE(CAST(t_from.id_sloc AS CHAR))))))
+               LEFT JOIN m_plant p ON (t_from.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci OR (t_from.id_plant IS NULL AND SUBSTRING(a.trace_no, 11, 2) = RIGHT(p.code_3, 2) COLLATE utf8mb4_unicode_ci)) AND p.status = 1
                LEFT JOIN t_balance_detail e ON a.id_balance_head = e.id_balance_head AND e.status = 1
                LEFT JOIN m_supplier f ON e.id_supplier = f.id_supplier
                LEFT JOIN (SELECT h.trace_no, ROUND(SUM(d.init_qty),3) AS init_qty, ROUND(SUM(d.qty),3) AS qty
@@ -189,102 +216,70 @@ class TransferRepository implements TransferRepositoryInterface
                             JOIN t_balance_detail d ON d.id_balance_head = h.id_balance_head
                            WHERE d.status = 1 AND d.init_qty > 0.0001
                            GROUP BY h.trace_no) bs ON bs.trace_no = a.trace_no
-               LEFT JOIN m_sloc_detail h_to ON JSON_CONTAINS(IF(JSON_VALID(a.id_tank_tail), a.id_tank_tail, IF(JSON_VALID(a.id_sloc_tail), a.id_sloc_tail, \'[]\')), JSON_QUOTE(CONCAT("S", CAST(h_to.id_sloc_tail AS CHAR))))
-               LEFT JOIN m_sloc_detail h_from ON JSON_CONTAINS(IF(JSON_VALID(th_from.id_sloc_tail), th_from.id_sloc_tail, IF(JSON_VALID(th_from.id_tank_tail), th_from.id_tank_tail, \'[]\')), JSON_QUOTE(CONCAT("S", CAST(h_from.id_sloc_tail AS CHAR))))
+               LEFT JOIN m_sloc h_to ON (h_to.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(h_to.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(h_to.id_sloc AS CHAR))))))
+               LEFT JOIN m_sloc h_from ON (h_from.id_sloc = th_from.id_sloc OR (JSON_VALID(th_from.id_sloc) AND (JSON_CONTAINS(th_from.id_sloc, CAST(h_from.id_sloc AS CHAR)) OR JSON_CONTAINS(th_from.id_sloc, JSON_QUOTE(CAST(h_from.id_sloc AS CHAR))))))
               WHERE a.status = 1
                 AND SUBSTRING(a.trace_no,1,1) = 7
-                AND (t_from.id_plant = ? OR a.id_plant = ? OR ? = 0)
+                AND a.id_balance_head IN ($idBindings)
               GROUP BY a.trace_no
-              ORDER BY a.trace_no DESC',
-            [$plantId, $plantId, $plantId]
+              ORDER BY a.trace_no DESC",
+            $idList
         ));
 
         $result = $result->map(function ($item) {
             $fromFormatted = $this->formatTankName($item->raw_from_desc);
             $toFormatted = $this->formatTankName($item->raw_to_desc);
-            
-            // Debug: Log current values
-            \Log::info('TransferList Debug', [
-                'trace_no' => $item->trace_no,
-                'trace_digits_11_12' => substr($item->trace_no ?? '', 10, 2),
-                'from_desc' => $item->raw_from_desc,
-                'to_desc' => $item->raw_to_desc,
-                'from_plant_id' => $item->from_plant_id ?? null,
-                'to_plant_id' => $item->to_plant_id ?? null,
-                'from_tf_number' => $item->from_tf_number ?? null,
-                'to_tf_number' => $item->to_tf_number ?? null,
-                'current_plant_name' => $item->plant_name ?? null,
-                'raw_sloc' => $item->raw_sloc
-            ]);
-            
-            // Build from and to parts using tf_number and description
+
             $fromPart = '';
             if (!empty($item->from_tf_number)) {
                 $fromPart = $item->from_tf_number . ' & ';
             }
             $fromPart .= $fromFormatted ?? '';
-            
+
             $toPart = '';
             if (!empty($item->to_tf_number)) {
                 $toPart = $item->to_tf_number . ' & ';
             }
             $toPart .= $toFormatted ?? '';
-            
-            // Check if this is TRF IN to EOMB (destination is EOMB plant 1001)
+
             if (($item->to_plant_id ?? 0) == 1001) {
-                // TRF IN to EOMB: specific sloc >>> EOMB
                 $item->sloc = trim($fromPart) . " >>> EOMB";
-            }
-            // Check if this is TRF OUT from EOMB (source is EOMB plant 1001)
-            elseif (($item->from_plant_id ?? 0) == 1001) {
-                // TRF OUT from EOMB: EOMB >>> specific sloc
+            } elseif (($item->from_plant_id ?? 0) == 1001) {
                 $item->sloc = "EOMB >>> " . trim($toPart);
-            }
-            else {
-                // Default: use original formatting
+            } else {
                 $item->sloc = str_replace(
-                    [
-                        $item->raw_from_desc ?? 'UNKNOWN_FROM', 
-                        $item->raw_to_desc ?? 'UNKNOWN_TO'
-                    ],
-                    [
-                        $fromFormatted ?? '', 
-                        $toFormatted ?? ''
-                    ],
+                    [$item->raw_from_desc ?? 'UNKNOWN_FROM', $item->raw_to_desc ?? 'UNKNOWN_TO'],
+                    [$fromFormatted ?? '', $toFormatted ?? ''],
                     $item->raw_sloc
                 );
             }
-            
+
             return $item;
         });
 
-        return $result;
+        return ['data' => $result, 'total' => $total];
     }
 
     public function getActiveTanksRundown(?int $materialId, int $plantId): Collection
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         if ($materialId === null) {
             $result = collect(DB::connection($this->connection)->select(
-                'SELECT b.id_tank, b.description AS tank, b.id_plant
-                   FROM m_tank b
+                'SELECT b.id_sloc AS id_tank, b.description AS tank, b.id_plant
+                   FROM m_sloc b
                   WHERE b.status = 1
                     AND b.id_plant <> ?
-                  GROUP BY b.id_tank
+                  GROUP BY b.id_sloc
                   ORDER BY b.description ASC',
                 [$plantId]
             ));
         } else {
             $result = collect(DB::connection($this->connection)->select(
-                'SELECT b.id_tank, b.description AS tank, b.id_plant
+                'SELECT b.id_sloc AS id_tank, b.description AS tank, b.id_plant
                    FROM m_material a
-                   LEFT JOIN m_tank b ON a.type = b.code_2 AND b.status = 1 AND b.id_plant = ?
+                   LEFT JOIN m_sloc b ON a.type = b.code_2 COLLATE utf8mb4_unicode_ci AND b.status = 1 AND b.id_plant = ?
                   WHERE a.status = 1
                     AND a.id_material = ?
-                  GROUP BY b.id_tank',
+                  GROUP BY b.id_sloc',
                 [$plantId, $materialId]
             ));
         }
@@ -297,7 +292,7 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function getActiveSpecificTanksRundown(int $sloc): Collection
     {
-        $tank = DB::connection($this->connection)->select('SELECT description, id_plant FROM m_tank WHERE id_tank = ?', [$sloc]);
+        $tank = DB::connection($this->connection)->select('SELECT description, id_plant FROM m_sloc WHERE id_sloc = ?', [$sloc]);
         if (empty($tank)) {
             return collect([]);
         }
@@ -305,12 +300,12 @@ class TransferRepository implements TransferRepositoryInterface
         $plantId = $tank[0]->id_plant;
 
         return collect(DB::connection($this->connection)->select(
-            'SELECT id_sloc AS id_sloc_tail, CONCAT("S", id_sloc) AS id_tank_tail, id_tank AS tankNo
+            'SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo
                FROM m_sloc
               WHERE status = 1
                 AND description = ?
                 AND id_plant = ?
-              ORDER BY id_tank ASC',
+              ORDER BY id_sloc ASC',
             [$formattedName, $plantId]
         ));
     }
@@ -343,7 +338,7 @@ class TransferRepository implements TransferRepositoryInterface
             'SELECT CONCAT(DATE_FORMAT(NOW(), "%y%m%d"), ?, b.code_4, UCASE(a.code_matl_supplier)) AS supplierCode,
                     COALESCE(c.id_supplier, 0) AS idSupplier
                FROM (SELECT a.code_matl_supplier FROM m_material a WHERE a.status = 1 AND a.id_material = ?) a
-               JOIN (SELECT b.code_4 FROM m_tank b WHERE b.status = 1 AND b.id_tank = ?) b
+               JOIN (SELECT p.code_4 FROM m_sloc s JOIN m_plant p ON s.id_plant = p.code_3 WHERE s.status = 1 AND s.id_sloc = ?) b
                LEFT JOIN (SELECT c.id_supplier FROM m_supplier c WHERE c.status = 1 AND c.type = ?) c ON 1=1
               LIMIT 1',
             [$seqNo, $idMaterial, $idTank, $idTank]
@@ -627,7 +622,7 @@ class TransferRepository implements TransferRepositoryInterface
         $jsonTails = json_encode(array_values(array_unique($tails)));
 
         $row = DB::connection($this->connection)->selectOne(
-            'SELECT id_tank_tail, trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
+            'SELECT trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
             [$idHead]
         );
 
@@ -636,24 +631,24 @@ class TransferRepository implements TransferRepositoryInterface
         }
 
         DB::connection($this->connection)->update(
-            'UPDATE t_balance_header SET id_tank_tail = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
+            'UPDATE t_balance_header SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
         );
 
         DB::connection($this->connection)->update(
-            'UPDATE t_trace_header SET id_tank_tail = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
+            'UPDATE t_trace_header SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
         );
 
         DB::connection($this->connection)->update(
-            'UPDATE t_balance_detail SET id_tank_tail = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
+            'UPDATE t_balance_detail SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
         );
 
         DB::connection($this->connection)->update(
-            'UPDATE t_trace_detail SET id_tank_tail = ?, updated_by = ?
+            'UPDATE t_trace_detail SET updated_by = ?
               WHERE id_trace_head IN (SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ?)',
-            [$jsonTails, $user, $idHead]
+            [$user, $idHead]
         );
 
         $this->logTransaction('T_BALANCE_HEAD', 'UPDATE_SUBTANK',
@@ -670,6 +665,77 @@ class TransferRepository implements TransferRepositoryInterface
             [$traceNo]
         );
         return ($result[0]->cnt ?? 0) > 0;
+    }
+
+    public function getSlocPlant(int $sloc): ?int
+    {
+        $result = DB::connection($this->connection)->table('m_sloc')
+            ->where('id_sloc', $sloc)->value('id_plant');
+
+        return $result !== null ? (int) $result : null;
+    }
+
+    public function findOrphanHeads(int $idMaterial, int $sloc, int $plantId): array
+    {
+        return DB::connection($this->connection)->select(
+            'SELECT bh.id_balance_head, bh.trace_no, bh.qty
+               FROM t_balance_header bh
+               LEFT JOIN t_balance_detail bd
+                 ON bh.id_balance_head = bd.id_balance_head
+                AND bd.status = 1
+                AND bd.qty > 0.0001
+              WHERE bh.status = 1
+                AND bh.qty > 0.0001
+                AND bh.id_material = ?
+                AND JSON_CONTAINS(bh.id_sloc, JSON_ARRAY(?))
+                AND bh.id_plant = ?
+                AND bd.id_balance_tail IS NULL',
+            [$idMaterial, $sloc, $plantId]
+        );
+    }
+
+    public function findPlantById(int $plantId): ?object
+    {
+        $result = DB::connection($this->connection)->table('m_plant')
+            ->where('id_plant', $plantId)
+            ->where('status', 1)
+            ->first();
+
+        return $result ?: null;
+    }
+
+    public function findPlantCode(int $plantId): string
+    {
+        if ($plantId) {
+            $plant = DB::connection($this->connection)->table('m_plant')
+                ->where('id_plant', $plantId)
+                ->where('status', 1)
+                ->first();
+            if ($plant && $plant->code_3) {
+                return $plant->code_3;
+            }
+        }
+        return (string) $plantId;
+    }
+
+    public function createBalanceHeader(array $data): int
+    {
+        return DB::connection($this->connection)->table('t_balance_header')->insertGetId($data);
+    }
+
+    public function createBalanceDetail(array $data): int
+    {
+        return DB::connection($this->connection)->table('t_balance_detail')->insertGetId($data);
+    }
+
+    public function createAdjustmentHeader(array $data): int
+    {
+        return DB::connection($this->connection)->table('t_adjustment_header')->insertGetId($data);
+    }
+
+    public function createAdjustmentDetail(array $data): bool
+    {
+        return DB::connection($this->connection)->table('t_adjustment_detail')->insert($data);
     }
 
     public function logTransaction(string $module, string $type, string $description, string $user): void
