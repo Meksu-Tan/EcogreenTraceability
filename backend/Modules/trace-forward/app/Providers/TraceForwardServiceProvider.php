@@ -17,7 +17,7 @@ class TraceForwardServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(TraceForwardServiceInterface::class, TraceForwardService::class);
+        $this->app->bind(TraceForwardServiceInterface::class, TraceForwardService::class);
 
         $this->app->bind(TraceForwardRepositoryInterface::class, function ($app) {
             $conn = $app['db']->connection('eudr_ts');
@@ -30,9 +30,14 @@ class TraceForwardServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->bind(Connection::class, function ($app) {
-            return $app['db']->connection('eudr_ts');
-        });
+        $this->app->when([
+            ForwardListQuery::class,
+            ForwardDetailQuery::class,
+            ForwardTraceQuery::class,
+            ForwardSearchQuery::class,
+        ])
+        ->needs(Connection::class)
+        ->give(fn ($app) => $app['db']->connection('eudr_ts'));
     }
 
     public function boot(): void

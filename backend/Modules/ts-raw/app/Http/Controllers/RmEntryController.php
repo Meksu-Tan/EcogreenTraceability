@@ -6,9 +6,10 @@ use App\Http\Controllers\Controller;
 use Modules\TsRaw\Services\Contracts\RmEntryServiceInterface;
 use Modules\TsRaw\Http\Requests\StoreRmEntryRequest;
 use Modules\TsRaw\Http\Requests\StoreSupplierTempRequest;
+use Modules\TsRaw\Http\Requests\TransferEntryRequest;
+use Modules\TsRaw\Http\Requests\UpdateRmEntryRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 use App\Helpers\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -21,8 +22,18 @@ class RmEntryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-        $data = $this->rmEntryService->getRmList($plantId);
-        return ApiResponse::success($data, 'OK', 200);
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 5)));
+
+        $result = $this->rmEntryService->getRmList($plantId, $page, $perPage);
+
+        return ApiResponse::paginated(
+            $result['data']->toArray(),
+            $result['total'],
+            $page,
+            $perPage,
+            'OK'
+        );
     }
 
     public function show($id): JsonResponse
@@ -41,9 +52,9 @@ class RmEntryController extends Controller
         return ApiResponse::success($result, 'RM Entry created successfully', 201);
     }
 
-    public function update(Request $request, $id): JsonResponse
+    public function update(UpdateRmEntryRequest $request, $id): JsonResponse
     {
-        $data = $request->all();
+        $data = $request->validated();
         $user = Auth::user()?->name ?? 'System';
 
         $result = $this->rmEntryService->updateRmEntry((int)$id, $data, $user);
@@ -136,23 +147,9 @@ class RmEntryController extends Controller
         return ApiResponse::success(['total' => number_format($total, 3)], 'OK', 200);
     }
 
-    public function transfer(Request $request): JsonResponse
+    public function transfer(TransferEntryRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'entry_date' => 'required|date',
-            'entry_no' => 'required|string',
-            'source_tank' => 'required',
-            'trf_tank' => 'required',
-            'tank_no' => 'present|array',
-            'trf_tank_no' => 'present|array',
-            'material_document' => 'nullable|string',
-        ]);
-
-        if ($validator->fails()) {
-            return ApiResponse::error('Validation error', 422, $validator->errors()->toArray());
-        }
-
-        $data = $request->all();
+        $data = $request->validated();
         $data['id_plant'] = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
         $user = Auth::user()?->name ?? 'System';
 
@@ -320,8 +317,9 @@ class RmEntryController extends Controller
 
         $idHead = (int)$request->input('id_head');
         $idTankTail = $request->input('id_tank_tail');
+        $user = Auth::user()->name ?? 'System';
 
-        $result = $this->rmEntryService->updateSubTankSlocTail($idHead, $idTankTail);
+        $result = $this->rmEntryService->updateSubTankSlocTail($idHead, $idTankTail, $user);
         return ApiResponse::success($result, 'Sub Tank updated successfully', 200);
     }
 
@@ -330,5 +328,12 @@ class RmEntryController extends Controller
         $user = Auth::user()->name;
         $result = $this->rmEntryService->deactivateTransfer((int)$id, $user);
         return ApiResponse::success($result, 'Transfer deactivated successfully', 200);
+    }
+
+    public function deactivateFeedLog(Request $request, $id): JsonResponse
+    {
+        $user = Auth::user()?->name ?? 'System';
+        $result = $this->rmEntryService->deactivateFeedLogEntry((int)$id, $user);
+        return ApiResponse::success($result, 'Feed log entry deactivated successfully', 200);
     }
 }

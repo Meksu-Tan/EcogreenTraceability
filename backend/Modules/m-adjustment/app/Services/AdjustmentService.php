@@ -5,6 +5,7 @@ namespace Modules\Adjustment\Services;
 use Modules\Adjustment\Services\Contracts\AdjustmentServiceInterface;
 use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
+use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
 use Modules\Shared\Services\PeriodLockService;
 use Modules\Shared\Services\AuditService;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ class AdjustmentService implements AdjustmentServiceInterface
         protected PeriodLockService $periodLockService,
         protected AuditService $auditService,
         protected AdjustmentPeriodServiceInterface $periodService,
-        protected AdjustmentMutationService $mutationService
+        protected AdjustmentMutationServiceInterface $mutationService
     ) {}
 
     // ——— Lookups (pure delegate) ———
@@ -97,9 +98,9 @@ class AdjustmentService implements AdjustmentServiceInterface
     }
 
     // ——— Existing methods follow ———
-    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip'): array
+    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array
     {
-        return $this->repository->getAdjustmentList($plantId, $userId, $adjType);
+        return $this->repository->getAdjustmentList($plantId, $userId, $adjType, $filters);
     }
 
     public function getSupplierList(array $data, ?int $userId = null): array

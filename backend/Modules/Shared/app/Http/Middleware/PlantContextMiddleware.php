@@ -4,21 +4,22 @@ namespace Modules\Shared\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use App\Helpers\ApiResponse;
 use Modules\Shared\Services\PlantContextService;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * PlantContextMiddleware - Middleware untuk auto-inject plant context
+ * PlantContextMiddleware - Middleware to auto-inject plant context
  *
- * Fungsi:
- * 1. Extract plant_id dari request (header, query, body)
- * 2. Resolve ke code_3 format
+ * Functions:
+ * 1. Extract plant_id from request (header, query, body)
+ * 2. Resolve to code_3 format
  * 3. Validate user access
- * 4. Set di request untuk digunakan downstream
+ * 4. Set on request for downstream use
  *
- * Usage di routes:
+ * Route usage:
  * Route::middleware(['auth:sanctum', 'plant.context'])->group(function () {
- *     // Semua routes di group ini akan punya plant context
+ *     // All routes in this group will have plant context
  * });
  */
 class PlantContextMiddleware
@@ -34,19 +35,19 @@ class PlantContextMiddleware
             return $next($request);
         }
 
-        // Extract plant_id dari berbagai source
+        // Extract plant_id from various sources
         $plantId = $this->extractPlantId($request);
 
         // Resolve plant
         $resolvedCode = PlantContextService::resolvePlantId($plantId, $user->id);
 
-        // Get user plants untuk dropdown/selector
+        // Get user plants for dropdown/selector
         $userPlants = PlantContextService::getUserPlants($user->id);
 
         // Get default plant
         $defaultPlant = PlantContextService::getDefaultPlant($user->id);
 
-        // Inject ke request attributes (bisa diakses via $request->get('plant_context'))
+        // Inject into request attributes (accessible via $request->get('plant_context'))
         $request->attributes->set('plant_context', [
             'plant_code' => $resolvedCode,
             'plant_id' => $plantId,
@@ -101,21 +102,21 @@ class PlantContextMiddleware
             return $user->id_plant;
         }
 
-        // Return 0 untuk "all plants" jika tidak ada pilihan lain
+        // Return 0 for "all plants" if no other choice
         return 0;
     }
 }
 
 /**
- * PlantScopeMiddleware - Middleware untuk enforce plant scoping
+ * PlantScopeMiddleware - Middleware to enforce plant scoping
  *
- * Bedanya dengan PlantContextMiddleware:
- * - PlantScopeMiddleware akan reject request jika tidak ada plant specified
- * - Untuk operations yang REQUIRE plant scope
+ * Difference with PlantContextMiddleware:
+ * - PlantScopeMiddleware will reject the request if no plant is specified
+ * - For operations that REQUIRE plant scope
  *
  * Usage:
  * Route::middleware(['auth:sanctum', 'plant.scope'])->group(function () {
- *     // Operations yang butuh plant scope
+ *     // Operations that require plant scope
  * });
  */
 class PlantScopeMiddleware
@@ -125,32 +126,21 @@ class PlantScopeMiddleware
         $user = $request->user();
 
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentication required',
-            ], 401);
+            return ApiResponse::error('Authentication required', 401);
         }
 
         $plantId = $request->query('id_plant') ?? $request->input('id_plant') ?? $request->header('X-Plant-Id');
 
         // Check if plant_id is provided
         if ($plantId === null || $plantId === '' || $plantId === '0') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Plant ID is required for this operation',
-                'error_code' => 'PLANT_REQUIRED',
-            ], 422);
+            return ApiResponse::error('Plant ID is required for this operation', 422, ['error_code' => 'PLANT_REQUIRED']);
         }
 
         // Resolve and validate
         $resolvedCode = PlantContextService::resolvePlantId($plantId, $user->id);
 
         if (!$resolvedCode) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid or inaccessible plant',
-                'error_code' => 'PLANT_INVALID',
-            ], 403);
+            return ApiResponse::error('Invalid or inaccessible plant', 403, ['error_code' => 'PLANT_INVALID']);
         }
 
         // Inject resolved plant code

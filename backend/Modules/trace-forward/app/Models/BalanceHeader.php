@@ -50,6 +50,8 @@ class BalanceHeader extends Model
 
     public function scopeRmEntry($query)
     {
-        return $query->whereRaw('SUBSTRING(trace_no, 1, 1) IN (1, 9)');
+        return $query->where(function ($q): void {
+            $q->where('trace_no', 'LIKE', '1%')->orWhere('trace_no', 'LIKE', '9%');
+        });
     }
 }

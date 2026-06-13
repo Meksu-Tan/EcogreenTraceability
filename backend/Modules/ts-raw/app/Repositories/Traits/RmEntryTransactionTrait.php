@@ -57,7 +57,7 @@ trait RmEntryTransactionTrait
             'SELECT id_balance_head, trace_no, qty, init_qty, entry_date, created_at
                FROM t_balance_header
               WHERE id_material = ?
-                AND COALESCE(id_sloc, id_tank) = ?
+                AND JSON_CONTAINS(id_sloc, JSON_ARRAY(?))
                 AND id_plant = ?
                 AND status = 1
                 AND created_at >= ?
@@ -130,15 +130,6 @@ trait RmEntryTransactionTrait
                     ]);
             }
 
-            if (isset($data['id_sloc_tail'])) {
-                DB::connection('eudr_ts')->table('t_balance_header')
-                    ->where('id_balance_head', $id)
-                    ->update([
-                        'id_sloc_tail' => null,
-                        'updated_by' => $user
-                    ]);
-            }
-
             DB::connection('eudr_ts')->commit();
             return ['success' => true, 'id' => $id];
 
@@ -150,7 +141,27 @@ trait RmEntryTransactionTrait
 
     public function saveRmEntry(array $data, string $user): array
     {
-        $data['id_plant'] = $this->resolvePlantCode($data['id_plant'] ?? 0);
+        $firstSlocId = null;
+        if (!empty($data['id_sloc'])) {
+            if (is_array($data['id_sloc'])) {
+                $firstSlocId = $data['id_sloc'][0] ?? null;
+            } else {
+                $decoded = json_decode($data['id_sloc'], true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $firstSlocId = $decoded[0] ?? null;
+                } else {
+                    $firstSlocId = $data['id_sloc'];
+                }
+            }
+        }
+        $slocPlant = null;
+        if ($firstSlocId) {
+            $slocPlant = DB::connection('eudr_ts')->table('m_sloc')
+                ->where('id_sloc', $firstSlocId)
+                ->value('id_plant');
+        }
+        $data['id_plant'] = $this->resolvePlantCode($slocPlant ?: ($data['id_plant'] ?? 0));
+
         DB::connection('eudr_ts')->beginTransaction();
 
         try {
@@ -165,6 +176,7 @@ trait RmEntryTransactionTrait
                 if (empty($row->id_supplier)) continue;
                 $supplierRows[] = [
                     'id_supplier' => $row->id_supplier,
+                    'id_manufacturer' => $row->id_manufacturer ?? null,
                     'batch_sap' => $row->batch_sap,
                     'rundownSupplier' => round((float)$row->qty_tail, 4),
                 ];
@@ -248,12 +260,12 @@ trait RmEntryTransactionTrait
             $id_tank_json = json_encode(array_map('strval', array_values($id_tank)));
 
             $srcTankRec = DB::connection('eudr_ts')->table('m_sloc')
-                ->select('id_tank AS code', 'description', 'id_plant')
+                ->select('id_tank AS code', 'description', 'id_plant', 'plant_name')
                 ->whereIn('id_sloc', $id_tankSource)
                 ->where('status', 1)
                 ->get();
             $tgtTankRec = DB::connection('eudr_ts')->table('m_sloc')
-                ->select('id_tank AS code')
+                ->select('id_tank AS code', 'description', 'id_plant', 'plant_name')
                 ->whereIn('id_sloc', $id_tank)
                 ->where('status', 1)
                 ->get();
@@ -269,10 +281,10 @@ trait RmEntryTransactionTrait
                     break;
                 }
             }
-            $balancePlant = $idPlant;
-            if (!$balancePlant && !empty($srcTankRec->first()->id_plant)) {
-                $balancePlant = $srcTankRec->first()->id_plant;
-            }
+
+            $srcPlant = !empty($srcTankRec->first()?->id_plant) ? $this->resolvePlantCode($srcTankRec->first()->id_plant) : $idPlant;
+            $tgtPlant = !empty($tgtTankRec->first()?->id_plant) ? $this->resolvePlantCode($tgtTankRec->first()->id_plant) : $idPlant;
+            $balancePlant = $srcPlant;
 
             $datTempMaterial = $this->getTempData($entry_no);
             if (empty($datTempMaterial)) {
@@ -306,16 +318,23 @@ trait RmEntryTransactionTrait
                         [$entry_no, $id_material]
                     );
 
+                    $slocNames = $srcTankRec->map(function($tank) {
+                        return $tank->description ?: ($tank->plant_name ? ($tank->plant_name . ' - ' . $tank->code) : $tank->code);
+                    })->filter()->implode(', ');
+                    if (empty($slocNames)) {
+                        $slocNames = implode(', ', $id_tankSource);
+                    }
+
                     if ($tempCheck[0]->count > 0) {
                         throw new Exception(
-                            'Stock synchronization issue detected. Material ' . $matLabel .
+                             'Stock synchronization issue detected in Sloc (' . $slocNames . '). Material ' . $matLabel .
                             ' has temporary data but stock not updated. Available: ' . number_format($availableQty, 3) .
                             ' MT, requested: ' . number_format($out_qty, 3) . ' MT. Please complete RM Entry process first.'
                         );
                     }
 
                     throw new Exception(
-                        'Insufficient stock for ' . $matLabel .
+                        'Insufficient stock in Sloc (' . $slocNames . ') for ' . $matLabel .
                         '. Available: ' . number_format($availableQty, 3) .
                         ' MT, requested: ' . number_format($out_qty, 3) . ' MT (FIFO sloc/sub-sloc/plant).'
                     );
@@ -326,7 +345,7 @@ trait RmEntryTransactionTrait
                 $feedResult = Feed::generalFeed(array_merge($feedParams, [
                     'user' => $user,
                     'entry_date' => $curr_entryDate,
-                    'id_plant' => $isStorageTank ? 0 : $idPlant,
+                    'id_plant' => $srcPlant,
                     'qty' => $out_qty,
                     'to_trace_no' => $this->traceNoToInt($entryTrfNo_in),
                     'tank_matching' => 'flexible',
@@ -336,8 +355,8 @@ trait RmEntryTransactionTrait
                     throw new Exception('Feed failed');
                 }
 
-                $supplierRows = DB::connection('eudr_ts')->select(
-                    'SELECT id_supplier, batch_sap, SUM(out_qty) AS rundownSupplier
+                 $supplierRows = DB::connection('eudr_ts')->select(
+                    'SELECT id_supplier, id_manufacturer, batch_sap, SUM(out_qty) AS rundownSupplier
                        FROM t_trace_detail
                       WHERE status = 1
                         AND id_trace_head IN (
@@ -346,14 +365,14 @@ trait RmEntryTransactionTrait
                              WHERE status = 1
                                AND to_trace_no = ?
                         )
-                      GROUP BY id_supplier, batch_sap',
+                      GROUP BY id_supplier, id_manufacturer, batch_sap',
                     [$this->traceNoToInt($entryTrfNo_in)]
                 );
 
                 if (empty($supplierRows)) {
                     throw new Exception(
-                        'Supplier breakdown kosong untuk transfer ' . number_format($out_qty, 3) .
-                        ' MT. Pastikan RM entry memiliki data supplier aktif.'
+                        'Supplier breakdown is empty for transfer ' . number_format($out_qty, 3) .
+                        ' MT. Ensure RM entry has active supplier data.'
                     );
                 }
 
@@ -361,6 +380,7 @@ trait RmEntryTransactionTrait
                 foreach ($supplierRows as $r) {
                     $supplierRowsFormatted[] = [
                         'id_supplier'     => $r->id_supplier,
+                        'id_manufacturer' => $r->id_manufacturer,
                         'batch_sap'       => $r->batch_sap,
                         'rundownSupplier' => (float) $r->rundownSupplier,
                     ];
@@ -376,7 +396,7 @@ trait RmEntryTransactionTrait
                     'id_material' => $id_material,
                     'id_sloc' => $id_tank_json,
                     'id_sloc_tail' => null,
-                    'id_plant' => $idPlant,
+                    'id_plant' => $tgtPlant,
                     'in_qty' => $out_qty,
                     'last_qtf' => 0,
                     'curr_qtf' => $out_qty,
@@ -453,6 +473,117 @@ trait RmEntryTransactionTrait
             DB::connection('eudr_ts')->rollBack();
             throw $e;
         }
+    }
+
+    public function deactivateFeedLogEntry(int $id, string $user): array
+    {
+        DB::connection('eudr_ts')->beginTransaction();
+
+        try {
+            $traceHead = DB::connection('eudr_ts')->table('t_trace_header')
+                ->where('id_trace_head', $id)
+                ->where('status', 1)
+                ->first();
+
+            if (!$traceHead) {
+                throw new Exception('Feed log entry not found');
+            }
+
+            $toTraceNo = (string) ($traceHead->to_trace_no ?? '');
+            if (substr($toTraceNo, 0, 1) === '7') {
+                throw new Exception('Use transfer deactivation for transfer entries');
+            }
+
+            // Check if this balance has been used by downstream operations
+            $usedCount = DB::connection('eudr_ts')->table('t_trace_header')
+                ->where('id_balance_head', $traceHead->id_balance_head)
+                ->where('out_qty', '!=', 0)
+                ->where('status', 1)
+                ->count();
+
+            if ($usedCount > 0) {
+                throw new Exception('Feed log entry has been used and cannot be deactivated');
+            }
+
+            // Deactivate balance header
+            DB::connection('eudr_ts')->table('t_balance_header')
+                ->where('id_balance_head', $traceHead->id_balance_head)
+                ->update(['status' => 0, 'updated_by' => $user]);
+
+            // Deactivate balance detail
+            DB::connection('eudr_ts')->table('t_balance_detail')
+                ->where('id_balance_head', $traceHead->id_balance_head)
+                ->update(['status' => 0, 'updated_by' => $user]);
+
+            // Deactivate trace header
+            DB::connection('eudr_ts')->table('t_trace_header')
+                ->where('id_trace_head', $id)
+                ->update(['status' => 0, 'updated_by' => $user]);
+
+            // Deactivate trace detail
+            DB::connection('eudr_ts')->table('t_trace_detail')
+                ->where('id_trace_head', $id)
+                ->update(['status' => 0, 'updated_by' => $user]);
+
+            $this->logTransaction(
+                'FEED_LOG',
+                'DEACTIVATE',
+                'ID: ' . $id . ' | Trace: ' . $toTraceNo,
+                $user
+            );
+
+            DB::connection('eudr_ts')->commit();
+            return ['success' => true];
+
+        } catch (Exception $e) {
+            DB::connection('eudr_ts')->rollBack();
+            throw $e;
+        }
+    }
+
+    public function updateEntrySubTank(string $user, int $idHead, array $tails): array
+    {
+        if (!is_array($tails)) {
+            return ['response' => 0, 'message' => 'INVALID SUBTANK DATA'];
+        }
+
+        $jsonTails = json_encode(array_values(array_unique($tails)));
+
+        $row = DB::connection('eudr_ts')->selectOne(
+            'SELECT trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
+            [$idHead]
+        );
+
+        if (!$row) {
+            return ['response' => 0, 'message' => 'BALANCE HEAD NOT FOUND'];
+        }
+
+        DB::connection('eudr_ts')->update(
+            'UPDATE t_balance_header SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
+        );
+
+        DB::connection('eudr_ts')->update(
+            'UPDATE t_trace_header SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
+        );
+
+        DB::connection('eudr_ts')->update(
+            'UPDATE t_balance_detail SET updated_by = ? WHERE id_balance_head = ?',
+            [$user, $idHead]
+        );
+
+        DB::connection('eudr_ts')->update(
+            'UPDATE t_trace_detail SET updated_by = ?
+              WHERE id_trace_head IN (SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ?)',
+            [$user, $idHead]
+        );
+
+        $this->logTransaction('T_BALANCE_HEAD', 'UPDATE_SUBTANK',
+            'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SUBTANKS: ' . implode(',', $tails),
+            $user);
+
+        return ['response' => 1];
     }
 
     public function deactivateRmEntryTrf(int $id, string $user): array

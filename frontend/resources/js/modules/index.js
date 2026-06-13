@@ -6,7 +6,7 @@
  *
  * Usage:
  *   import { MODULES } from '@/modules'
- *   console.log(MODULES.material.name)  // 'material'
+ *   MODULES.material.name  // 'material'
  */
 
 export const MODULES = {
@@ -25,7 +25,6 @@ export const MODULES = {
   'ts-wip':         () => import('./ts-wip/module'),
   dashboard:        () => import('./dashboard/module'),
   admin:            () => import('./admin/module'),
-  inquiry:          () => import('./inquiry/module'),
   shared:           () => import('./shared/module'),
   'ts-stock':       () => import('./ts-stock/module'),
   'ts-tsreport':    () => import('./ts-tsreport/module'),

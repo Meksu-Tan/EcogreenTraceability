@@ -25,12 +25,12 @@ async function handleSave(data) {
 <template>
   <BaseModal
     :show="show"
-    :title="material ? 'Edit Material' : 'Tambah Material'"
+    :title="material ? 'Edit Material' : 'Add Material'"
     @close="emit('close')"
   >
     <!-- form fields would go here -->
-    <div class="p-4">
-      <p class="text-slate-500">
+    <div class="pa-4">
+      <p class="text-body-2 text-medium-emphasis">
         Module-scoped component example — form logic is fully contained
         within <code>modules/material/components/</code>.
       </p>

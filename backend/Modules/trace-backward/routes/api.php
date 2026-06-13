@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\TraceBackward\Http\Controllers\TraceBackwardController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('trace')->group(function () {
         Route::get('backward', [TraceBackwardController::class, 'index']);
         Route::get('backward/detail', [TraceBackwardController::class, 'traceDetail']);

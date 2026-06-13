@@ -23,16 +23,21 @@ class AuthServiceTest extends TestCase
         
         $mockUser = Mockery::mock(\stdClass::class);
         $mockUser->password = Hash::make('password');
+        $mockUser->isActive = 1;
         
         $mockUserData = Mockery::mock(\stdClass::class);
         $mockUserData->id = 1;
         $mockUserData->name = 'Admin';
         $mockUserData->email = 'admin@ecogreen.com';
         $mockUserData->id_plant = 1002;
+        $mockUserData->role = 'admin';
         $mockUserData->shouldReceive('getRoleNames')->andReturn(collect(['admin']));
         $mockUserData->shouldReceive('getAllPermissions')->andReturn(collect([
             (object)['name' => 'task-read']
         ]));
+        $mockUserData->shouldReceive('plants')->andReturn(
+            Mockery::mock(['get' => Mockery::mock(['toArray' => [['id_plant' => 1, 'code_3' => 'PLN', 'description' => 'Plant 1']]])])
+        );
 
         $repoMock->shouldReceive('findByEmail')
             ->once()
@@ -41,7 +46,7 @@ class AuthServiceTest extends TestCase
 
         $repoMock->shouldReceive('createToken')
             ->once()
-            ->with($mockUser)
+            ->with($mockUser, 'auth_token')
             ->andReturn('mocked-sanctum-token');
 
         $repoMock->shouldReceive('getUserWithPermissions')
@@ -68,8 +73,7 @@ class AuthServiceTest extends TestCase
             ->andReturnNull();
 
         $authService = new AuthService($repoMock);
+        $this->expectNotToPerformAssertions();
         $authService->logout($user);
-        
-        $this->assertTrue(true); // Assert no exception is thrown
     }
 }

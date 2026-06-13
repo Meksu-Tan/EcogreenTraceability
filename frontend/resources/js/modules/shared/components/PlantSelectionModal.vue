@@ -1,128 +1,107 @@
 <template>
-  <Teleport to="body">
-    <div v-if="isOpen" class="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-300">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-green-600 to-green-600 p-6 text-white">
-          <h3 class="text-xl font-bold flex items-center gap-3">
-            <Icon icon="ri:factory-line" class="text-green-200" />
-            Pilih Plant Transaksi
-          </h3>
-          <p class="text-green-50/80 text-sm mt-1">Silakan pilih plant untuk melihat data transaksi di halaman ini.</p>
-        </div>
+  <VDialog v-model="isOpen" max-width="480" persistent>
+    <VCard rounded="lg">
+      <!-- Header -->
+      <VCardTitle class="d-flex align-center gap-3 pa-5 pb-3">
+        <VIcon icon="ri-factory-line" color="primary" />
+        <span class="text-h6 font-weight-bold">Select Transaction Plant</span>
+      </VCardTitle>
+      <VCardSubtitle class="pa-5 pt-2 pb-3">
+        Please select a plant to view transaction data on this page.
+      </VCardSubtitle>
 
-        <!-- Content -->
-        <div class="p-6">
-          <div class="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-            <!-- All Plants Option -->
-            <button
-              @click="selectPlant(null, 'All Plants')"
-              class="group flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 text-left"
-              :class="plantSelectionStore.selectedPlantId === null ? 'border-green-500 bg-green-50 shadow-md' : 'border-slate-100 hover:border-green-200 hover:bg-slate-50'"
-            >
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
-                  <Icon icon="ri:global-line" />
-                </div>
-                <div>
-                  <span class="block font-bold text-slate-800">Semua Plant</span>
-                  <span class="text-xs text-slate-500 uppercase tracking-wider">Tampilkan data dari semua lokasi</span>
-                </div>
-              </div>
-              <Icon v-if="plantSelectionStore.selectedPlantId === null" icon="ri:check-circle-fill" class="text-green-600 text-xl" />
-            </button>
+      <VDivider />
 
-            <!-- Dynamic Plants -->
-            <button
-              v-for="plant in plantStore.plants"
-              :key="plant.id_plant"
-              @click="selectPlant(plant.id_plant, plant.description)"
-              class="group flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 text-left"
-              :class="plantSelectionStore.selectedPlantId === plant.id_plant ? 'border-green-500 bg-green-50 shadow-md' : 'border-slate-100 hover:border-green-200 hover:bg-slate-50'"
-            >
-              <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">
-                  <Icon icon="ri:building-4-line" />
-                </div>
-                <div>
-                  <span class="block font-bold text-slate-800">{{ plant.description }}</span>
-                  <span class="text-xs text-slate-500 uppercase tracking-wider">ID Plant: {{ plant.id_plant }}</span>
-                </div>
-              </div>
-              <Icon v-if="plantSelectionStore.selectedPlantId === plant.id_plant" icon="ri:check-circle-fill" class="text-green-600 text-xl" />
-            </button>
-          </div>
-        </div>
-
-        <!-- Footer (Optional) -->
-        <div v-if="!isMandatory" class="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button
-            @click="close"
-            class="px-4 py-2 text-slate-600 font-bold hover:text-slate-800 transition-colors"
+      <!-- Plant List -->
+      <VCardText class="pa-3" style="max-height: 60vh; overflow-y: auto;">
+        <VList lines="two" density="compact">
+          <!-- All Plants -->
+          <VListItem
+            :active="plantSelectionStore.selectedPlantId === null"
+            base-color="primary"
+            rounded="lg"
+            class="mb-2"
+            @click="selectPlant(null, 'All Plants')"
           >
-            Batal
-          </button>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+            <template #prepend>
+              <VAvatar color="primary-lighten-2" rounded="lg" size="44">
+                <VIcon icon="ri-layout-grid-line" color="primary" />
+              </VAvatar>
+            </template>
+            <VListItemTitle class="font-weight-bold">All Plants</VListItemTitle>
+            <VListItemSubtitle>Show data from all locations</VListItemSubtitle>
+            <template #append>
+              <VIcon
+                v-if="plantSelectionStore.selectedPlantId === null"
+                icon="ri-checkbox-circle-line"
+                color="primary"
+              />
+            </template>
+          </VListItem>
+
+          <!-- Individual Plants -->
+          <VListItem
+            v-for="plant in plantStore.plants"
+            :key="plant.id_plant"
+            :active="plantSelectionStore.selectedPlantId === plant.id_plant"
+            base-color="primary"
+            rounded="lg"
+            class="mb-2"
+            @click="selectPlant(plant.id_plant, plant.description)"
+          >
+            <template #prepend>
+              <VAvatar color="primary-lighten-2" rounded="lg" size="44">
+                <VIcon icon="ri-building-4-line" color="primary" />
+              </VAvatar>
+            </template>
+            <VListItemTitle class="font-weight-bold">{{ plant.description }}</VListItemTitle>
+            <VListItemSubtitle>ID Plant: {{ plant.id_plant }}</VListItemSubtitle>
+            <template #append>
+              <VIcon
+                v-if="plantSelectionStore.selectedPlantId === plant.id_plant"
+                icon="ri-checkbox-circle-line"
+                color="primary"
+              />
+            </template>
+          </VListItem>
+        </VList>
+      </VCardText>
+
+      <!-- Footer -->
+      <VDivider v-if="!isMandatory" />
+      <VCardActions v-if="!isMandatory" class="pa-5 pt-3 justify-end gap-2">
+        <VBtn variant="outlined" color="medium-emphasis" @click="close">Cancel</VBtn>
+      </VCardActions>
+    </VCard>
+  </VDialog>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Icon } from '@iconify/vue'
-import { usePlantSelectionStore } from '@/stores/plant'
-import { useSetupPlantStore } from '@/stores/plant'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
 
-const props = defineProps({
-  isMandatory: {
-    type: Boolean,
-    default: true
-  }
+defineProps({
+  isMandatory: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['selected', 'close'])
 
 const plantSelectionStore = usePlantSelectionStore()
-const plantStore = useSetupPlantStore()
-const isOpen = ref(false)
+const plantStore          = useSetupPlantStore()
+const isOpen              = ref(false)
 
-function open() {
-  isOpen.value = true
-}
+function open()  { isOpen.value = true }
+function close() { isOpen.value = false; emit('close') }
 
-function close() {
-  isOpen.value = false
-  emit('close')
-}
-
-async function selectPlant(id, name) {
+function selectPlant(id, name) {
   plantSelectionStore.setPlant(id, name)
   isOpen.value = false
   emit('selected', id)
 }
 
 onMounted(async () => {
-  if (plantStore.plants.length === 0) {
-    await plantStore.fetchPlants()
-  }
+  if (plantStore.plants.length === 0) await plantStore.fetchPlants()
 })
 
 defineExpose({ open, close })
 </script>
-
-<style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
-  border-radius: 10px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
-}
-</style>

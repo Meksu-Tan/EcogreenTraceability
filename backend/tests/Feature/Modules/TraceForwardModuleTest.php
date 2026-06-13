@@ -4,11 +4,18 @@ namespace Tests\Feature\Modules;
 
 use App\Models\User;
 use Modules\TraceForward\Services\Contracts\TraceForwardServiceInterface;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 use Mockery;
 use Tests\TestCase;
 
 class TraceForwardModuleTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(PlantContextMiddleware::class);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
@@ -42,10 +49,9 @@ class TraceForwardModuleTest extends TestCase
 
     public function test_it_validates_id_material_required_for_search(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/forward/search');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/search');
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['id_material']);
@@ -53,10 +59,9 @@ class TraceForwardModuleTest extends TestCase
 
     public function test_it_validates_either_id_header_or_trace_no_for_detail(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/forward/detail');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/detail');
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['lookup']);
@@ -64,10 +69,9 @@ class TraceForwardModuleTest extends TestCase
 
     public function test_it_validates_per_page_max_value_on_list(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/forward?per_page=500');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward?per_page=500');
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['per_page']);
@@ -75,8 +79,7 @@ class TraceForwardModuleTest extends TestCase
 
     public function test_it_returns_paginated_list_on_index(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $mockData = [
             'data' => [
@@ -112,7 +115,7 @@ class TraceForwardModuleTest extends TestCase
             ->andReturn($mockData);
         $this->app->instance(TraceForwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/forward?page=1&per_page=25');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward?page=1&per_page=25');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.data.0.trace_no', '100001-001')
@@ -125,8 +128,7 @@ class TraceForwardModuleTest extends TestCase
 
     public function test_it_returns_initial_and_chain_for_trace_detail(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $mockData = [
             'initial' => [
@@ -171,7 +173,7 @@ class TraceForwardModuleTest extends TestCase
             ->andReturn($mockData);
         $this->app->instance(TraceForwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=100001-001&id_material=5');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=100001-001&id_material=5');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.initial.0.curr_trace', '100001-001')
@@ -180,8 +182,7 @@ class TraceForwardModuleTest extends TestCase
 
     public function test_it_returns_500_when_service_throws_on_index(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $serviceMock = Mockery::mock(TraceForwardServiceInterface::class);
         $serviceMock->shouldReceive('getForwardList')
@@ -189,7 +190,7 @@ class TraceForwardModuleTest extends TestCase
             ->andThrow(new \RuntimeException('DB unreachable'));
         $this->app->instance(TraceForwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/forward');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward');
 
         $response->assertStatus(500)
             ->assertJsonPath('status', 0)
@@ -198,8 +199,7 @@ class TraceForwardModuleTest extends TestCase
 
     public function test_it_returns_500_when_service_throws_on_trace_detail(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $serviceMock = Mockery::mock(TraceForwardServiceInterface::class);
         $serviceMock->shouldReceive('getForwardTraceDetail')
@@ -207,7 +207,7 @@ class TraceForwardModuleTest extends TestCase
             ->andThrow(new \RuntimeException('SQL syntax error'));
         $this->app->instance(TraceForwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=T001&id_material=5');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=T001&id_material=5');
 
         $response->assertStatus(500)
             ->assertJsonPath('status', 0)

@@ -3,6 +3,19 @@ namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Feed helper — FIFO balance consumption engine.
+ *
+ * RAW SQL DEBT (C06): The t_balance_header and t_balance_detail queries
+ * in generalFeed() remain as raw SQL because of dynamic JSON_CONTAINS
+ * and SUBSTRING WHERE clauses that are impractical to express in
+ * QueryBuilder. These are deliberately wrapped in a transaction with
+ * FOR UPDATE (C09) to prevent race conditions. getAvailableQty() and
+ * debugStock() are read-only and intentionally raw for the same reason.
+ *
+ * Long-term: extract the sloc-JSON predicate builder into a shared
+ * scope class and migrate to QueryBuilder.
+ */
 class Feed
 {
     protected $connection = 'eudr_ts';
@@ -14,17 +27,36 @@ class Feed
         $sql = 'SELECT id_balance_head, qty, out_qty, trace_no, init_qty
                 FROM t_balance_header
                 WHERE status = 1
-                    AND qty > "0.0001"
+                    AND qty > 0.0001
                     AND id_material = ?';
 
         $params = [$feedData['id_material']];
 
         if (!empty($feedData['id_sloc'])) {
-            $sql .= ' AND id_sloc = ?';
-            $params[] = $feedData['id_sloc'];
-        } elseif (!empty($feedData['id_tank'])) {
-            $sql .= ' AND id_tank = ?';
-            $params[] = $feedData['id_tank'];
+            $slocVal = $feedData['id_sloc'];
+            $slocIds = [];
+            if (is_array($slocVal)) {
+                $slocIds = $slocVal;
+            } else {
+                $decoded = json_decode($slocVal, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $slocIds = $decoded;
+                } else {
+                    $slocIds = [$slocVal];
+                }
+            }
+            $slocIds = array_map('strval', array_filter($slocIds));
+
+            if (!empty($slocIds)) {
+                $conditions = [];
+                foreach ($slocIds as $id) {
+                    $conditions[] = "id_sloc = ? OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, CAST(? AS JSON))) OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, JSON_QUOTE(?)))";
+                    $params[] = $id;
+                    $params[] = $id;
+                    $params[] = $id;
+                }
+                $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
+            }
         }
 
         $tracePrefixes = $feedData['trace_prefixes'] ?? null;
@@ -48,17 +80,36 @@ class Feed
         $sql = 'SELECT id_balance_head, qty, out_qty, trace_no, init_qty
                 FROM t_balance_header
                 WHERE status = 1
-                    AND qty > "0.0001"
+                    AND qty > 0.0001
                     AND id_material = ?';
 
         $params = [$feedData['id_material']];
 
         if (!empty($feedData['id_sloc'])) {
-            $sql .= ' AND id_sloc = ?';
-            $params[] = $feedData['id_sloc'];
-        } elseif (!empty($feedData['id_tank'])) {
-            $sql .= ' AND id_tank = ?';
-            $params[] = $feedData['id_tank'];
+            $slocVal = $feedData['id_sloc'];
+            $slocIds = [];
+            if (is_array($slocVal)) {
+                $slocIds = $slocVal;
+            } else {
+                $decoded = json_decode($slocVal, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $slocIds = $decoded;
+                } else {
+                    $slocIds = [$slocVal];
+                }
+            }
+            $slocIds = array_map('strval', array_filter($slocIds));
+
+            if (!empty($slocIds)) {
+                $conditions = [];
+                foreach ($slocIds as $id) {
+                    $conditions[] = "id_sloc = ? OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, CAST(? AS JSON))) OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, JSON_QUOTE(?)))";
+                    $params[] = $id;
+                    $params[] = $id;
+                    $params[] = $id;
+                }
+                $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
+            }
         }
 
         $tracePrefixes = $feedData['trace_prefixes'] ?? null;
@@ -70,30 +121,30 @@ class Feed
 
         $sql .= ' ORDER BY id_balance_head ASC';
 
-        $balHeads = DB::connection($connection)->select($sql, $params);
+        return DB::connection($connection)->transaction(function () use ($feedData, $sql, $params, $connection) {
 
-        if (count($balHeads) === 0) {
-            return [
-                'response' => 3,
-                'trace_head_ids' => [],
-                'used_heads' => [],
-                'total_out' => 0,
-                'feed_in_details' => [],
-            ];
-        }
+            $balHeads = DB::connection($connection)->select($sql . ' FOR UPDATE', $params);
 
-        $totalAvailable = array_sum(array_column($balHeads, 'qty'));
-        if (round($totalAvailable, 4) < round($feedData['qty'], 4)) {
-            return [
-                'response' => 3,
-                'trace_head_ids' => [],
-                'used_heads' => [],
-                'total_out' => 0,
-                'feed_in_details' => [],
-            ];
-        }
+            if (count($balHeads) === 0) {
+                return [
+                    'response' => 3,
+                    'trace_head_ids' => [],
+                    'used_heads' => [],
+                    'total_out' => 0,
+                    'feed_in_details' => [],
+                ];
+            }
 
-        return DB::connection($connection)->transaction(function () use ($feedData, $balHeads, $connection) {
+            $totalAvailable = array_sum(array_column($balHeads, 'qty'));
+            if (round($totalAvailable, 4) < round($feedData['qty'], 4)) {
+                return [
+                    'response' => 3,
+                    'trace_head_ids' => [],
+                    'used_heads' => [],
+                    'total_out' => 0,
+                    'feed_in_details' => [],
+                ];
+            }
 
             $qtyWh = $feedData['qty'];
             $traceHeadIds = [];
@@ -126,10 +177,13 @@ class Feed
                 $useQty = round($useQty, 4);
                 $totalOut += $useQty;
 
-                DB::connection($connection)->update(
-                    'UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ?',
-                    [$newBalance, round($newOutQty, 4), $feedData['user'], $idHead]
-                );
+                DB::connection($connection)->table('t_balance_header')
+                    ->where('id_balance_head', $idHead)
+                    ->update([
+                        'qty' => $newBalance,
+                        'out_qty' => round($newOutQty, 4),
+                        'updated_by' => $feedData['user'],
+                    ]);
 
                 // CREATE TRACE HEADER (FEED OUT)
                 $traceHeadId = DB::connection($connection)->table('t_trace_header')->insertGetId([
@@ -138,8 +192,7 @@ class Feed
                     'id_balance_head' => $idHead,
                     'id_material' => $feedData['id_material'],
                     'entry_date' => $feedData['entry_date'],
-                    'id_sloc' => $feedData['id_tank'] ?? $feedData['id_sloc'] ?? 0,
-                    'id_tank_tail' => $feedData['id_tank_tail'] ?? null,
+                    'id_sloc' => $feedData['id_sloc'] ?? '[]',
                     'out_qty' => $useQty,
                     'last_qtf' => $feedData['last_qtf'] ?? 0,
                     'curr_qtf' => $feedData['qty'],
@@ -157,15 +210,16 @@ class Feed
                 // FETCH & DEDUCT SUPPLIER TAILS (FIFO)
                 // FIFO: consume oldest entry first by entry_date, then by id_balance_tail
                 $balTails = DB::connection($connection)->select(
-                    'SELECT a.id_balance_tail, a.id_supplier, a.batch_sap, a.qty, a.out_qty, a.init_qty,
+                    'SELECT a.id_balance_tail, a.id_supplier, a.id_manufacturer, a.batch_sap, a.qty, a.out_qty, a.init_qty,
                             COALESCE(b.created_at, a.created_at) AS entry_ts
                        FROM t_balance_detail a
                        JOIN m_supplier b ON a.id_supplier = b.id_supplier
                        LEFT JOIN t_balance_header h ON a.id_balance_head = h.id_balance_head
                       WHERE a.id_balance_head = ?
                         AND a.status = 1
-                        AND a.qty > "0.0001"
-                      ORDER BY entry_ts ASC, a.id_balance_tail ASC',
+                        AND a.qty > 0.0001
+                      ORDER BY entry_ts ASC, a.id_balance_tail ASC
+                      FOR UPDATE',
                     [$idHead]
                 );
 
@@ -201,32 +255,36 @@ class Feed
                         $qtyTail = 0;
                     }
 
-                    $key = $tail->id_supplier . '|' . $tail->batch_sap;
+                    $key = $tail->id_supplier . '|' . $tail->id_manufacturer . '|' . $tail->batch_sap;
 
                     if (!isset($feedInDetails[$key])) {
                         $feedInDetails[$key] = [
                             'id_supplier' => $tail->id_supplier,
+                            'id_manufacturer' => $tail->id_manufacturer ?? null,
                             'batch_sap' => $tail->batch_sap,
                             'qty' => 0,
                         ];
                     }
                     $feedInDetails[$key]['qty'] += $useTailQty;
 
-                    DB::connection($connection)->update(
-                        'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
-                        [round($newTailQty, 4), round($newTailOut, 4), $feedData['user'], $tail->id_balance_tail]
-                    );
+                    DB::connection($connection)->table('t_balance_detail')
+                        ->where('id_balance_tail', $tail->id_balance_tail)
+                        ->update([
+                            'qty' => round($newTailQty, 4),
+                            'out_qty' => round($newTailOut, 4),
+                            'updated_by' => $feedData['user'],
+                        ]);
 
                     // CREATE TRACE DETAIL (FEED OUT DETAIL)
                     DB::connection($connection)->table('t_trace_detail')->insert([
                         'id_trace_head' => $traceHeadId,
                         'id_balance_tail' => $tail->id_balance_tail,
                         'id_supplier' => $tail->id_supplier,
+                        'id_manufacturer' => $tail->id_manufacturer ?? null,
                         'id_material' => $feedData['id_material'],
                         'out_qty' => round($useTailQty, 4),
                         'batch_sap' => $tail->batch_sap,
-                        'id_sloc' => $feedData['id_tank'] ?? $feedData['id_sloc'] ?? 0,
-                        'id_tank_tail' => $feedData['id_tank_tail'] ?? null,
+                        'id_sloc' => $feedData['id_sloc'] ?? '[]',
                         'id_plant' => $feedData['id_plant'],
                         'created_by' => $feedData['user'],
                     ]);
@@ -256,17 +314,36 @@ class Feed
         $sql = 'SELECT id_balance_head, qty, out_qty, trace_no, init_qty, id_sloc, id_plant
                 FROM t_balance_header
                 WHERE status = 1
-                    AND qty > "0.0001"
+                    AND qty > 0.0001
                     AND id_material = ?';
 
         $sqlParams = [$params['id_material']];
 
         if (!empty($params['id_sloc'])) {
-            $sql .= ' AND id_sloc = ?';
-            $sqlParams[] = $params['id_sloc'];
-        } elseif (!empty($params['id_tank'])) {
-            $sql .= ' AND id_tank = ?';
-            $sqlParams[] = $params['id_tank'];
+            $slocVal = $params['id_sloc'];
+            $slocIds = [];
+            if (is_array($slocVal)) {
+                $slocIds = $slocVal;
+            } else {
+                $decoded = json_decode($slocVal, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $slocIds = $decoded;
+                } else {
+                    $slocIds = [$slocVal];
+                }
+            }
+            $slocIds = array_map('strval', array_filter($slocIds));
+
+            if (!empty($slocIds)) {
+                $conditions = [];
+                foreach ($slocIds as $id) {
+                    $conditions[] = "id_sloc = ? OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, CAST(? AS JSON))) OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, JSON_QUOTE(?)))";
+                    $sqlParams[] = $id;
+                    $sqlParams[] = $id;
+                    $sqlParams[] = $id;
+                }
+                $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
+            }
         }
 
         $tracePrefixes = $params['trace_prefixes'] ?? null;

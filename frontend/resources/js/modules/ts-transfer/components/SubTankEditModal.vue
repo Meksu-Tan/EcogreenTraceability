@@ -1,66 +1,83 @@
-﻿<template>
-  <Teleport to="body">
-    <div v-show="isOpen" class="fixed inset-0 z-[110] overflow-y-auto" role="dialog" aria-modal="true" :aria-hidden="!isOpen">
-      <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
-        <div class="fixed inset-0 z-[1] bg-black/40 backdrop-blur-sm" aria-hidden="true" @click="closeModal" />
-        <div class="relative z-[2] mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white text-left shadow-xl">
-          <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 to-green-600 px-6 py-4">
-            <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">Sloc</p>
-              <h3 class="text-lg font-bold text-white">Assign Specific Sloc (Sub Tank)</h3>
+<template>
+  <VDialog
+    :model-value="isOpen"
+    max-width="440"
+    @update:model-value="$emit('update:isOpen', $event)"
+  >
+    <VCard rounded="lg">
+      <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+        <span class="text-h6 font-weight-bold">Assign Specific Sloc (Sub Tank)</span>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="closeModal"
+        />
+      </VCardTitle>
+
+      <VDivider />
+
+      <VCardText class="pa-5">
+        <p class="mb-4 text-body-2">Main SLoc: <strong>{{ mainSloc }}</strong></p>
+        
+        <form @submit.prevent="handleSave" class="d-flex flex-column gap-4">
+          <div>
+            <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Select Specific Sloc</label>
+            <div v-if="loadingTanks" class="d-flex align-center justify-center py-4">
+              <VProgressCircular indeterminate color="primary" size="24" />
+              <span class="ms-2 text-caption text-medium-emphasis">Loading...</span>
             </div>
-            <button type="button" @click="closeModal" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div v-else class="mt-2 pa-2 border rounded overflow-y-auto" style="max-height: 192px;">
+              <VCheckbox
+                v-for="tank in availableTanks"
+                :key="tank.id_sloc_tail"
+                v-model="selectedTails"
+                :value="String(tank.id_sloc_tail)"
+                :label="tank.tankNo || tank.tf_number"
+                density="compact"
+                hide-details
+                color="primary"
+              />
+              <p v-if="availableTanks.length === 0" class="text-caption text-disabled text-center py-2">No specific sloc available</p>
+            </div>
           </div>
-          <div class="px-6 py-5">
-            <p class="mb-4 text-sm text-slate-600">Main SLoc: <strong>{{ mainSloc }}</strong></p>
-            <form @submit.prevent="handleSave">
-              <div>
-                <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Select Specific Sloc</label>
-                <div v-if="loadingTanks" class="mt-2 text-sm text-slate-400">Loading...</div>
-                <div v-else class="mt-2 space-y-2 max-h-48 overflow-y-auto">
-                  <label
-                    v-for="tank in availableTanks"
-                    :key="tank.id_sloc_tail"
-                    class="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      :value="String(tank.id_sloc_tail)"
-                      v-model="selectedTails"
-                      class="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                    />
-                    <span class="text-sm text-slate-700">{{ tank.tankNo || tank.tf_number }}</span>
-                  </label>
-                  <p v-if="availableTanks.length === 0" class="text-sm text-slate-400">No specific sloc available</p>
-                </div>
-              </div>
-              <p v-if="errorMsg" class="mt-2 text-sm text-red-600">{{ errorMsg }}</p>
-              <div class="mt-6 flex items-center justify-end gap-3">
-                <button type="button" @click="closeModal" class="rounded-xl border border-slate-200 bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-200">Cancel</button>
-                <button type="submit" :disabled="loading" class="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-green-700 disabled:bg-slate-300">
-                  <svg v-if="loading" class="animate-spin -ml-1 mr-2 h-4 w-4 inline" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Save
-                </button>
-              </div>
-            </form>
+
+          <VAlert
+            v-if="errorMsg"
+            type="error"
+            variant="tonal"
+            density="comfortable"
+          >
+            {{ errorMsg }}
+          </VAlert>
+
+          <div class="d-flex justify-end gap-2 mt-2">
+            <VBtn
+              variant="outlined"
+              color="medium-emphasis"
+              @click="closeModal"
+            >
+              Cancel
+            </VBtn>
+            <VBtn
+              type="submit"
+              color="primary"
+              :loading="loading"
+            >
+              Save
+            </VBtn>
           </div>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+        </form>
+      </VCardText>
+    </VCard>
+  </VDialog>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
 import { useTsTransferStore } from '../stores'
-import transferApi from '../api'
+import transferApi from '../services'
 
 const props = defineProps({
   isOpen: Boolean,

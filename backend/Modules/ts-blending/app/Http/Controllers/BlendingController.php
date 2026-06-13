@@ -4,7 +4,7 @@ namespace Modules\TsBlending\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use Modules\TsBlending\Services\BlendingService;
+use Modules\TsBlending\Services\Contracts\BlendingServiceInterface;
 use Modules\TsBlending\Http\Requests\StoreBlendingRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 class BlendingController extends Controller
 {
     public function __construct(
-        protected BlendingService $blendingService
+        protected BlendingServiceInterface $blendingService
     ) {}
 
     /**
@@ -21,18 +21,29 @@ class BlendingController extends Controller
     public function index(Request $request): JsonResponse
     {
         $plantId = (int) $request->input('id_plant', 0);
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 5)));
 
         try {
-            $data = $this->blendingService->getBlendingList($plantId);
+            $result = $this->blendingService->getBlendingList($plantId, $page, $perPage);
 
-            return ApiResponse::success($data, 'Blending list retrieved successfully', 200);
+            return ApiResponse::paginated(
+                $result['data']->toArray(),
+                $result['total'],
+                $page,
+                $perPage,
+                'Blending list retrieved successfully'
+            );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve blending list: ' . $e->getMessage(), 500);
         }
     }
 
     /**
-     * Store a new blending entry or update existing
+     * Store a new blending entry or update existing.
+     *
+     * @todo Technical Debt: Flag-based routing with 5 branches (42 lines).
+     * Recommended: Split into separate methods: storeFeed(), storeRundown(), storeTransfer(), etc.
      */
     public function store(StoreBlendingRequest $request): JsonResponse
     {

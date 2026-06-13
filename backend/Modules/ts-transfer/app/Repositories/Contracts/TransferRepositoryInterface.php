@@ -11,7 +11,7 @@ interface TransferRepositoryInterface
 
     public function getTotalStockMaterial(int $materialId, int $tankId, int $plantId): float;
 
-    public function getTransferList(int $plantId): Collection;
+    public function getTransferList(int $plantId, int $page = 1, int $perPage = 5): array;
 
     public function getActiveTanksRundown(?int $materialId, int $plantId): Collection;
 
@@ -32,4 +32,20 @@ interface TransferRepositoryInterface
     public function checkTraceNoExists(string $traceNo): bool;
 
     public function logTransaction(string $module, string $type, string $description, string $user): void;
+
+    public function getSlocPlant(int $sloc): ?int;
+
+    public function findOrphanHeads(int $idMaterial, int $sloc, int $plantId): array;
+
+    public function findPlantById(int $plantId): ?object;
+
+    public function findPlantCode(int $plantId): string;
+
+    public function createBalanceHeader(array $data): int;
+
+    public function createBalanceDetail(array $data): int;
+
+    public function createAdjustmentHeader(array $data): int;
+
+    public function createAdjustmentDetail(array $data): bool;
 }

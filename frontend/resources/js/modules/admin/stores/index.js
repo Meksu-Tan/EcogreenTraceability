@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import adminUsersApi from '../api'
+import adminUsersApi from '../services'
 import { useToastStore } from '@/stores/toast'
 
 export const useAdminUsersStore = defineStore('adminUsers', {
@@ -44,11 +44,11 @@ export const useAdminUsersStore = defineStore('adminUsers', {
           this.users.push(response.data.data)
           return { status: 1, message: response.data.message }
         }
-        return { status: 0, message: 'Gagal menambahkan user' }
+        return { status: 0, message: 'Failed to add user' }
       } catch (err) {
         return {
           status: 0,
-          message: err.response?.data?.message || 'Terjadi kesalahan saat menambahkan user',
+          message: err.response?.data?.message || 'An error occurred while adding user',
           errors: err.response?.data?.errors
         }
       }
@@ -63,11 +63,11 @@ export const useAdminUsersStore = defineStore('adminUsers', {
           }
           return { status: 1, message: response.data.message }
         }
-        return { status: 0, message: 'Gagal memperbarui user' }
+        return { status: 0, message: 'Failed to update user' }
       } catch (err) {
         return {
           status: 0,
-          message: err.response?.data?.message || 'Terjadi kesalahan saat memperbarui user',
+          message: err.response?.data?.message || 'An error occurred while updating user',
           errors: err.response?.data?.errors
         }
       }
@@ -79,11 +79,11 @@ export const useAdminUsersStore = defineStore('adminUsers', {
           this.users = this.users.filter(u => u.id !== id)
           return { status: 1, message: response.data.message }
         }
-        return { status: 0, message: 'Gagal menghapus user' }
+        return { status: 0, message: 'Failed to delete user' }
       } catch (err) {
         return {
           status: 0,
-          message: err.response?.data?.message || 'Terjadi kesalahan saat menghapus user'
+          message: err.response?.data?.message || 'An error occurred while deleting user'
         }
       }
     }

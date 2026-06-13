@@ -18,11 +18,19 @@ class AdminService implements AdminServiceInterface
 
     public function createUser(array $data): object
     {
+        if (!empty($data['password'])) {
+            $data['password'] = bcrypt($data['password']);
+        }
+
         return $this->adminRepository->createUser($data);
     }
 
     public function updateUser(int $id, array $data): bool
     {
+        if (!empty($data['password'])) {
+            $data['password'] = bcrypt($data['password']);
+        }
+
         return $this->adminRepository->updateUser($id, $data);
     }
 

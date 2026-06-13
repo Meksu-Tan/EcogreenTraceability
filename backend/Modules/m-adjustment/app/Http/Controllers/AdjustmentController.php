@@ -13,14 +13,19 @@ use Modules\Adjustment\Http\Requests\StoreAdjustmentDetailRequest;
 use Modules\Adjustment\Http\Requests\StoreAdjustmentWhxRequest;
 use Modules\Adjustment\Http\Requests\InitAdjustmentWhxRequest;
 use Modules\Adjustment\Http\Requests\AdjustStatusRequest;
-use Modules\Adjustment\Http\Requests\AddEntrySupplierRequest;
 use Modules\Adjustment\Http\Requests\DestroyAdjustmentRequest;
+use Modules\Adjustment\Http\Requests\AdjustmentActionRequest;
+use Modules\Shared\Helpers\ResponseCode;
 
 class AdjustmentController extends Controller
 {
+   const APPROVED_MSG = 'Adjustment approved';
+   const REJECTED_MSG = 'Adjustment rejected';
+
     public function __construct(
         protected AdjustmentServiceInterface $adjustmentService
     ) {}
+
 
     public function index(Request $request): JsonResponse
     {
@@ -28,7 +33,13 @@ class AdjustmentController extends Controller
             $plantId = $request->input('id_plant');
             $userId = $request->user()?->id;
             $adjType = $request->input('adj_type', 'wip');
-            $data = $this->adjustmentService->getAdjustmentList($plantId, $userId, $adjType);
+            
+            $filters = [
+                'page' => (int) $request->input('page', 1),
+                'per_page' => (int) $request->input('per_page', 10),
+            ];
+
+            $data = $this->adjustmentService->getAdjustmentList($plantId, $userId, $adjType, $filters);
             return ApiResponse::success($data, 'Adjustment list retrieved', 200);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
@@ -109,7 +120,7 @@ class AdjustmentController extends Controller
             $data = $request->validated();
             $result = $this->adjustmentService->createAdjustmentHeader($user, $data, $data['id_plant']);
 
-            if ($result['response'] == 99) {
+            if ($result['response'] == ResponseCode::PERIOD_LOCKED) {
                 return ApiResponse::error($result['message'] ?? 'Date is locked', 422);
             }
             if ($result['response'] == 1) {
@@ -137,15 +148,16 @@ class AdjustmentController extends Controller
         }
     }
 
-    public function approve(Request $request, string $id): JsonResponse
+    public function approve(AdjustmentActionRequest $request, string $id): JsonResponse
     {
         try {
             $user = $request->user()->name ?? 'system';
-            $status = (int) $request->input('status', 2);
+            $validated = $request->validated();
+            $status = (int) ($validated['status'] ?? 2);
             $result = $this->adjustmentService->approveAdjustment($user, (int) $id, $status);
 
             if ($result['response'] == 1) {
-                $message = $status == 2 ? 'Adjustment approved' : 'Adjustment rejected';
+                $message = $status == 2 ? self::APPROVED_MSG : self::REJECTED_MSG;
                 return ApiResponse::success($result, $message, 200);
             }
             return ApiResponse::error($result['message'] ?? 'Failed to process', 422);
@@ -168,11 +180,12 @@ class AdjustmentController extends Controller
         }
     }
 
-    public function cancel(Request $request, string $id): JsonResponse
+    public function cancel(AdjustmentActionRequest $request, string $id): JsonResponse
     {
         try {
             $user = $request->user()->name ?? 'system';
-            $reason = $request->input('reason', 'Cancelled by user');
+            $validated = $request->validated();
+            $reason = $validated['reason'] ?? 'Cancelled by user';
             $result = $this->adjustmentService->cancelAdjustment($user, (int) $id, $reason);
             if ($result['response'] == 1) {
                 return ApiResponse::success($result, 'Adjustment cancelled', 200);
@@ -276,12 +289,12 @@ class AdjustmentController extends Controller
 
     // ========== New mutation endpoints ==========
 
-    public function storeAdjustment(Request $request): JsonResponse
+    public function storeAdjustment(AdjustmentActionRequest $request): JsonResponse
     {
         try {
             $user = $request->user()->name ?? 'system';
             $plantId = $request->input('id_plant');
-            $result = $this->adjustmentService->storeAdjustment($user, $request->all(), $plantId);
+            $result = $this->adjustmentService->storeAdjustment($user, $request->validated(), $plantId);
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success($result, 'Adjustment stored', 200);
             }
@@ -305,12 +318,12 @@ class AdjustmentController extends Controller
         }
     }
 
-    public function addEntrySupplier(AddEntrySupplierRequest $request): JsonResponse
+    public function addEntrySupplier(AdjustmentActionRequest $request): JsonResponse
     {
         try {
             $user = $request->user()->name ?? 'system';
             $plantId = $request->input('id_plant');
-            $result = $this->adjustmentService->addEntrySupplier($user, $request->all(), $plantId);
+            $result = $this->adjustmentService->addEntrySupplier($user, $request->validated(), $plantId);
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success($result, 'Supplier entry added', 200);
             }
@@ -333,12 +346,12 @@ class AdjustmentController extends Controller
         }
     }
 
-    public function adjustmentInit(Request $request): JsonResponse
+    public function adjustmentInit(AdjustmentActionRequest $request): JsonResponse
     {
         try {
             $user = $request->user()->name ?? 'system';
             $plantId = $request->input('id_plant');
-            $result = $this->adjustmentService->adjustmentInit($user, $request->all(), $plantId);
+            $result = $this->adjustmentService->adjustmentInit($user, $request->validated(), $plantId);
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success($result, 'Init adjustment stored', 200);
             }
@@ -348,12 +361,12 @@ class AdjustmentController extends Controller
         }
     }
 
-    public function adjustmentSupplier(Request $request): JsonResponse
+    public function adjustmentSupplier(AdjustmentActionRequest $request): JsonResponse
     {
         try {
             $user = $request->user()->name ?? 'system';
             $plantId = $request->input('id_plant');
-            $result = $this->adjustmentService->adjustmentSupplier($user, $request->all(), $plantId);
+            $result = $this->adjustmentService->adjustmentSupplier($user, $request->validated(), $plantId);
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success($result, 'Supplier adjustment stored', 200);
             }
@@ -449,11 +462,11 @@ class AdjustmentController extends Controller
         }
     }
 
-    public function periodHeadersUpload(Request $request): JsonResponse
+    public function periodHeadersUpload(AdjustmentActionRequest $request): JsonResponse
     {
         try {
             $user = $request->user()->name ?? 'system';
-            $data = $request->all();
+            $data = $request->validated();
             $file = $request->file('file');
             $result = $this->adjustmentService->periodHeadersUpload($user, $data, $file);
             if (($result['response'] ?? 0) == 1) {

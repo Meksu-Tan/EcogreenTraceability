@@ -2,7 +2,8 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Material\Http\Controllers\MaterialController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
+    Route::get('qty/fetch', [MaterialController::class, 'fetchQty']);
     Route::get('materials', [MaterialController::class, 'index']);
     Route::post('materials', [MaterialController::class, 'store']);
     Route::put('materials/{id}', [MaterialController::class, 'update']);

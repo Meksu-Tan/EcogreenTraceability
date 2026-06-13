@@ -1,6 +1,8 @@
-// GAP #6: Add Repository pattern for WIP Entry
-// Provides structured data access layer consistent with RmEntryRepository
-import wipApi from '@/modules/ts-wip/api/wip'
+/**
+ * @note Naming convention mismatch: this file lives in `repositories/` but should be in `services/`
+ *       per project convention (View → Store → Service → Axios). Rename deferred due to risk.
+ */
+import wipApi from '@/modules/ts-wip/services/wip'
 
 class WipEntryRepository {
   // Feed operations
@@ -116,10 +118,8 @@ class WipEntryRepository {
     return this.normalizeResponse(res)
   }
 
-  // GAP #5: Normalize response format to be consistent with RM Entry
-  // WIP returns {status: 0/1, message, data} - normalize to {success, message, data}
   normalizeResponse(res) {
-    const status = res.data?.status ?? res.status ?? res.success ? 1 : 0
+    const status = (res.data?.status ?? res.status ?? res.success) ? 1 : 0
     return {
       success: status === 1,
       message: res.data?.message ?? res.message ?? '',

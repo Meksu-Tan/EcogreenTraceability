@@ -11,10 +11,6 @@ class QuantifierRepository implements QuantifierRepositoryInterface
 
     public function getQuantifierList(array $filters = []): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $sql = 'SELECT a.id_reset, a.reset_date, a.flowmeter, a.remark, a.value,
                        a.status, a.created_by, a.created_at,
                        CASE a.status
@@ -65,10 +61,6 @@ class QuantifierRepository implements QuantifierRepositoryInterface
 
     public function getActiveFlowmeters(): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $sql = 'SELECT flowmeter FROM (
                     SELECT qtf_feed AS flowmeter FROM m_material WHERE status = 1 AND qtf_feed LIKE "%FT%"
                     UNION

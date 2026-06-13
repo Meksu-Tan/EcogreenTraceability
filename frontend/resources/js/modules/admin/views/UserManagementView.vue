@@ -1,92 +1,97 @@
 <template>
-  <div class="space-y-6">
-    <!-- Section header -->
-    <div class="flex items-center justify-between">
+  <div>
+    <!-- Page header -->
+    <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">User Management</h1>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-sm text-gray-500">Admin Setup</span>
-          <span class="text-gray-300">/</span>
-          <span class="text-sm font-semibold text-green-600">Users</span>
+        <h1 class="text-h5 font-weight-bold">User Management</h1>
+        <div class="d-flex align-center gap-1 mt-1">
+          <span class="text-caption text-medium-emphasis">Admin Setup</span>
+          <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
+          <span class="text-caption font-weight-semibold text-primary">Users</span>
         </div>
       </div>
-      <button
+      <VBtn
         id="btn-tambah-user"
-        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95"
+        color="primary"
+        prepend-icon="ri-add-line"
         @click="openModal"
       >
-        <Icon icon="ri:add-line" class="w-4 h-4" /> Tambah User
-      </button>
+        Add User
+      </VBtn>
     </div>
 
-    <!-- Data Table Container -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-50 bg-gray-50/30">
-        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Icon icon="ri:user-3-line" class="text-green-600 w-4 h-4" />
-          Data Pengguna
-        </h4>
-      </div>
+    <!-- Data Table Card -->
+    <VCard rounded="lg" elevation="1">
+      <VCardTitle class="pa-5 pb-3 d-flex align-center gap-2">
+        <VIcon icon="ri-user-3-line" color="primary" size="20" />
+        <span class="text-body-1 font-weight-bold">Users Data</span>
+      </VCardTitle>
+      <VDivider />
 
-      <div class="p-6">
+      <VCardText class="pa-0">
         <DataTable
           :columns="columns"
           :data="store.users"
           :loading="store.loading"
           row-key="id"
         >
-          <!-- Custom rendering for Name + Email -->
+          <!-- Name + Email -->
           <template #cell-name="{ row }">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs shrink-0">
-                {{ row.name.charAt(0).toUpperCase() }}
-              </div>
+            <div class="d-flex align-center gap-3">
+              <VAvatar color="primary-lighten-2" size="32">
+                <span class="text-caption font-weight-bold text-primary">{{ row.name.charAt(0).toUpperCase() }}</span>
+              </VAvatar>
               <div>
-                <div class="font-bold text-slate-800">{{ row.name }}</div>
-                <div class="text-xs text-gray-500">{{ row.email }}</div>
+                <p class="text-body-2 font-weight-bold mb-0">{{ row.name }}</p>
+                <p class="text-caption text-medium-emphasis mb-0">{{ row.email }}</p>
               </div>
             </div>
           </template>
 
-          <!-- Role Badge -->
-          <template #cell-roles="{ row }">
-            <span
-              v-for="role in row.roles"
-              :key="role.id"
-              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-              :class="{
-                'bg-green-100 text-green-800': role.name === 'admin',
-                'bg-green-100 text-green-800': role.name === 'user',
-                'bg-gray-100 text-gray-800': !['admin', 'user'].includes(role.name)
-              }"
-            >
-              {{ role.name.charAt(0).toUpperCase() + role.name.slice(1) }}
-            </span>
-            <span v-if="!row.roles || row.roles.length === 0" class="text-xs text-gray-400 italic">No Role</span>
+          <!-- Plant Assignment -->
+          <template #cell-plant="{ row }">
+            <div class="d-flex flex-wrap gap-1">
+              <VChip
+                v-for="plant in row.plants"
+                :key="plant.code_3"
+                size="x-small"
+                color="secondary"
+                variant="tonal"
+                class="me-1"
+              >
+                {{ plant.description }}
+              </VChip>
+              <span v-if="!row.plants || row.plants.length === 0" class="text-caption text-medium-emphasis">
+                All Plants (Global)
+              </span>
+            </div>
           </template>
 
-          <!-- Custom Actions -->
+          <!-- Roles -->
+          <template #cell-roles="{ row }">
+            <VChip
+              v-for="role in row.roles"
+              :key="role.id"
+              size="x-small"
+              color="primary"
+              variant="tonal"
+              class="me-1"
+            >
+              {{ role.name.charAt(0).toUpperCase() + role.name.slice(1) }}
+            </VChip>
+            <span v-if="!row.roles || row.roles.length === 0" class="text-caption text-medium-emphasis">No Role</span>
+          </template>
+
+          <!-- Actions -->
           <template #actions="{ row }">
-            <div class="flex items-center justify-center gap-1.5">
-              <button
-                class="p-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm active:scale-90"
-                title="Edit"
-                @click="onEdit(row)"
-              >
-                <Icon icon="ri:edit-line" class="text-[11px]" />
-              </button>
-              <button
-                class="p-1.5 rounded-md bg-red-500 hover:bg-red-600 transition-colors shadow-sm active:scale-90 text-white"
-                title="Hapus User"
-                @click="onDelete(row)"
-              >
-                <Icon icon="ri:delete-bin-line" class="text-[11px]" />
-              </button>
+            <div class="d-flex justify-center gap-1">
+              <VBtn size="x-small" icon="ri-edit-line" color="primary" variant="tonal" @click="onEdit(row)" />
+              <VBtn size="x-small" icon="ri-delete-bin-line" color="error" variant="tonal" @click="onDelete(row)" />
             </div>
           </template>
         </DataTable>
-      </div>
-    </div>
+      </VCardText>
+    </VCard>
 
     <!-- Create/Edit Modal -->
     <UserModal
@@ -100,21 +105,23 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Icon } from '@iconify/vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import UserModal from './UserModal.vue'
 import { useAdminUsersStore } from '@/modules/admin/stores'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
 
 const store      = useAdminUsersStore()
 const toast      = useToastStore()
+const confirmStore = useConfirmStore()
 const showModal  = ref(false)
 const editRow    = ref(null)
 const submitting = ref(false)
 
 // Columns definition for DataTable
 const columns = [
-  { key: 'name',  label: 'Pengguna' }, // Will use slot #cell-name
+  { key: 'name',  label: 'User' }, // Will use slot #cell-name
+  { key: 'plant', label: 'Plant Assignment' }, // Will use slot #cell-plant
   { key: 'roles', label: 'Role' },     // Will use slot #cell-roles
 ]
 
@@ -134,7 +141,8 @@ function onEdit(row) {
 }
 
 async function onDelete(row) {
-  if (!confirm(`Hapus pengguna "${row.name}"? Tindakan ini tidak dapat dibatalkan.`)) return
+  const isConfirmed = await confirmStore.show({ message: `Delete user "${row.name}"? This action cannot be undone.` })
+  if (!isConfirmed) return
 
   const response = await store.deleteUser(row.id)
   if (response.status === 1) {

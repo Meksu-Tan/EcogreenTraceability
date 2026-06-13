@@ -2,7 +2,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\TsTransfer\Http\Controllers\TransferController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('transactions/transfers')->group(function () {
         Route::get('/', [TransferController::class, 'index']);
         Route::post('/', [TransferController::class, 'store']);

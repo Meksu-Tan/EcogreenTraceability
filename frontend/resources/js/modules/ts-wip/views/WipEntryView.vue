@@ -1,95 +1,159 @@
 <template>
-  <div class="p-6 space-y-6">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-5">
+  <div>
+    <!-- Page header -->
+    <div class="d-flex align-center justify-space-between mb-6 flex-wrap gap-4">
+      <div class="d-flex align-center ga-5">
         <div>
-          <h1 class="text-2xl font-bold text-gray-800">WIP Transaction</h1>
-          <div class="mt-1 text-sm text-gray-500">
-            Lokasi:
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
+          <h1 class="text-h5 font-weight-bold">WIP Transaction</h1>
+          <div class="d-flex align-center gap-2 mt-1 flex-wrap">
+            <span class="text-caption text-medium-emphasis">Location:</span>
+            <VChip size="x-small" color="primary" variant="tonal" prepend-icon="ri-factory-line">
               {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
-            </span>
+            </VChip>
           </div>
         </div>
         <PlantSelector @change="reloadAll" />
       </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <select v-model="selectedSection" class="px-3 py-2 text-xs font-bold text-gray-700 bg-white border border-gray-300 rounded-lg">
-          <option value="allSection">- All Section -</option>
-          <option v-for="section in wipSections" :key="section.key" :value="section.key">- {{ section.title }} -</option>
-        </select>
-        <button @click="reloadAll" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-          <Icon icon="ri:loader-4-line" :class="{ 'animate-spin': loading }" class="w-4 h-4" /> Sync Data
-        </button>
-        <div class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold">
+      <div class="d-flex align-center gap-3 flex-wrap">
+        <VSelect
+          v-model="selectedSection"
+          :items="sectionSelectItems"
+          density="compact"
+          hide-details
+          variant="outlined"
+          rounded="md"
+          color="primary"
+          style="min-width: 200px;"
+        />
+        <VBtn color="primary" prepend-icon="ri-loader-4-line" :loading="loading" @click="reloadAll">
+          Sync Data
+        </VBtn>
+        <VAlert
+          type="error"
+          variant="tonal"
+          density="compact"
+          class="text-caption font-weight-bold"
+        >
           QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
-        </div>
+        </VAlert>
       </div>
     </div>
 
-    <div v-if="loading" class="flex justify-center py-24">
-      <div class="flex flex-col items-center gap-3">
-        <Icon icon="ri:loader-4-line" class="w-8 h-8 animate-spin text-green-600" />
-        <span class="text-xs font-medium text-gray-500">Loading WIP entry sections...</span>
-      </div>
-    </div>
+    <!-- Sections -->
+    <div class="d-flex flex-column ga-6">
+      <VCard
+        v-for="section in visibleSections"
+        :key="section.key"
+        rounded="lg"
+        elevation="1"
+      >
+        <VCardTitle class="pa-5 pb-3 bg-neutral-50">
+          <h2 class="text-h6 font-weight-bold">{{ section.title }}</h2>
+        </VCardTitle>
+        <VCardText class="pa-4">
+          <div class="d-flex flex-column ga-4">
+            <template v-for="(step, index) in section.steps" :key="step.key">
+              <VSheet
+                v-if="step.type === 'label'"
+                color="neutral-900"
+                rounded="md"
+                class="d-flex align-center justify-center ga-4 px-4 py-3"
+              >
+                <VIcon :icon="step.icon" size="16" color="on-primary" />
+                <span class="text-body-2 font-weight-bold text-white">{{ step.label }}</span>
+                <VIcon :icon="step.icon" size="16" color="on-primary" />
+              </VSheet>
 
-    <div v-else class="space-y-6">
-      <section v-for="section in visibleSections" :key="section.key" class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
-          <h2 class="text-lg font-bold text-slate-800">{{ section.title }}</h2>
-        </div>
-        <div class="p-4 space-y-4">
-          <template v-for="(step, index) in section.steps" :key="step.key">
-            <div v-if="step.type === 'label'" class="flex items-center justify-center gap-4 rounded-md border border-slate-200 bg-slate-700 px-4 py-3 text-white">
-              <Icon :icon="step.icon" class="w-4 h-4" />
-              <span class="text-sm font-bold tracking-wide">{{ step.label }}</span>
-              <Icon :icon="step.icon" class="w-4 h-4" />
-            </div>
-             <div v-else-if="step.type === 'mode'" class="flex justify-start px-2 py-2">
-               <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm">
-                 <span class="text-[11px] font-bold tracking-widest text-slate-500 uppercase">Mode</span>
-                 <select 
-                   :value="step.currentValue" 
-                   @change="onModeChange(`selectedMode${step.sectionKey}`, $event.target.value)" 
-                   class="min-w-[240px] px-3 py-1.5 text-xs font-bold text-slate-700 bg-gray-50 border border-gray-300 rounded focus:border-green-500 focus:ring-1 focus:ring-green-500 focus:outline-none cursor-pointer"
-                 >
-                   <option v-for="opt in step.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-                 </select>
-               </div>
-             </div>
-            <div v-else class="border border-gray-100 rounded-lg overflow-hidden">
-              <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 text-center">
-                <h3 class="text-lg font-bold text-gray-800">{{ step.title }}</h3>
-              </div>
-              <div class="p-6">
-                <div class="flex flex-wrap justify-end gap-2 mb-4">
-                  <button v-if="step.type === 'feed'" @click="openFeedModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <Icon icon="ri:edit-line" class="w-3 h-3 mr-1" /> {{ step.button }}
-                  </button>
-                  <button v-else @click="openRundownModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <Icon icon="ri:edit-line" class="w-3 h-3 mr-1" /> {{ step.button }}
-                  </button>
-                  <button @click="openBalanceModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <Icon icon="ri:list-check-2" class="w-3 h-3 mr-1" /> View Balance Per Batches
-                  </button>
-                  <button v-if="step.type === 'feed'" @click="openFeedLogModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <Icon icon="ri:list-check-2" class="w-3 h-3 mr-1" /> View Feed Logs
-                  </button>
-                  <button v-else @click="openRundownLogModal(step)" class="px-3 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                    <Icon icon="ri:list-check-2" class="w-3 h-3 mr-1" /> View Rundown Logs
-                  </button>
+              <div v-else-if="step.type === 'mode'" class="d-flex justify-start px-2 py-2">
+                <div class="d-flex align-center ga-3 bg-surface px-4 py-2 rounded-lg border">
+                  <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Mode</span>
+                  <VSelect
+                    :model-value="step.currentValue"
+                    :items="step.options"
+                    item-title="label"
+                    item-value="value"
+                    density="compact"
+                    hide-details
+                    variant="outlined"
+                    rounded="md"
+                    color="primary"
+                    style="min-width: 240px;"
+                    @update:model-value="onModeChange(`selectedMode${step.sectionKey}`, $event)"
+                  />
                 </div>
-                <div class="mb-2 text-sm font-medium text-gray-700">LATEST LOG OF {{ step.title }}</div>
-                <WipMiniTable :columns="step.type === 'feed' ? feedColumns : rundownColumns" :data="stepRows(step)" />
               </div>
-            </div>
-            <div v-if="index < section.steps.length - 1 && step.type !== 'label' && step.type !== 'mode'" class="flex items-center justify-center text-slate-500">
-              <Icon icon="ri:arrow-down-line" class="w-5 h-5" />
-            </div>
-          </template>
-        </div>
-      </section>
+
+              <VCard v-else variant="outlined" rounded="md">
+                <VCardTitle class="pa-4 pb-3 bg-neutral-50 text-center">
+                  <h3 class="text-h6 font-weight-bold">{{ step.title }}</h3>
+                </VCardTitle>
+                <VCardText class="pa-6">
+                  <div class="d-flex flex-wrap justify-end ga-2 mb-4">
+                    <VBtn
+                      v-if="step.type === 'feed' && plantSelectionStore.selectedPlantId"
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      prepend-icon="ri-edit-line"
+                      @click="openFeedModal(step)"
+                    >
+                      {{ step.button }}
+                    </VBtn>
+                    <VBtn
+                      v-else-if="step.type !== 'feed' && plantSelectionStore.selectedPlantId"
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      prepend-icon="ri-edit-line"
+                      @click="openRundownModal(step)"
+                    >
+                      {{ step.button }}
+                    </VBtn>
+                    <VBtn
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      prepend-icon="ri-list-check-2"
+                      @click="openBalanceModal(step)"
+                    >
+                      View Balance Per Batches
+                    </VBtn>
+                    <VBtn
+                      v-if="step.type === 'feed'"
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      prepend-icon="ri-list-check-2"
+                      @click="openFeedLogModal(step)"
+                    >
+                      View Feed Logs
+                    </VBtn>
+                    <VBtn
+                      v-else
+                      color="primary"
+                      size="small"
+                      variant="tonal"
+                      prepend-icon="ri-list-check-2"
+                      @click="openRundownLogModal(step)"
+                    >
+                      View Rundown Logs
+                    </VBtn>
+                  </div>
+                  <div class="mb-2 text-body-2 font-weight-medium text-medium-emphasis">LATEST LOG OF {{ step.title }}</div>
+                  <WipMiniTable :columns="step.type === 'feed' ? feedColumns : rundownColumns" :data="stepRows(step)" />
+                </VCardText>
+              </VCard>
+
+              <div
+                v-if="index < section.steps.length - 1 && step.type !== 'label' && step.type !== 'mode'"
+                class="d-flex align-center justify-center text-medium-emphasis"
+              >
+                <VIcon icon="ri-arrow-down-line" size="20" />
+              </div>
+            </template>
+          </div>
+        </VCardText>
+      </VCard>
     </div>
 
     <BaseModal v-model="feedModalOpen" :title="feedModalTitle" :loading="storeLoading" submit-label="Save Feed" max-width="640px" @submit="submitFeed">
@@ -101,53 +165,73 @@
     </BaseModal>
 
     <BaseModal v-model="balanceModalOpen" :title="balanceTitle" max-width="1000px">
-      <div class="space-y-4">
-        <WipMiniTable :columns="balanceColumns" :data="paginatedBalanceData" />
-        <div v-if="totalPagesBalance > 1" class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-          <div class="text-xs text-gray-600">
-            Showing {{ (currentPageBalance - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageBalance * itemsPerPageLog, balanceData.length) }} of {{ balanceData.length }} entries
+      <div class="d-flex flex-column ga-4">
+        <div v-if="balanceLoading" class="d-flex justify-center py-6">
+          <VProgressCircular indeterminate color="primary" />
+        </div>
+        <WipMiniTable v-else :columns="balanceColumns" :data="balanceData" />
+        <div v-if="balanceTotalFromServer > 0" class="d-flex flex-wrap justify-space-between align-center custom-pagination-footer pa-3 rounded border gap-2">
+          <div class="text-caption text-medium-emphasis">
+            Showing {{ (currentPageBalance - 1) * itemsPerPageLog + 1 }} - {{ Math.min(currentPageBalance * itemsPerPageLog, balanceTotalFromServer) }} of {{ balanceTotalFromServer }} records
           </div>
-          <div class="flex gap-1">
-            <button @click="currentPageBalance = 1" :disabled="currentPageBalance === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
-            <button @click="currentPageBalance--" :disabled="currentPageBalance === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
-            <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageBalance }} of {{ totalPagesBalance }}</span>
-            <button @click="currentPageBalance++" :disabled="currentPageBalance === totalPagesBalance" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-            <button @click="currentPageBalance = totalPagesBalance" :disabled="currentPageBalance === totalPagesBalance" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
-          </div>
+          <VPagination
+            v-if="balanceTotalPages > 1"
+            v-model="currentPageBalance"
+            :length="balanceTotalPages"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="goBalancePage"
+          />
         </div>
       </div>
     </BaseModal>
+
     <BaseModal v-model="feedLogModalOpen" :title="feedLogTitle" max-width="1000px">
-      <div class="space-y-4">
-        <WipMiniTable :columns="feedColumns" :data="paginatedFeedLogData" />
-        <div v-if="totalPagesFeedLog > 1" class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-          <div class="text-xs text-gray-600">
-            Showing {{ (currentPageFeedLog - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageFeedLog * itemsPerPageLog, feedLogData.length) }} of {{ feedLogData.length }} entries
+      <div class="d-flex flex-column ga-4">
+        <div v-if="feedLogLoading" class="d-flex justify-center py-6">
+          <VProgressCircular indeterminate color="primary" />
+        </div>
+        <WipMiniTable v-else :columns="feedColumns" :data="feedLogData" />
+        <div v-if="feedLogTotalFromServer > 0" class="d-flex flex-wrap justify-space-between align-center custom-pagination-footer pa-3 rounded border gap-2">
+          <div class="text-caption text-medium-emphasis">
+            Showing {{ (currentPageFeedLog - 1) * itemsPerPageLog + 1 }} - {{ Math.min(currentPageFeedLog * itemsPerPageLog, feedLogTotalFromServer) }} of {{ feedLogTotalFromServer }} records
           </div>
-          <div class="flex gap-1">
-            <button @click="currentPageFeedLog = 1" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
-            <button @click="currentPageFeedLog--" :disabled="currentPageFeedLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
-            <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageFeedLog }} of {{ totalPagesFeedLog }}</span>
-            <button @click="currentPageFeedLog++" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-            <button @click="currentPageFeedLog = totalPagesFeedLog" :disabled="currentPageFeedLog === totalPagesFeedLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
-          </div>
+          <VPagination
+            v-if="feedLogTotalPages > 1"
+            v-model="currentPageFeedLog"
+            :length="feedLogTotalPages"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="goFeedLogPage"
+          />
         </div>
       </div>
     </BaseModal>
+
     <BaseModal v-model="rundownLogModalOpen" :title="rundownLogTitle" max-width="1000px">
-      <div class="space-y-4">
-        <WipMiniTable :columns="rundownColumns" :data="paginatedRundownLogData" />
-        <div v-if="totalPagesRundownLog > 1" class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-          <div class="text-xs text-gray-600">
-            Showing {{ (currentPageRundownLog - 1) * itemsPerPageLog + 1 }} to {{ Math.min(currentPageRundownLog * itemsPerPageLog, rundownLogData.length) }} of {{ rundownLogData.length }} entries
+      <div class="d-flex flex-column ga-4">
+        <div v-if="rundownLogLoading" class="d-flex justify-center py-6">
+          <VProgressCircular indeterminate color="primary" />
+        </div>
+        <WipMiniTable v-else :columns="rundownColumns" :data="rundownLogData" />
+        <div v-if="rundownLogTotalFromServer > 0" class="d-flex flex-wrap justify-space-between align-center custom-pagination-footer pa-3 rounded border gap-2">
+          <div class="text-caption text-medium-emphasis">
+            Showing {{ (currentPageRundownLog - 1) * itemsPerPageLog + 1 }} - {{ Math.min(currentPageRundownLog * itemsPerPageLog, rundownLogTotalFromServer) }} of {{ rundownLogTotalFromServer }} records
           </div>
-          <div class="flex gap-1">
-            <button @click="currentPageRundownLog = 1" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">First</button>
-            <button @click="currentPageRundownLog--" :disabled="currentPageRundownLog === 1" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
-            <span class="px-2 py-1 text-xs font-bold text-gray-700">Page {{ currentPageRundownLog }} of {{ totalPagesRundownLog }}</span>
-            <button @click="currentPageRundownLog++" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
-            <button @click="currentPageRundownLog = totalPagesRundownLog" :disabled="currentPageRundownLog === totalPagesRundownLog" class="px-2 py-1 text-xs bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">Last</button>
-          </div>
+          <VPagination
+            v-if="rundownLogTotalPages > 1"
+            v-model="currentPageRundownLog"
+            :length="rundownLogTotalPages"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="goRundownLogPage"
+          />
         </div>
       </div>
     </BaseModal>
@@ -155,21 +239,24 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
-import { Icon } from '@iconify/vue'
+import { computed, h, onMounted, reactive, ref, resolveComponent, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
 import { useTsWipEntryStore } from '@/modules/ts-wip/stores/wip'
 import { useToastStore } from '@/stores/toast'
-import wipApi from '@/modules/ts-wip/api/wip'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import BaseModal from '@/modules/shared/components/BaseModal.vue'
 import WipMiniTable from './WipMiniTable.vue'
 
-const EntryForm = defineComponent({
+const EntryForm = {
   props: { mode: String, form: Object, tanks: Array, specificTanks: Array, dcsStatus: String },
   emits: ['tank-change', 'fetch-dcs'],
   setup(props, { emit }) {
+    const VTextField = resolveComponent('VTextField')
+    const VSelect = resolveComponent('VSelect')
+    const VAlert = resolveComponent('VAlert')
+    const VBtn = resolveComponent('VBtn')
+
     const uniqueTanks = computed(() => {
       if (!Array.isArray(props.tanks)) return []
       const map = new Map()
@@ -183,59 +270,72 @@ const EntryForm = defineComponent({
       return Array.from(map.values())
     })
 
-    return () => h('div', { class: 'space-y-4' }, [
-      h('div', { class: 'rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs font-semibold text-amber-800' }, `${props.mode === 'feed' ? 'Feed' : 'Rundown'} entry MUST be entered on the same day as the related process entry.`),
-      h('div', { class: 'grid grid-cols-2 gap-4' }, [
-        field('Trace No', h('input', { value: props.form.batchNo, readonly: true, class: inputClass(true) })),
-        field('Entry Date', h('input', { type: 'date', value: props.form.entryDate, onInput: e => props.form.entryDate = e.target.value, class: inputClass() })),
+    return () => h('div', { class: 'd-flex flex-column ga-4' }, [
+      h(VAlert, { type: 'warning', variant: 'tonal', density: 'compact', class: 'text-caption font-weight-semibold' }, () =>
+        `${props.mode === 'feed' ? 'Feed' : 'Rundown'} entry MUST be entered on the same day as the related process entry.`
+      ),
+      h('div', { class: 'd-flex ga-4' }, [
+        h('div', { class: 'flex-grow-1' }, [
+          h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Trace No'),
+          h(VTextField, { modelValue: props.form.batchNo, readonly: true, density: 'comfortable', variant: 'outlined', hideDetails: true }),
+        ]),
+        h('div', { class: 'flex-grow-1' }, [
+          h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Entry Date'),
+          h(VTextField, { modelValue: props.form.entryDate, type: 'date', density: 'comfortable', variant: 'outlined', hideDetails: true, 'onUpdate:modelValue': v => { props.form.entryDate = v } }),
+        ]),
       ]),
-      field('Sloc', h('select', { value: props.form.tank || '', onChange: e => { props.form.tank = e.target.value ? Number(e.target.value) : null; emit('tank-change') }, class: inputClass() }, [
-        h('option', { value: '' }, uniqueTanks.value?.length ? '-- Select Sloc --' : '-- No Sloc found for selected plant --'),
-        ...(uniqueTanks.value || []).map(t => h('option', { value: t.id_sloc || t.id_tank }, t.tank || t.description || t.id_tank)),
-      ])),
-      field('Specific Sloc', h('div', { class: 'max-h-36 overflow-y-auto rounded-xl border border-gray-200 bg-gray-50/80 p-3 shadow-inner' }, [
-        !props.form.tank
-          ? h('p', { class: 'py-2 text-center text-xs italic text-gray-400' }, 'Pilih Sloc terlebih dahulu')
-          : !props.specificTanks?.length
-            ? h('p', { class: 'py-2 text-center text-xs italic text-gray-400' }, 'Tidak ada Specific Sloc ditemukan')
-            : h('div', { class: 'grid grid-cols-2 gap-2 sm:grid-cols-3' },
-                props.specificTanks.map(t => h('label', {
-                  class: 'flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-white px-2 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:border-green-200 hover:bg-green-50/50'
-                }, [
-                  h('input', {
-                    type: 'checkbox',
-                    value: t.id_sloc_tail || t.id_tank_tail,
-                    checked: props.form.tankNo?.includes(t.id_sloc_tail || t.id_tank_tail),
-                    onChange: e => {
-                      const val = t.id_sloc_tail || t.id_tank_tail
-                      if (e.target.checked) {
-                        if (!props.form.tankNo.includes(val)) {
-                          props.form.tankNo.push(val)
+      h('div', [
+        h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Sloc'),
+        h(VSelect, {
+          modelValue: props.form.tank || null,
+          items: uniqueTanks.value.map(t => ({ value: t.id_sloc || t.id_tank, title: t.tank || t.description || t.id_tank })),
+          density: 'comfortable', variant: 'outlined', hideDetails: true,
+          placeholder: uniqueTanks.value?.length ? '-- Select Sloc --' : '-- No Sloc found for selected plant --',
+          'onUpdate:modelValue': v => { props.form.tank = v ? Number(v) : null; emit('tank-change') },
+        }),
+      ]),
+      h('div', [
+        h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Specific Sloc'),
+        h('div', { class: 'rounded border pa-3 bg-neutral-50', style: 'max-height: 144px; overflow-y: auto;' }, [
+          !props.form.tank
+            ? h('p', { class: 'py-2 text-center text-caption text-disabled' }, 'Select Sloc first')
+            : !props.specificTanks?.length
+              ? h('p', { class: 'py-2 text-center text-caption text-disabled' }, 'No Specific Sloc found')
+              : h('div', { class: 'd-flex flex-wrap ga-2' },
+                  props.specificTanks.map(t => h('label', {
+                    class: 'd-flex align-center ga-2 px-2 py-1 rounded border text-caption font-weight-medium cursor-pointer',
+                  }, [
+                    h('input', {
+                      type: 'checkbox',
+                      value: t.id_sloc_tail || t.id_tank_tail,
+                      checked: props.form.tankNo?.includes(t.id_sloc_tail || t.id_tank_tail),
+                      onChange: e => {
+                        const val = t.id_sloc_tail || t.id_tank_tail
+                        if (e.target.checked) {
+                          if (!props.form.tankNo.includes(val)) {
+                            props.form.tankNo.push(val)
+                          }
+                        } else {
+                          props.form.tankNo = props.form.tankNo.filter(v => v !== val)
                         }
-                      } else {
-                        props.form.tankNo = props.form.tankNo.filter(v => v !== val)
-                      }
-                    },
-                    class: 'h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500'
-                  }),
-                  h('span', t.tankNo)
-                ]))
-              )
-      ])),
-      h('div', { class: 'grid grid-cols-[1fr_auto] gap-3 items-end' }, [
-        field(`Current ${props.mode === 'feed' ? 'Feed' : 'Rundown'} (MT)`, h('input', { type: 'number', step: '0.001', value: props.form.currQtf, onInput: e => props.form.currQtf = e.target.value, class: inputClass() })),
-        h('button', { type: 'button', onClick: () => emit('fetch-dcs'), class: 'px-4 py-2 text-xs font-bold rounded-md bg-blue-600 text-white hover:bg-blue-700' }, 'Fetch DCS Data'),
+                      },
+                      class: '',
+                    }),
+                    h('span', t.tankNo),
+                  ]))
+                )
+        ]),
       ]),
-      h('div', { class: 'text-xs font-semibold text-gray-500' }, props.dcsStatus || 'DCS data has not been fetched.'),
+      h('div', { class: 'd-flex ga-3 align-end' }, [
+        h('div', { class: 'flex-grow-1' }, [
+          h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, `Current ${props.mode === 'feed' ? 'Feed' : 'Rundown'} (MT)`),
+          h(VTextField, { modelValue: props.form.currQtf, type: 'number', step: '0.001', density: 'comfortable', variant: 'outlined', hideDetails: true, 'onUpdate:modelValue': v => { props.form.currQtf = v } }),
+        ]),
+        h(VBtn, { color: 'primary', variant: 'outlined', onClick: () => emit('fetch-dcs') }, () => 'Fetch DCS Data'),
+      ]),
+      h('div', { class: 'text-caption font-weight-semibold text-medium-emphasis' }, props.dcsStatus || 'DCS data has not been fetched.'),
     ])
   },
-})
-
-function field(label, child) {
-  return h('label', { class: 'block' }, [h('span', { class: 'block text-xs font-bold text-gray-600 mb-1' }, label), child])
-}
-function inputClass(readonly = false) {
-  return `w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-green-500 focus:border-green-500 ${readonly ? 'bg-gray-50 text-gray-500' : ''}`
 }
 
 const MODE_WARNING = 'WARNING: DO NOT ENTRY SEVERAL MODES AT THE SAME TIME! ( MUST FINISH FEED & RUNDOWN ENTRY PER ONE MODE )'
@@ -269,7 +369,7 @@ const wipSectionsBase = [
 ]
 
 function section(key, title, steps) { return { key, title, steps } }
-function label(label) { return { type: 'label', key: label, label, icon: label.startsWith('END') ? 'ri:flag-checkered-line' : 'ri:arrow-down-line' } }
+function label(label) { return { type: 'label', key: label, label, icon: label.startsWith('END') ? 'ri-flag-checkered-line' : 'ri-arrow-down-line' } }
 function feed(title, id, tag = null) { return { type: 'feed', key: `feed-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
 function rundown(title, id, tag = null) { return { type: 'rundown', key: `rundown-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
 function modeSwitch(sectionKey, currentValue, options) {
@@ -360,7 +460,7 @@ const section112Steps = computed(() => {
     { value: 'mode-112-4', label: '- Mode FA14lrr 112/114 -' },
     { value: 'mode-112-5', label: '- Mode FA18lrr 112/114 -' },
   ])
-  
+
   if (selectedMode112.value === 'mode-112-1') {
     return [
       header,
@@ -420,11 +520,16 @@ const wipSections = computed(() => {
   return result
 })
 
+const sectionSelectItems = computed(() => [
+  { value: 'allSection', title: '- All Section -' },
+  ...wipSections.value.map(s => ({ value: s.key, title: `- ${s.title} -` })),
+])
+
 const plantSelectionStore = usePlantSelectionStore()
 const plantStore = useSetupPlantStore()
 const store = useTsWipEntryStore()
 const toastStore = useToastStore()
-const { feedLogs, rundownLogs } = storeToRefs(store)
+const { feedLatest, rundownLatest, feedLogs, rundownLogs, balanceData, balanceMeta, feedLogMeta, rundownLogMeta } = storeToRefs(store)
 const loading = ref(false)
 const storeLoading = ref(false)
 const selectedSection = ref('allSection')
@@ -468,42 +573,76 @@ const balanceColumns = [
   { key: 'sloc', label: 'Sloc' }, { key: 'qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Supplier / Batch' },
 ]
 
-// Log Modal Pagination
 const itemsPerPageLog = 5
 const currentPageFeedLog = ref(1)
 const currentPageRundownLog = ref(1)
 const currentPageBalance = ref(1)
 
-const paginatedBalanceData = computed(() => {
-  const start = (currentPageBalance.value - 1) * itemsPerPageLog
-  return balanceData.value.slice(start, start + itemsPerPageLog)
-})
+// Server-side pagination loading states
+const balanceLoading = ref(false)
+const feedLogLoading = ref(false)
+const rundownLogLoading = ref(false)
 
-const totalPagesBalance = computed(() => {
-  return Math.ceil(balanceData.value.length / itemsPerPageLog)
-})
+// Server-side totals from store meta
+const balanceTotalFromServer = computed(() => balanceMeta.value?.total ?? 0)
+const balanceTotalPages = computed(() => Math.max(1, Math.ceil(balanceTotalFromServer.value / itemsPerPageLog)))
 
-const paginatedFeedLogData = computed(() => {
-  const start = (currentPageFeedLog.value - 1) * itemsPerPageLog
-  return feedLogData.value.slice(start, start + itemsPerPageLog)
+const feedLogTotalFromServer = computed(() => {
+  const meta = feedLogMeta.value?.[activeFeedLogStepId.value]
+  return meta?.total ?? 0
 })
+const feedLogTotalPages = computed(() => Math.max(1, Math.ceil(feedLogTotalFromServer.value / itemsPerPageLog)))
 
-const totalPagesFeedLog = computed(() => {
-  return Math.ceil(feedLogData.value.length / itemsPerPageLog)
+const rundownLogTotalFromServer = computed(() => {
+  const meta = rundownLogMeta.value?.[activeRundownLogStepId.value]
+  return meta?.total ?? 0
 })
+const rundownLogTotalPages = computed(() => Math.max(1, Math.ceil(rundownLogTotalFromServer.value / itemsPerPageLog)))
 
-const paginatedRundownLogData = computed(() => {
-  const start = (currentPageRundownLog.value - 1) * itemsPerPageLog
-  return rundownLogData.value.slice(start, start + itemsPerPageLog)
-})
+// Track which step is currently open in each log modal
+const activeFeedLogStepId = ref(null)
+const activeRundownLogStepId = ref(null)
+const activeBalanceStepId = ref(null)
 
-const totalPagesRundownLog = computed(() => {
-  return Math.ceil(rundownLogData.value.length / itemsPerPageLog)
-})
+// Server-side page navigation helpers
+async function goBalancePage(page) {
+  if (!activeBalanceStepId.value) return
+  currentPageBalance.value = page
+  balanceLoading.value = true
+  try {
+    await store.fetchBalance(activeBalanceStepId.value, {}, page)
+  } finally {
+    balanceLoading.value = false
+  }
+}
+
+async function goFeedLogPage(page) {
+  if (!activeFeedLogStepId.value) return
+  currentPageFeedLog.value = page
+  feedLogLoading.value = true
+  try {
+    const res = await store.fetchFeed(activeFeedLogStepId.value, 'LOG', page)
+    feedLogData.value = res.data || []
+  } finally {
+    feedLogLoading.value = false
+  }
+}
+
+async function goRundownLogPage(page) {
+  if (!activeRundownLogStepId.value) return
+  currentPageRundownLog.value = page
+  rundownLogLoading.value = true
+  try {
+    const res = await store.fetchRundown(activeRundownLogStepId.value, 'LOG', page)
+    rundownLogData.value = normalizeRundownRows(res.data || [])
+  } finally {
+    rundownLogLoading.value = false
+  }
+}
 
 
 function stepRows(step) {
-  const rows = step.type === 'feed' ? feedLogs.value[step.id] || [] : normalizeRundownRows(rundownLogs.value[step.id] || [])
+  const rows = step.type === 'feed' ? feedLatest.value[step.id] || [] : normalizeRundownRows(rundownLatest.value[step.id] || [])
   return rows.slice(0, 1)
 }
 function normalizeRundownRows(rows) { return rows.map(row => ({ ...row, rundown_trace_no: row.rundown_trace_no || row.to_trace_no })) }
@@ -631,15 +770,12 @@ function findAdaptiveTank(tanks, mode) {
     const tankDesc = String(t.tank || t.description || '').toUpperCase()
     let score = 0
 
-    // Match plant keywords
     const matchesPlant = keywords.some(kw => tankDesc.includes(kw))
     if (matchesPlant) score += 10
 
-    // Match type keywords
     if (targetType === 'FEED' && tankDesc.includes('FEED')) score += 5
     if (targetType === 'WIP' && (tankDesc.includes('WIP') || tankDesc.includes('RUNDOWN'))) score += 5
 
-    // Prioritize tanks with details count
     if (t.details_count && Number(t.details_count) > 0) {
       score += 5
     }
@@ -688,24 +824,18 @@ async function fetchTanks(type, id) {
   const params = { id_plant: resolvePlantCode() }
   try {
     const response = type === 'feed'
-      ? await wipApi.getActiveTanksFeed(id, params)
-      : await wipApi.getActiveTanksRundown(id, params)
+      ? await store.fetchActiveTanksFeed(id, params)
+      : await store.fetchActiveTanksRundown(id, params)
     if (Array.isArray(response) && response.length) return response
   } catch (error) {
-    toastStore.error('Direct WIP sloc fetch failed:', error)
+    toastStore.error('Failed to fetch WIP sloc:', error)
   }
-
-  const primary = type === 'feed'
-    ? await store.fetchActiveTanksFeed(id)
-    : await store.fetchActiveTanksRundown(id)
-  return primary || []
+  return []
 }
 
 async function fetchSpecificTanks(sloc) {
-  const primary = await store.fetchActiveSpecificTanks(sloc)
-  if (primary?.length) return primary
-  const response = await wipApi.getActiveSpecificTanks(sloc)
-  return Array.isArray(response) ? response : []
+  const data = await store.fetchActiveSpecificTanks(sloc)
+  return Array.isArray(data) ? data : []
 }
 
 async function fetchFeedDcs() { await fetchDcs(activeFeedStep, feedForm, feedDcsStatus) }
@@ -740,44 +870,69 @@ async function submitRundown() {
 }
 
 const balanceModalOpen = ref(false)
-const balanceData = ref([])
 const balanceTitle = ref('Balance Detail')
 async function openBalanceModal(step) {
+  activeBalanceStepId.value = step.id
   currentPageBalance.value = 1
   balanceTitle.value = `Balance Detail - ${step.title}`
-  const res = await store.fetchBalance(step.id)
-  balanceData.value = res?.data || []
+  balanceData.value = [] // Reset to empty immediately
   balanceModalOpen.value = true
+  balanceLoading.value = true
+  try {
+    await store.fetchBalance(step.id, {}, 1)
+  } finally {
+    balanceLoading.value = false
+  }
 }
 
 const feedLogModalOpen = ref(false)
 const feedLogTitle = ref('')
 const feedLogData = ref([])
 async function openFeedLogModal(step) {
+  activeFeedLogStepId.value = step.id
   currentPageFeedLog.value = 1
   feedLogTitle.value = `Feed Log - ${step.title}`
-  feedLogData.value = feedLogs.value[step.id] || []
+  feedLogData.value = [] // Reset to empty immediately
   feedLogModalOpen.value = true
-  const res = await store.fetchFeed(step.id, 'LOG')
-  feedLogData.value = res.data || []
+  feedLogLoading.value = true
+  try {
+    const res = await store.fetchFeed(step.id, 'LOG', 1)
+    feedLogData.value = res.data || []
+  } finally {
+    feedLogLoading.value = false
+  }
 }
 
 const rundownLogModalOpen = ref(false)
 const rundownLogTitle = ref('')
 const rundownLogData = ref([])
 async function openRundownLogModal(step) {
+  activeRundownLogStepId.value = step.id
   currentPageRundownLog.value = 1
   rundownLogTitle.value = `Rundown Log - ${step.title}`
-  rundownLogData.value = normalizeRundownRows(rundownLogs.value[step.id] || [])
+  rundownLogData.value = [] // Reset to empty immediately
   rundownLogModalOpen.value = true
-  const res = await store.fetchRundown(step.id, 'LOG')
-  rundownLogData.value = normalizeRundownRows(res.data || [])
+  rundownLogLoading.value = true
+  try {
+    const res = await store.fetchRundown(step.id, 'LOG', 1)
+    rundownLogData.value = normalizeRundownRows(res.data || [])
+  } finally {
+    rundownLogLoading.value = false
+  }
 }
 
 async function reloadAll() {
+  store.clearLogs()
   loading.value = true
   try {
-    await Promise.all(runnableSteps.value.map(step => step.type === 'feed' ? store.fetchFeed(step.id, 'LATEST') : store.fetchRundown(step.id, 'LATEST')))
+    for (const section of visibleSections.value) {
+      const steps = section.steps.filter(s => s.type === 'feed' || s.type === 'rundown')
+      if (steps.length > 0) {
+        await Promise.all(steps.map(step => 
+          step.type === 'feed' ? store.fetchFeed(step.id, 'LATEST') : store.fetchRundown(step.id, 'LATEST')
+        ))
+      }
+    }
   } finally {
     loading.value = false
   }
@@ -785,3 +940,4 @@ async function reloadAll() {
 
 onMounted(reloadAll)
 </script>
+

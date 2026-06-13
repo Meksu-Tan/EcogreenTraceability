@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { MaterialRepository } from '@/repositories'
+import * as materialService from '../services'
 
 export const useSetupMaterialStore = defineStore('setupMaterial', () => {
   const materials        = ref([])
@@ -9,13 +9,11 @@ export const useSetupMaterialStore = defineStore('setupMaterial', () => {
   const loading          = ref(false)
   const loadingPkg       = ref(false)
 
-  const repository = MaterialRepository
-
   async function fetchMaterials() {
     loading.value = true
     try {
-      const res = await repository.all()
-      materials.value = res
+      const res = await materialService.getMaterials()
+      materials.value = res.data?.data || res.data || []
     } finally {
       loading.value = false
     }
@@ -24,60 +22,61 @@ export const useSetupMaterialStore = defineStore('setupMaterial', () => {
   async function fetchPackagings() {
     loadingPkg.value = true
     try {
-      const res = await repository.getPackagings()
-      packagings.value = res
+      const res = await materialService.getPackagings()
+      packagings.value = res.data?.data || res.data || []
     } finally {
       loadingPkg.value = false
     }
   }
 
   async function fetchSourceProducts() {
-    const res = await repository.getSourceProducts()
-    sourceProducts.value = res
+    const res = await materialService.getSourceProducts()
+    sourceProducts.value = res.data?.data || res.data || []
   }
 
   async function createMaterial(data) {
-    const res = await repository.create(data)
+    const res = await materialService.storeMaterial(data)
     if (res.status === 1) await fetchMaterials()
     return res
   }
 
   async function editMaterial(id, data) {
-    const res = await repository.update(id, data)
+    const res = await materialService.updateMaterial(id, data)
     if (res.status === 1) await fetchMaterials()
     return res
   }
 
   async function toggleMaterial(id, currentStatus) {
     const res = currentStatus == 1
-      ? await repository.deactivate(id)
-      : await repository.activate(id)
+      ? await materialService.deactivateMaterial(id)
+      : await materialService.activateMaterial(id)
     if (res.status === 1) await fetchMaterials()
     return res
   }
 
   async function createPackaging(data) {
-    const res = await repository.createPackaging(data)
+    const res = await materialService.storePackaging(data)
     if (res.status === 1) await fetchPackagings()
     return res
   }
 
   async function editPackaging(id, data) {
-    const res = await repository.updatePackaging(id, data)
+    const res = await materialService.updatePackaging(id, data)
     if (res.status === 1) await fetchPackagings()
     return res
   }
 
   async function togglePackaging(id, currentStatus) {
     const res = currentStatus == 1
-      ? await repository.deactivatePackaging(id)
-      : await repository.activatePackaging(id)
+      ? await materialService.deactivatePackaging(id)
+      : await materialService.activatePackaging(id)
     if (res.status === 1) await fetchPackagings()
     return res
   }
 
   async function searchMaterials(query, limit = 10) {
-    return await repository.search(query, limit)
+    const res = await materialService.getMaterials({ search: query, per_page: limit })
+    return res.data?.data || res.data || []
   }
 
   return {

@@ -9,13 +9,13 @@ vi.mock('@/api/axios', () => ({
   }
 }))
 
-import * as materialApi from '@/modules/m-material/api'
+import * as materialApi from '@/modules/m-material/services'
 import api from '@/api/axios'
 
 describe('Material API', () => {
   it('getMaterials calls GET /api/v1/materials', () => {
     materialApi.getMaterials()
-    expect(api.get).toHaveBeenCalledWith('/api/v1/materials')
+    expect(api.get).toHaveBeenCalledWith('/api/v1/materials', { params: {} })
   })
 
   it('storeMaterial calls POST /api/v1/materials', () => {

@@ -1,4 +1,8 @@
-import * as MaterialApi from '@/modules/m-material/api'
+/**
+ * @note Naming convention mismatch: this file lives in `repositories/` but should be in `services/`
+ *       per project convention (View → Store → Service → Axios). Rename deferred due to risk.
+ */
+import * as MaterialApi from '@/modules/m-material/services'
 
 class MaterialRepository {
   async all() {
@@ -57,17 +61,12 @@ class MaterialRepository {
   }
 
   async search(query, limit = 10) {
-    const res = await MaterialApi.getMaterials()
-    const list = res.data?.data ?? res.data ?? res ?? []
-    return list.filter(item =>
-      Object.values(item).some(val =>
-        String(val).toLowerCase().includes(query.toLowerCase())
-      )
-    ).slice(0, limit)
+    const res = await MaterialApi.getMaterials({ search: query, limit })
+    return res.data?.data ?? res.data ?? res ?? []
   }
 
   async getByType(type) {
-    const res = await MaterialApi.getMaterials()
+    const res = await MaterialApi.getMaterials({ type })
     const list = res.data?.data ?? res.data ?? res ?? []
     return list.filter(item =>
       item.type?.toUpperCase() === type?.toUpperCase() ||

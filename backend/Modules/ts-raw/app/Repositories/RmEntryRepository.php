@@ -7,6 +7,7 @@ use Modules\TsRaw\Repositories\Traits\RmEntryQueryTrait;
 use Modules\TsRaw\Repositories\Traits\RmEntrySupplierTrait;
 use Modules\TsRaw\Repositories\Traits\RmEntryTransactionTrait;
 use Modules\TsRaw\Repositories\Traits\RmEntryTransferTrait;
+use Modules\TsRaw\Repositories\Traits\RmEntryModelAccessTrait;
 
 class RmEntryRepository implements RmEntryRepositoryInterface
 {
@@ -14,6 +15,7 @@ class RmEntryRepository implements RmEntryRepositoryInterface
     use RmEntrySupplierTrait;
     use RmEntryTransactionTrait;
     use RmEntryTransferTrait;
+    use RmEntryModelAccessTrait;
 
     protected $movSeq = '000';
     protected $movType1 = '1';

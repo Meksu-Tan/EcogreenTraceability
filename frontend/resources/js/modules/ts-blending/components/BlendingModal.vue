@@ -1,202 +1,202 @@
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition duration-300 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-show="isOpen"
-        class="fixed inset-0 z-[105] overflow-y-auto"
-      role="dialog"
-      aria-modal="true"
-      :aria-hidden="!isOpen"
-    >
-      <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
-        <div class="fixed inset-0 z-[1] bg-black/40 backdrop-blur-sm" aria-hidden="true" @click="closeModal" />
+  <VDialog
+    :model-value="isOpen"
+    max-width="960"
+    scrollable
+    @update:model-value="$emit('update:isOpen', $event)"
+  >
+    <VCard>
+      <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+        <span class="text-h6 font-weight-bold">Blending Entry</span>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="closeModal"
+        />
+      </VCardTitle>
 
-        <div class="relative z-[2] mx-auto flex w-full max-w-5xl max-h-[min(92vh,940px)] flex-col overflow-hidden rounded-2xl bg-white text-left shadow-xl">
-          <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 to-green-600 px-6 py-4 sm:px-8">
-            <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">Blending</p>
-              <h3 class="text-lg font-bold text-white sm:text-xl">Blending Entry</h3>
-            </div>
-            <button type="button" @click="closeModal" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+      <VDivider />
 
-          <div class="relative min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white px-5 py-5 sm:px-8 sm:py-6">
-            <div
-              v-if="blendingStore.loading"
-              class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-xl bg-white/75 backdrop-blur-sm"
-            >
-              <svg class="h-11 w-11 animate-spin text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <p class="text-sm font-semibold text-slate-600">Processing...</p>
-            </div>
-
-            <p v-if="formError" class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ formError }}</p>
-
-            <form @submit.prevent="handleSubmit" :class="{ 'pointer-events-none opacity-45': blendingStore.loading }" class="space-y-5">
-              <!-- Row 1: Header Fields -->
-              <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Entry Mode</label>
-                    <input :value="mode" type="text" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-slate-700" />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Entry Number (Auto)</label>
-                    <input :value="form.entry_no" type="text" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm font-bold text-slate-900" />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Date</label>
-                    <input v-model="form.entry_date" type="date" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25" />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Material Document (SAP)</label>
-                    <input v-model="form.material_doc" type="text" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm uppercase shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25" />
-                  </div>
-                </div>
-              </div>
-
-
-
-              <!-- Row 2: Material + Tank -->
-              <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:gap-6">
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Blended Material</label>
-                    <select
-                      v-model="form.id_material"
-                      required
-                      @change="onMaterialChange"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                    >
-                      <option value="" disabled>- Select Material -</option>
-                      <option v-for="mat in blendingStore.activeMaterials" :key="mat.id_material" :value="mat.id_material">
-                        {{ mat.material_code || mat.description || mat.material }}
-                      </option>
-                    </select>
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Storage Location (SLoc)</label>
-                    <select
-                      v-model="form.id_tank"
-                      @change="onTankChange"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                    >
-                      <option value="">- Select Tank -</option>
-                      <option v-for="tank in blendingStore.allTanks" :key="tank.id_tank" :value="tank.id_tank">
-                        {{ tank.tank || tank.description }}
-                      </option>
-                    </select>
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Specific Storage Location</label>
-                    <div class="max-h-32 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-inner">
-                      <div v-if="specificTanks.length === 0" class="px-2 py-2 text-center text-xs text-slate-400 italic">
-                        {{ form.id_tank ? 'No specific sloc' : 'Select a tank first' }}
-                      </div>
-                      <div v-else class="grid grid-cols-2 gap-1.5">
-                        <label
-                          v-for="tank in specificTanks"
-                          :key="tank.id_tank_tail"
-                          class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent bg-white px-2 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-green-200 hover:bg-green-50/50"
-                        >
-                          <input
-                            type="checkbox"
-                            :value="String(tank.id_tank_tail)"
-                            v-model="selectedTankTails"
-                            class="h-3.5 w-3.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                          />
-                          <span>{{ tank.tankNo || tank.tf_number }}</span>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Row 3: Buttons + Total Qty -->
-              <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-                <div class="flex items-center gap-3">
-                  <button
-                    type="button"
-                    @click="openSourceMaterialModal"
-                    class="rounded-xl bg-slate-800 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-slate-900"
-                  >
-                    <Icon icon="ri:add-circle-line" class="w-4 h-4 mr-1" /> Add Blend Source & Qty
-                  </button>
-                  <button
-                    type="submit"
-                    :disabled="blendingStore.loading"
-                    class="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
-                  >
-                    <Icon icon="ri:check-line" class="w-4 h-4 mr-1" /> Save Entry
-                  </button>
-                </div>
-                <div class="flex items-center gap-2">
-                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Total Qty (MT)</label>
-                  <input
-                    :value="formattedTotalQty"
-                    type="text"
-                    readonly
-                    class="w-36 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-right text-sm font-bold text-slate-900"
-                  />
-                </div>
-              </div>
-
-              <!-- Row 4: Detail DataTable -->
-              <div class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead class="bg-gray-50">
-                    <tr>
-                      <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-[7%]">No</th>
-                      <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
-                      <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-                      <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty (MT)</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-gray-200">
-                    <tr v-for="(item, idx) in blendingStore.materialList" :key="item.id || idx" class="hover:bg-gray-50">
-                      <td class="px-4 py-3 text-center text-gray-900">{{ idx + 1 }}</td>
-                      <td class="px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          @click="removeMaterial(item)"
-                          class="text-red-500 hover:text-red-700"
-                          title="Delete Material"
-                        >
-                          <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
-                        </button>
-                      </td>
-                      <td class="px-4 py-3 text-gray-900">{{ item.material }}</td>
-                      <td class="px-4 py-3 text-right text-gray-900">{{ item.qty }}</td>
-                    </tr>
-                    <tr v-if="blendingStore.materialList.length === 0">
-                      <td colspan="4" class="px-4 py-8 text-center text-sm text-slate-400">No source materials added yet</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </form>
-          </div>
+      <VCardText class="pa-5 bg-neutral-50">
+        <div v-if="blendingStore.loading" class="d-flex flex-column align-center justify-center pa-8">
+          <VProgressCircular indeterminate color="primary" size="48" />
+          <span class="mt-3 text-body-2 text-medium-emphasis">Processing...</span>
         </div>
-      </div>
-    </div>
-  </Transition>
-</Teleport>
 
-  <!-- Source Material Sub-Modal -->
+        <VAlert
+          v-if="formError"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+          density="comfortable"
+        >
+          {{ formError }}
+        </VAlert>
+
+        <form @submit.prevent="handleSubmit" :class="{ 'opacity-50': blendingStore.loading }" class="d-flex flex-column gap-4">
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" sm="6" md="3">
+                  <VTextField
+                    :model-value="mode"
+                    label="Entry Mode"
+                    readonly
+                    density="compact"
+                    variant="outlined"
+                  />
+                </VCol>
+                <VCol cols="12" sm="6" md="3">
+                  <VTextField
+                    :model-value="form.entry_no"
+                    label="Entry Number (Auto)"
+                    readonly
+                    density="compact"
+                    variant="outlined"
+                  />
+                </VCol>
+                <VCol cols="12" sm="6" md="3">
+                  <VTextField
+                    v-model="form.entry_date"
+                    label="Date"
+                    type="date"
+                    required
+                    density="compact"
+                    variant="outlined"
+                  />
+                </VCol>
+                <VCol cols="12" sm="6" md="3">
+                  <VTextField
+                    v-model="form.material_doc"
+                    label="Material Document (SAP)"
+                    density="compact"
+                    variant="outlined"
+                    class="text-uppercase"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
+
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" md="4">
+                  <VSelect
+                    v-model="form.id_material"
+                    label="Blended Material"
+                    :items="materialOptions"
+                    item-title="label"
+                    item-value="value"
+                    required
+                    density="compact"
+                    variant="outlined"
+                    @update:model-value="onMaterialChange"
+                  />
+                </VCol>
+                <VCol cols="12" md="4">
+                  <VSelect
+                    v-model="form.id_tank"
+                    label="Storage Location (SLoc)"
+                    :items="tankOptions"
+                    item-title="label"
+                    item-value="value"
+                    density="compact"
+                    variant="outlined"
+                    @update:model-value="onTankChange"
+                  />
+                </VCol>
+                <VCol cols="12" md="4">
+                  <VSelect
+                    v-model="selectedTankTails"
+                    label="Specific Storage Location"
+                    :items="specificTankOptions"
+                    item-title="title"
+                    item-value="value"
+                    multiple
+                    chips
+                    closable-chips
+                    variant="outlined"
+                    density="compact"
+                    :disabled="!form.id_tank"
+                    :placeholder="form.id_tank ? '' : 'Select a tank first'"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
+
+          <VCard variant="outlined">
+            <VCardText class="d-flex flex-wrap align-center justify-space-between gap-3">
+              <div class="d-flex gap-2">
+                <VBtn
+                  color="secondary"
+                  prepend-icon="ri-add-circle-line"
+                  @click="openSourceMaterialModal"
+                >
+                  Add Blend Source & Qty
+                </VBtn>
+                <VBtn
+                  type="submit"
+                  color="primary"
+                  prepend-icon="ri-check-line"
+                  :loading="blendingStore.loading"
+                >
+                  Save Entry
+                </VBtn>
+              </div>
+              <div class="d-flex align-center gap-2">
+                <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Total Qty (MT)</label>
+                <VTextField
+                  :model-value="formattedTotalQty"
+                  readonly
+                  density="compact"
+                  variant="outlined"
+                  style="width:144px"
+                  class="text-right"
+                />
+              </div>
+            </VCardText>
+          </VCard>
+
+          <VCard variant="outlined">
+            <VTable density="comfortable" class="text-body-2">
+              <thead>
+                <tr>
+                  <th class="text-center text-caption font-weight-medium text-medium-emphasis" style="width:7%">No</th>
+                  <th class="text-center text-caption font-weight-medium text-medium-emphasis">Action</th>
+                  <th class="text-left text-caption font-weight-medium text-medium-emphasis">Material</th>
+                  <th class="text-right text-caption font-weight-medium text-medium-emphasis">Qty (MT)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, idx) in blendingStore.materialList" :key="item.id || idx">
+                  <td class="text-center">{{ idx + 1 }}</td>
+                  <td class="text-center">
+                    <VBtn
+                      icon="ri-delete-bin-line"
+                      size="x-small"
+                      color="error"
+                      variant="text"
+                      @click="removeMaterial(item)"
+                    />
+                  </td>
+                  <td>{{ item.material }}</td>
+                  <td class="text-right">{{ item.qty }}</td>
+                </tr>
+                <tr v-if="blendingStore.materialList.length === 0">
+                  <td colspan="4" class="text-center text-disabled py-4 text-body-2">No source materials added yet</td>
+                </tr>
+              </tbody>
+            </VTable>
+          </VCard>
+        </form>
+      </VCardText>
+    </VCard>
+  </VDialog>
+
   <BlendingSourceMaterialModal
     v-model:is-open="isSourceModalOpen"
     :entry-no="form.entry_no"
@@ -210,7 +210,6 @@
 
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
-import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
 import { useTsBlendingStore } from '../stores'
 import BlendingSourceMaterialModal from './BlendingSourceMaterialModal.vue'
@@ -238,12 +237,14 @@ const activePlantId = computed(() => {
     return plantSelectionStore.selectedPlantId
   }
   if (form.id_tank) {
-    const tank = blendingStore.allTanks.find(t => String(t.id_tank) === String(form.id_tank))
+    // Lookup using fallback: id_sloc (new) or id_tank (legacy)
+    const tank = blendingStore.allTanks.find(t => String(t.id_sloc || t.id_tank) === String(form.id_tank))
     if (tank && tank.id_plant) {
       return tank.id_plant
     }
   }
-  return 0
+  const firstTank = blendingStore.allTanks.find(t => t.id_plant)
+  return firstTank?.id_plant || setupPlantStore.plants[0]?.code_3 || setupPlantStore.plants[0]?.id || 0
 })
 
 const form = reactive({
@@ -255,23 +256,44 @@ const form = reactive({
   idHead: null
 })
 
+const materialOptions = computed(() => {
+  return (blendingStore.activeMaterials || []).map(m => ({
+    value: m.id_material,
+    label: String(m.material_code || m.description || m.material || m.id_material || '')
+  })).filter(item => item.value && item.label)
+})
+
+const tankOptions = computed(() => {
+  return (blendingStore.allTanks || []).map(t => ({
+    value: t.id_sloc || t.id_tank,
+    label: String(t.tank || t.description || t.id_sloc || t.id_tank || '')
+  })).filter(item => item.value && item.label)
+})
+
 const formattedTotalQty = computed(() => {
   const qty = blendingStore.totalQty || 0
   return Number(qty).toFixed(3)
 })
 
+const specificTankOptions = computed(() =>
+  (specificTanks.value || []).map(t => ({
+    value: String(t.id_sloc || t.id_tank_tail),
+    title: t.tankName || t.tankNo || t.tf_number,
+  }))
+)
+
 async function bootstrap() {
   formError.value = null
-  const plantId = activePlantId.value
 
   try {
-    // Load all needed data
+    if (setupPlantStore.plants.length === 0) {
+      await setupPlantStore.fetchPlants()
+    }
     await Promise.all([
       blendingStore.fetchActiveMaterials(),
       blendingStore.fetchAllTanks({ id_plant: plantSelectionStore.selectedPlantId || 0 })
     ])
 
-    // Clear form for ADD mode
     form.entry_no = ''
     form.id_material = ''
     form.id_tank = ''
@@ -287,13 +309,19 @@ async function bootstrap() {
   }
 }
 
+async function fetchQty(){
+    if(!form.idMaterialSource){errorMsg.value='Select material first';return}
+    blendingStore.fetchQty({idMaterial: form.idMaterialSource, idPlant: props.idPlant})
+      .then(r=>{if(r?.status===1)form.qty=r.data?.qty||'';else errorMsg.value=r?.message||'Fetch failed'})
+      .catch(e=>{errorMsg.value=e.message})
+}
+
 async function onMaterialChange() {
   const plantId = activePlantId.value
 
   if (!form.id_material) return
 
   try {
-    // Generate new entry no
     const entryResponse = await blendingStore.fetchNewEntryNo({
       id_plant: plantId,
       id_material: form.id_material
@@ -302,21 +330,20 @@ async function onMaterialChange() {
       form.entry_no = entryResponse.data[0].entryNo
     }
 
-    // Auto-select matching tank from allTanks if available
     await blendingStore.fetchActiveTanksRundown({
       idMaterial: form.id_material,
-      id_plant: plantSelectionStore.selectedPlantId || 0
+      id_plant: activePlantId.value
     })
     if (blendingStore.activeTanks.length > 0) {
-      const matchingTankId = blendingStore.activeTanks[0].id_tank
-      const found = blendingStore.allTanks.find(t => Number(t.id_tank) === Number(matchingTankId))
+      // Use fallback: id_sloc (new) or id_tank (legacy)
+      const matchingTankId = blendingStore.activeTanks[0].id_sloc || blendingStore.activeTanks[0].id_tank
+      const found = blendingStore.allTanks.find(t => Number(t.id_sloc || t.id_tank) === Number(matchingTankId))
       if (found) {
-        form.id_tank = found.id_tank
+        form.id_tank = found.id_sloc || found.id_tank
         await onTankChange()
       }
     }
 
-    // Load material list for this entry
     await refreshMaterialList()
     await refreshTotalQty()
   } catch (err) {
@@ -339,10 +366,11 @@ async function onTankChange() {
 
   if (form.id_tank) {
     try {
-      const response = await blendingStore.fetchActiveSpecificTanksRundown({ sloc: form.id_tank })
-      specificTanks.value = response?.data || []
+      await blendingStore.fetchActiveSpecificTanksRundown({ sloc: form.id_tank })
+      specificTanks.value = blendingStore.activeSpecificTanks
       if (specificTanks.value.length === 1) {
-        selectedTankTails.value = [String(specificTanks.value[0].id_tank_tail)]
+        // Use fallback: id_sloc or id_tank_tail (backend provides both as alias)
+        selectedTankTails.value = [String(specificTanks.value[0].id_sloc || specificTanks.value[0].id_tank_tail)]
       } else {
         selectedTankTails.value = []
       }

@@ -33,7 +33,6 @@ trait RmEntryTransferTrait
     public function getStorageLog($plantId): array
     {
         $plantId = $this->resolvePlantCode($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date,
                          a.from_trace_no, a.to_trace_no,
@@ -83,27 +82,26 @@ trait RmEntryTransferTrait
     public function debugFeedLog($plantId): array
     {
         $plantId = $this->resolvePlantCode($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $query = "SELECT a.id_trace_head, a.id_balance_head, a.entry_date,
                          a.from_trace_no, a.to_trace_no,
                          c.code AS material_code, c.description AS material_name,
                          d.description AS tank_description,
-                         d.id_tank AS tank_number,
-                         a.id_tank_tail,
+                         d.id_sloc AS tank_number,
+                         a.id_sloc_tail AS id_tank_tail,
                          FORMAT(a.in_qty, 3) AS in_qty,
                          FORMAT(a.out_qty, 3) AS out_qty,
                          a.created_by, a.created_at,
                          md.material_document, md.po_so,
                          (
-                            SELECT GROUP_CONCAT(CONCAT(h.tf_number, ' - ', h.description) ORDER BY h.tf_number ASC SEPARATOR ' | ')
-                            FROM m_sloc_detail h
-                            WHERE FIND_IN_SET(h.id_sloc_tail, REPLACE(REPLACE(REPLACE(REPLACE(a.id_sloc_tail, '[', ''), ']', ''), '\"', ''), ' ', '')) > 0
+                            SELECT GROUP_CONCAT(CONCAT(h.id_sloc, ' - ', h.description) ORDER BY h.id_sloc ASC SEPARATOR ' | ')
+                            FROM m_sloc h
+                            WHERE FIND_IN_SET(h.id_sloc, REPLACE(REPLACE(REPLACE(REPLACE(a.id_sloc_tail, '[', ''), ']', ''), '\"', ''), ' ', '')) > 0
                               AND h.status = 1
                          ) AS sub_slocs_raw, p.code AS plant_code
                     FROM t_trace_header a
                     JOIN m_material c ON a.id_material = c.id_material
-                    JOIN m_sloc d ON (a.id_sloc = d.id_sloc) OR (a.id_sloc IS NULL AND a.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = d.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = d.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))
+                    JOIN m_sloc d ON a.id_sloc = d.id_sloc
                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
                     LEFT JOIN m_plant p ON d.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                    WHERE a.status = 1
@@ -162,7 +160,6 @@ trait RmEntryTransferTrait
     public function getTankLog($plantId, string $tankType): array
     {
         $plantId = $this->resolvePlantCode($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""));');
 
         $query = "SELECT
                           a.id_balance_head,
@@ -375,7 +372,7 @@ trait RmEntryTransferTrait
                     sl.description AS tank, FORMAT(bh.qty, 3) AS qty
                FROM t_balance_header bh
                JOIN m_material m ON bh.id_material = m.id_material
-               JOIN m_sloc sl ON (bh.id_sloc = sl.id_sloc) OR (bh.id_sloc IS NULL AND bh.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = sl.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = sl.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))
+               JOIN m_sloc sl ON bh.id_sloc = sl.id_sloc
               WHERE bh.status = 1
                 AND SUBSTRING(bh.trace_no, 1, 1) = '1'
                 AND bh.qty > 0
@@ -403,7 +400,6 @@ trait RmEntryTransferTrait
     public function getTransferList($plantId): array
     {
         $plantId = $this->resolvePlantCode($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         $query = "SELECT
                     bh.id_balance_head, bh.id_material,
@@ -422,7 +418,7 @@ trait RmEntryTransferTrait
                     md.material_document, md.po_so
                 FROM t_balance_header bh
                 INNER JOIN m_material m ON bh.id_material = m.id_material
-                LEFT JOIN m_sloc sl ON ((bh.id_sloc = sl.id_sloc) OR (bh.id_sloc IS NULL AND bh.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = sl.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = sl.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))) AND sl.status = 1
+                LEFT JOIN m_sloc sl ON bh.id_sloc = sl.id_sloc AND sl.status = 1
                 LEFT JOIN (
                     SELECT f2.id_balance_head, MAX(f2.id_trace_head) AS id_trace_head,
                            MAX(f2.from_trace_no) AS from_trace_no, MAX(f2.to_trace_no) AS to_trace_no,
@@ -443,7 +439,6 @@ trait RmEntryTransferTrait
 
     public function getActiveMaterialsForTransfer(): array
     {
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
         return DB::connection('eudr_ts')->select(
             'SELECT a.id_material, CONCAT(UPPER(a.description), " (", a.code, ")") AS material
                FROM m_material a
@@ -481,28 +476,26 @@ trait RmEntryTransferTrait
 
     public function getActiveTanksForTransfer(?int $materialId, $plantId): array
     {
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
-
         if ($materialId === null || $materialId === 0) {
             return DB::connection('eudr_ts')->select(
-                'SELECT b.id_tank, b.description AS tank
-                   FROM m_tank b
+                'SELECT b.id_sloc AS id_tank, b.description AS tank
+                   FROM m_sloc b
                   WHERE b.status = 1
                     AND b.id_plant <> ?
-                  GROUP BY b.id_tank
+                  GROUP BY b.id_sloc
                   ORDER BY b.description ASC',
                 [$plantId]
             );
         }
 
         return DB::connection('eudr_ts')->select(
-            'SELECT b.id_tank, b.description AS tank
+            'SELECT b.id_sloc AS id_tank, b.description AS tank
                FROM m_material a
-               LEFT JOIN m_tank b
-                 ON a.type = b.code_2 AND b.status = 1 AND b.id_plant = ?
+               LEFT JOIN m_sloc b
+                 ON a.type = b.code_2 COLLATE utf8mb4_unicode_ci AND b.status = 1 AND b.id_plant = ?
               WHERE a.status = 1
                 AND a.id_material = ?
-              GROUP BY b.id_tank',
+              GROUP BY b.id_sloc',
             [$plantId, $materialId]
         );
     }
@@ -510,11 +503,11 @@ trait RmEntryTransferTrait
     public function getActiveSpecificTanksRundown(int $sloc): array
     {
         return DB::connection('eudr_ts')->select(
-            'SELECT a.id_tank_tail, a.tf_number AS tankNo
-               FROM m_tank_detail a
+            'SELECT a.id_sloc AS id_tank_tail, a.id_tank AS tankNo
+               FROM m_sloc a
               WHERE a.status = 1
-                AND a.id_tank = ?
-              ORDER BY a.tf_number ASC',
+                AND a.id_sloc = ?
+              ORDER BY a.description ASC',
             [$sloc]
         );
     }

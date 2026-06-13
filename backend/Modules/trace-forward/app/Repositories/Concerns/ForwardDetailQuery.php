@@ -10,10 +10,6 @@ final class ForwardDetailQuery
 
     public function execute(string $traceNo, int $idMaterial): array
     {
-        $this->connection->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $cte = '
             WITH RECURSIVE ForwardBOM AS (
                 SELECT
@@ -87,7 +83,7 @@ final class ForwardDetailQuery
                         ) e ON c.id_trace_head = e.id_trace_head
             LEFT JOIN m_supplier f ON f.id_supplier = e.id_supplier
             LEFT JOIN m_material_pck g ON c.id_material = g.id_materialpck
-            LEFT JOIN m_tank h ON c.id_sloc = h.id_tank
+            LEFT JOIN m_sloc h ON c.id_sloc = h.id_sloc
             LEFT JOIN m_warehouse i ON c.id_sloc = i.id_warehouse
             WHERE e.status <> 0
             GROUP BY trace_no, `path`

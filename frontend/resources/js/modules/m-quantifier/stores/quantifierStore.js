@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import quantifierApi from '@/modules/m-quantifier/api'
+import quantifierApi from '@/modules/m-quantifier/services'
 
 export const useQuantifierStore = defineStore('quantifier', () => {
   const list = ref([])
@@ -20,6 +20,7 @@ export const useQuantifierStore = defineStore('quantifier', () => {
   }
 
   async function fetchFlowmeters() {
+    if (flowmeters.value.length > 0) return
     try {
       const res = await quantifierApi.getFlowmeters()
       flowmeters.value = res.data?.data || []

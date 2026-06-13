@@ -1,136 +1,181 @@
 <template>
-  <div class="p-6">
-    <div class="flex justify-between items-center mb-6">
-      <div class="flex items-center gap-6">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-800">Transfer List</h1>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-sm text-gray-500">Lokasi:</span>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-              <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3 opacity-70" />
-              {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
-            </span>
-          </div>
-        </div>
-        <div class="h-10 w-px bg-gray-200"></div>
-        <PlantSelector @change="fetchData" />
+  <div class="pa-6">
+    <VRow justify="space-between" align="center" class="mb-4">
+      <VCol cols="auto">
+        <VRow align="center" no-gutters>
+          <VCol cols="auto">
+            <h1 class="text-h5 font-weight-bold">Transfer List</h1>
+            <div class="d-flex align-center gap-2 mt-1">
+              <span class="text-body-2 text-medium-emphasis">Location:</span>
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="ri-factory-line"
+              >
+                {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
+              </VChip>
+            </div>
+          </VCol>
+          <VCol cols="auto" class="ml-6 pl-6 border-s">
+            <PlantSelector @change="fetchData" />
+          </VCol>
+        </VRow>
+      </VCol>
+      <VCol cols="auto">
+        <VBtn
+          color="primary"
+          prepend-icon="ri-add-line"
+          @click="openTransferModal"
+        >
+          New Transfer Entry
+        </VBtn>
+      </VCol>
+    </VRow>
+
+    <VAlert
+      type="error"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+      icon="ri-alert-line"
+    >
+      QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
+    </VAlert>
+
+    <VCard v-if="transferStore.loading">
+      <VCardText class="pa-0">
+        <VSkeletonLoader type="table-thead, table-tbody@5" :loading="true" />
+      </VCardText>
+    </VCard>
+
+    <VAlert
+      v-else-if="transferStore.error"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+    >
+      <div class="d-flex flex-column">
+        <strong class="text-body-2 font-weight-medium">Error loading data</strong>
+        <span class="text-body-2 mt-1">{{ transferStore.error }}</span>
+        <VBtn color="error" variant="tonal" size="small" class="mt-3 align-self-start" @click="fetchData">
+          Try again
+        </VBtn>
       </div>
-      <button
-        @click="openTransferModal"
-        class="inline-flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-      >
-        <Icon icon="ri:add-line" class="w-4 h-4" />
-        New Transfer Entry
-      </button>
-    </div>
+    </VAlert>
 
-    <!-- Warning -->
-    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-      <p class="text-sm text-red-700">
-        <Icon icon="ri:alert-line" class="w-4 h-4 mr-2" />
-        QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
-      </p>
-    </div>
+    <VCard v-else>
+      <VCardText class="pa-0">
+        <div class="overflow-x-auto">
+          <VTable density="compact" class="text-body-2">
+            <thead>
+              <tr>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="width:48px">No</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date')">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'plant_name' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('plant_name')">Plant<VIcon v-if="sortKey==='plant_name'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
 
-    <!-- Loading State -->
-    <div v-if="transferStore.loading" class="flex items-center justify-center py-12">
-      <svg class="h-8 w-8 animate-spin text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-      </svg>
-      <span class="ml-3 text-sm text-gray-600">Memuat data...</span>
-    </div>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material_document' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material_document')">Matl Doc<VIcon v-if="sortKey==='material_document'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('trace_no')">Trace No<VIcon v-if="sortKey==='trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material')">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc')">Sloc (From >>> To)<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'init_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('init_qty')">Init Material (MT)<VIcon v-if="sortKey==='init_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier')">Init Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty')">On-Hand Material (MT)<VIcon v-if="sortKey==='qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty_supplier')">On-Hand Supplier (MT)<VIcon v-if="sortKey==='qty_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:200px">Supplier / Batch SAP / Init Qty (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(trf, index) in sortedList" :key="trf.id_balance_head">
+                <td class="text-caption text-medium-emphasis">{{ (page - 1) * perPage + index + 1 }}</td>
+                <td class="text-center">{{ formatDate(trf.entry_date) }}</td>
+                <td class="text-center font-weight-medium text-caption">{{ trf.plant_name || '-' }}</td>
+                <td class="text-center">
+                  <span v-if="trf.material_document" class="text-caption">{{ trf.material_document }}</span>
+                  <VBtn
+                    v-else
+                    size="x-small"
+                    color="warning"
+                    variant="tonal"
+                    @click="openMatlDocModal(trf)"
+                  >
+                    Add Doc No
+                  </VBtn>
+                </td>
+                <td class="text-center font-weight-medium font-mono text-caption">{{ trf.trace_no }}</td>
+                <td class="font-weight-medium text-truncate" style="max-width:160px" :title="trf.material">{{ trf.material }}</td>
+                <td class="text-caption text-medium-emphasis">{{ trf.sloc }}</td>
+                
+                <!-- Init Qty columns style comparison -->
+                <td class="text-right font-monospace text-caption" :class="trf.init_qty === trf.balance_supplier ? 'text-success' : 'text-error'">{{ trf.init_qty || '0.000' }}</td>
+                <td class="text-right font-monospace text-caption" :class="trf.init_qty === trf.balance_supplier ? 'text-success' : 'text-error'">{{ trf.balance_supplier || '0.000' }}</td>
+                
+                <!-- On-Hand Qty columns style comparison -->
+                <td class="text-right font-monospace font-weight-bold text-caption" :class="trf.qty === trf.qty_supplier ? 'text-success' : 'text-error'">{{ trf.qty }}</td>
+                <td class="text-right font-monospace font-weight-bold text-caption" :class="trf.qty === trf.qty_supplier ? 'text-success' : 'text-error'">{{ trf.qty_supplier || '0.000' }}</td>
 
-    <!-- Error State -->
-    <div v-else-if="transferStore.error" class="rounded-lg border border-red-200 bg-red-50 p-4">
-      <div class="flex">
-        <div class="flex-shrink-0"><Icon icon="ri:error-warning-line" class="w-5 h-5 text-red-400" /></div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-red-800">Error loading data</h3>
-          <p class="mt-2 text-sm text-red-700">{{ transferStore.error }}</p>
-          <button @click="fetchData" class="mt-3 rounded-md bg-red-100 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-200">Coba lagi</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Transfer Table -->
-    <div v-else class="bg-white rounded-lg shadow-sm border border-gray-200">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
-              <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-              <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Entry Date</th>
-              <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Plant</th>
-              <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Matl Doc</th>
-              <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Trace No</th>
-              <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Material</th>
-              <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sloc (From >>> To)</th>
-              <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Init Material (MT)</th>
-              <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">On-Hand (MT)</th>
-              <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style="min-width:200px">Supplier / Batch SAP / Init Qty (MT)</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="(trf, index) in transferStore.transferList" :key="trf.id_balance_head" class="hover:bg-gray-50">
-              <td class="px-3 py-3 whitespace-nowrap text-sm text-gray-900">{{ index + 1 }}</td>
-              <td class="px-3 py-3 whitespace-nowrap text-center">
-                <button
-                  @click="deactivateTransfer(trf)"
-                  :disabled="deactivatingId === trf.id_balance_head"
-                  class="text-red-500 hover:text-red-700 text-sm disabled:opacity-50"
-                  title="De-Activate"
-                >
-                  <Icon v-if="deactivatingId !== trf.id_balance_head" icon="ri:delete-bin-line" class="w-4 h-4" />
-                  <Icon v-else icon="ri:loader-4-line" class="w-4 h-4 animate-spin" />
-                </button>
-              </td>
-              <td class="px-3 py-3 whitespace-nowrap text-center text-sm text-gray-900">{{ formatDate(trf.entry_date) }}</td>
-              <td class="px-3 py-3 whitespace-nowrap text-center text-sm text-gray-900">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                  {{ trf.plant_name || '-' }}
-                </span>
-              </td>
-              <td class="px-3 py-3 whitespace-nowrap text-center text-sm">
-                <span v-if="trf.material_document">
-                  {{ trf.material_document }}
-                </span>
-                <button
-                  v-else
-                  @click="openMatlDocModal(trf)"
-                  class="inline-flex items-center gap-1 rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 hover:bg-yellow-200"
-                >
-                  Add Doc No
-                </button>
-              </td>
-              <td class="px-3 py-3 whitespace-nowrap text-center font-mono text-sm text-gray-900">{{ trf.trace_no }}</td>
-              <td class="px-3 py-3 text-sm text-gray-900">{{ trf.material }}</td>
-              <td class="px-3 py-3 text-xs text-gray-600">{{ trf.sloc }}</td>
-              <td class="px-3 py-3 whitespace-nowrap text-right font-mono text-sm">{{ trf.init_qty || '0.000' }}</td>
-              <td class="px-3 py-3 whitespace-nowrap text-right font-mono text-sm text-gray-900">{{ trf.qty }}</td>
-              <td class="px-3 py-3 text-xs" style="min-width:200px">
-                <template v-if="trf.supplier">
-                  <span
+                <td style="min-width:200px">
+                  <VChip
                     v-for="(sup, si) in parseSuppliers(trf.supplier)"
                     :key="si"
-                    class="inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-green-600 text-white text-[10px] font-medium"
-                  >{{ sup }}</span>
-                </template>
-              </td>
-            </tr>
-            <tr v-if="transferStore.transferList.length === 0">
-              <td colspan="11" class="px-6 py-12 text-center text-sm text-gray-500">
-                <Icon icon="ri:inbox-2-line" class="w-10 h-10 text-gray-300 mb-3" />
-                <p>Belum ada data transfer</p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+                    size="x-small"
+                    color="primary"
+                    variant="flat"
+                    class="mr-1 mb-1"
+                  >
+                    {{ sup }}
+                  </VChip>
+                </td>
+                <td class="text-center">
+                  <VBtn
+                    :loading="deactivatingId === trf.id_balance_head"
+                    :icon="deactivatingId === trf.id_balance_head ? 'ri-loader-4-line' : 'ri-delete-bin-line'"
+                    size="x-small"
+                    color="error"
+                    variant="tonal"
+                    @click="deactivateTransfer(trf)"
+                  />
+                </td>
+              </tr>
+              <tr v-if="sortedList.length === 0">
+                <td colspan="11" class="text-center pa-8">
+                  <VIcon icon="ri-inbox-2-line" size="40" class="text-disabled mb-2" />
+                  <p class="text-body-2 text-medium-emphasis">No transfer data yet</p>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </div>
 
-    <!-- Material Document Modal -->
+        <div v-if="transferStore.pagination.total > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+          <div class="d-flex align-center gap-3">
+            <span class="text-caption text-medium-emphasis">
+              Showing {{ (page - 1) * perPage + 1 }} - {{ Math.min(page * perPage, transferStore.pagination.total) }} of {{ transferStore.pagination.total }} records
+            </span>
+            <VSelect
+              v-model="perPage"
+              :items="[5, 10, 15, 20]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 80px; max-width: 100px;"
+            />
+          </div>
+          <VPagination
+            v-if="lastPage > 1"
+            v-model="page"
+            :length="lastPage"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="changePage"
+          />
+        </div>
+      </VCardText>
+    </VCard>
+
     <MaterialDocModal
       v-if="selectedTransfer"
       v-model:is-open="isMatlDocModalOpen"
@@ -140,7 +185,6 @@
       @success="onMatlDocSuccess"
     />
 
-    <!-- Transfer Entry Modal -->
     <TransferEntryModal
       v-model:is-open="isTransferModalOpen"
       @success="onTransferSuccess"
@@ -149,8 +193,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { Icon } from '@iconify/vue'
+import { ref, watch, computed } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsTransferStore } from '@/modules/ts-transfer/stores'
 import { useToastStore } from '@/stores/toast'
@@ -185,9 +228,66 @@ function formatDate(dateString) {
   })
 }
 
+const page = ref(1)
+const perPage = ref(5)
+
+const sortKey = ref(null)
+const sortDir = ref(null)
+
+function detectColumnType(colKey) {
+  const rows = transferStore.transferList
+  if (!rows || rows.length === 0) return 'text'
+  for (const row of rows) {
+    const val = row[colKey]
+    if (val !== null && val !== undefined && val !== '') {
+      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
+    }
+  }
+  return 'text'
+}
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    if (sortDir.value === 'asc') {
+      sortDir.value = 'desc'
+    } else if (sortDir.value === 'desc') {
+      sortKey.value = null
+      sortDir.value = null
+    }
+  } else {
+    sortKey.value = key
+    sortDir.value = detectColumnType(key) === 'text' ? 'asc' : 'desc'
+  }
+}
+
+const sortedList = computed(() => {
+  if (!sortKey.value || !sortDir.value) return transferStore.transferList
+  const key = sortKey.value
+  const dir = sortDir.value
+  const rows = [...transferStore.transferList]
+  const type = detectColumnType(key)
+  return rows.sort((a, b) => {
+    const va = a[key]
+    const vb = b[key]
+    if (va == null && vb == null) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    if (type === 'number') return dir === 'asc' ? va - vb : vb - va
+    return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va))
+  })
+})
+
+const lastPage = computed(() => transferStore.pagination.lastPage)
+
 async function fetchData() {
   const plantId = plantSelectionStore.selectedPlantId || 0
-  await transferStore.fetchTransferList(plantId)
+  await transferStore.fetchTransferList(plantId, page.value, perPage.value)
+}
+
+async function changePage(p) {
+  if (p < 1 || p > lastPage.value) return
+  transferStore.setPage(p)
+  await fetchData()
 }
 
 function openTransferModal() {
@@ -228,6 +328,19 @@ async function deactivateTransfer(trf) {
 }
 
 watch(() => plantSelectionStore.selectedPlantId, () => {
+  page.value = 1
   fetchData()
 }, { immediate: true })
+
+watch(perPage, () => {
+  page.value = 1
+  fetchData()
+})
 </script>
+
+<style scoped>
+.sort-icon { vertical-align: middle; transition: opacity 0.15s; opacity: 0.35; }
+.sortable-th:hover .sort-icon { opacity: 0.7; }
+.sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
+</style>
+

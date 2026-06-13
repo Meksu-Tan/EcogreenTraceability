@@ -1,83 +1,97 @@
 <template>
-  <div class="space-y-6">
-    <!-- Section header -->
-    <div class="flex items-center justify-between">
+  <div>
+    <!-- Page header -->
+    <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Dashboard</h1>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-sm text-gray-400">Home</span>
-          <span class="text-gray-300">/</span>
-          <span class="text-sm font-semibold text-green-500">Dashboard</span>
+        <h1 class="text-h5 font-weight-bold">Dashboard</h1>
+        <div class="d-flex align-center gap-1 mt-1">
+          <span class="text-caption text-medium-emphasis">Home</span>
+          <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
+          <span class="text-caption font-weight-semibold text-primary">Dashboard</span>
         </div>
       </div>
     </div>
 
     <!-- Welcome card -->
-    <div class="relative overflow-hidden bg-green-500 rounded-2xl shadow-lg">
-      <!-- Decorative circles -->
-      <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl"></div>
-      <div class="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full -ml-10 -mb-10 blur-xl"></div>
-
-      <div class="relative px-8 py-10 flex items-center justify-between gap-6 flex-wrap">
-        <div class="space-y-2">
-          <h4 class="text-white text-2xl font-extrabold tracking-tight">
+    <VCard color="primary" rounded="lg" elevation="1" class="mb-6 overflow-hidden">
+      <VCardText class="pa-8 d-flex align-center justify-space-between flex-wrap gap-4">
+        <div>
+          <h2 class="text-h6 font-weight-black text-on-primary mb-2">
             Selamat datang, {{ authStore.user?.name || 'User' }}!
-          </h4>
-          <p class="text-green-50 text-sm font-medium opacity-90">
-            Logged in as <span class="bg-white/20 px-2 py-0.5 rounded-md font-bold">{{ firstRole }}</span> &mdash; {{ today }}
+          </h2>
+          <p class="text-body-2 text-on-primary mb-0" style="opacity: 0.9;">
+            Logged in as
+            <VChip size="x-small" variant="tonal" color="on-primary" class="mx-1">{{ firstRole }}</VChip>
+            &mdash; {{ today }}
           </p>
         </div>
-        <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30 shadow-lg">
-          <Icon icon="ri:user-3-line" class="text-white text-2xl w-8 h-8" />
-        </div>
-      </div>
-    </div>
+        <VAvatar color="rgb(var(--v-theme-primary) / 0.2)" size="64" style="border: 2px solid rgb(var(--v-theme-primary) / 0.3);">
+          <VIcon icon="ri-user-3-line" size="32" color="on-primary" />
+        </VAvatar>
+      </VCardText>
+    </VCard>
 
-    <!-- Quick navigation -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-50 bg-gray-50/30">
-        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Icon icon="ri:dashboard-line" class="text-green-500 w-4 h-4" />
-          Quick Navigation
-        </h4>
-      </div>
-      <div class="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <RouterLink
-          v-for="link in quickLinks"
-          :key="link.to"
-          :to="link.to"
-          class="group flex flex-col items-center p-6 border-2 border-slate-50 rounded-2xl hover:border-green-100 hover:bg-green-50/50 transition-all active:scale-95 text-center"
-        >
-          <div
-            class="w-14 h-14 rounded-xl flex items-center justify-center mb-4 shadow-md transition-transform group-hover:scale-110 group-hover:rotate-3"
-            :class="link.bgClass"
+    <!-- Quick Navigation -->
+    <VCard rounded="lg" elevation="1" class="mb-2">
+      <VCardTitle class="pa-5 pb-3 d-flex align-center gap-2">
+        <VIcon icon="ri-dashboard-line" color="primary" size="20" />
+        <span class="text-body-1 font-weight-bold">Quick Navigation</span>
+      </VCardTitle>
+      <VDivider />
+      <VCardText class="pa-5">
+        <VRow>
+          <VCol
+            v-for="link in quickLinks"
+            :key="link.to"
+            cols="12" sm="6" md="4"
           >
-            <Icon :icon="link.icon" class="text-xl text-white w-6 h-6" />
-          </div>
-          <span class="text-sm font-bold text-slate-700 group-hover:text-green-700">{{ link.label }}</span>
-        </RouterLink>
-      </div>
-    </div>
+            <VCard
+              :to="link.to"
+              rounded="lg"
+              variant="outlined"
+              class="quick-nav-card text-center pa-4"
+            >
+              <VAvatar color="primary" size="56" rounded="lg" class="mb-3">
+                <VIcon :icon="link.icon" size="26" color="on-primary" />
+              </VAvatar>
+              <p class="text-body-2 font-weight-bold text-on-surface mb-0">{{ link.label }}</p>
+            </VCard>
+          </VCol>
+        </VRow>
+      </VCardText>
+    </VCard>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
-import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
 
 const firstRole = computed(() => authStore.roles?.[0] || 'User')
-const today = computed(() => new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
+const today     = computed(() => new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
 
 const quickLinks = [
-  { to: '/setup/material',     label: 'Setup Material',     bgClass: 'bg-green-500', icon: 'ri:flask-line' },
-  { to: '/setup/storage',     label: 'Setup Storage',     bgClass: 'bg-green-500', icon: 'ri:database-2-line' },
-  { to: '/setup/supplier',    label: 'Setup Supplier',     bgClass: 'bg-green-500', icon: 'ri:truck-line' },
-  { to: '/setup/tank',        label: 'Setup Tank',          bgClass: 'bg-green-600', icon: 'ri:water-flash-line' },
-  { to: '/setup/manufacturer', label: 'Setup Manufacturer', bgClass: 'bg-green-600', icon: 'ri:factory-line' },
-  { to: '/setup/plant',        label: 'Setup Plant',         bgClass: 'bg-green-700', icon: 'ri:building-4-line' },
+  { to: '/setup/material',      label: 'Setup Material',     icon: 'ri-flask-line' },
+  { to: '/setup/storage',       label: 'Setup Storage',      icon: 'ri-database-2-line' },
+  { to: '/setup/supplier',      label: 'Setup Supplier',     icon: 'ri-truck-line' },
+  { to: '/setup/tank',          label: 'Setup Tank',         icon: 'ri-water-flash-line' },
+  { to: '/setup/manufacturer',  label: 'Setup Manufacturer', icon: 'ri-building-3-line' },
+  { to: '/setup/plant',         label: 'Setup Plant',        icon: 'ri-building-4-line' },
 ]
 </script>
+
+<style scoped>
+.quick-nav-card {
+  border-color: rgb(var(--v-theme-neutral-200));
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  cursor: pointer;
+}
+
+.quick-nav-card:hover {
+  border-color: rgb(var(--v-theme-primary));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgb(var(--v-theme-primary) / 0.15) !important;
+}
+</style>

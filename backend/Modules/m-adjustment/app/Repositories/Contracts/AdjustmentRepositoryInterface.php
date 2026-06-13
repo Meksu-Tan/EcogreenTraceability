@@ -5,7 +5,7 @@ namespace Modules\Adjustment\Repositories\Contracts;
 interface AdjustmentRepositoryInterface
 {
     // ——— Existing ———
-    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip'): array;
+    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array;
     public function getSupplierList(array $data, ?int $userId = null): array;
     public function getTotalQtySupplier(array $data, ?int $userId = null): ?float;
     public function getActiveSuppliers(string $search, ?int $userId = null): array;

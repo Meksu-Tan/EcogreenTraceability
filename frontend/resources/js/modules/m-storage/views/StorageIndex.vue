@@ -1,58 +1,39 @@
 <template>
-  <div class="space-y-6">
-    <!-- Section header -->
-    <div class="flex items-center justify-between">
+  <div>
+    <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Setup Storage</h1>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-sm text-gray-500">TS Setup</span>
-          <span class="text-gray-300">/</span>
-          <span class="text-sm font-semibold text-green-500">Storage</span>
+        <h1 class="text-h5 font-weight-bold">Setup Storage</h1>
+        <div class="d-flex align-center gap-1 mt-1">
+          <span class="text-caption text-medium-emphasis">TS Setup</span>
+          <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
+          <span class="text-caption font-weight-semibold text-primary">Storage</span>
         </div>
       </div>
-      <button
-        id="btn-tambah-storage"
-        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95"
-        @click="openModal"
-      >
-        <Icon icon="ri:add-line" class="w-4 h-4" /> Tambah
-      </button>
+      <VBtn id="btn-tambah-storage" color="primary" prepend-icon="ri-add-line" @click="openModal">Add</VBtn>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Icon icon="ri:database-2-line" class="text-green-500 w-4 h-4" />
-          Data Storage
-        </h4>
-        <div class="flex bg-gray-100 p-1 rounded-lg">
-          <button
-            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
-            :class="activeTab==='tank' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-            @click="activeTab='tank'"
-          >
-            Storage Tank
-          </button>
-          <button
-            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
-            :class="activeTab==='warehouse' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-            @click="activeTab='warehouse'"
-          >
-            Warehouse
-          </button>
+    <VCard rounded="lg" elevation="1">
+      <div class="d-flex align-center justify-space-between pa-5 pb-3">
+        <div class="d-flex align-center gap-2">
+          <VIcon icon="ri-database-2-line" color="primary" size="20" />
+          <span class="text-body-1 font-weight-bold">Data Storage</span>
         </div>
+        <VBtnToggle v-model="activeTab" mandatory rounded="lg" density="compact" color="primary">
+          <VBtn value="tank" size="small">Storage Tank</VBtn>
+          <VBtn value="warehouse" size="small">Warehouse</VBtn>
+        </VBtnToggle>
       </div>
-      <div class="p-6">
+      <VDivider />
+      <VCardText class="pa-5">
         <StorageDetailTab v-if="activeTab==='tank'" ref="tankTabRef" />
         <WarehouseTab     v-if="activeTab==='warehouse'" ref="warehouseTabRef" />
-      </div>
-    </div>
+      </VCardText>
+    </VCard>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { Icon } from '@iconify/vue'
 import StorageDetailTab from './StorageDetailTab.vue'
 import WarehouseTab     from './WarehouseTab.vue'
 

@@ -7,6 +7,7 @@ use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Config;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -62,12 +63,12 @@ class RolePermissionSeeder extends Seeder
             ['email' => 'admin@eods.local'],
             [
                 'name'     => 'Administrator',
-                'password' => Hash::make('password123'),
+                'password' => Hash::make(Config::get('app.admin_default_password')),
             ]
         );
         $admin->assignRole('super-admin');
 
         $this->command->info('Roles, Permissions, and Admin user seeded successfully!');
-        $this->command->info('Admin login: admin@eods.local / password123');
+        $this->command->info('Admin login: admin@eods.local / ********');
     }
 }

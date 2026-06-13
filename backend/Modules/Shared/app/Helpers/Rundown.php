@@ -3,6 +3,18 @@ namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Rundown helper — balance header creation / accumulation engine.
+ *
+ * RAW SQL DEBT (C07): The t_balance_header EXISTS check and supplier
+ * dedup queries remain as raw SQL because of JSON_CONTAINS predicates
+ * and dynamic WHERE clauses that are impractical to express in
+ * QueryBuilder. The read-then-write pattern inside the transaction
+ * is safe against races (FOR UPDATE not strictly required here since
+ * we INSERT-or-UPDATE on a unique combination per trace_no + id_sloc,
+ * but a productionisation step would add a UNIQUE constraint and
+ * use upsert (ON DUPLICATE KEY UPDATE) instead).
+ */
 class Rundown
 {
     protected $connection = 'eudr_ts';
@@ -20,16 +32,34 @@ class Rundown
         return DB::connection($connection)->transaction(function () use ($data, $connection) {
 
             // CHECK IF BALANCE HEADER ALREADY EXISTS FOR THIS TRACE_NO
-            $existingHead = DB::connection($connection)->select(
-                'SELECT id_balance_head, qty, in_qty, init_qty
-                   FROM t_balance_header
-                  WHERE trace_no = ?
-                    AND id_material = ?
-                    AND COALESCE(id_sloc, id_tank) = COALESCE(?, ?)
-                    AND status = 1
-                  LIMIT 1',
-                [$data['trace_no'], $data['id_material'], $data['id_sloc'] ?? null, $data['id_tank'] ?? null]
-            );
+            // Handle id_sloc as JSON array string, single int, or array
+            $idSloc = $data['id_sloc'];
+            $decoded = is_string($idSloc) ? json_decode($idSloc, true) : null;
+            if (is_array($decoded)) {
+                // Already a JSON array string — pass directly as target
+                $existingHead = DB::connection($connection)->select(
+                    'SELECT id_balance_head, qty, in_qty, init_qty
+                       FROM t_balance_header
+                      WHERE trace_no = ?
+                        AND id_material = ?
+                        AND JSON_CONTAINS(id_sloc, ?)
+                        AND status = 1
+                      LIMIT 1 FOR UPDATE',
+                    [$data['trace_no'], $data['id_material'], $idSloc]
+                );
+            } else {
+                // Single value — wrap with JSON_ARRAY
+                $existingHead = DB::connection($connection)->select(
+                    'SELECT id_balance_head, qty, in_qty, init_qty
+                       FROM t_balance_header
+                      WHERE trace_no = ?
+                        AND id_material = ?
+                        AND JSON_CONTAINS(id_sloc, JSON_ARRAY(?))
+                        AND status = 1
+                      LIMIT 1 FOR UPDATE',
+                    [$data['trace_no'], $data['id_material'], $idSloc]
+                );
+            }
 
             if (!empty($existingHead)) {
                 // UPDATE EXISTING BALANCE HEADER
@@ -54,8 +84,7 @@ class Rundown
                     'id_balance_head' => $idHead,
                     'id_material' => $data['id_material'],
                     'entry_date' => $data['entry_date'],
-                    'id_sloc' => $data['id_tank'] ?? $data['id_sloc'] ?? 0,
-                    'id_tank_tail' => $data['id_tank_tail'] ?? null,
+                    'id_sloc' => $data['id_sloc'] ?? '[]',
                     'in_qty' => $data['in_qty'],
                     'last_qtf' => $data['last_qtf'] ?? 0,
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
@@ -68,10 +97,7 @@ class Rundown
                     'entry_date' => $data['entry_date'],
                     'trace_no' => $data['trace_no'],
                     'id_material' => $data['id_material'],
-                    'id_tank' => $data['id_tank'],
-                    'id_sloc' => $data['id_sloc'] ?? null,
-                    'id_tank_tail' => $data['id_tank_tail'] ?? $data['id_sloc_tail'] ?? null,
-                    'id_sloc_tail' => $data['id_sloc_tail'] ?? $data['id_tank_tail'] ?? null,
+                    'id_sloc' => $data['id_sloc'] ?? '[]',
                     'qty' => $data['in_qty'],
                     'in_qty' => $data['in_qty'],
                     'out_qty' => 0,
@@ -87,8 +113,7 @@ class Rundown
                     'id_balance_head' => $idHead,
                     'id_material' => $data['id_material'],
                     'entry_date' => $data['entry_date'],
-                    'id_sloc' => $data['id_tank'] ?? $data['id_sloc'] ?? 0,
-                    'id_tank_tail' => $data['id_tank_tail'] ?? null,
+                    'id_sloc' => $data['id_sloc'] ?? '[]',
                     'in_qty' => $data['in_qty'],
                     'last_qtf' => $data['last_qtf'] ?? 0,
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
@@ -113,7 +138,7 @@ class Rundown
                         AND id_trace_head = ?
                         AND id_supplier = ?
                         AND batch_sap = ?
-                      LIMIT 1',
+                      LIMIT 1 FOR UPDATE',
                     [$idTraceHead, $idSupplier, $batchSap]
                 );
 
@@ -122,11 +147,9 @@ class Rundown
                     $idTail = DB::connection($connection)->table('t_balance_detail')->insertGetId([
                         'id_balance_head' => $idHead,
                         'id_supplier' => $idSupplier,
+                        'id_manufacturer' => $row['id_manufacturer'] ?? null,
                         'id_material' => $data['id_material'],
-                        'id_tank' => $data['id_tank'],
-                        'id_sloc' => $data['id_sloc'] ?? null,
-                        'id_tank_tail' => $data['id_tank_tail'] ?? $data['id_sloc_tail'] ?? null,
-                        'id_sloc_tail' => $data['id_sloc_tail'] ?? $data['id_tank_tail'] ?? null,
+                        'id_sloc' => $data['id_sloc'] ?? '[]',
                         'qty' => $qty,
                         'in_qty' => $qty,
                         'out_qty' => 0,
@@ -141,9 +164,9 @@ class Rundown
                         'id_trace_head' => $idTraceHead,
                         'id_balance_tail' => $idTail,
                         'id_supplier' => $idSupplier,
+                        'id_manufacturer' => $row['id_manufacturer'] ?? null,
                         'id_material' => $data['id_material'],
-                        'id_sloc' => $data['id_tank'] ?? $data['id_sloc'] ?? 0,
-                        'id_tank_tail' => $data['id_tank_tail'] ?? null,
+                        'id_sloc' => $data['id_sloc'] ?? '[]',
                         'in_qty' => $qty,
                         'batch_sap' => $batchSap,
                         'id_plant' => $data['id_plant'],
@@ -155,15 +178,21 @@ class Rundown
                     $idTraceTail = $existing[0]->id_trace_tail;
                     $newQty = round($existing[0]->in_qty + $qty, 4);
 
-                    DB::connection($connection)->update(
-                        'UPDATE t_balance_detail SET qty = ?, in_qty = ?, init_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
-                        [$newQty, $newQty, $newQty, $data['user'], $idTail]
-                    );
+                    DB::connection($connection)->table('t_balance_detail')
+                        ->where('id_balance_tail', $idTail)
+                        ->update([
+                            'qty' => $newQty,
+                            'in_qty' => $newQty,
+                            'init_qty' => $newQty,
+                            'updated_by' => $data['user'],
+                        ]);
 
-                    DB::connection($connection)->update(
-                        'UPDATE t_trace_detail SET in_qty = ?, updated_by = ? WHERE id_trace_tail = ?',
-                        [$newQty, $data['user'], $idTraceTail]
-                    );
+                    DB::connection($connection)->table('t_trace_detail')
+                        ->where('id_trace_tail', $idTraceTail)
+                        ->update([
+                            'in_qty' => $newQty,
+                            'updated_by' => $data['user'],
+                        ]);
                 }
             }
 

@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import traceApi from '@/modules/trace-forward/api'
+import traceApi from '@/modules/trace-forward/services'
 
 export const useTraceForwardStore = defineStore('traceForward', () => {
   const list = ref([])
-  const listMeta = ref({ page: 1, perPage: 25, total: 0, lastPage: 1 })
+  const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
   const detail = ref({ initial: [], chain: [] })
   const loading = ref(false)
   const loadingDetail = ref(false)
@@ -19,7 +19,7 @@ export const useTraceForwardStore = defineStore('traceForward', () => {
       list.value = payload.data || (Array.isArray(payload) ? payload : [])
       listMeta.value = {
         page: payload.page || params.page || 1,
-        perPage: payload.per_page || params.per_page || 25,
+        perPage: payload.per_page || params.per_page || 10,
         total: payload.total || list.value.length,
         lastPage: payload.last_page || 1,
       }
@@ -56,7 +56,7 @@ export const useTraceForwardStore = defineStore('traceForward', () => {
   function clear() {
     list.value = []
     detail.value = { initial: [], chain: [] }
-    listMeta.value = { page: 1, perPage: 25, total: 0, lastPage: 1 }
+    listMeta.value = { page: 1, perPage: 10, total: 0, lastPage: 1 }
     error.value = null
   }
 

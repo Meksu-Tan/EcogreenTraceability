@@ -1,42 +1,36 @@
 <template>
-  <div class="space-y-6">
-    <!-- Section header -->
-    <div class="flex items-center justify-between">
+  <div>
+    <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Setup Tank</h1>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-sm text-gray-500">TS Setup</span>
-          <span class="text-gray-300">/</span>
-          <span class="text-sm font-semibold text-green-500">Tank</span>
+        <h1 class="text-h5 font-weight-bold">Setup Tank</h1>
+        <div class="d-flex align-center gap-1 mt-1">
+          <span class="text-caption text-medium-emphasis">TS Setup</span>
+          <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
+          <span class="text-caption font-weight-semibold text-primary">Tank</span>
         </div>
       </div>
-      <div class="flex items-center gap-3">
-        <button
+      <div class="d-flex gap-2">
+        <VBtn
           id="btn-sync-tank"
-          class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer disabled:opacity-50"
+          color="primary"
+          variant="tonal"
+          :loading="syncing"
+          prepend-icon="ri-refresh-line"
           @click="onSync"
-          :disabled="syncing"
         >
-          <Icon icon="ri:refresh-line" :class="{'animate-spin': syncing}" class="w-4 h-4" /> {{ syncing ? 'Updating...' : 'Update Data' }}
-        </button>
-        <button
-          id="btn-tambah-tank"
-          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer"
-          @click="openModal"
-        >
-          <Icon icon="ri:add-line" class="w-4 h-4" /> Tambah
-        </button>
+          Update Data
+        </VBtn>
+        <VBtn id="btn-tambah-tank" color="primary" prepend-icon="ri-add-line" @click="openModal">Add</VBtn>
       </div>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Icon icon="ri:water-flash-line" class="text-green-500 w-4 h-4" />
-          Data Tank
-        </h4>
-      </div>
-      <div class="p-6">
+    <VCard rounded="lg" elevation="1">
+      <VCardTitle class="pa-5 pb-3 d-flex align-center gap-2">
+        <VIcon icon="ri-water-flash-line" color="primary" size="20" />
+        <span class="text-body-1 font-weight-bold">Data Tank</span>
+      </VCardTitle>
+      <VDivider />
+      <VCardText class="pa-0">
         <DataTable
           :columns="columns"
           :data="store.tanks"
@@ -44,70 +38,58 @@
           row-key="id"
         >
           <template #cell-id="{ row }">
-            <span class="text-xs font-mono text-slate-500 font-semibold">{{ row.id }}</span>
+            <span class="text-caption text-medium-emphasis" style="font-family: var(--font-mono); font-weight: 600;">{{ row.id }}</span>
           </template>
           <template #cell-plant="{ row }">
-            <span class="font-bold text-slate-700">{{ row.plant_code }}</span>
-            <span class="mx-2 text-slate-300">|</span>
-            <span class="text-slate-600">{{ row.plant_name }}</span>
+            <span class="font-weight-bold">{{ row.plant_code }}</span>
+            <span class="mx-2 text-disabled">|</span>
+            <span>{{ row.plant_name }}</span>
           </template>
           <template #cell-tank_height="{ row }">
-            <span class="text-sm font-semibold text-slate-700">{{ parseFloat(row.tank_height).toLocaleString() }}</span>
-            <span class="text-[10px] text-gray-400 ml-1">m</span>
+            <span class="text-body-2 font-weight-semibold">{{ parseFloat(row.tank_height).toLocaleString() }}</span>
+            <span class="text-caption text-medium-emphasis ms-1">m</span>
           </template>
           <template #cell-status="{ row }">
-            <span
-              class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase inline-flex items-center gap-1"
-              :class="row.status == 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+            <VChip
+              :color="row.status == 1 ? 'success' : 'error'"
+              variant="tonal"
+              size="x-small"
+              :prepend-icon="row.status == 1 ? 'ri-checkbox-circle-line' : 'ri-close-circle-line'"
             >
-              <span class="w-1.5 h-1.5 rounded-full" :class="row.status == 1 ? 'bg-green-500' : 'bg-red-500'"></span>
               {{ row.status == 1 ? 'Active' : 'Inactive' }}
-            </span>
+            </VChip>
           </template>
           <template #actions="{ row }">
-            <div class="flex items-center justify-center gap-1.5">
-              <button
-                type="button"
-                class="p-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm active:scale-90 cursor-pointer"
-                title="Edit"
-                @click.stop="onEdit(row)"
-              >
-                <Icon icon="ri:edit-line" class="text-[11px] pointer-events-none w-3 h-3" />
-              </button>
-              <button
-                type="button"
-                class="p-1.5 rounded-md transition-colors shadow-sm active:scale-90 text-white cursor-pointer"
-                :class="row.status == 1 ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'"
-                :title="row.status == 1 ? 'Deactivate' : 'Activate'"
+            <div class="d-flex justify-center gap-1">
+              <VBtn size="x-small" icon="ri-edit-line" color="primary" variant="tonal" @click.stop="onEdit(row)" />
+              <VBtn
+                size="x-small"
+                :icon="row.status == 1 ? 'ri-close-line' : 'ri-check-line'"
+                :color="row.status == 1 ? 'error' : 'success'"
+                variant="tonal"
                 @click.stop="onToggle(row)"
-              >
-                <Icon :icon="row.status == 1 ? 'ri:close-line' : 'ri:check-line'" class="text-[11px] pointer-events-none w-3 h-3" />
-              </button>
+              />
             </div>
           </template>
         </DataTable>
-      </div>
-    </div>
+      </VCardText>
+    </VCard>
 
-    <TankModal
-      v-model="showModal"
-      :edit-data="editData"
-      :loading="submitting"
-      @submit="onSubmit"
-    />
+    <TankModal v-model="showModal" :edit-data="editData" :loading="submitting" @submit="onSubmit" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Icon } from '@iconify/vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import TankModal from './TankModal.vue'
 import { useSetupTankStore } from '@/modules/m-tank/stores'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
 
 const store      = useSetupTankStore()
 const toast      = useToastStore()
+const confirmStore = useConfirmStore()
 const showModal  = ref(false)
 const editData   = ref(null)
 const submitting = ref(false)
@@ -142,7 +124,11 @@ function onEdit(row) {
 }
 
 async function onToggle(row) {
-  if (!confirm(`${row.status==1?'Deactivate':'Activate'} tank "${row.tank_number}" for plant "${row.plant_name}"?`)) return
+  const isConfirmed = await confirmStore.show({
+    title: 'Confirmation',
+    message: `${row.status==1?'Deactivate':'Activate'} tank "${row.tank_number}" for plant "${row.plant_name}"?`
+  })
+  if (!isConfirmed) return
   const r = await store.toggleTank(row.id, row.status)
   if (r.status === 1) {
     toast.success(r.message)

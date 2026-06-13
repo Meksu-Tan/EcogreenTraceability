@@ -1,155 +1,203 @@
 <template>
-  <div class="p-6">
-    <div class="flex justify-between items-center mb-6">
-      <div class="flex items-center gap-6">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-800">Blending</h1>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-sm text-gray-500">Lokasi:</span>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
-              <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3" />
-              {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
+  <div class="pa-6">
+    <VRow justify="space-between" align="center" class="mb-4">
+      <VCol cols="auto">
+        <VRow align="center" no-gutters>
+          <VCol cols="auto">
+            <h1 class="text-h5 font-weight-bold">Blending</h1>
+            <div class="d-flex align-center gap-2 mt-1">
+              <span class="text-body-2 text-medium-emphasis">Location:</span>
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="ri-factory-line"
+              >
+                {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
+              </VChip>
+            </div>
+          </VCol>
+          <VCol cols="auto" class="ml-6 pl-6 border-s">
+            <PlantSelector @change="fetchData" />
+          </VCol>
+        </VRow>
+      </VCol>
+      <VCol cols="auto">
+        <VBtn
+          color="primary"
+          prepend-icon="ri-add-line"
+          @click="openBlendingModal"
+        >
+          New Blending Entry
+        </VBtn>
+      </VCol>
+    </VRow>
+
+    <VAlert
+      type="error"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+      icon="ri-error-warning-line"
+    >
+      QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
+    </VAlert>
+
+    <VCard v-if="blendingStore.loading">
+      <VCardText class="pa-0">
+        <VSkeletonLoader type="table-thead, table-tbody@5" :loading="true" />
+      </VCardText>
+    </VCard>
+
+    <VAlert
+      v-else-if="blendingStore.error"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+    >
+      <div class="d-flex flex-column">
+        <strong class="text-body-2 font-weight-medium">Error loading data</strong>
+        <span class="text-body-2 mt-1">{{ blendingStore.error }}</span>
+        <VBtn color="error" variant="tonal" size="small" class="mt-3 align-self-start" @click="fetchData">
+          Try again
+        </VBtn>
+      </div>
+    </VAlert>
+
+    <VCard v-else>
+      <VCardText class="pa-0">
+        <div class="overflow-x-auto">
+          <VTable density="compact" class="text-body-2">
+            <thead>
+              <tr>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="width:48px">No</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date')">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material_document' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material_document')">Matl Doc<VIcon v-if="sortKey==='material_document'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('trace_no')">Trace No<VIcon v-if="sortKey==='trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'plant_name' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('plant_name')">Plant<VIcon v-if="sortKey==='plant_name'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material')">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:130px">Blending Source</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc')">Sloc<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'init_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('init_qty')">Init Material (MT)<VIcon v-if="sortKey==='init_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier')">Init Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty')">On-Hand (MT)<VIcon v-if="sortKey==='qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:200px">Supplier / Batch SAP / Init Qty (MT) / Remark</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in sortedList" :key="item.idHead || item.trace_no">
+                <td class="text-caption text-medium-emphasis text-center">{{ (page - 1) * perPage + index + 1 }}</td>
+                <td class="text-center">{{ item.entry_date }}</td>
+                <td class="text-center">
+                  <template v-if="item.material_document">
+                    <span class="text-caption">{{ item.material_document }}</span>
+                    <VBtn
+                      icon="ri-edit-line"
+                      size="x-small"
+                      color="warning"
+                      variant="tonal"
+                      @click="openMatlDocEdit(item)"
+                    />
+                  </template>
+                  <VBtn
+                    v-else
+                    size="x-small"
+                    color="warning"
+                    variant="tonal"
+                    prepend-icon="ri-add-line"
+                    @click="openMatlDocAdd(item)"
+                  >
+                    Add Doc No
+                  </VBtn>
+                </td>
+                <td class="text-center font-weight-medium font-mono text-caption">{{ item.trace_no }}</td>
+                <td class="text-center">{{ item.plant_name || '-' }}</td>
+                <td class="font-weight-medium text-truncate" style="max-width:160px" :title="item.material">{{ item.material }}</td>
+                <td class="text-caption">
+                  <template v-if="item.from_trace_no">
+                    <VChip
+                      v-for="(batch, bi) in (typeof item.from_trace_no === 'string' ? item.from_trace_no.split('|') : [item.from_trace_no])"
+                      :key="bi"
+                      size="x-small"
+                      variant="outlined"
+                      class="mr-1 mb-1"
+                    >
+                      {{ batch.trim() }}
+                    </VChip>
+                  </template>
+                </td>
+                <td class="text-center">
+                  <a href="#" @click.prevent="openSubTankEdit(item)" class="text-medium-emphasis text-decoration-underline text-caption">
+                    {{ item.sloc }}
+                  </a>
+                </td>
+                <td class="text-right font-monospace text-caption">{{ item.init_qty }}</td>
+                <td class="text-right font-monospace text-caption" :class="initSupplierColor(item)">{{ item.balance_supplier }}</td>
+                <td class="text-right font-monospace font-weight-bold text-caption">{{ item.qty }}</td>
+                <td class="text-caption" style="min-width:200px">
+                  <template v-if="item.supplier">
+                    <VChip
+                      v-for="(sup, si) in (typeof item.supplier === 'string' ? item.supplier.split('|') : [item.supplier])"
+                      :key="si"
+                      size="x-small"
+                      color="primary"
+                      variant="flat"
+                      class="mr-1 mb-1"
+                    >
+                      {{ sup.trim() }}
+                    </VChip>
+                  </template>
+                </td>
+                <td class="text-center">
+                  <VBtn
+                    v-if="!item.next_process"
+                    icon="ri-delete-bin-line"
+                    size="x-small"
+                    color="error"
+                    variant="tonal"
+                    @click="deactivateBlending(item)"
+                  />
+                </td>
+              </tr>
+              <tr v-if="sortedList.length === 0">
+                <td colspan="13" class="text-center pa-8">
+                  <VIcon icon="ri-inbox-2-line" size="40" class="text-disabled mb-2" />
+                  <p class="text-body-2 text-medium-emphasis">No blending data yet</p>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </div>
+
+        <div v-if="blendingStore.pagination.total > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+          <div class="d-flex align-center gap-3">
+            <span class="text-caption text-medium-emphasis">
+              Showing {{ (page - 1) * perPage + 1 }} - {{ Math.min(page * perPage, blendingStore.pagination.total) }} of {{ blendingStore.pagination.total }} records
             </span>
+            <VSelect
+              v-model="perPage"
+              :items="[5, 10, 15, 20]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 80px; max-width: 100px;"
+            />
           </div>
+          <VPagination
+            v-if="lastPage > 1"
+            v-model="page"
+            :length="lastPage"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="changePage"
+          />
         </div>
-        <div class="h-10 w-px bg-gray-200"></div>
-        <PlantSelector @change="fetchData" />
-      </div>
-      <button
-        @click="openBlendingModal"
-        class="inline-flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-      >
-        <Icon icon="ri:add-line" class="w-4 h-4" />
-        New Blending Entry
-      </button>
-    </div>
+      </VCardText>
+    </VCard>
 
-    <!-- Warning -->
-    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-      <p class="text-sm text-red-700 flex items-center gap-2">
-        <Icon icon="ri:error-warning-line" class="w-4 h-4" />
-        QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
-      </p>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="blendingStore.loading" class="flex items-center justify-center py-12">
-      <Icon icon="ri:loader-4-line" class="w-8 h-8 animate-spin text-green-500" />
-      <span class="ml-3 text-sm text-gray-600">Memuat data...</span>
-    </div>
-
-    <!-- Error State -->
-    <div v-else-if="blendingStore.error" class="rounded-lg border border-red-200 bg-red-50 p-4">
-      <div class="flex">
-        <div class="flex-shrink-0">
-          <Icon icon="ri:error-warning-line" class="w-5 h-5 text-red-400" />
-        </div>
-        <div class="ml-3">
-          <h3 class="text-sm font-medium text-red-800">Error loading data</h3>
-          <p class="mt-2 text-sm text-red-700">{{ blendingStore.error }}</p>
-          <button @click="fetchData" class="mt-3 rounded-md bg-red-100 px-3 py-2 text-sm font-medium text-red-800 hover:bg-red-200">Coba lagi</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Blending List DataTable -->
-    <div v-else class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200 text-sm">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">No</th>
-            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
-            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Entry Date</th>
-            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Matl Doc</th>
-            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trace No</th>
-            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Plant</th>
-            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Blending Source</th>
-            <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Sloc</th>
-            <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Init Material (MT)</th>
-            <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Init Supplier (MT)</th>
-            <th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">On-Hand (MT)</th>
-            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase" style="min-width:200px">Supplier / Batch SAP / Init Qty (MT) / Remark</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="(item, index) in blendingStore.blendingList" :key="item.idHead || item.trace_no" class="hover:bg-gray-50">
-            <td class="px-3 py-3 whitespace-nowrap text-center text-gray-900">{{ index + 1 }}</td>
-            <td class="px-3 py-3 whitespace-nowrap text-center">
-              <button
-                v-if="!item.next_process"
-                @click="deactivateBlending(item)"
-                class="text-red-500 hover:text-red-700 text-sm"
-                title="De-Activate"
-              >
-                <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
-              </button>
-            </td>
-            <td class="px-3 py-3 whitespace-nowrap text-center text-gray-900">{{ item.entry_date }}</td>
-            <td class="px-3 py-3 whitespace-nowrap text-center">
-              <span v-if="item.material_document">
-                {{ item.material_document }}
-                <button
-                  @click="openMatlDocEdit(item)"
-                  class="text-yellow-600 hover:text-yellow-800 ml-1 text-xs"
-                  title="Edit"
-                >
-                  <Icon icon="ri:edit-line" class="w-3 h-3" />
-                </button>
-              </span>
-              <button
-                v-else
-                @click="openMatlDocAdd(item)"
-                class="inline-flex items-center gap-1 rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800 hover:bg-yellow-200"
-              >
-                <Icon icon="ri:add-line" class="w-3 h-3" /> Add Doc No
-              </button>
-            </td>
-            <td class="px-3 py-3 whitespace-nowrap text-center font-mono text-gray-900">{{ item.trace_no }}</td>
-            <td class="px-3 py-3 whitespace-nowrap text-center text-gray-900">{{ item.plant_name || '-' }}</td>
-            <td class="px-3 py-3 text-gray-900">{{ item.material }}</td>
-            <td class="px-3 py-3 text-xs">
-              <template v-if="item.from_trace_no">
-                <span
-                  v-for="(batch, bi) in (typeof item.from_trace_no === 'string' ? item.from_trace_no.split('|') : [item.from_trace_no])"
-                  :key="bi"
-                  class="badge badge-light inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200 text-[10px] font-medium"
-                >{{ batch.trim() }}</span>
-              </template>
-            </td>
-            <td class="px-3 py-3 whitespace-nowrap text-center">
-              <a
-                href="#"
-                @click.prevent="openSubTankEdit(item)"
-                class="text-gray-500 hover:text-gray-700 text-xs underline decoration-dotted"
-              >
-                {{ item.sloc }}
-              </a>
-            </td>
-            <td class="px-3 py-3 whitespace-nowrap text-right font-mono text-gray-900">{{ item.init_qty }}</td>
-            <td class="px-3 py-3 whitespace-nowrap text-right font-mono" :class="initSupplierColor(item)">{{ item.balance_supplier }}</td>
-            <td class="px-3 py-3 whitespace-nowrap text-right font-mono text-gray-900">{{ item.qty }}</td>
-            <td class="px-3 py-3 text-xs" style="min-width:200px">
-              <template v-if="item.supplier">
-                <span
-                  v-for="(sup, si) in (typeof item.supplier === 'string' ? item.supplier.split('|') : [item.supplier])"
-                  :key="si"
-                  class="badge badge-primary inline-block mr-1 mb-0.5 px-1.5 py-0.5 rounded bg-green-500 text-white text-[10px] font-medium"
-                >{{ sup.trim() }}</span>
-              </template>
-            </td>
-          </tr>
-          <tr v-if="blendingStore.blendingList.length === 0">
-            <td colspan="12" class="px-6 py-12 text-center text-sm text-gray-500">
-              <Icon icon="ri:inbox-2-line" class="w-10 h-10 text-gray-300 mb-3" />
-              <p>Belum ada data blending</p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Modals -->
     <BlendingModal v-model:is-open="isModalOpen" @success="onBlendingSuccess" />
     <MaterialDocModal
       v-model:is-open="isMatlDocModalOpen"
@@ -170,14 +218,16 @@
 </template>
 
 <script setup>
+import { useConfirmStore } from '@/stores/confirm'
 import { ref, watch, reactive, computed } from 'vue'
-import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsBlendingStore } from '@/modules/ts-blending/stores'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import BlendingModal from '@/modules/ts-blending/components/BlendingModal.vue'
 import MaterialDocModal from '@/modules/ts-blending/components/MaterialDocModal.vue'
 import SubTankEditModal from '@/modules/ts-blending/components/SubTankEditModal.vue'
+const confirmStore = useConfirmStore()
+
 
 const plantSelectionStore = usePlantSelectionStore()
 const blendingStore = useTsBlendingStore()
@@ -201,15 +251,72 @@ const subTankContext = reactive({
   idTankTail: []
 })
 
-function initSupplierColor(item) {
-  const initQty = parseFloat(item.init_qty) || 0
-  const balanceSupplier = parseFloat(item.balance_supplier) || 0
-  return initQty === balanceSupplier ? 'text-green-600' : 'text-red-600'
+const page = ref(1)
+const perPage = ref(5)
+
+const sortKey = ref(null)
+const sortDir = ref(null)
+
+function detectColumnType(colKey) {
+  const rows = blendingStore.blendingList
+  if (!rows || rows.length === 0) return 'text'
+  for (const row of rows) {
+    const val = row[colKey]
+    if (val !== null && val !== undefined && val !== '') {
+      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
+    }
+  }
+  return 'text'
 }
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    if (sortDir.value === 'asc') {
+      sortDir.value = 'desc'
+    } else if (sortDir.value === 'desc') {
+      sortKey.value = null
+      sortDir.value = null
+    }
+  } else {
+    sortKey.value = key
+    sortDir.value = detectColumnType(key) === 'text' ? 'asc' : 'desc'
+  }
+}
+
+const lastPage = computed(() => blendingStore.pagination.lastPage)
+
+const sortedList = computed(() => {
+  if (!sortKey.value || !sortDir.value) return blendingStore.blendingList
+  const key = sortKey.value
+  const dir = sortDir.value
+  const rows = [...blendingStore.blendingList]
+  const type = detectColumnType(key)
+  return rows.sort((a, b) => {
+    const va = a[key]
+    const vb = b[key]
+    if (va == null && vb == null) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    if (type === 'number') return dir === 'asc' ? va - vb : vb - va
+    return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va))
+  })
+})
 
 async function fetchData() {
   const plantId = plantSelectionStore.selectedPlantId
-  await blendingStore.fetchBlendingList({ id_plant: plantId })
+  await blendingStore.fetchBlendingList({ id_plant: plantId, page: page.value, per_page: perPage.value })
+}
+
+function initSupplierColor(item) {
+  const initQty = parseFloat(item.init_qty) || 0
+  const balanceSupplier = parseFloat(item.balance_supplier) || 0
+  return initQty === balanceSupplier ? 'text-success' : 'text-error'
+}
+
+async function changePage(p) {
+  if (p < 1 || p > lastPage.value) return
+  blendingStore.setPage(p)
+  await fetchData()
 }
 
 function openBlendingModal() {
@@ -257,11 +364,27 @@ function onSubTankSuccess() {
 }
 
 async function deactivateBlending(item) {
-  if (confirm('Are you sure? De-Activate this data')) {
+  const isConfirmed = await confirmStore.show({ message: 'Are you sure? De-Activate this data' })
+  if (isConfirmed) {
     await blendingStore.deactivateBlending(item.idHead + '|' + item.idTraceHead)
     fetchData()
   }
 }
 
-watch(() => plantSelectionStore.selectedPlantId, () => { fetchData() }, { immediate: true })
+watch(() => plantSelectionStore.selectedPlantId, () => {
+  page.value = 1
+  fetchData()
+}, { immediate: true })
+
+watch(perPage, () => {
+  page.value = 1
+  fetchData()
+})
 </script>
+
+<style scoped>
+.sort-icon { vertical-align: middle; transition: opacity 0.15s; opacity: 0.35; }
+.sortable-th:hover .sort-icon { opacity: 0.7; }
+.sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
+</style>
+

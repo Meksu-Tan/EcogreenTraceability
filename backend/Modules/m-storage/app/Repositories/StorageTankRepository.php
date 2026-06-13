@@ -10,28 +10,44 @@ class StorageTankRepository implements StorageTankRepositoryInterface
 {
     public function getAllTanks(): array
     {
-        \DB::select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
-
-        return StorageTank::selectRaw('
-            a.id_sloc, CONCAT(a.code_2, " | ", a.code_3) AS code,
-            a.description, a.status, a.created_at, a.created_by,
-            a.updated_at, a.updated_by, a.code_2, a.code_3, a.code_4,
-            a.id_plant, IFNULL(b.total_tank, 0) AS total_tank
-        ')
-        ->from('m_sloc AS a')
-        ->leftJoinSub(
-            \DB::table('m_sloc_detail')
-                ->selectRaw('COUNT(id_sloc_tail) AS total_tank, id_sloc')
-                ->where('status', 1)
-                ->groupBy('id_sloc'),
-            'b',
-            'a.id_sloc',
-            '=',
-            'b.id_sloc'
+        $tanks = StorageTank::select(
+            'id_sloc', 'code_2', 'code_3', 'code_4',
+            'description', 'status', 'id_plant',
+            'created_at', 'created_by', 'updated_at', 'updated_by'
         )
-        ->orderBy('a.description')
-        ->get()
-        ->toArray();
+        ->orderBy('description')
+        ->get();
+
+        $counts = $this->getTankCountsByLocation();
+
+        return $tanks->map(function (StorageTank $tank) use ($counts): array {
+            return [
+                'id_sloc'     => $tank->id_sloc,
+                'code'        => "{$tank->code_2} | {$tank->code_3}",
+                'code_2'      => $tank->code_2,
+                'code_3'      => $tank->code_3,
+                'code_4'      => $tank->code_4,
+                'description' => $tank->description,
+                'status'      => $tank->status,
+                'id_plant'    => $tank->id_plant,
+                'created_at'  => $tank->created_at,
+                'created_by'  => $tank->created_by,
+                'updated_at'  => $tank->updated_at,
+                'updated_by'  => $tank->updated_by,
+                'total_tank'  => $counts[$tank->id_sloc] ?? 0,
+            ];
+        })->toArray();
+    }
+
+    private function getTankCountsByLocation(): array
+    {
+        return StorageDetail::where('status', 1)
+            ->groupBy('id_sloc')
+            ->selectRaw('id_sloc, COUNT(id_sloc_tail) AS total_tank')
+            ->get()
+            ->keyBy('id_sloc')
+            ->map(fn(StorageDetail $r): int => (int) $r->total_tank)
+            ->toArray();
     }
 
     public function findTankById(int $id): ?object

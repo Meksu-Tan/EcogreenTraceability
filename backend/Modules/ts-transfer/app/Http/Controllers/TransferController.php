@@ -4,26 +4,39 @@ namespace Modules\TsTransfer\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use Modules\TsTransfer\Services\TransferService;
+use Modules\TsTransfer\Services\Contracts\TransferServiceInterface;
 use Modules\TsTransfer\Http\Requests\StoreTransferRequest;
+use Modules\TsTransfer\Http\Requests\ApprovalActionRequest;
 use Modules\Shared\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * @todo Technical Debt: Controller is 386 lines (limit: 200).
+ * Recommended: Split into TransferEntryController and TransferApprovalController.
+ */
 class TransferController extends Controller
 {
     public function __construct(
-        protected TransferService $transferService
+        protected TransferServiceInterface $transferService
     ) {}
 
     public function index(Request $request): JsonResponse
     {
         $plantId = (int) $request->input('id_plant', 0);
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 5)));
 
         try {
-            $data = $this->transferService->getTransferList($plantId);
+            $result = $this->transferService->getTransferList($plantId, $page, $perPage);
 
-            return ApiResponse::success($data, 'Transfer list retrieved successfully', 200);
+            return ApiResponse::paginated(
+                $result['data']->toArray(),
+                $result['total'],
+                $page,
+                $perPage,
+                'Transfer list retrieved successfully'
+            );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve transfer list: ' . $e->getMessage(), 500);
         }
@@ -65,6 +78,10 @@ class TransferController extends Controller
         $data = $request->all();
         $trfType = $request->input('trf_type', 'out');
 
+        /**
+         * @todo This auto-adjustment business logic belongs in TransferService.
+         * Refactor to pass $trfType to service and let service handle the logic.
+         */
         $result = $this->transferService->executeTransfer($user, $data, $plantId);
 
         // Auto-adjustment: if stock not enough (response 4) and not 'all' type
@@ -214,14 +231,10 @@ class TransferController extends Controller
     /**
      * Submit transfer for approval.
      */
-    public function submitForApproval(Request $request): JsonResponse
+    public function submitForApproval(ApprovalActionRequest $request): JsonResponse
     {
         $user = $request->user()->name ?? 'system';
-        $idBalanceHead = $request->input('id_balance_head');
-
-        if (!$idBalanceHead) {
-            return ApiResponse::error('id_balance_head is required', 422);
-        }
+        $idBalanceHead = (int) $request->validated('id_balance_head');
 
         try {
             $result = $this->transferService->submitForApproval($idBalanceHead, $user);
@@ -238,15 +251,11 @@ class TransferController extends Controller
     /**
      * Approve a transfer.
      */
-    public function approveTransfer(Request $request): JsonResponse
+    public function approveTransfer(ApprovalActionRequest $request): JsonResponse
     {
         $user = $request->user()->name ?? 'system';
-        $idBalanceHead = $request->input('id_balance_head');
+        $idBalanceHead = (int) $request->validated('id_balance_head');
         $notes = $request->input('notes');
-
-        if (!$idBalanceHead) {
-            return ApiResponse::error('id_balance_head is required', 422);
-        }
 
         try {
             $result = $this->transferService->approveTransfer($idBalanceHead, $user, $notes);
@@ -263,15 +272,11 @@ class TransferController extends Controller
     /**
      * Reject a transfer.
      */
-    public function rejectTransfer(Request $request): JsonResponse
+    public function rejectTransfer(ApprovalActionRequest $request): JsonResponse
     {
         $user = $request->user()->name ?? 'system';
-        $idBalanceHead = $request->input('id_balance_head');
+        $idBalanceHead = (int) $request->validated('id_balance_head');
         $reason = $request->input('reason', '');
-
-        if (!$idBalanceHead) {
-            return ApiResponse::error('id_balance_head is required', 422);
-        }
 
         if (empty($reason)) {
             return ApiResponse::error('Rejection reason is required', 422);
@@ -292,14 +297,10 @@ class TransferController extends Controller
     /**
      * Cancel a transfer.
      */
-    public function cancelTransfer(Request $request): JsonResponse
+    public function cancelTransfer(ApprovalActionRequest $request): JsonResponse
     {
         $user = $request->user()->name ?? 'system';
-        $idBalanceHead = $request->input('id_balance_head');
-
-        if (!$idBalanceHead) {
-            return ApiResponse::error('id_balance_head is required', 422);
-        }
+        $idBalanceHead = (int) $request->validated('id_balance_head');
 
         try {
             $result = $this->transferService->cancelTransfer($idBalanceHead, $user);

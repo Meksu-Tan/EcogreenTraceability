@@ -33,7 +33,7 @@ interface BlendingRepositoryInterface
     /**
      * Get blending list with all related data
      */
-    public function getBlendingList(int $plantId): Collection;
+    public function getBlendingList(int $plantId, int $page = 1, int $perPage = 5): array;
 
     /**
      * Get main tanks for dropdown (based on material type)

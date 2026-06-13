@@ -7,14 +7,15 @@ use App\Http\Controllers\Controller;
 use Modules\Material\Http\Requests\StoreMaterialRequest;
 use Modules\Material\Http\Requests\UpdateMaterialRequest;
 use Modules\Material\Http\Requests\StoreMaterialPackagingRequest;
-use Modules\Material\Services\MaterialService;
+use Modules\Material\Http\Requests\UpdateMaterialPackagingRequest;
+use Modules\Material\Services\Contracts\MaterialServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class MaterialController extends Controller
 {
     public function __construct(
-        protected MaterialService $materialService
+        protected MaterialServiceInterface $materialService
     ) {}
 
     // -----------------------------------------------------------------------
@@ -114,9 +115,9 @@ class MaterialController extends Controller
     /**
      * PUT /api/v1/material-packagings/{id}
      */
-    public function updatePackaging(Request $request, int $id): JsonResponse
+    public function updatePackaging(UpdateMaterialPackagingRequest $request, int $id): JsonResponse
     {
-        $data = array_merge($request->only(['code', 'code_noneudr', 'description', 'id_material']), [
+        $data = array_merge($request->validated(), [
             'updated_by' => $request->user()->name,
         ]);
         $result = $this->materialService->updatePackaging($id, $data);
@@ -139,5 +140,21 @@ class MaterialController extends Controller
         return $result['status'] === 1
             ? ApiResponse::success($result, 'Packaging ' . ($action === 'activate' ? 'activated.' : 'deactivated.'), 200)
             : ApiResponse::error('Failed to ' . $action . ' packaging.', 422);
+    }
+
+    /**
+     * GET /api/v1/qty/fetch
+     */
+    public function fetchQty(Request $request): JsonResponse
+    {
+        $idMaterial = $request->query('id_material');
+        $idPlant = $request->query('id_plant');
+
+        // Setup placeholder untuk konfigurasi curl/HTTP request eksternal
+        // $url = config('services.external_api.url');
+        // $response = Http::get($url, ['material' => $idMaterial, 'plant' => $idPlant]);
+        // ...
+
+        return ApiResponse::error('Please Connect the Database', 500);
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Modules\Inquiry\Services\PsPaReportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Shared\Helpers\ResponseCode;
 
 class PsPaReportController extends Controller
 {
@@ -70,7 +71,7 @@ class PsPaReportController extends Controller
 
             $result = $this->psPaReportService->generateReport($user, $plantId, $period, $data);
 
-            if ($result['response'] == 99) {
+            if ($result['response'] == ResponseCode::PERIOD_LOCKED) {
                 return ApiResponse::error($result['message'] ?? 'Period is locked', 422);
             }
 

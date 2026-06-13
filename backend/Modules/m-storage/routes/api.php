@@ -2,7 +2,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Storage\Http\Controllers\StorageController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::get('storage-tanks', [StorageController::class, 'indexTanks']);
     Route::post('storage-tanks', [StorageController::class, 'storeTank']);
     Route::put('storage-tanks/{id}', [StorageController::class, 'updateTank']);

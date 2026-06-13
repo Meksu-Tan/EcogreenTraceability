@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import * as plantApi from '@/modules/m-plant/api'
+import * as plantApi from '@/modules/m-plant/services'
 
 export const useSetupPlantStore = defineStore('setupPlant', () => {
   const plants = ref([])
@@ -15,7 +15,7 @@ export const useSetupPlantStore = defineStore('setupPlant', () => {
       plants.value = res.data.data || res.data || []
     } catch (err) {
       error.value = err.message || 'Failed to fetch plants'
-      console.error('Fetch plants error:', err)
+      plants.value = []
     } finally {
       loading.value = false
     }

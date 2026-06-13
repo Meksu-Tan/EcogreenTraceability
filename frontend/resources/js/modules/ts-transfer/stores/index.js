@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import transferApi from '../api'
+import transferApi from '../services'
 import { useToastStore } from '@/stores/toast'
 
 export const useTsTransferStore = defineStore('transactionTransfer', () => {
@@ -15,13 +15,40 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
   const supplierCode = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const pagination = ref({ currentPage: 1, perPage: 5, total: 0, lastPage: 1 })
 
-  async function fetchTransferList(plantId = 0) {
+  const STALE_TIME = 30 * 1000
+  const _cache = { transferList: 0, activeMaterials: 0 }
+
+  function _isFresh(key) {
+    return Date.now() - (_cache[key] || 0) < STALE_TIME
+  }
+
+  function _touch(key) {
+    _cache[key] = Date.now()
+  }
+
+  function resetCache() {
+    Object.keys(_cache).forEach(k => { _cache[k] = 0 })
+  }
+
+  function setPage(p) {
+    pagination.value = { ...pagination.value, currentPage: p }
+  }
+
+  async function fetchTransferList(plantId = 0, page = 1, perPage = 5) {
     loading.value = true
     error.value = null
     try {
-      const response = await transferApi.getTransferList(plantId)
+      const response = await transferApi.getTransferList(plantId, page, perPage)
       transferList.value = response?.data || []
+      pagination.value = {
+        currentPage: response?.current_page || 1,
+        perPage: response?.per_page || 5,
+        total: response?.total || 0,
+        lastPage: response?.last_page || 1
+      }
+      _touch('transferList')
     } catch (err) {
       error.value = err.response?.data?.message || err.message
       transferList.value = []
@@ -31,9 +58,11 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
   }
 
   async function fetchActiveMaterials() {
+    if (_isFresh('activeMaterials') && activeMaterials.value.length > 0) return
     try {
       const response = await transferApi.getActiveMaterials()
       activeMaterials.value = response?.data || []
+      _touch('activeMaterials')
     } catch (err) {
       toastStore.error('Failed to fetch active materials:')
     }
@@ -50,16 +79,27 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
     }
   }
 
-  async function fetchTotalStockMaterial(params = {}) {
-    try {
-      const response = await transferApi.getTotalStock(params)
-      totalStock.value = parseFloat(response?.data?.[0]?.total || 0)
-      return response
-    } catch (err) {
-      toastStore.error('Failed to fetch total stock:')
-      throw err
+  async function fetchTransferQty(payload){
+    try{
+        const res = await import('@/modules/shared/services/qty').then(m=>m.fetchQty(payload))
+        return res.data
+    }catch(e){
+        toastStore.error('Fetch qty failed: '+(e.message||e))
+        throw e
     }
+}
+
+async function fetchTotalStockMaterial(params = {}) {
+  try {
+    const response = await transferApi.getTotalStock(params)
+    totalStock.value = parseFloat(response?.data?.[0]?.total || 0)
+    return response
+  } catch (err) {
+    toastStore.error('Failed to fetch total stock:')
+    throw err
   }
+}
+
 
   async function fetchActiveTanksRundown(params = {}) {
     try {
@@ -75,7 +115,8 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
   async function fetchActiveSpecificTanksRundown(params = {}) {
     try {
       const response = await transferApi.getSpecificTanksRundown(params)
-      activeSpecificTanks.value = response?.data || []
+      // ApiResponse::success() wraps Collection in data.data (2 levels)
+      activeSpecificTanks.value = response?.data?.data || response?.data || []
       return response
     } catch (err) {
       toastStore.error('Failed to fetch specific tanks:')
@@ -174,9 +215,13 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
     supplierCode,
     loading,
     error,
+    pagination,
+    setPage,
+    resetCache,
     fetchTransferList,
     fetchActiveMaterials,
     fetchNewEntryNo,
+    fetchTransferQty,
     fetchTotalStockMaterial,
     fetchActiveTanksRundown,
     fetchActiveSpecificTanksRundown,

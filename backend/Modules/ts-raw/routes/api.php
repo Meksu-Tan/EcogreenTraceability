@@ -2,7 +2,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\TsRaw\Http\Controllers\RmEntryController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('transactions/rm-entries')->group(function () {
         Route::get('/', [RmEntryController::class, 'index']);
         Route::get('new-number', [RmEntryController::class, 'newNumber']);
@@ -33,6 +33,7 @@ Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
         Route::post('matl-doc', [RmEntryController::class, 'matlDoc']);
         Route::post('update-sub-tank', [RmEntryController::class, 'updateSubTank']);
         Route::delete('transfers/{id}', [RmEntryController::class, 'deactivateTransfer']);
+        Route::delete('feed-log/{id}', [RmEntryController::class, 'deactivateFeedLog']);
         // Parameterized routes must come last to avoid conflicts
         Route::post('/', [RmEntryController::class, 'store']);
         Route::get('{id}', [RmEntryController::class, 'show']);

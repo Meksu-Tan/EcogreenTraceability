@@ -1,98 +1,73 @@
 <template>
-  <div class="space-y-6">
-    <!-- Section header -->
-    <div class="flex items-center justify-between">
+  <div>
+    <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Setup Material</h1>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-sm text-gray-500">TS Setup</span>
-          <span class="text-gray-300">/</span>
-          <span class="text-sm font-semibold text-green-500">Material</span>
+        <h1 class="text-h5 font-weight-bold">Setup Material</h1>
+        <div class="d-flex align-center gap-1 mt-1">
+          <span class="text-caption text-medium-emphasis">TS Setup</span>
+          <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
+          <span class="text-caption font-weight-semibold text-primary">Material</span>
         </div>
       </div>
-      <button
-        id="btn-tambah-material"
-        class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95"
-        @click="openModal"
-      >
-        <Icon icon="ri:add-line" class="w-4 h-4" /> Tambah
-      </button>
+      <VBtn id="btn-tambah-material" color="primary" prepend-icon="ri-add-line" @click="openModal">Add</VBtn>
     </div>
 
-    <!-- Card -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Icon icon="ri:flask-line" class="text-green-500 w-4 h-4" />
-          Data Material
-        </h4>
-        <div class="flex bg-gray-100 p-1 rounded-lg">
-          <button
-            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
-            :class="activeTab==='wip' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-            @click="activeTab='wip'"
-          >
-            Material WIP
-          </button>
-          <button
-            class="px-4 py-1.5 text-xs font-bold rounded-md transition-all"
-            :class="activeTab==='packaging' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-            @click="activeTab='packaging'"
-          >
-            Packaging
-          </button>
+    <VCard rounded="lg" elevation="1">
+      <div class="d-flex align-center justify-space-between pa-5 pb-3">
+        <div class="d-flex align-center gap-2">
+          <VIcon icon="ri-flask-line" color="primary" size="20" />
+          <span class="text-body-1 font-weight-bold">Data Material</span>
         </div>
+        <VBtnToggle v-model="activeTab" mandatory rounded="lg" density="compact" color="primary">
+          <VBtn value="wip" size="small">Material WIP</VBtn>
+          <VBtn value="packaging" size="small">Packaging</VBtn>
+        </VBtnToggle>
       </div>
-      <div class="p-6">
-        <!-- Tab: WIP -->
+      <VDivider />
+      <VCardText class="pa-0">
         <div v-if="activeTab === 'wip'">
           <DataTable
             :columns="materialColumns"
             :data="store.materials"
             :loading="store.loading"
             row-key="id_material"
+            :show-top-info="false"
             @edit="onEditMaterial"
             @toggle-status="onToggleMaterial"
           >
-            <template #cell-yield>{{ value }}%</template>
             <template #cell-status_packaging="{ value }">
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                :class="value == 1 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
+              <VChip
+                :color="value == 1 ? 'primary' : 'default'"
+                variant="tonal"
+                size="x-small"
               >
-                {{ value == 1 ? 'Ya' : 'Tidak' }}
-              </span>
+                {{ value == 1 ? 'Yes' : 'No' }}
+              </VChip>
             </template>
           </DataTable>
         </div>
-        <!-- Tab: Packaging -->
-        <div v-if="activeTab === 'packaging'">
+        <div v-if="activeTab === 'packaging'" class="pa-5">
           <MaterialPackagingTab ref="packagingTabRef" />
         </div>
-      </div>
-    </div>
+      </VCardText>
+    </VCard>
 
-    <!-- Modal -->
-    <MaterialModal
-      v-model="showModal"
-      :edit-data="editRow"
-      :loading="submitting"
-      @submit="onSubmitMaterial"
-    />
+    <MaterialModal v-model="showModal" :edit-data="editRow" :loading="submitting" @submit="onSubmitMaterial" />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Icon } from '@iconify/vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import MaterialModal from './MaterialModal.vue'
 import MaterialPackagingTab from './MaterialPackagingTab.vue'
 import { useSetupMaterialStore } from '@/modules/m-material/stores'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
 
 const store           = useSetupMaterialStore()
 const toast           = useToastStore()
+const confirmStore = useConfirmStore()
 const activeTab       = ref('wip')
 const showModal       = ref(false)
 const editRow         = ref(null)
@@ -131,7 +106,8 @@ function openModal() {
 function onEditMaterial(row) { editRow.value = row; showModal.value = true }
 
 async function onToggleMaterial(row) {
-  if (!confirm(`${row.status == 1 ? 'Deactivate' : 'Activate'} material "${row.description}"?`)) return
+  const isConfirmed = await confirmStore.show({ message: `${row.status == 1 ? 'Deactivate' : 'Activate'} material "${row.description}"?` })
+  if (!isConfirmed) return
   const r = await store.toggleMaterial(row.id_material, row.status)
   r.status === 1 ? toast.success(r.message) : toast.error(r.message)
 }

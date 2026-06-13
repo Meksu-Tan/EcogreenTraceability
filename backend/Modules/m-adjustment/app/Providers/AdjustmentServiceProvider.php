@@ -8,6 +8,7 @@ use Modules\Adjustment\Repositories\AdjustmentRepository;
 use Modules\Adjustment\Services\Contracts\AdjustmentServiceInterface;
 use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
 use Modules\Adjustment\Services\AdjustmentService;
+use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
 use Modules\Adjustment\Services\AdjustmentMutationService;
 use Modules\Adjustment\Services\AdjustmentPeriodService;
 
@@ -28,6 +29,7 @@ class AdjustmentServiceProvider extends ServiceProvider
             AdjustmentService::class
         );
         $this->app->singleton(
+            AdjustmentMutationServiceInterface::class,
             AdjustmentMutationService::class
         );
     }

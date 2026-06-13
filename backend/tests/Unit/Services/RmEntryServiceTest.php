@@ -22,7 +22,7 @@ class RmEntryServiceTest extends TestCase
 
         $repoMock->shouldReceive('getRmList')
             ->once()
-            ->with(1002)
+            ->with(1002, 1, 5)
             ->andReturn($expectedList);
 
         $service = new RmEntryService($repoMock);

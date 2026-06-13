@@ -15,10 +15,6 @@ class TsReportRepository implements TsReportRepositoryInterface
 
     public function getTsReport(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $entryDate = $filters['entry_date'] ?? now()->toDateString();
 
         return DB::connection($this->connection)->select(
@@ -73,10 +69,6 @@ class TsReportRepository implements TsReportRepositoryInterface
 
     public function getTsReportRm(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $entryDate = $filters['entry_date'] ?? now()->toDateString();
 
         return DB::connection($this->connection)->select(
@@ -105,10 +97,6 @@ class TsReportRepository implements TsReportRepositoryInterface
 
     public function getTsReportPck(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $entryDate = $filters['entry_date'] ?? now()->toDateString();
 
         return DB::connection($this->connection)->select(
@@ -141,10 +129,6 @@ class TsReportRepository implements TsReportRepositoryInterface
 
     public function getTsReportShipment(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $entryDate = $filters['entry_date'] ?? now()->toDateString();
 
         return DB::connection($this->connection)->select(
@@ -175,10 +159,6 @@ class TsReportRepository implements TsReportRepositoryInterface
 
     public function getTsReportTransfer(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $entryDate = $filters['entry_date'] ?? now()->toDateString();
 
         return DB::connection($this->connection)->select(
@@ -197,7 +177,7 @@ class TsReportRepository implements TsReportRepositoryInterface
                LEFT JOIN m_material c ON a.id_material=c.id_material
                LEFT JOIN m_supplier d ON b.id_supplier=d.id_supplier
                LEFT JOIN t_balance_header e ON a.to_trace_no=e.trace_no AND e.status=1
-               LEFT JOIN m_tank f ON f.id_tank=a.id_sloc
+               LEFT JOIN m_sloc f ON f.id_sloc=a.id_sloc
               WHERE a.status=1
                 AND (SUBSTRING(a.to_trace_no,1,1)='7' OR SUBSTRING(a.to_trace_no,1,1)='9')
                 AND SUBSTRING(a.to_trace_no,8,2)<>'00' AND b.qty<>0 AND a.entry_date = ?
@@ -208,10 +188,6 @@ class TsReportRepository implements TsReportRepositoryInterface
 
     public function getTsReportWip(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $entryDate = $filters['entry_date'] ?? now()->toDateString();
 
         return DB::connection($this->connection)->select(

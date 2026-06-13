@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import * as manufacturerApi from '../api'
+import * as manufacturerApi from '../services'
 
 export const useSetupManufacturerStore = defineStore('setupManufacturer', () => {
   const manufacturers = ref([])

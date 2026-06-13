@@ -8,8 +8,8 @@ describe('App Router', () => {
     expect(router.hasRoute('dashboard')).toBe(true)
     expect(router.hasRoute('setup.material')).toBe(true)
     expect(router.hasRoute('setup.supplier')).toBe(true)
-    expect(router.hasRoute('setup.adjustment')).toBe(true)
-    expect(router.hasRoute('setup.quantifier')).toBe(true)
+    expect(router.hasRoute('setup-adjustment')).toBe(true)
+    expect(router.hasRoute('setup-quantifier')).toBe(true)
     expect(router.hasRoute('ts-raw-rm-entry')).toBe(true)
   })
 

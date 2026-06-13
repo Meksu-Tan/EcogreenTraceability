@@ -79,8 +79,6 @@ trait WipEntryWriteTrait
                 'user' => $user,
             ]);
 
-            DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
-
             if ($this->checkPeriodLock($currEntryDate)) {
                 \Log::warning('WIP Feed Save - Period Lock Failed', ['entry_date' => $currEntryDate]);
                 return [['response' => '99']];
@@ -95,7 +93,7 @@ trait WipEntryWriteTrait
                   FROM m_material a
                   LEFT JOIN t_balance_header b ON a.id_material = b.id_material AND b.status = 1
                  WHERE a.id_feed = ? AND a.status = 1
-                   AND b.qty > "0.0001"
+                   AND b.qty > 0.0001
                    AND (b.id_sloc = ? OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(? AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(? AS CHAR))))))
                    AND b.id_plant = ?
             ', [$feedId, $idTank, $idTank, $idTank, $idPlant]);
@@ -133,9 +131,9 @@ trait WipEntryWriteTrait
             $balanceDetails = DB::connection('eudr_ts')->select('
                 SELECT COUNT(a.id_balance_tail) AS detail_count
                   FROM t_balance_header b
-                  LEFT JOIN t_balance_detail a ON b.id_balance_head = a.id_balance_head AND a.status = 1 AND a.qty > "0.0001"
+                  LEFT JOIN t_balance_detail a ON b.id_balance_head = a.id_balance_head AND a.status = 1 AND a.qty > 0.0001
                  WHERE b.id_material = ? AND b.status = 1
-                   AND b.qty > "0.0001"
+                   AND b.qty > 0.0001
                    AND (b.id_sloc = ? OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(? AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(? AS CHAR))))))
                    AND b.id_plant = ?
             ', [$idMaterial, $idTank, $idTank, $idTank, $idPlant]);
@@ -264,8 +262,6 @@ trait WipEntryWriteTrait
 
         $inQty = (float)$currQtf - (float)$lastQtf;
         \Log::info('WIP Rundown Save - Calculated In Qty', ['in_qty' => $inQty, 'curr_qtf' => $currQtf, 'last_qtf' => $lastQtf]);
-        
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         $originalEntryNo = $entryNo;
         $maxAttempts = 10;
@@ -298,7 +294,7 @@ trait WipEntryWriteTrait
              WHERE SUBSTRING(to_trace_no,1,1) = ?
                AND SUBSTRING(to_trace_no,8,3) = ?
                AND entry_date = ? AND id_plant = ? AND status = 1
-               AND out_qty > "0.0001"
+               AND out_qty > 0.0001
              GROUP BY id_trace_head
              ORDER BY id_trace_head DESC LIMIT 1
         ', [$this->movType2, $feedId, $currEntryDate, $idPlant]);
@@ -343,7 +339,7 @@ trait WipEntryWriteTrait
              WHERE SUBSTRING(to_trace_no,1,1) = ?
                AND SUBSTRING(to_trace_no,8,3) = ?
                AND entry_date = ? AND status = 1
-               AND out_qty > "0.0001" AND id_plant = ?
+               AND out_qty > 0.0001 AND id_plant = ?
              ORDER BY id_trace_head DESC
         ', [$this->movType2, $feedId, $currEntryDate, $idPlant]);
 
@@ -581,22 +577,22 @@ trait WipEntryWriteTrait
         if (!$row) return [['response' => '0', 'message' => 'HEAD NOT FOUND']];
 
         DB::connection('eudr_ts')->update(
-            'UPDATE t_balance_header SET id_sloc_tail = ?, updated_by = ? WHERE id_balance_head = ?',
+            'UPDATE t_balance_header SET id_sloc = ?, updated_by = ? WHERE id_balance_head = ?',
             [$jsonTails, $user, $idHead]
         );
 
         DB::connection('eudr_ts')->update(
-            'UPDATE t_trace_header SET id_sloc_tail = ?, updated_by = ? WHERE id_balance_head = ?',
+            'UPDATE t_trace_header SET id_sloc = ?, updated_by = ? WHERE id_balance_head = ?',
             [$jsonTails, $user, $idHead]
         );
 
         DB::connection('eudr_ts')->update(
-            'UPDATE t_balance_detail SET id_sloc_tail = ?, updated_by = ? WHERE id_balance_head = ?',
+            'UPDATE t_balance_detail SET id_sloc = ?, updated_by = ? WHERE id_balance_head = ?',
             [$jsonTails, $user, $idHead]
         );
 
         DB::connection('eudr_ts')->update('
-            UPDATE t_trace_detail SET id_sloc_tail = ?, updated_by = ?
+            UPDATE t_trace_detail SET id_sloc = ?, updated_by = ?
             WHERE id_trace_head IN (SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ?)
         ', [$jsonTails, $user, $idHead]);
 

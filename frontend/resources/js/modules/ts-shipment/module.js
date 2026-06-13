@@ -1,3 +1,5 @@
+import { useShipmentEntryStore } from './stores/useShipmentEntryStore'
+
 export default {
   name: 'ts-shipment',
   routes: [
@@ -8,5 +10,5 @@ export default {
       meta: { title: 'Shipment Entry', requiresAuth: true },
     },
   ],
-  stores: [],
+  stores: [useShipmentEntryStore],
 }

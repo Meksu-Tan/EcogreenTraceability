@@ -4,11 +4,12 @@
     :data="store.packagings"
     :loading="store.loadingPkg"
     row-key="id_materialpck"
+    :show-top-info="false"
     @edit="onEdit"
     @toggle-status="onToggle"
   >
     <template #cell-source_product="{ value }">
-      <span class="text-sm font-medium text-slate-500">{{ value }}</span>
+      <span class="text-body-2 text-medium-emphasis">{{ value }}</span>
     </template>
   </DataTable>
 
@@ -27,11 +28,13 @@ import DataTable from '@/modules/shared/components/DataTable.vue'
 import MaterialPackagingModal from './MaterialPackagingModal.vue'
 import { useSetupMaterialStore } from '@/modules/m-material/stores'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
 
 defineExpose({ openModal })
 
 const store      = useSetupMaterialStore()
 const toast      = useToastStore()
+const confirmStore = useConfirmStore()
 const showModal  = ref(false)
 const editRow    = ref(null)
 const submitting = ref(false)
@@ -66,7 +69,8 @@ function onEdit(row) {
 }
 
 async function onToggle(row) {
-  if (!confirm(`${row.status == 1 ? 'Deactivate' : 'Activate'} packaging "${row.description}"?`)) return
+  const isConfirmed = await confirmStore.show({ message: `${row.status == 1 ? 'Deactivate' : 'Activate'} packaging "${row.description}"?` })
+  if (!isConfirmed) return
   const result = await store.togglePackaging(row.id_materialpck, row.status)
   result.status === 1 ? toast.success(result.message) : toast.error(result.message)
 }

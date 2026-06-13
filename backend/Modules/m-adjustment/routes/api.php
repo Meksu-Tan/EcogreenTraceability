@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Adjustment\Http\Controllers\AdjustmentController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('master/adjustment')->group(function () {
         // ——— Lookups (exact routes BEFORE {id}) ———
         Route::get('supplier-list', [AdjustmentController::class, 'getSupplierList']);

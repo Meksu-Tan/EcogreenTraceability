@@ -1,6 +1,5 @@
 export function exportToCSV(data, filename = 'export.csv') {
   if (!data || data.length === 0) {
-    console.warn('No data to export')
     return
   }
 

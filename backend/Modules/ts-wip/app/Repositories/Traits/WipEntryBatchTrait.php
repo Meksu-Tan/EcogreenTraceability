@@ -2,6 +2,7 @@
 namespace Modules\TsWip\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
+use Modules\TsWip\Services\BatchNumberGenerator;
 
 trait WipEntryBatchTrait
 {
@@ -161,55 +162,69 @@ trait WipEntryBatchTrait
 
     public function generateNewFeedNumber(string $feedId, $plantId): ?string
     {
-        $idPlant = $this->resolvePlantId($plantId);
-        $datePrefix = date('ymd');
-        $sectionId = $this->mapFrontendSectionToDbFeedId($feedId);
-        $traceSectionId = substr($sectionId, 0, 3);
-        $plantCode = ($idPlant == 0 || $idPlant == '0') ? '00' : str_pad(substr((string)$idPlant, -2), 2, '0', STR_PAD_LEFT);
+        $idPlant       = $this->resolvePlantId($plantId);
+        $datePrefix    = date('ymd');
+        $traceSectionId = substr($this->mapFrontendSectionToDbFeedId($feedId), 0, 3);
+        $plantCode     = $this->resolvePlantCode($idPlant);
 
-        $result = DB::connection('eudr_ts')->select(
-            'SELECT a.feed_number
-              FROM (SELECT a.to_trace_no+1 AS feed_number
-                      FROM t_trace_header a
-                     WHERE SUBSTRING(a.to_trace_no,1,1) = "3"
-                       AND SUBSTRING(a.to_trace_no,2,6) = ?
-                       AND SUBSTRING(a.to_trace_no,8,3) = ?
-                       AND SUBSTRING(a.to_trace_no,11,2) = ?
-                       AND a.status = 1
-                     ORDER BY a.id_trace_head DESC LIMIT 1) a
-             UNION ALL
-            SELECT CONCAT("3", ?, ?, ?, "01") AS feed_number
-             LIMIT 1',
-            [$datePrefix, $traceSectionId, $plantCode, $datePrefix, $traceSectionId, $plantCode]
+        return DB::connection('eudr_ts')->transaction(
+            fn () => $this->computeNextBatchNumber('3', $datePrefix, $traceSectionId, $plantCode)
         );
+    }
 
-        return $result[0]->feed_number ?? null;
+    /**
+     * Fetch existing today's batch numbers for the given prefix/date/section/plant
+     * under a row-level lock, then derive the next sequence in PHP.
+     */
+    private function computeNextBatchNumber(
+        string $prefix,
+        string $date,
+        string $section,
+        string $plantCode
+    ): string {
+        $existing = DB::connection('eudr_ts')
+            ->table('t_trace_header')
+            ->where('status', 1)
+            // TODO [TD-3]: raw SQL — refactor ke Query Builder saat architecture sprint
+            ->whereRaw('SUBSTRING(to_trace_no, 1, 1) = ?', [$prefix])
+            ->whereRaw('SUBSTRING(to_trace_no, 2, 6) = ?', [$date])
+            ->whereRaw('SUBSTRING(to_trace_no, 8, 3) = ?', [$section])
+            ->whereRaw('SUBSTRING(to_trace_no, 11, 2) = ?', [$plantCode])
+            ->lockForUpdate()
+            ->pluck('to_trace_no');
+
+        $nextSeq = BatchNumberGenerator::nextSequence($existing);
+
+        return BatchNumberGenerator::format($prefix, $date, $section, $plantCode, $nextSeq);
     }
 
     public function generateNewRundownNumber(string $rundownId, $plantId, ?string $subgroup = null): ?string
     {
-        $idPlant = $this->resolvePlantId($plantId);
-        $datePrefix = date('ymd');
-        $sectionId = $this->mapFrontendSectionToDbRundownId($rundownId, $subgroup);
-        $traceSectionId = substr($sectionId, 0, 3);
-        $plantCode = ($idPlant == 0 || $idPlant == '0') ? '00' : str_pad(substr((string)$idPlant, -2), 2, '0', STR_PAD_LEFT);
+        $idPlant        = $this->resolvePlantId($plantId);
+        $datePrefix     = date('ymd');
+        $traceSectionId = substr($this->mapFrontendSectionToDbRundownId($rundownId, $subgroup), 0, 3);
+        $plantCode      = $this->resolvePlantCode($idPlant);
 
-        $result = DB::connection('eudr_ts')->select(
-            'SELECT a.rundown_number
-              FROM (SELECT a.to_trace_no+1 AS rundown_number
-                      FROM t_trace_header a
-                     WHERE SUBSTRING(a.to_trace_no,1,1) = "2"
-                       AND SUBSTRING(a.to_trace_no,2,6) = ?
-                       AND SUBSTRING(a.to_trace_no,8,3) = ?
-                       AND SUBSTRING(a.to_trace_no,11,2) = ?
-                       AND a.status = 1
-                     ORDER BY a.id_trace_head DESC LIMIT 1) a
-             UNION ALL
-            SELECT CONCAT("2", ?, ?, ?, "01") AS rundown_number
-             LIMIT 1',
-            [$datePrefix, $traceSectionId, $plantCode, $datePrefix, $traceSectionId, $plantCode]
+        return DB::connection('eudr_ts')->transaction(
+            fn () => $this->computeNextBatchNumber('2', $datePrefix, $traceSectionId, $plantCode)
         );
+    }
 
-        return $result[0]->rundown_number ?? null;
+    /**
+     * Resolve the 2-character plant suffix used in batch numbers.
+     * Returns '00' when no plant is selected (all-plants context).
+     */
+    private function resolvePlantCode(?string $idPlant): string
+    {
+        if ($idPlant === null || $idPlant === '0' || $idPlant === '') {
+            return '00';
+        }
+
+        $plant = DB::connection('eudr_ts')
+            ->table('m_plant')
+            ->where('code_3', $idPlant)
+            ->value('code_3');
+
+        return $plant ? substr($plant, -2) : substr($idPlant, -2);
     }
 }

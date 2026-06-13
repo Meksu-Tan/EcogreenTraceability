@@ -5,7 +5,7 @@ namespace Modules\Shared\Repositories\Traits;
 use Modules\Shared\Services\PlantContextService;
 
 /**
- * PlantFilterTrait - Trait untuk auto-inject plant filter di repository queries
+ * PlantFilterTrait - Trait to auto-inject plant filter in repository queries
  *
  * Usage:
  * class MyRepository {
@@ -20,11 +20,11 @@ use Modules\Shared\Services\PlantContextService;
 trait PlantFilterTrait
 {
     /**
-     * Build plant filter dari request parameters
+     * Build plant filter from request parameters
      *
-     * @param mixed $plantId Plant ID dari request
-     * @param int|null $userId User ID untuk validasi access
-     * @param string $defaultColumn Column default (e.g., 'id_plant')
+     * @param mixed $plantId Plant ID from request
+     * @param int|null $userId User ID for access validation
+     * @param string $defaultColumn Default column (e.g., 'id_plant')
      * @return array ['sql' => string, 'bindings' => array, 'plant_code' => string|null]
      */
     protected function buildPlantFilter(mixed $plantId, ?int $userId = null, string $defaultColumn = 'id_plant'): array
@@ -39,7 +39,7 @@ trait PlantFilterTrait
     }
 
     /**
-     * Build plant filter dengan alias table
+     * Build plant filter with table alias
      *
      * @param string $tableAlias Table alias (e.g., 'bh', 'a')
      * @param mixed $plantId Plant ID
@@ -59,12 +59,12 @@ trait PlantFilterTrait
     }
 
     /**
-     * Get all plants untuk "all plants" selection
-     * Atau filter dengan plant tertentu
+     * Get all plants for "all plants" selection
+     * Or filter with specific plant
      *
-     * @param mixed $plantId Plant ID atau null untuk all
+     * @param mixed $plantId Plant ID or null for all
      * @param int|null $userId User ID
-     * @return string|null Plant code atau null
+     * @return string|null Plant code or null
      */
     protected function resolvePlantFilter(mixed $plantId, ?int $userId = null): ?string
     {
@@ -72,7 +72,7 @@ trait PlantFilterTrait
     }
 
     /**
-     * Add plant filter binding ke array
+     * Add plant filter binding to array
      *
      * @param array $bindings Existing bindings
      * @param mixed $plantId Plant ID
@@ -91,7 +91,7 @@ trait PlantFilterTrait
     }
 
     /**
-     * Check jika plant filter aktif (bukan "all plants")
+     * Check if plant filter is active (not "all plants")
      *
      * @param mixed $plantId
      * @return bool
@@ -117,7 +117,7 @@ trait PlantFilterTrait
     }
 
     /**
-     * Validate plant access untuk user
+     * Validate plant access for user
      *
      * @param int $userId
      * @param string $plantCode

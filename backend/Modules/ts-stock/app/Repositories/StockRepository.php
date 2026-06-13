@@ -14,10 +14,6 @@ class StockRepository implements StockRepositoryInterface
 
     public function getActiveMaterialStock(?string $search = null, ?string $type = null): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         if ($search === null) {
             return DB::connection($this->connection)->select(
                 "SELECT id_material, UPPER(material) AS material FROM (
@@ -60,10 +56,6 @@ class StockRepository implements StockRepositoryInterface
 
     public function getStockMovement(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantId = $filters['id_plant'] ?? $filters['plant_id'] ?? null;
         $materialId = $filters['material_id'] ?? null;
         $dateFrom = $filters['date_from'] ?? null;
@@ -95,7 +87,7 @@ class StockRepository implements StockRepositoryInterface
                     t.description AS sloc, th.id_plant
                FROM t_trace_header th
                LEFT JOIN m_material m ON th.id_material = m.id_material
-               LEFT JOIN m_tank t ON th.id_sloc = t.id_tank
+               LEFT JOIN m_sloc t ON th.id_sloc = t.id_sloc
               WHERE " . implode(' AND ', $where) . "
               ORDER BY th.entry_date DESC, th.id_trace_head DESC
               LIMIT 500",
@@ -105,10 +97,6 @@ class StockRepository implements StockRepositoryInterface
 
     public function getStockList(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $reportType = $filters['report_type'] ?? 'detail';
 
         if ($reportType === 'summary') {
@@ -156,12 +144,12 @@ class StockRepository implements StockRepositoryInterface
                                      WHERE z.id_material = ?
                                     ),
                                     bh_filtered AS (
-                                        SELECT bb.id_balance_head, bb.id_tank, bb.id_material, bb.trace_no
+                                        SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no
                                           FROM t_balance_header bb
                                           JOIN requested_material rm
                                             ON bb.id_material = rm.id_material
                                          WHERE bb.status = 1
-                                           AND bb.id_tank <> 4
+                                           AND bb.id_sloc <> 4
                                            AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
                                     ),
                                     th_grouped AS (
@@ -170,8 +158,8 @@ class StockRepository implements StockRepositoryInterface
                                               SUM(b.out_qty) AS out_qty, SUM(b.in_qty) - SUM(b.out_qty) AS balance,
                                               GROUP_CONCAT(DISTINCT mt.description SEPARATOR "|") AS sloc
                                          FROM t_trace_header b
-                                         LEFT JOIN m_tank mt
-                                           ON b.id_sloc = mt.id_tank
+                                         LEFT JOIN m_sloc mt
+                                           ON b.id_sloc = mt.id_sloc
                                           AND mt.id_plant = ?
                                         WHERE b.status = 1
                                           AND b.entry_date <= ?
@@ -242,13 +230,13 @@ class StockRepository implements StockRepositoryInterface
                                     bh_filtered2 AS (
                                         SELECT
                                               bb.id_balance_head,
-                                              bb.id_tank,
+                                              bb.id_sloc,
                                               bb.id_material
                                          FROM t_balance_header bb
                                          JOIN requested_material rm
                                             ON bb.id_material = rm.id_material
                                         WHERE bb.status = 1
-                                          AND bb.id_tank <> 4
+                                          AND bb.id_sloc <> 4
                                           AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
                                     ),
                                     supplier_plant AS (
@@ -258,8 +246,8 @@ class StockRepository implements StockRepositoryInterface
                                         JOIN bh_filtered2 bh
                                           ON sl.id_balance_head = bh.id_balance_head
                                          AND sl.id_material     = bh.id_material
-                                        JOIN m_tank t
-                                          ON t.id_tank = bh.id_tank
+                                        JOIN m_sloc t
+                                          ON t.id_sloc = bh.id_sloc
                                        WHERE t.id_plant = ?
                                     ),
                                     supplier_roll AS (
@@ -320,8 +308,8 @@ class StockRepository implements StockRepositoryInterface
                                             LEFT JOIN (SELECT bb.id_material, bb.id_trace_head, bb.entry_date, "Beginning Balance" AS `description`,
                                                              bb.`balance` AS balance, bbb.description AS sloc,
                                                              bb.`in` AS `in`, bb.`out` AS `out`
-                                                         FROM m_tank bbb
-                                                         LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, bb.entry_date,
+                                                         FROM m_sloc bbb
+                                                         LEFT JOIN (SELECT bb.id_sloc, bb.id_balance_head, bb.id_material, bb.entry_date,
                                                                            b.id_trace_head, b.balance, b.in, b.out
                                                                       FROM t_balance_header bb
                                                                       LEFT JOIN (SELECT b.id_balance_head, b.id_material, b.id_trace_head, b.entry_date,
@@ -335,10 +323,10 @@ class StockRepository implements StockRepositoryInterface
                                                                         ON b.id_balance_head = bb.id_balance_head AND b.id_material = bb.id_material
                                                                      WHERE bb.status = 1
                                                                        AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 9 OR SUBSTRING(bb.trace_no,1,1) = 7)
-                                                                       AND bb.id_tank = 4
+                                                                       AND bb.id_sloc = 4
                                                                        AND b.id_trace_head IS NOT NULL
                                                                    ) bb
-                                                          ON bbb.id_tank = bb.id_tank
+                                                          ON bbb.id_sloc = bb.id_sloc
                                                        WHERE bb.id_trace_head IS NOT NULL
                                                          AND bbb.id_plant = ?
                                                      ) b
@@ -348,8 +336,8 @@ class StockRepository implements StockRepositoryInterface
                                                          FROM (SELECT cc.id_material, cc.id_trace_head, cc.entry_date, cc.id_trace_tail,
                                                                       SUM(ROUND(cc.in_qty,4)) - SUM(ROUND(cc.out_qty,4)) AS `balance`, cc.supplier, cc.`batch_sap`,
                                                                       cc.to_trace_no
-                                                                 FROM m_tank bbb
-                                                                 LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
+                                                                 FROM m_sloc bbb
+                                                                 LEFT JOIN (SELECT bb.id_sloc, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
                                                                                    c.supplier, c.in_qty, c.out_qty, c.batch_sap, c.id_trace_tail, c.to_trace_no
                                                                               FROM t_balance_header bb
                                                                               LEFT JOIN (SELECT c.id_material, c.id_trace_head, c.id_balance_head,
@@ -366,7 +354,7 @@ class StockRepository implements StockRepositoryInterface
                                                                                                                      cc.id_material, cc.id_trace_tail
                                                                                                                 FROM t_trace_detail cc
                                                                                                                WHERE cc.`status` = 1
-                                                                                                                 AND (cc.in_qty > "0.0001" OR cc.out_qty > "0.0001")
+                                                                                                                 AND (cc.in_qty > 0.0001 OR cc.out_qty > 0.0001)
                                                                                                             ) cc
                                                                                                      ON c.id_trace_head = cc.id_trace_head
                                                                                                    LEFT JOIN m_supplier ccc
@@ -378,10 +366,10 @@ class StockRepository implements StockRepositoryInterface
                                                                                   ON c.id_balance_head = bb.id_balance_head
                                                                                WHERE bb.status = 1
                                                                                  AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 9 OR SUBSTRING(bb.trace_no,1,1) = 7)
-                                                                                 AND bb.id_tank = 4
+                                                                                 AND bb.id_sloc = 4
                                                                                  AND c.id_trace_head IS NOT NULL
                                                                             ) cc
-                                                                   ON bbb.id_tank = cc.id_tank
+                                                                   ON bbb.id_sloc = cc.id_sloc
                                                                 WHERE bbb.id_plant = ?
                                                                 GROUP BY cc.id_material, cc.batch_sap, cc.supplier, cc.id_balance_head
                                                               ) d
@@ -480,12 +468,12 @@ class StockRepository implements StockRepositoryInterface
                                      WHERE z.id_material = ?
                                     ),
                                     bh_filtered AS (
-                                        SELECT bb.id_balance_head, bb.id_tank, bb.id_material, bb.trace_no
+                                        SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no
                                           FROM t_balance_header bb
                                           JOIN requested_material rm
                                             ON bb.id_material = rm.id_material
                                          WHERE bb.status = 1
-                                           AND bb.id_tank <> 4
+                                           AND bb.id_sloc <> 4
                                            AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
                                     ),
                                     th_grouped AS (
@@ -494,8 +482,8 @@ class StockRepository implements StockRepositoryInterface
                                               SUM(b.out_qty) AS out_qty, SUM(b.in_qty) - SUM(b.out_qty) AS balance,
                                               GROUP_CONCAT(DISTINCT mt.description SEPARATOR "|") AS sloc, b.to_trace_no
                                          FROM t_trace_header b
-                                         LEFT JOIN m_tank mt
-                                           ON b.id_sloc = mt.id_tank
+                                         LEFT JOIN m_sloc mt
+                                           ON b.id_sloc = mt.id_sloc
                                           AND mt.id_plant = ?
                                         WHERE b.status = 1
                                           AND b.entry_date > ?
@@ -567,13 +555,13 @@ class StockRepository implements StockRepositoryInterface
                                     bh_filtered2 AS (
                                         SELECT
                                               bb.id_balance_head,
-                                              bb.id_tank,
+                                              bb.id_sloc,
                                               bb.id_material
                                          FROM t_balance_header bb
                                          JOIN requested_material rm
                                             ON bb.id_material = rm.id_material
                                         WHERE bb.status = 1
-                                          AND bb.id_tank <> 4
+                                          AND bb.id_sloc <> 4
                                           AND LEFT(bb.trace_no,1) IN (1,2,3,7,8,9)
                                     ),
                                     supplier_plant AS (
@@ -583,8 +571,8 @@ class StockRepository implements StockRepositoryInterface
                                         JOIN bh_filtered2 bh
                                           ON sl.id_balance_head = bh.id_balance_head
                                          AND sl.id_material     = bh.id_material
-                                        JOIN m_tank t
-                                          ON t.id_tank = bh.id_tank
+                                        JOIN m_sloc t
+                                          ON t.id_sloc = bh.id_sloc
                                        WHERE t.id_plant = ?
                                     ),
                                     supplier_roll AS (
@@ -636,8 +624,8 @@ class StockRepository implements StockRepositoryInterface
                                                    ON z.code = a.code
                                                  LEFT JOIN (SELECT cc.id_material, cc.id_trace_head, cc.entry_date,
                                                                    cc.`to_trace_no`, cc.in, cc.out, cc.balance, bbb.description AS sloc
-                                                              FROM m_tank bbb
-                                                              LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, bb.entry_date, d.id_trace_head,
+                                                              FROM m_sloc bbb
+                                                              LEFT JOIN (SELECT bb.id_sloc, bb.id_balance_head, bb.id_material, bb.entry_date, d.id_trace_head,
                                                                                 d.to_trace_no, d.in, d.out, d.balance
                                                                            FROM t_balance_header bb
                                                                            LEFT JOIN (SELECT d.id_balance_head, d.id_material, d.id_trace_head,
@@ -651,10 +639,10 @@ class StockRepository implements StockRepositoryInterface
                                                                              ON d.id_balance_head = bb.id_balance_head
                                                                           WHERE bb.status = 1
                                                                             AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 9 OR SUBSTRING(bb.trace_no,1,1) = 7)
-                                                                            AND bb.id_tank = 4
+                                                                            AND bb.id_sloc = 4
                                                                             AND d.id_trace_head IS NOT NULL
                                                                         ) cc
-                                                                ON bbb.id_tank = cc.id_tank
+                                                                ON bbb.id_sloc = cc.id_sloc
                                                              WHERE cc.id_trace_head IS NOT NULL
                                                                AND bbb.id_plant = ?
                                                             ) c
@@ -667,8 +655,8 @@ class StockRepository implements StockRepositoryInterface
                                                                                 SUM(d.`balance`) AS balance_supplier
                                                                            FROM (SELECT cc.id_material, cc.id_trace_head, cc.entry_date, cc.id_trace_tail, cc.to_trace_no,
                                                                                         SUM(ROUND(cc.in_qty,4)) - SUM(ROUND(cc.out_qty,4)) AS `balance`, cc.supplier, cc.`batch_sap`
-                                                                                   FROM m_tank bbb
-                                                                                   LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
+                                                                                   FROM m_sloc bbb
+                                                                                   LEFT JOIN (SELECT bb.id_sloc, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
                                                                                                      c.supplier, c.in_qty, c.out_qty, c.batch_sap, c.id_trace_tail, c.to_trace_no
                                                                                                 FROM t_balance_header bb
                                                                                                 LEFT JOIN (SELECT c.id_material, c.id_trace_head, c.id_balance_head, c.to_trace_no,
@@ -683,7 +671,7 @@ class StockRepository implements StockRepositoryInterface
                                                                                                                                          cc.id_material, cc.id_trace_tail
                                                                                                                                     FROM t_trace_detail cc
                                                                                                                                    WHERE cc.`status` = 1
-                                                                                                                                     AND (cc.in_qty > "0.0001" OR cc.out_qty > "0.0001")
+                                                                                                                                     AND (cc.in_qty > 0.0001 OR cc.out_qty > 0.0001)
                                                                                                                                    ) cc
                                                                                                                        ON c.id_trace_head = cc.id_trace_head
                                                                                                                        LEFT JOIN m_supplier ccc
@@ -695,10 +683,10 @@ class StockRepository implements StockRepositoryInterface
                                                                                                    ON c.id_balance_head = bb.id_balance_head
                                                                                                  WHERE bb.status = 1
                                                                                                    AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 9 OR SUBSTRING(bb.trace_no,1,1) = 7)
-                                                                                                   AND bb.id_tank = 4
+                                                                                                   AND bb.id_sloc = 4
                                                                                                    AND c.id_trace_head IS NOT NULL
                                                                                                ) cc
-                                                                                       ON bbb.id_tank = cc.id_tank
+                                                                                       ON bbb.id_sloc = cc.id_sloc
                                                                                    WHERE cc.id_trace_head IS NOT NULL
                                                                                    AND bbb.id_plant = ?
                                                                                    GROUP BY cc.id_material, cc.batch_sap, cc.supplier, cc.id_balance_head
@@ -824,8 +812,8 @@ class StockRepository implements StockRepositoryInterface
                                                     LEFT JOIN (SELECT bb.id_material, bb.id_trace_head, bb.entry_date, "Current On-Hand" AS `description`,
                                                                       IFNULL(SUM(bb.`balance`),0) AS balance, bb.sloc,
                                                                       IFNULL(SUM(bb.`in`),0) AS `in`, IFNULL(SUM(bb.`out`),0) AS `out`
-                                                                 FROM m_tank bbb
-                                                                 LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, bb.entry_date,
+                                                                 FROM m_sloc bbb
+                                                                 LEFT JOIN (SELECT bb.id_sloc, bb.id_balance_head, bb.id_material, bb.entry_date,
                                                                                    b.id_trace_head, b.balance, b.in, b.out
                                                                               FROM t_balance_header bb
                                                                               LEFT JOIN (SELECT b.id_balance_head, b.id_material, b.id_trace_head, b.entry_date,
@@ -840,10 +828,10 @@ class StockRepository implements StockRepositoryInterface
                                                                                 ON b.id_balance_head = bb.id_balance_head AND b.id_material = bb.id_material
                                                                              WHERE bb.status = 1
                                                                                AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 9 OR SUBSTRING(bb.trace_no,1,1) = 7)
-                                                                               AND bb.id_tank = 4
+                                                                               AND bb.id_sloc = 4
                                                                                AND b.id_trace_head IS NOT NULL
                                                                            ) bb
-                                                                  ON bbb.id_tank = bb.id_tank
+                                                                  ON bbb.id_sloc = bb.id_sloc
                                                                WHERE bb.id_trace_head IS NOT NULL
                                                                  AND bbb.id_plant = ?
                                                              ) b
@@ -856,8 +844,8 @@ class StockRepository implements StockRepositoryInterface
                                                                                    SUM(d.`balance`) AS balance_supplier
                                                                               FROM (SELECT cc.id_material, cc.id_trace_head, cc.entry_date, cc.id_trace_tail, cc.to_trace_no,
                                                                                            SUM(ROUND(cc.in_qty,4)) - SUM(ROUND(cc.out_qty,4)) AS `balance`, cc.supplier, cc.`batch_sap`
-                                                                                      FROM m_tank bbb
-                                                                                      LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
+                                                                                      FROM m_sloc bbb
+                                                                                      LEFT JOIN (SELECT bb.id_sloc, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
                                                                                                         c.supplier, c.in_qty, c.out_qty, c.batch_sap, c.id_trace_tail, c.to_trace_no
                                                                                                    FROM t_balance_header bb
                                                                                                    LEFT JOIN (SELECT c.id_material, c.id_trace_head, c.id_balance_head, c.to_trace_no,
@@ -872,7 +860,7 @@ class StockRepository implements StockRepositoryInterface
                                                                                                                                             cc.id_material, cc.id_trace_tail
                                                                                                                                        FROM t_trace_detail cc
                                                                                                                                       WHERE cc.`status` = 1
-                                                                                                                                        AND (cc.in_qty > "0.0001" OR cc.out_qty > "0.0001")
+                                                                                                                                        AND (cc.in_qty > 0.0001 OR cc.out_qty > 0.0001)
                                                                                                                                       ) cc
                                                                                                                           ON c.id_trace_head = cc.id_trace_head
                                                                                                                           LEFT JOIN m_supplier ccc
@@ -884,10 +872,10 @@ class StockRepository implements StockRepositoryInterface
                                                                                                       ON c.id_balance_head = bb.id_balance_head
                                                                                                     WHERE bb.status = 1
                                                                                                       AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 9 OR SUBSTRING(bb.trace_no,1,1) = 7)
-                                                                                                      AND bb.id_tank = 4
+                                                                                                      AND bb.id_sloc = 4
                                                                                                       AND c.id_trace_head IS NOT NULL
                                                                                                   ) cc
-                                                                                          ON bbb.id_tank = cc.id_tank
+                                                                                          ON bbb.id_sloc = cc.id_sloc
                                                                                       WHERE cc.id_trace_head IS NOT NULL
                                                                                       AND bbb.id_plant = ?
                                                                                       GROUP BY cc.id_material, cc.batch_sap, cc.supplier, cc.id_balance_head
@@ -907,8 +895,8 @@ class StockRepository implements StockRepositoryInterface
                                                                                  SUM(d.`balance`) AS balance_supplier
                                                                             FROM (SELECT cc.id_material, cc.id_trace_head, cc.entry_date, cc.id_trace_tail, cc.to_trace_no,
                                                                                          SUM(ROUND(cc.in_qty,4)) - SUM(ROUND(cc.out_qty,4)) AS `balance`, cc.supplier, cc.`batch_sap`
-                                                                                    FROM m_tank bbb
-                                                                                    LEFT JOIN (SELECT bb.id_tank, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
+                                                                                    FROM m_sloc bbb
+                                                                                    LEFT JOIN (SELECT bb.id_sloc, bb.id_balance_head, bb.id_material, bb.entry_date, c.id_trace_head,
                                                                                                       c.supplier, c.in_qty, c.out_qty, c.batch_sap, c.id_trace_tail, c.to_trace_no
                                                                                                  FROM t_balance_header bb
                                                                                                  LEFT JOIN (SELECT c.id_material, c.id_trace_head, c.id_balance_head, c.to_trace_no,
@@ -923,7 +911,7 @@ class StockRepository implements StockRepositoryInterface
                                                                                                                                           cc.id_material, cc.id_trace_tail
                                                                                                                                      FROM t_trace_detail cc
                                                                                                                                     WHERE cc.`status` = 1
-                                                                                                                                      AND (cc.in_qty > "0.0001" OR cc.out_qty > "0.0001")
+                                                                                                                                      AND (cc.in_qty > 0.0001 OR cc.out_qty > 0.0001)
                                                                                                                                     ) cc
                                                                                                                         ON c.id_trace_head = cc.id_trace_head
                                                                                                                         LEFT JOIN m_supplier ccc
@@ -935,10 +923,10 @@ class StockRepository implements StockRepositoryInterface
                                                                                                     ON c.id_balance_head = bb.id_balance_head
                                                                                                   WHERE bb.status = 1
                                                                                                     AND (SUBSTRING(bb.trace_no,1,1) = 1 OR SUBSTRING(bb.trace_no,1,1) = 9 OR SUBSTRING(bb.trace_no,1,1) = 7)
-                                                                                                    AND bb.id_tank = 4
+                                                                                                    AND bb.id_sloc = 4
                                                                                                     AND c.id_trace_head IS NOT NULL
                                                                                                 ) cc
-                                                                                        ON bbb.id_tank = cc.id_tank
+                                                                                        ON bbb.id_sloc = cc.id_sloc
                                                                                     WHERE cc.id_trace_head IS NOT NULL
                                                                                     AND bbb.id_plant = ?
                                                                                     GROUP BY cc.id_material, cc.batch_sap, cc.supplier, cc.id_balance_head
@@ -1021,7 +1009,7 @@ class StockRepository implements StockRepositoryInterface
                     t.description AS tank
                FROM t_balance_header bh
                LEFT JOIN m_material m ON bh.id_material = m.id_material
-               LEFT JOIN m_tank t ON bh.id_tank = t.id_tank
+               LEFT JOIN m_sloc t ON bh.id_sloc = t.id_sloc
               WHERE bh.id_balance_head = ? AND bh.status = 1',
             [$id]
         );
@@ -1047,13 +1035,9 @@ class StockRepository implements StockRepositoryInterface
 
     public function getActiveSlocs(): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         return DB::connection($this->connection)->select('
             SELECT id_plant, IF(id_plant = 1002, "EOB1", description) AS description
-              FROM m_tank
+              FROM m_sloc
              WHERE status = 1
              GROUP BY id_plant
              ORDER BY

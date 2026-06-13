@@ -1,87 +1,415 @@
 <template>
-  <div class="p-6">
-    <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
-      <h1 class="text-xl font-bold mb-4 flex items-center gap-2"><Icon icon="ri:flask-line" class="w-6 h-6 text-orange-600" /> Summary of Raw Material to Product</h1>
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div><label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Year</label><select v-model="selectedYear" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"><option v-for="y in years" :key="y" :value="y">{{ y }}</option></select></div>
-        <div class="flex items-end"><button @click="loadData" class="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-semibold hover:bg-orange-700 flex items-center gap-1"><Icon icon="ri:search-line" class="w-4 h-4" /> Search</button></div>
-      </div>
-    </div>
-    <div class="bg-white rounded-lg shadow-sm border">
-      <div v-if="loading" class="p-8 text-center text-gray-500"><svg class="animate-spin h-8 w-8 text-orange-600 mx-auto" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg><p class="mt-2">Loading report data...</p></div>
-      <template v-else>
-        <div class="overflow-x-auto"><table class="w-full">
-          <thead><tr class="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase">
-            <th class="px-3 py-3 text-center w-12">No</th><th class="px-3 py-3 text-center w-20">Action</th><th class="px-3 py-3 text-left">Trace No</th><th class="px-3 py-3 text-left">Entry Date</th>
-            <th class="px-3 py-3 text-left">Matl Doc</th><th class="px-3 py-3 text-left">PurchO</th><th class="px-3 py-3 text-left">Material</th><th class="px-3 py-3 text-left">Sloc</th>
-            <th class="px-3 py-3 text-right">Init (MT)</th><th class="px-3 py-3 text-right">On-Hand (MT)</th><th class="px-3 py-3 text-right">On-WIP (MT)</th><th class="px-3 py-3 text-right">On-PRD (MT)</th><th class="px-3 py-3 text-right">On-ADJOUT (MT)</th><th class="px-3 py-3 text-left max-w-sm">Supplier / Batch SAP / Init Qty (MT)</th>
-          </tr></thead>
-          <tbody v-if="tableData.length === 0">
-            <tr><td colspan="14" class="p-8 text-center text-gray-400"><Icon icon="ri:flask-line" class="w-12 h-12 mx-auto mb-4 text-gray-300" /><p>No data for {{ selectedYear }}.</p></td></tr>
-          </tbody>
-          <tbody v-else class="divide-y text-sm">
-            <tr v-for="(row, i) in tableData" :key="row.id_balance_head || i" class="hover:bg-gray-50">
-              <td class="px-3 py-3 text-center">{{ i + 1 }}</td>
-              <td class="px-3 py-3 text-center"><button @click="openDetail(row)" class="px-2 py-1 text-xs bg-[#47c363] text-white rounded hover:bg-[#58d474] flex items-center gap-1 mx-auto"><Icon icon="ri:eye-line" class="w-3 h-3" /> Detail</button></td>
-              <td class="px-3 py-3 font-mono">{{ row.trace_no }}</td><td class="px-3 py-3">{{ row.entry_date }}</td>
-              <td class="px-3 py-3 font-mono">{{ row.material_document || '-' }}</td><td class="px-3 py-3 font-mono">{{ row.po_so || '-' }}</td>
-              <td class="px-3 py-3 font-medium max-w-xs truncate" :title="row.material">{{ row.material }}</td><td class="px-3 py-3">{{ row.tank || '-' }}</td>
-              <td class="px-3 py-3 text-right font-mono">{{ row.init_qty || row.qty }}</td><td class="px-3 py-3 text-right font-mono font-semibold">{{ row.qty }}</td>
-              <td class="px-3 py-3 text-right font-mono">{{ row.qty_tank || '-' }}</td><td class="px-3 py-3 text-right font-mono">{{ row.qty_warehouse || '-' }}</td><td class="px-3 py-3 text-right font-mono">{{ row.qty_adjustment || '-' }}</td>
-              <td class="px-3 py-3 max-w-xs truncate text-xs" :title="row.supplier">{{ row.supplier || '-' }}</td>
-            </tr>
-          </tbody>
-        </table></div>
-        <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 flex justify-between items-center"><span class="text-xs text-gray-500">{{ tableData.length }} records</span></div>
-      </template>
-    </div>
-    <!-- Detail Modal -->
-    <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center" @click.self="showModal = false">
-      <div class="absolute inset-0 bg-black/50" />
-      <div class="relative bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[90vh] flex flex-col">
-        <div class="flex items-center justify-between p-4 border-b"><h2 class="text-lg font-semibold flex items-center gap-2"><Icon icon="ri:flask-line" class="text-orange-500 w-5 h-5" /> Detail RM Traceability <span class="text-sm font-normal text-gray-500 ml-2">Batch SAP: {{ detailBatch }} | Qty RM: {{ detailQty }} MT</span></h2><button @click="showModal = false" class="p-1 hover:bg-gray-100 rounded"><Icon icon="ri:close-line" class="w-5 h-5" /></button></div>
-        <div class="flex-1 overflow-auto">
-          <div class="border-b"><div class="flex">
-            <button v-for="tab in detailTabs" :key="tab.key" @click="detailTab = tab.key" :class="detailTab === tab.key ? 'border-b-2 border-orange-500 text-orange-600 font-semibold' : 'text-gray-500 hover:text-gray-700'" class="px-4 py-3 text-sm flex items-center gap-1"><Icon :icon="tab.icon" class="w-4 h-4" /> {{ tab.label }}</button>
-          </div></div>
-          <div v-if="detailTab === 'wip'" class="p-4">
-            <table class="w-full border"><thead><tr class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-2 text-center w-12">No</th><th class="px-3 py-2 text-left">Sloc</th><th class="px-3 py-2 text-left">Material</th><th class="px-3 py-2 text-right">IN Qty</th><th class="px-3 py-2 text-right">OUT Qty</th><th class="px-3 py-2 text-right">Balance</th></tr></thead><tbody class="divide-y text-sm"><tr v-for="(d,i) in detailWip" :key="i"><td class="px-3 py-2 text-center">{{ i+1 }}</td><td class="px-3 py-2">{{ d.sloc || '-' }}</td><td class="px-3 py-2">{{ d.material || '-' }}</td><td class="px-3 py-2 text-right font-mono">{{ d.in_qty || '0.000' }}</td><td class="px-3 py-2 text-right font-mono">{{ d.out_qty || '0.000' }}</td><td class="px-3 py-2 text-right font-mono font-semibold">{{ d.balance || '0.000' }}</td></tr></tbody></table><div v-if="detailWip.length===0" class="p-4 text-center text-gray-400 text-sm">No WIP data.</div>
-          </div>
-          <div v-if="detailTab === 'prd'" class="p-4">
-            <table class="w-full border"><thead><tr class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-2 text-center w-12">No</th><th class="px-3 py-2 text-left">Sloc</th><th class="px-3 py-2 text-left">Material</th><th class="px-3 py-2 text-right">IN Qty</th><th class="px-3 py-2 text-right">OUT Qty</th><th class="px-3 py-2 text-right">Balance</th><th class="px-3 py-2 text-left">Shipment</th></tr></thead><tbody class="divide-y text-sm"><tr v-for="(d,i) in detailPrd" :key="i"><td class="px-3 py-2 text-center">{{ i+1 }}</td><td class="px-3 py-2">{{ d.sloc || '-' }}</td><td class="px-3 py-2">{{ d.material || '-' }}</td><td class="px-3 py-2 text-right font-mono">{{ d.in_qty || '0.000' }}</td><td class="px-3 py-2 text-right font-mono">{{ d.out_qty || '0.000' }}</td><td class="px-3 py-2 text-right font-mono font-semibold">{{ d.balance || '0.000' }}</td><td class="px-3 py-2">{{ d.shipment || '-' }}</td></tr></tbody></table><div v-if="detailPrd.length===0" class="p-4 text-center text-gray-400 text-sm">No PRODUCT data.</div>
-          </div>
-          <div v-if="detailTab === 'adj'" class="p-4">
-            <table class="w-full border"><thead><tr class="bg-gray-50 text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-2 text-center w-12">No</th><th class="px-3 py-2 text-left">Sloc</th><th class="px-3 py-2 text-left">Material</th><th class="px-3 py-2 text-right">IN Qty</th><th class="px-3 py-2 text-right">OUT Qty</th><th class="px-3 py-2 text-right">Balance</th></tr></thead><tbody class="divide-y text-sm"><tr v-for="(d,i) in detailAdj" :key="i"><td class="px-3 py-2 text-center">{{ i+1 }}</td><td class="px-3 py-2">{{ d.sloc || '-' }}</td><td class="px-3 py-2">{{ d.material || '-' }}</td><td class="px-3 py-2 text-right font-mono">{{ d.in_qty || '0.000' }}</td><td class="px-3 py-2 text-right font-mono">{{ d.out_qty || '0.000' }}</td><td class="px-3 py-2 text-right font-mono font-semibold">{{ d.balance || '0.000' }}</td></tr></tbody></table><div v-if="detailAdj.length===0" class="p-4 text-center text-gray-400 text-sm">No ADJUSTMENT data.</div>
-          </div>
+  <div class="pa-6">
+    <VRow justify="space-between" align="center" class="mb-4">
+      <VCol cols="auto">
+        <VRow align="center" no-gutters>
+          <VCol cols="auto">
+            <h1 class="text-h5 font-weight-bold">Summary of Raw Material to Product</h1>
+            <div class="d-flex align-center gap-2 mt-1">
+              <span class="text-body-2 text-medium-emphasis">Location:</span>
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="ri-factory-line"
+              >
+                {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
+              </VChip>
+            </div>
+          </VCol>
+          <VCol cols="auto" class="ml-6 pl-6 border-s">
+            <PlantSelector @change="loadData" />
+          </VCol>
+        </VRow>
+      </VCol>
+    </VRow>
+
+    <VCard class="mb-4">
+      <VCardTitle class="d-flex align-center ga-2 pa-5">
+        <VIcon icon="ri-flask-line" color="primary" size="24" />
+        <span class="text-h6 font-weight-bold">Summary of Raw Material to Product</span>
+      </VCardTitle>
+      <VCardText>
+        <VRow dense>
+          <VCol cols="12" md="3">
+            <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Year</label>
+            <VSelect
+              v-model="selectedYear"
+              :items="years.map(y => ({ value: y, title: String(y) }))"
+              density="compact"
+              variant="outlined"
+              class="mt-1"
+            />
+          </VCol>
+          <VCol cols="12" md="2" class="d-flex align-end">
+            <VBtn color="primary" prepend-icon="ri-search-line" block @click="loadData">Search</VBtn>
+          </VCol>
+        </VRow>
+      </VCardText>
+    </VCard>
+
+    <VCard class="mb-4">
+      <VCardText class="pa-0">
+        <div v-if="loading" class="d-flex flex-column align-center justify-center pa-8">
+          <VProgressCircular indeterminate color="primary" size="32" />
+          <span class="mt-3 text-body-2 text-medium-emphasis">Loading report data...</span>
         </div>
-      </div>
-    </div>
+        <template v-else>
+          <div class="overflow-x-auto">
+            <VTable density="compact" class="text-body-2">
+              <thead>
+                <tr>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('trace_no')">
+                    Trace No<span class="sort-icon" :class="{ active: sortKey === 'trace_no', desc: sortKey === 'trace_no' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('entry_date')">
+                    Entry Date<span class="sort-icon" :class="{ active: sortKey === 'entry_date', desc: sortKey === 'entry_date' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('material_document')">
+                    Matl Doc<span class="sort-icon" :class="{ active: sortKey === 'material_document', desc: sortKey === 'material_document' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('po_so')">
+                    PurchO<span class="sort-icon" :class="{ active: sortKey === 'po_so', desc: sortKey === 'po_so' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('material')">
+                    Material<span class="sort-icon" :class="{ active: sortKey === 'material', desc: sortKey === 'material' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('tank')">
+                    Sloc<span class="sort-icon" :class="{ active: sortKey === 'tank', desc: sortKey === 'tank' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" @click="toggleSort('init_qty')">
+                    Init (MT)<span class="sort-icon" :class="{ active: sortKey === 'init_qty', desc: sortKey === 'init_qty' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" @click="toggleSort('qty')">
+                    On-Hand (MT)<span class="sort-icon" :class="{ active: sortKey === 'qty', desc: sortKey === 'qty' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" @click="toggleSort('qty_tank')">
+                    On-WIP (MT)<span class="sort-icon" :class="{ active: sortKey === 'qty_tank', desc: sortKey === 'qty_tank' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" @click="toggleSort('qty_warehouse')">
+                    On-PRD (MT)<span class="sort-icon" :class="{ active: sortKey === 'qty_warehouse', desc: sortKey === 'qty_warehouse' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" @click="toggleSort('qty_adjustment')">
+                    On-ADJOUT (MT)<span class="sort-icon" :class="{ active: sortKey === 'qty_adjustment', desc: sortKey === 'qty_adjustment' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('supplier')">
+                    Supplier / Batch SAP / Init Qty (MT)<span class="sort-icon" :class="{ active: sortKey === 'supplier', desc: sortKey === 'supplier' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:80px">Action</th>
+                </tr>
+              </thead>
+              <tbody v-if="tableData.length === 0">
+                <tr>
+                  <td colspan="14" class="text-center pa-8">
+                    <VIcon icon="ri-flask-line" size="48" class="text-disabled mb-2" />
+                    <p>No data for {{ selectedYear }}.</p>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr v-for="(row, i) in paginatedList" :key="row.id_balance_head || i">
+                  <td class="text-center text-caption text-medium-emphasis">{{ (page - 1) * perPage + i + 1 }}</td>
+                  <td class="font-monospace text-caption">{{ row.trace_no }}</td>
+                  <td class="text-caption">{{ row.entry_date }}</td>
+                  <td class="font-monospace text-caption">{{ row.material_document || '-' }}</td>
+                  <td class="font-monospace text-caption">{{ row.po_so || '-' }}</td>
+                  <td class="font-weight-medium text-truncate text-caption" style="max-width:200px" :title="row.material">{{ row.material }}</td>
+                  <td class="text-caption">{{ row.tank || '-' }}</td>
+                  <td class="text-right font-monospace text-caption">{{ row.init_qty || row.qty }}</td>
+                  <td class="text-right font-monospace font-weight-bold text-caption">{{ row.qty }}</td>
+                  <td class="text-right font-monospace text-caption">{{ row.qty_tank || '-' }}</td>
+                  <td class="text-right font-monospace text-caption">{{ row.qty_warehouse || '-' }}</td>
+                  <td class="text-right font-monospace text-caption">{{ row.qty_adjustment || '-' }}</td>
+                  <td class="text-caption text-truncate" style="max-width:200px" :title="row.supplier">{{ row.supplier || '-' }}</td>
+                  <td class="text-center">
+                    <VBtn size="x-small" color="success" variant="tonal" prepend-icon="ri-eye-line" @click="openDetail(row)">
+                      Detail
+                    </VBtn>
+                  </td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+          <VDivider />
+          <div v-if="totalRecords > 0" class="px-4 py-2 text-caption text-medium-emphasis bg-neutral-50 d-flex justify-space-between align-center">
+            <div class="d-flex align-center ga-3">
+              <div class="d-flex align-center ga-1">
+                <span>Rows:</span>
+                <VSelect
+                  v-model="perPage"
+                  :items="[5, 10, 15, 20]"
+                  density="compact"
+                  variant="plain"
+                  hide-details
+                  style="width:70px"
+                />
+              </div>
+              <span>Showing {{ (page - 1) * perPage + 1 }} - {{ Math.min(page * perPage, totalRecords) }} of {{ totalRecords }} records</span>
+            </div>
+            <VPagination
+              v-if="lastPage > 1"
+              v-model="page"
+              :length="lastPage"
+              :total-visible="5"
+              density="comfortable"
+              size="small"
+              show-first-last-page
+              @update:model-value="loadData"
+            />
+          </div>
+        </template>
+      </VCardText>
+    </VCard>
+
+    <VDialog v-model="showModal" max-width="960" scrollable>
+      <VCard>
+        <VCardTitle class="d-flex align-center justify-space-between border-b pa-4">
+          <div class="d-flex align-center ga-2">
+            <VIcon icon="ri-flask-line" color="primary" size="20" />
+            <span class="text-body-1 font-weight-bold">Detail RM Traceability</span>
+            <span class="text-caption text-medium-emphasis ml-2">Batch SAP: {{ detailBatch }} | Qty RM: {{ detailQty }} MT</span>
+          </div>
+          <VBtn icon="ri-close-line" size="small" variant="text" @click="showModal = false" />
+        </VCardTitle>
+
+        <VTabs v-model="detailTab" color="primary" align-tabs="start">
+          <VTab v-for="tab in detailTabs" :key="tab.key" :prepend-icon="tab.icon">
+            {{ tab.label }}
+          </VTab>
+        </VTabs>
+
+        <VCardText class="pa-0">
+          <VWindow v-model="detailTab">
+            <VWindowItem value="wip">
+              <VTable density="compact" class="text-body-2">
+                <thead>
+                  <tr>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sloc</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">IN Qty</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">OUT Qty</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody v-if="detailWip.length === 0">
+                  <tr><td colspan="6" class="text-center pa-4 text-disabled text-body-2">No WIP data.</td></tr>
+                </tbody>
+                <tbody v-else>
+                  <tr v-for="(d, i) in detailWip" :key="i">
+                    <td class="text-center">{{ i + 1 }}</td>
+                    <td>{{ d.sloc || '-' }}</td>
+                    <td>{{ d.material || '-' }}</td>
+                    <td class="text-right font-monospace">{{ d.in_qty || '0.000' }}</td>
+                    <td class="text-right font-monospace">{{ d.out_qty || '0.000' }}</td>
+                    <td class="text-right font-monospace font-weight-bold">{{ d.balance || '0.000' }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </VWindowItem>
+            <VWindowItem value="prd">
+              <VTable density="compact" class="text-body-2">
+                <thead>
+                  <tr>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sloc</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">IN Qty</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">OUT Qty</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Balance</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Shipment</th>
+                  </tr>
+                </thead>
+                <tbody v-if="detailPrd.length === 0">
+                  <tr><td colspan="7" class="text-center pa-4 text-disabled text-body-2">No PRODUCT data.</td></tr>
+                </tbody>
+                <tbody v-else>
+                  <tr v-for="(d, i) in detailPrd" :key="i">
+                    <td class="text-center">{{ i + 1 }}</td>
+                    <td>{{ d.sloc || '-' }}</td>
+                    <td>{{ d.material || '-' }}</td>
+                    <td class="text-right font-monospace">{{ d.in_qty || '0.000' }}</td>
+                    <td class="text-right font-monospace">{{ d.out_qty || '0.000' }}</td>
+                    <td class="text-right font-monospace font-weight-bold">{{ d.balance || '0.000' }}</td>
+                    <td>{{ d.shipment || '-' }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </VWindowItem>
+            <VWindowItem value="adj">
+              <VTable density="compact" class="text-body-2">
+                <thead>
+                  <tr>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sloc</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">IN Qty</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">OUT Qty</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Balance</th>
+                  </tr>
+                </thead>
+                <tbody v-if="detailAdj.length === 0">
+                  <tr><td colspan="6" class="text-center pa-4 text-disabled text-body-2">No ADJUSTMENT data.</td></tr>
+                </tbody>
+                <tbody v-else>
+                  <tr v-for="(d, i) in detailAdj" :key="i">
+                    <td class="text-center">{{ i + 1 }}</td>
+                    <td>{{ d.sloc || '-' }}</td>
+                    <td>{{ d.material || '-' }}</td>
+                    <td class="text-right font-monospace">{{ d.in_qty || '0.000' }}</td>
+                    <td class="text-right font-monospace">{{ d.out_qty || '0.000' }}</td>
+                    <td class="text-right font-monospace font-weight-bold">{{ d.balance || '0.000' }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </VWindowItem>
+          </VWindow>
+        </VCardText>
+
+        <VDivider />
+
+        <VCardActions class="pa-4 justify-end">
+          <VBtn variant="outlined" color="medium-emphasis" @click="showModal = false">Close</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
+
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Icon } from '@iconify/vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRmReportStore } from '../stores/rmReportStore'
+import { usePlantSelectionStore } from '@/stores/plant'
+import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
+
 const rmReportStore = useRmReportStore()
-const selectedYear = ref(new Date().getFullYear()), loading = ref(false), tableData = ref([])
-const showModal = ref(false), detailBatch = ref(''), detailQty = ref(''), detailTab = ref('wip')
-const detailWip = ref([]), detailPrd = ref([]), detailAdj = ref([])
-const years = []; for (let i = 0; i < 5; i++) years.push(new Date().getFullYear() - i)
+const plantSelectionStore = usePlantSelectionStore()
+const selectedYear = ref(new Date().getFullYear())
+const loading = ref(false)
+const tableData = ref([])
+const page = ref(1)
+const perPage = ref(10)
+const sortKey = ref('')
+const sortDir = ref('asc')
+
+const detectColumnType = (key) => {
+  const numericFields = ['init_qty', 'qty', 'qty_tank', 'qty_warehouse', 'qty_adjustment']
+  return numericFields.includes(key) ? 'number' : 'string'
+}
+
+const toggleSort = (key) => {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
+
+const sortedList = computed(() => {
+  if (!sortKey.value) return tableData.value
+  const list = [...tableData.value]
+  const type = detectColumnType(sortKey.value)
+  list.sort((a, b) => {
+    const valA = a[sortKey.value] ?? ''
+    const valB = b[sortKey.value] ?? ''
+    let cmp
+    if (type === 'number') {
+      cmp = parseFloat(valA) - parseFloat(valB)
+    } else {
+      cmp = String(valA).localeCompare(String(valB))
+    }
+    return sortDir.value === 'asc' ? cmp : -cmp
+  })
+  return list
+})
+
+const paginatedList = computed(() => {
+  const start = (page.value - 1) * perPage.value
+  const end = start + perPage.value
+  return sortedList.value.slice(start, end)
+})
+
+const totalRecords = computed(() => {
+  if (Array.isArray(rmReportStore.rmReportSummary)) {
+    return rmReportStore.rmReportSummary.length
+  }
+  return rmReportStore.rmReportSummary.total || 0
+})
+
+const lastPage = computed(() => {
+  if (Array.isArray(rmReportStore.rmReportSummary)) {
+    return Math.ceil(totalRecords.value / perPage.value) || 1
+  }
+  return rmReportStore.rmReportSummary.last_page || 1
+})
+const showModal = ref(false)
+const detailBatch = ref('')
+const detailQty = ref('')
+const detailTab = ref('wip')
+const detailWip = ref([])
+const detailPrd = ref([])
+const detailAdj = ref([])
+
+const years = []
+for (let i = 0; i < 5; i++) years.push(new Date().getFullYear() - i)
+
 const detailTabs = [
-  { key: 'wip', label: 'On-WIP', icon: 'ri:settings-4-line' },
-  { key: 'prd', label: 'On-PRODUCT', icon: 'ri:box-3-line' },
-  { key: 'adj', label: 'On-ADJUSTMENT', icon: 'ri:tune-line' }
+  { key: 'wip', label: 'On-WIP', icon: 'ri-settings-line' },
+  { key: 'prd', label: 'On-PRODUCT', icon: 'ri-box-3-line' },
+  { key: 'adj', label: 'On-ADJUSTMENT', icon: 'ri-tune-line' }
 ]
+
 onMounted(() => loadData())
+
 const loadData = async () => {
   loading.value = true
-  try { await rmReportStore.fetchRmReportSummary({ year: selectedYear.value }); tableData.value = rmReportStore.rmReportSummary || [] }
-  catch { tableData.value = [] } finally { loading.value = false }
+  try {
+    await rmReportStore.fetchRmReportSummary({
+      year: selectedYear.value,
+      selectedYear: selectedYear.value,
+      page: page.value,
+      per_page: perPage.value,
+      plant_id: (plantSelectionStore.selectedPlantId === null || plantSelectionStore.selectedPlantId === undefined) ? 0 : plantSelectionStore.selectedPlantId
+    })
+    const responseData = rmReportStore.rmReportSummary
+    tableData.value = Array.isArray(responseData) ? responseData : (responseData.data || [])
+  } catch {
+    tableData.value = []
+  } finally {
+    loading.value = false
+  }
 }
+
+watch(() => plantSelectionStore.selectedPlantId, () => {
+  page.value = 1
+  loadData()
+})
+
+watch(perPage, () => {
+  page.value = 1
+  loadData()
+})
+
 const openDetail = (row) => {
-  showModal.value = true; detailBatch.value = row.batch_sap || row.trace_no || '-'; detailQty.value = row.qty || '0'; detailTab.value = 'wip'
-  detailWip.value = row.supplier ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }] : []
-  detailPrd.value = row.supplier ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0', shipment: '-' }] : []
-  detailAdj.value = row.supplier ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }] : []
+  showModal.value = true
+  detailBatch.value = row.batch_sap || row.trace_no || '-'
+  detailQty.value = row.qty || '0'
+  detailTab.value = 'wip'
+  const baseRow = row.supplier
+    ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }]
+    : []
+  detailWip.value = baseRow
+  detailPrd.value = row.supplier
+    ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0', shipment: '-' }]
+    : []
+  detailAdj.value = baseRow
 }
 </script>
+
+<style scoped>
+.sort-icon { vertical-align: middle; transition: opacity 0.15s; opacity: 0.35; }
+.sortable-th:hover .sort-icon { opacity: 0.7; }
+.sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
+</style>

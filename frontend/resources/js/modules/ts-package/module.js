@@ -1,3 +1,5 @@
+import { usePackageEntryStore } from './stores/usePackageEntryStore'
+
 export default {
   name: 'ts-package',
   routes: [
@@ -8,5 +10,5 @@ export default {
       meta: { title: 'Package Entry', requiresAuth: true },
     },
   ],
-  stores: [],
+  stores: [usePackageEntryStore],
 }

@@ -1,286 +1,249 @@
 <template>
-  <div class="p-6 space-y-6">
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-      <div class="flex items-center gap-6">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-800">Raw Material Lists</h1>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-sm text-gray-500">Lokasi:</span>
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-              <Icon icon="ri:factory-line" class="mr-1.5 w-3 h-3 opacity-70" />
-              {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
-            </span>
-          </div>
-        </div>
-        <div class="h-10 w-px bg-gray-200"></div>
-        <PlantSelector @change="fetchData" />
-      </div>
+  <div class="pa-6">
+    <VRow justify="space-between" align="center" class="mb-4">
+      <VCol cols="auto">
+        <VRow align="center" no-gutters>
+          <VCol cols="auto">
+            <h1 class="text-h5 font-weight-bold">Raw Material Lists</h1>
+            <div class="d-flex align-center gap-2 mt-1">
+              <span class="text-body-2 text-medium-emphasis">Location:</span>
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="ri-factory-line"
+              >
+                {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
+              </VChip>
+            </div>
+          </VCol>
+          <VCol cols="auto" class="ml-6 pl-6 border-s">
+            <PlantSelector @change="fetchData" />
+          </VCol>
+        </VRow>
+      </VCol>
+      <VCol cols="auto">
+        <VRow no-gutters>
+          <VBtn
+            color="primary"
+            prepend-icon="ri-add-line"
+            class="mr-2"
+            @click="openCreateModal"
+          >
+            New RM Entry
+          </VBtn>
+          <VBtn
+            color="primary"
+            prepend-icon="ri-arrow-right-line"
+            class="mr-2"
+            @click="openTransferModal"
+          >
+            Transfer to Feed Tank
+          </VBtn>
+          <VAlert type="error" variant="tonal" density="compact" class="font-weight-bold">
+            QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
+          </VAlert>
+        </VRow>
+      </VCol>
+    </VRow>
 
-      <div class="flex items-center gap-3">
-        <button
-          type="button"
-          @click="openCreateModal"
-          class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-        >
-          <Icon icon="ri:add-line" class="w-4 h-4" />
-          New RM Entry
-        </button>
-        <button
-          type="button"
-          @click="openTransferModal"
-          class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-        >
-          <Icon icon="ri:arrow-right-line" class="w-4 h-4" />
-          Transfer to Feed Tank
-        </button>
-        <div class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-bold flex items-center">
-          QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
+    <VCard class="mb-4">
+      <VCardTitle class="bg-neutral-50 text-uppercase text-body-2 font-weight-bold py-3">
+        STORAGE TANK LOG
+      </VCardTitle>
+      <VDivider />
+      <VCardText class="pa-0">
+        <div class="overflow-x-auto">
+          <VTable density="compact" class="text-body-2">
+            <thead>
+              <tr>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">No</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Trace No</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Entry Date</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Matl Doc</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">PurchO</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Manufacturer</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sloc</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Init Material (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Init Supplier (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">On-Hand (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:240px">Supplier / Batch SAP / Init Qty (MT) / Remark</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Status</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="loading">
+                <td colspan="16" class="pa-0">
+                  <VSkeletonLoader type="table-tbody@5" :loading="true" />
+                </td>
+              </tr>
+              <tr v-else-if="!hasEntries">
+                <td colspan="16" class="text-center text-medium-emphasis py-4">No RM entries found</td>
+              </tr>
+              <tr v-for="(entry, index) in entries" :key="entry.id_balance_head" v-else>
+                <td class="text-center text-caption text-medium-emphasis">{{ (currentPageStorage - 1) * itemsPerPage + index + 1 }}</td>
+                <td class="font-weight-medium font-mono text-caption">{{ entry.trace_no }}</td>
+                <td class="text-caption">{{ formatDate(entry.entry_date) }}</td>
+                <td class="text-caption">{{ entry.material_document || '-' }}</td>
+                <td class="text-caption">{{ entry.po_so || '-' }}</td>
+                <td class="text-caption font-weight-medium">{{ entry.material }}</td>
+                <td class="text-caption">{{ entry.manufacturer_name || '-' }}</td>
+                <td class="text-caption">
+                  <a href="#" @click.prevent="openSlocEdit(entry)" class="text-medium-emphasis text-decoration-underline">
+                    {{ entry.tf_number }}
+                  </a>
+                </td>
+                <td class="text-right font-weight-medium text-caption" :class="entry.init_qty === entry.balance_supplier ? 'text-success' : 'text-error'">{{ entry.init_qty }}</td>
+                <td class="text-right font-weight-medium text-caption" :class="entry.init_qty === entry.balance_supplier ? 'text-success' : 'text-error'">{{ entry.balance_supplier }}</td>
+                <td class="text-right font-weight-bold text-caption">{{ entry.qty }}</td>
+                <td class="text-caption">
+                  <div class="supplier-scroll text-caption" style="max-height:80px;overflow-y:auto;white-space:pre-wrap">
+                    {{ formatSuppliers(entry.supplier) }}
+                  </div>
+                </td>
+                <td class="text-center">
+                  <VIcon
+                    :icon="entry.status == 1 ? 'ri-check-line' : 'ri-close-line'"
+                    :color="entry.status == 1 ? 'success' : 'error'"
+                    size="small"
+                  />
+                </td>
+                <td class="text-caption text-medium-emphasis">{{ entry.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ entry.created_by }}</td>
+                <td class="text-center">
+                  <VBtn
+                    icon="ri-delete-bin-line"
+                    size="x-small"
+                    color="error"
+                    variant="tonal"
+                    :disabled="entry.traced !== 'N/A'"
+                    @click="deactivateEntry(entry.id_balance_head)"
+                  />
+                  <VBtn
+                    icon="ri-edit-line"
+                    size="x-small"
+                    color="primary"
+                    variant="tonal"
+                    @click="openUpdateModal(entry)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
         </div>
-      </div>
-    </div>
+        <div v-if="store.pagination.total > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+          <span class="text-caption text-medium-emphasis">
+            Showing {{ (currentPageStorage - 1) * itemsPerPage + 1 }} - {{ Math.min(currentPageStorage * itemsPerPage, store.pagination.total) }} of {{ store.pagination.total }} records
+          </span>
+          <VPagination
+            v-if="totalPagesStorage > 1"
+            v-model="currentPageStorage"
+            :length="totalPagesStorage"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="changeStoragePage"
+          />
+        </div>
+      </VCardText>
+    </VCard>
 
-    <!-- Storage Tank Log Card -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-      <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <h2 class="text-lg font-bold text-slate-800">STORAGE TANK LOG</h2>
-      </div>
-      <div class="p-0 overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50 text-slate-700">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-16">No</th>
-              <th v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Plant</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Action</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Trace No</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Entry Date</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Matl Doc</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">PurchO</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Material</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Sloc</th>
-              <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">Init Material (MT)</th>
-              <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">Init Supplier (MT)</th>
-              <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">On-Hand (MT)</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-1/4">Supplier / Batch SAP / Init Qty (MT) / Remark</th>
-              <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Created at</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Created by</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="loading"><td colspan="15" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
-            <tr v-else-if="!hasEntries"><td colspan="15" class="px-6 py-4 text-center text-gray-500">No RM entries found</td></tr>
-            <tr v-else v-for="(entry, index) in paginatedStorageEntries" :key="entry.id_balance_head" class="hover:bg-gray-50 text-sm">
-              <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageStorage - 1) * itemsPerPage + index + 1 }}</td>
-              <td v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 whitespace-nowrap text-gray-600 font-semibold">{{ entry.plant_code || '-' }}</td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <div class="flex gap-2">
-                  <button @click="deactivateEntry(entry.id_balance_head)" :disabled="entry.traced !== 'N/A'" class="text-red-600 hover:text-red-900 disabled:text-gray-400">
-                    <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
-                  </button>
-                  <button @click="openUpdateModal(entry)" class="text-green-600 hover:text-green-900">
-                    <Icon icon="ri:edit-line" class="w-4 h-4" />
-                  </button>
-                </div>
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-900 text-center">{{ entry.trace_no }}</td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ formatDate(entry.entry_date) }}</td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ entry.material_document || '-' }}</td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ entry.po_so || '-' }}</td>
-              <td class="px-4 py-3 text-gray-900">{{ entry.material }}</td>
-              <td class="px-4 py-3 text-center">
-                <a href="#" @click.prevent="openSlocEdit(entry)" class="text-slate-500 hover:underline">{{ entry.tf_number }}</a>
-              </td>
-              <td class="px-4 py-3 text-right font-medium" :class="entry.init_qty === entry.balance_supplier ? 'text-green-600' : 'text-red-600'">{{ entry.init_qty }}</td>
-              <td class="px-4 py-3 text-right font-medium" :class="entry.init_qty === entry.balance_supplier ? 'text-green-600' : 'text-red-600'">{{ entry.balance_supplier }}</td>
-              <td class="px-4 py-3 text-right font-bold text-gray-900">{{ entry.qty }}</td>
-              <td class="px-4 py-3 text-gray-900">
-                <div class="max-h-20 overflow-y-auto whitespace-pre-wrap text-xs">
-                  {{ formatSuppliers(entry.supplier) }}
-                </div>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <Icon v-if="entry.status == 1" icon="ri:check-line" class="w-4 h-4 text-green-500" title="Active" />
-                <Icon v-else icon="ri:close-line" class="w-4 h-4 text-red-500" title="Inactive" />
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ entry.created_at }}</td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ entry.created_by }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- Pagination Storage -->
-      <div v-if="totalPagesStorage > 1" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-        <div class="text-sm text-gray-600">
-          Showing {{ (currentPageStorage - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPageStorage * itemsPerPage, filteredEntries.length) }} of {{ filteredEntries.length }} entries
-        </div>
-        <div class="flex gap-2">
-          <button
-            @click="currentPageStorage = 1"
-            :disabled="currentPageStorage === 1"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="First Page"
-          >
-            <Icon icon="ri:arrow-left-double-line" class="w-4 h-4" />
-          </button>
-          <button
-            @click="currentPageStorage--"
-            :disabled="currentPageStorage === 1"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Previous Page"
-          >
-            <Icon icon="ri:arrow-left-s-line" class="w-4 h-4" />
-          </button>
-          <div class="flex gap-1">
-            <button
-              v-for="page in visiblePagesStorage"
-              :key="page"
-              @click="currentPageStorage = page"
-              class="px-3 py-1 rounded transition-colors"
-              :class="currentPageStorage === page ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-700'"
-            >
-              {{ page }}
-            </button>
-          </div>
-          <button
-            @click="currentPageStorage++"
-            :disabled="currentPageStorage === totalPagesStorage"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Next Page"
-          >
-            <Icon icon="ri:arrow-right-s-line" class="w-4 h-4" />
-          </button>
-          <button
-            @click="currentPageStorage = totalPagesStorage"
-            :disabled="currentPageStorage === totalPagesStorage"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Last Page"
-          >
-            <Icon icon="ri:arrow-right-double-line" class="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Feed Tank Log Card -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-      <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-        <h2 class="text-lg font-bold text-slate-800">FEED TANK LOG</h2>
-      </div>
-      <div class="p-0 overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50 text-slate-700">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-16">No</th>
-              <th v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Plant</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Action</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">TraceNo (From >>> To)</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Entry Date</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Matl Doc</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Material</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Sloc</th>
-              <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">Init Material (MT)</th>
-              <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">Init Supplier (MT)</th>
-              <th class="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">On-Hand (MT)</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider w-1/4">Supplier / Batch SAP / Init Qty (MT) / Remark</th>
-              <th class="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">Status</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Created at</th>
-              <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">Created by</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="feedLoading"><td colspan="14" class="px-6 py-4 text-center text-gray-500">Loading...</td></tr>
-            <tr v-else-if="feedLogsSafe.length === 0"><td colspan="14" class="px-6 py-4 text-center text-gray-500">No feed logs found</td></tr>
-            <tr v-for="(log, index) in paginatedFeedLogs" :key="log.id_trace_head" class="hover:bg-gray-50 text-sm">
-              <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ (currentPageFeed - 1) * itemsPerPage + index + 1 }}</td>
-              <td v-if="!plantSelectionStore.selectedPlantId" class="px-4 py-3 whitespace-nowrap text-gray-600 font-semibold">{{ log.plant_code || '-' }}</td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <button @click="deactivateTransfer(log.id_trace_head)" class="text-red-600 hover:text-red-900">
-                  <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
-                </button>
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap font-medium text-gray-900 text-right">
-                <div class="text-xs leading-tight">
-                  <div v-for="(pair, idx) in (log.trace_pairs_array || [log.from_trace_no + ' >>> ' + log.to_trace_no])" :key="idx">
+    <VCard class="mb-4">
+      <VCardTitle class="bg-neutral-50 text-uppercase text-body-2 font-weight-bold py-3">
+        FEED TANK LOG
+      </VCardTitle>
+      <VDivider />
+      <VCardText class="pa-0">
+        <div class="overflow-x-auto">
+          <VTable density="compact" class="text-body-2">
+            <thead>
+              <tr>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">TraceNo (From >>> To)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Entry Date</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Matl Doc</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Manufacturer</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sloc</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Init Material (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Init Supplier (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">On-Hand (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:240px">Supplier / Batch SAP / Init Qty (MT) / Remark</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Status</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:80px">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="feedLoading">
+                <td colspan="15" class="pa-0">
+                  <VSkeletonLoader type="table-tbody@5" :loading="true" />
+                </td>
+              </tr>
+              <tr v-else-if="feedLogsSafe.length === 0">
+                <td colspan="15" class="text-center text-medium-emphasis py-4">No feed logs found</td>
+              </tr>
+              <tr v-for="(log, index) in paginatedFeedLogs" :key="log.id_trace_head" v-else>
+                <td class="text-center text-caption text-medium-emphasis">{{ (currentPageFeed - 1) * itemsPerPage + index + 1 }}</td>
+                <td class="text-caption font-mono">
+                  <div class="text-caption" v-for="(pair, idx) in (log.trace_pairs_array || [log.from_trace_no + ' >>> ' + log.to_trace_no])" :key="idx">
                     {{ pair.replace('>>>', ' >>> ') }}
                   </div>
-                </div>
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ formatDate(log.entry_date) }}</td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-900 text-center">{{ log.material_document || '-' }}</td>
-              <td class="px-4 py-3 text-gray-900">{{ log.material_name }}</td>
-              <td class="px-4 py-3 text-center text-gray-900">{{ log.tank_name }}</td>
-              <td class="px-4 py-3 text-right font-medium">{{ log.in_qty }}</td>
-              <td class="px-4 py-3 text-right font-medium">{{ log.in_qty }}</td>
-              <td class="px-4 py-3 text-right font-bold text-gray-900">{{ log.in_qty }}</td>
-              <td class="px-4 py-3 text-gray-900">
-                <div class="max-h-20 overflow-y-auto whitespace-pre-wrap text-xs">
-                  {{ log.material_name }} / {{ log.from_trace_no }} / {{ log.in_qty }} MT
-                </div>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <Icon icon="ri:check-line" class="w-4 h-4 text-green-500" title="Active" />
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ log.created_at }}</td>
-              <td class="px-4 py-3 whitespace-nowrap text-gray-500 text-xs">{{ log.created_by }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <!-- Pagination Feed -->
-      <div v-if="totalPagesFeed > 1" class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
-        <div class="text-sm text-gray-600">
-          Showing {{ (currentPageFeed - 1) * itemsPerPage + 1 }} to {{ Math.min(currentPageFeed * itemsPerPage, feedLogsSafe.length) }} of {{ feedLogsSafe.length }} entries
+                </td>
+                <td class="text-caption">{{ formatDate(log.entry_date) }}</td>
+                <td class="text-caption font-mono">{{ log.material_document || '-' }}</td>
+                <td class="font-weight-medium text-caption">{{ log.material_name }}</td>
+                <td class="text-caption">{{ log.manufacturer_name || '-' }}</td>
+                <td class="text-center text-caption">{{ log.tank_name }}</td>
+                <td class="text-right font-weight-medium text-caption">{{ log.in_qty }}</td>
+                <td class="text-right font-weight-medium text-caption">{{ log.in_qty }}</td>
+                <td class="text-right font-weight-bold text-caption">{{ log.in_qty }}</td>
+                <td class="text-caption">
+                  <div class="text-caption" style="max-height:80px;overflow-y:auto;white-space:pre-wrap">
+                    {{ log.material_name }} / {{ log.from_trace_no }} / {{ log.in_qty }} MT
+                  </div>
+                </td>
+                <td class="text-center">
+                  <VIcon icon="ri-check-line" color="success" size="small" />
+                </td>
+                <td class="text-caption text-medium-emphasis">{{ log.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ log.created_by }}</td>
+                <td class="text-center">
+                  <VBtn
+                    icon="ri-delete-bin-line"
+                    size="x-small"
+                    color="error"
+                    variant="tonal"
+                    @click="deactivateTransfer(log.id_trace_head)"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
         </div>
-        <div class="flex gap-2">
-          <button
-            @click="currentPageFeed = 1"
-            :disabled="currentPageFeed === 1"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="First Page"
-          >
-            <Icon icon="ri:arrow-left-double-line" class="w-4 h-4" />
-          </button>
-          <button
-            @click="currentPageFeed--"
-            :disabled="currentPageFeed === 1"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Previous Page"
-          >
-            <Icon icon="ri:arrow-left-s-line" class="w-4 h-4" />
-          </button>
-          <div class="flex gap-1">
-            <button
-              v-for="page in visiblePagesFeed"
-              :key="page"
-              @click="currentPageFeed = page"
-              class="px-3 py-1 rounded transition-colors"
-              :class="currentPageFeed === page ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 hover:bg-gray-100 text-gray-700'"
-            >
-              {{ page }}
-            </button>
-          </div>
-          <button
-            @click="currentPageFeed++"
-            :disabled="currentPageFeed === totalPagesFeed"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Next Page"
-          >
-            <Icon icon="ri:arrow-right-s-line" class="w-4 h-4" />
-          </button>
-          <button
-            @click="currentPageFeed = totalPagesFeed"
-            :disabled="currentPageFeed === totalPagesFeed"
-            class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Last Page"
-          >
-            <Icon icon="ri:arrow-right-double-line" class="w-4 h-4" />
-          </button>
+        <div v-if="feedLogsSafe.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+          <span class="text-caption text-medium-emphasis">
+            Showing {{ (currentPageFeed - 1) * itemsPerPage + 1 }} - {{ Math.min(currentPageFeed * itemsPerPage, feedLogsSafe.length) }} of {{ feedLogsSafe.length }} records
+          </span>
+          <VPagination
+            v-if="totalPagesFeed > 1"
+            v-model="currentPageFeed"
+            :length="totalPagesFeed"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+          />
         </div>
-      </div>
-    </div>
+      </VCardText>
+    </VCard>
 
-    <!-- Modals: always mounted (like Bootstrap modals in DOM) - avoids destroy/remount glitches; visibility via :is-open -->
     <RmEntryModal
       :is-open="isCreateModalOpen"
       :edit-id="editingEntryId"
@@ -292,25 +255,24 @@
       @close="isTransferModalOpen = false"
       @saved="fetchData"
     />
-
-    <!-- Plant Selection Modal (Initial Popup) -->
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Icon } from '@iconify/vue'
+import { useConfirmStore } from '@/stores/confirm'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
 import { usePlantSelectionStore } from '@/stores/plant'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import RmEntryModal from '@/modules/ts-raw/components/RmEntryModal.vue'
 import TransferModal from '@/modules/ts-raw/components/TransferModal.vue'
-import Swal from 'sweetalert2'
+import { useToastStore } from '@/stores/toast'
 
 const store = useTsRawRmEntryStore()
+const confirmStore = useConfirmStore()
+const toastStore = useToastStore()
 const plantSelectionStore = usePlantSelectionStore()
 
-// State
 const isCreateModalOpen = ref(false)
 const isTransferModalOpen = ref(false)
 const isSlocModalOpen = ref(false)
@@ -321,27 +283,16 @@ onMounted(() => {
   fetchData()
 })
 
-// Pagination State
 const itemsPerPage = 5
 const currentPageStorage = ref(1)
 const currentPageFeed = ref(1)
-const maxVisiblePages = 5
 
-// Computed
 const loading = computed(() => store.loading)
 const feedLoading = computed(() => store.feedLoading)
 const entries = computed(() => store.entries)
 const hasEntries = computed(() => entries.value.length > 0)
-const filteredEntries = computed(() => entries.value)
 
-const paginatedStorageEntries = computed(() => {
-  const start = (currentPageStorage.value - 1) * itemsPerPage
-  return filteredEntries.value.slice(start, start + itemsPerPage)
-})
-
-const totalPagesStorage = computed(() => {
-  return Math.ceil(filteredEntries.value.length / itemsPerPage)
-})
+const totalPagesStorage = computed(() => store.pagination.lastPage)
 
 const feedLogsSafe = computed(() =>
   Array.isArray(store.feedLogs) ? store.feedLogs : []
@@ -356,33 +307,6 @@ const totalPagesFeed = computed(() => {
   return Math.ceil(feedLogsSafe.value.length / itemsPerPage)
 })
 
-// Computed page numbers for Storage
-const visiblePagesStorage = computed(() => {
-  const pages = []
-  const startPage = Math.max(1, currentPageStorage.value - Math.floor(maxVisiblePages / 2))
-  const endPage = Math.min(totalPagesStorage.value, startPage + maxVisiblePages - 1)
-  const adjustedStart = Math.max(1, endPage - maxVisiblePages + 1)
-
-  for (let i = adjustedStart; i <= endPage; i++) {
-    pages.push(i)
-  }
-  return pages
-})
-
-// Computed page numbers for Feed
-const visiblePagesFeed = computed(() => {
-  const pages = []
-  const startPage = Math.max(1, currentPageFeed.value - Math.floor(maxVisiblePages / 2))
-  const endPage = Math.min(totalPagesFeed.value, startPage + maxVisiblePages - 1)
-  const adjustedStart = Math.max(1, endPage - maxVisiblePages + 1)
-
-  for (let i = adjustedStart; i <= endPage; i++) {
-    pages.push(i)
-  }
-  return pages
-})
-
-// Methods
 function buildPlantParams() {
   const id = plantSelectionStore.selectedPlantId
   return { id_plant: id === null || id === undefined || id === '' ? 0 : id }
@@ -394,12 +318,23 @@ async function fetchData() {
   currentPageFeed.value = 1
 
   await Promise.all([
-    store.fetchEntries(params),
+    store.fetchEntries({ ...params, page: 1, per_page: itemsPerPage }),
     store.fetchFeedLogs(params),
     store.fetchTanks(params, true),
     store.fetchMaterials(),
     store.searchSuppliers('')
   ])
+}
+
+async function fetchStoragePage() {
+  const params = buildPlantParams()
+  await store.fetchEntries({ ...params, page: currentPageStorage.value, per_page: itemsPerPage })
+}
+
+async function changeStoragePage(p) {
+  if (p < 1 || p > totalPagesStorage.value) return
+  currentPageStorage.value = p
+  await fetchStoragePage()
 }
 
 function openCreateModal() {
@@ -423,46 +358,35 @@ function openSlocEdit(entry) {
 }
 
 async function deactivateEntry(id) {
-  const result = await Swal.fire({
+  const isConfirmed = await confirmStore.show({
     title: 'Are you sure?',
-    text: 'De-Activate this data',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#16a34a',
-    cancelButtonColor: '#d33',
-    confirmButtonText: 'Yes!'
+    message: 'De-Activate this data'
   })
 
-  if (result.isConfirmed) {
+  if (isConfirmed) {
     try {
       await store.deactivateEntry(id)
-      Swal.fire('Deactivated!', 'Entry has been deactivated.', 'success')
+      toastStore.success('Entry has been deactivated.')
       fetchData()
     } catch (error) {
-      Swal.fire('Error', error.message || 'Failed to deactivate', 'error')
+      toastStore.error(error.message || 'Failed to deactivate')
     }
   }
 }
 
-
 async function deactivateTransfer(id) {
-  const result = await Swal.fire({
+  const isConfirmed = await confirmStore.show({
     title: 'Are you sure?',
-    text: 'De-Activate this transfer?',
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonColor: '#16a34a',
-    cancelButtonColor: '#d33',
-    confirmButtonText: 'Yes!'
+    message: 'De-Activate this feed log entry?'
   })
 
-  if (result.isConfirmed) {
+  if (isConfirmed) {
     try {
-      await store.deleteTransfer(id)
-      Swal.fire('Deactivated!', 'Transfer has been deactivated.', 'success')
+      await store.deleteFeedLog(id)
+      toastStore.success('Feed log entry has been deactivated.')
       fetchData()
     } catch (error) {
-      Swal.fire('Error', error.message || 'Failed to deactivate', 'error')
+      toastStore.error(error.message || 'Failed to deactivate')
     }
   }
 }
@@ -477,3 +401,4 @@ function formatSuppliers(supplierString) {
   return supplierString.split(' | ').join('\n')
 }
 </script>
+

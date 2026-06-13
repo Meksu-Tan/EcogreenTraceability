@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import wipApi from '../api/wip'
+import wipApi from '../services/wip'
 import { useToastStore } from '@/stores/toast'
 import { usePlantSelectionStore } from '@/stores/plant'
 
@@ -20,6 +20,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   const rundownLatest = ref({})
   const rundownLogs = ref({})
   const balanceData = ref([])
+
+  // Pagination meta from server
+  const balanceMeta = ref({ total: 0, page: 1, per_page: 5 })
+  const feedLogMeta = ref({})
+  const rundownLogMeta = ref({})
 
   // Dropdown data
   const activeTanksFeed = ref([])
@@ -69,42 +74,58 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     }
   }
 
-  async function fetchFeed(feedId, mode = 'LOG') {
+  async function fetchFeed(feedId, mode = 'LOG', page = 1) {
     try {
-      const res = await wipApi.getFeed(feedId, mode, { id_plant: plantId.value || 0 })
+      const res = await wipApi.getFeed(feedId, mode, { id_plant: plantId.value || 0, page })
       const data = res.data || []
-      feedLatest.value[feedId] = data
-      feedLogs.value[feedId] = data
+      if (mode === 'LATEST') {
+        feedLatest.value[feedId] = data
+      } else {
+        feedLogs.value[feedId] = data
+        feedLogMeta.value[feedId] = { total: res.total || 0, page: res.page || page, per_page: res.per_page || 5 }
+      }
       return res
     } catch (error) {
-      feedLatest.value[feedId] = []
-      feedLogs.value[feedId] = []
+      if (mode === 'LATEST') {
+        feedLatest.value[feedId] = []
+      } else {
+        feedLogs.value[feedId] = []
+      }
       return { data: [] }
     }
   }
 
-  async function fetchRundown(rundownId, mode = 'LOG') {
+  async function fetchRundown(rundownId, mode = 'LOG', page = 1) {
     try {
-      const res = await wipApi.getRundown(rundownId, mode, { id_plant: plantId.value || 0 })
+      const res = await wipApi.getRundown(rundownId, mode, { id_plant: plantId.value || 0, page })
       const data = res.data || []
-      rundownLatest.value[rundownId] = data
-      rundownLogs.value[rundownId] = data
+      if (mode === 'LATEST') {
+        rundownLatest.value[rundownId] = data
+      } else {
+        rundownLogs.value[rundownId] = data
+        rundownLogMeta.value[rundownId] = { total: res.total || 0, page: res.page || page, per_page: res.per_page || 5 }
+      }
       return res
     } catch (error) {
-      rundownLatest.value[rundownId] = []
-      rundownLogs.value[rundownId] = []
+      if (mode === 'LATEST') {
+        rundownLatest.value[rundownId] = []
+      } else {
+        rundownLogs.value[rundownId] = []
+      }
       return { data: [] }
     }
   }
 
-  async function fetchBalance(rundownId, params = {}) {
+  async function fetchBalance(rundownId, params = {}, page = 1) {
     try {
-      const res = await wipApi.getBalance(rundownId, { id_plant: plantId.value || 0, ...params })
+      const res = await wipApi.getBalance(rundownId, { id_plant: plantId.value || 0, page, ...params })
       balanceData.value = res.data || []
+      balanceMeta.value = { total: res.total || 0, page: res.page || page, per_page: res.per_page || 5 }
       return res
     } catch (error) {
       balanceData.value = []
-      return { data: [] }
+      balanceMeta.value = { total: 0, page: 1, per_page: 5 }
+      return { data: [], total: 0, page: 1, per_page: 5 }
     }
   }
 
@@ -169,9 +190,9 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     }
   }
 
-  async function fetchActiveTanksFeed(feedID) {
+  async function fetchActiveTanksFeed(feedID, params = {}) {
     try {
-      const data = await wipApi.getActiveTanksFeed(feedID, { id_plant: plantId.value })
+      const data = await wipApi.getActiveTanksFeed(feedID, { id_plant: plantId.value, ...params })
       activeTanksFeed.value = Array.isArray(data) ? data : []
       return activeTanksFeed.value
     } catch (error) {
@@ -416,6 +437,13 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     }
   }
 
+  function clearLogs() {
+    feedLatest.value = {}
+    feedLogs.value = {}
+    rundownLatest.value = {}
+    rundownLogs.value = {}
+  }
+
   return {
     // State
     loading,
@@ -426,6 +454,9 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     rundownLatest,
     rundownLogs,
     balanceData,
+    balanceMeta,
+    feedLogMeta,
+    rundownLogMeta,
     activeTanksFeed,
     activeTanksRundown,
     activeSpecificTanks,
@@ -459,5 +490,6 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     updateEntrySubTank,
     resetFeedForm,
     resetRundownForm,
+    clearLogs,
   }
 })

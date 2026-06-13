@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    protected $connection = 'eudr_ts';
+
     public function up(): void
     {
-        Schema::create('t_warehouse_header', function (Blueprint $table) {
+        Schema::connection('eudr_ts')->create('t_warehouse_header', function (Blueprint $table) {
             $table->bigIncrements('id_whx_head');
             $table->date('entry_date')->default(null)->nullable();
             $table->unsignedBigInteger('from_trace_no')->nullable();
@@ -20,6 +22,8 @@ return new class extends Migration
             $table->string('id_plant', 10)->nullable()->index();
             $table->string('batch_no', 50)->nullable();
             $table->string('po_no', 50)->nullable();
+            $table->unsignedBigInteger('id_tank')->nullable()->index();
+            $table->json('id_tank_tail')->nullable();
             $table->double('qty')->default('0');
             $table->double('in_qty')->default('0');
             $table->double('out_qty')->default('0');
@@ -37,6 +41,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('t_warehouse_header');
+        Schema::connection('eudr_ts')->dropIfExists('t_warehouse_header');
     }
 };

@@ -5,9 +5,11 @@ namespace Modules\Adjustment\Services;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
 use Modules\Shared\Services\PeriodLockService;
 use Modules\Shared\Services\AuditService;
+use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
+use Modules\Shared\Helpers\ResponseCode;
 use Illuminate\Support\Facades\DB;
 
-class AdjustmentMutationService
+class AdjustmentMutationService implements AdjustmentMutationServiceInterface
 {
     public function __construct(
         protected AdjustmentRepositoryInterface $repository,
@@ -93,8 +95,8 @@ class AdjustmentMutationService
 
     public function createAdjustmentHeader(string $user, array $data, mixed $plantId): array
     {
-        if (!PeriodLockService::isLocked($data['entry_date'] ?? '2099-12-31')) {
-            return ['response' => 99, 'message' => 'Period is locked'];
+        if (PeriodLockService::isLocked($data['entry_date'] ?? ResponseCode::FALLBACK_DATE)) {
+            return ['response' => ResponseCode::PERIOD_LOCKED, 'message' => 'Period is locked'];
         }
 
         return DB::connection('eudr_ts')->transaction(function () use ($user, $data, $plantId) {

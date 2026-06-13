@@ -4,11 +4,18 @@ namespace Tests\Feature\Modules;
 
 use App\Models\User;
 use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 use Mockery;
 use Tests\TestCase;
 
 class TraceBackwardModuleTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(PlantContextMiddleware::class);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();
@@ -37,10 +44,9 @@ class TraceBackwardModuleTest extends TestCase
 
     public function test_it_validates_trace_no_required_for_detail(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/backward/detail');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward/detail');
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['trace_no']);
@@ -48,10 +54,9 @@ class TraceBackwardModuleTest extends TestCase
 
     public function test_it_validates_per_page_max_value_on_list(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/backward?per_page=500');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward?per_page=500');
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['per_page']);
@@ -59,8 +64,7 @@ class TraceBackwardModuleTest extends TestCase
 
     public function test_it_returns_paginated_list_with_source_on_index(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $mockData = [
             'data' => [
@@ -94,7 +98,7 @@ class TraceBackwardModuleTest extends TestCase
             ->andReturn($mockData);
         $this->app->instance(TraceBackwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/backward?page=1&per_page=25');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward?page=1&per_page=25');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.data.0.trace_no', '300001-001')
@@ -105,8 +109,7 @@ class TraceBackwardModuleTest extends TestCase
 
     public function test_it_returns_chain_on_trace_detail(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $mockData = [
             (object) [
@@ -132,7 +135,7 @@ class TraceBackwardModuleTest extends TestCase
             ->andReturn($mockData);
         $this->app->instance(TraceBackwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/backward/detail?trace_no=300001-001&id_material=3');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward/detail?trace_no=300001-001&id_material=3');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.0.curr_trace', '100001-001')
@@ -141,8 +144,7 @@ class TraceBackwardModuleTest extends TestCase
 
     public function test_it_returns_500_when_service_throws_on_index(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $serviceMock = Mockery::mock(TraceBackwardServiceInterface::class);
         $serviceMock->shouldReceive('getBackwardList')
@@ -150,7 +152,7 @@ class TraceBackwardModuleTest extends TestCase
             ->andThrow(new \RuntimeException('DB unreachable'));
         $this->app->instance(TraceBackwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/backward');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward');
 
         $response->assertStatus(500)
             ->assertJsonPath('status', 0)
@@ -159,8 +161,7 @@ class TraceBackwardModuleTest extends TestCase
 
     public function test_it_returns_500_when_service_throws_on_trace_detail(): void
     {
-        $user = new User(['id' => 1, 'name' => 'Test', 'email' => 't@x.com']);
-        $user->id = 1;
+        $user = User::factory()->make();
 
         $serviceMock = Mockery::mock(TraceBackwardServiceInterface::class);
         $serviceMock->shouldReceive('getBackwardTraceDetail')
@@ -168,7 +169,7 @@ class TraceBackwardModuleTest extends TestCase
             ->andThrow(new \RuntimeException('SQL syntax error'));
         $this->app->instance(TraceBackwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user)->getJson('/api/v1/trace/backward/detail?trace_no=B456');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward/detail?trace_no=B456');
 
         $response->assertStatus(500)
             ->assertJsonPath('status', 0)

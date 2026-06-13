@@ -9,7 +9,7 @@ use Exception;
 
 trait RmEntryQueryTrait
 {
-    public function getRmList($plantId): array
+    public function getRmList($plantId, int $page = 1, int $perPage = 5): array
     {
         $resolvedPlant = $this->resolvePlantCode($plantId);
         $allPlants = $resolvedPlant === null || $resolvedPlant === '' || $resolvedPlant === 0 || $resolvedPlant === '0';
@@ -52,11 +52,9 @@ trait RmEntryQueryTrait
         }
         $slocFilterSql = '(' . implode(' OR ', $slocConditions) . ')';
 
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
-
         $query = "SELECT
-                    bh.id_balance_head, bh.id_material, COALESCE(bh.id_sloc, bh.id_tank) AS id_tank,
-                    COALESCE(bh.id_sloc_tail, bh.id_tank_tail) AS id_tank_tail_raw, bh.status,
+                    bh.id_balance_head, bh.id_material, bh.id_sloc AS id_tank,
+                    NULL AS id_tank_tail_raw, bh.status,
                     CAST(bh.trace_no AS CHAR) AS trace_no,
                     bh.qty,
                     bh.created_by, bh.created_at,
@@ -67,21 +65,16 @@ trait RmEntryQueryTrait
                     bh.entry_date,
                     f.material_document, f.po_so, f.id_trace_head,
                     FORMAT(bs.supplier_qty,3) AS balance_supplier,
-                    bh.id_plant, p.code AS plant_code
+                    bh.id_plant, p.code AS plant_code, p.description AS plant_description
                     FROM (
-                        SELECT id_balance_head, id_material, id_sloc, id_tank, id_sloc_tail, id_tank_tail,
+                        SELECT id_balance_head, id_material, id_sloc,
                                status, trace_no, qty, init_qty, created_by, created_at, entry_date, id_plant
                         FROM t_balance_header
                         WHERE status = 1
                           AND SUBSTRING(trace_no,1,1) = '1'
                           AND SUBSTRING(trace_no,8,3) = '000'
                           AND (id_plant = ? OR ? = 0)
-                          AND ($slocFilterSql OR (id_sloc IS NULL AND id_tank IN (
-                               SELECT mt.id_tank FROM m_tank mt
-                               JOIN m_sloc ms ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci
-                                             AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci
-                               WHERE ms.id_sloc IN ($inClause)
-                           )))
+                          AND ($slocFilterSql)
                         ORDER BY id_balance_head DESC
                     ) bh
                     INNER JOIN m_material m ON bh.id_material = m.id_material AND m.type = ?
@@ -89,7 +82,6 @@ trait RmEntryQueryTrait
                          (bh.id_sloc = sl.id_sloc)
                          OR JSON_CONTAINS(bh.id_sloc, JSON_QUOTE(CAST(sl.id_sloc AS CHAR)))
                          OR JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS CHAR))
-                         OR (bh.id_sloc IS NULL AND bh.id_tank = (SELECT mt.id_tank FROM m_tank mt WHERE mt.code COLLATE utf8mb4_unicode_ci = sl.code COLLATE utf8mb4_unicode_ci AND mt.id_plant COLLATE utf8mb4_unicode_ci = sl.id_plant COLLATE utf8mb4_unicode_ci LIMIT 1))
                     ) AND sl.status = 1
                     LEFT JOIN (
                         SELECT f.id_balance_head, MAX(g.material_document) AS material_document,
@@ -143,6 +135,23 @@ trait RmEntryQueryTrait
                 $supplierMap[$traceNo]['id_balance_detail'][] = $sd->id_balance_tail;
             }
 
+            // Batch-fetch trace status to avoid N+1
+            $traceStatusRows = DB::connection('eudr_ts')->select(
+                "SELECT bh.trace_no,
+                        IF(SUM(td.out_qty) > 0, 'USED', 'N/A') AS traced
+                   FROM t_trace_detail td
+                   JOIN t_trace_header th ON td.id_trace_head = th.id_trace_head
+                   JOIN t_balance_header bh ON th.id_balance_head = bh.id_balance_head
+                  WHERE bh.trace_no IN ($placeholders) AND td.status = 1
+                  GROUP BY bh.trace_no",
+                $traceNos
+            );
+
+            $traceStatusMap = [];
+            foreach ($traceStatusRows as $ts) {
+                $traceStatusMap[$ts->trace_no] = $ts->traced;
+            }
+
             foreach ($results as &$r) {
                 $traceKey = $r->trace_no;
                 if (isset($supplierMap[$traceKey])) {
@@ -158,28 +167,46 @@ trait RmEntryQueryTrait
                     $r->tf_number = $r->sloc_description . ' | ' . $r->sloc_tank_number;
                 }
 
-                $traceStatus = DB::connection('eudr_ts')->select(
-                    "SELECT IF(SUM(td.out_qty) > 0, 'USED', 'N/A') AS traced
-                     FROM t_trace_detail td
-                     JOIN t_trace_header th ON td.id_trace_head = th.id_trace_head
-                     JOIN t_balance_header bh ON th.id_balance_head = bh.id_balance_head
-                     WHERE bh.trace_no = ? AND td.status = 1",
-                    [$r->trace_no]
-                );
-                $r->traced = $traceStatus[0]->traced ?? 'N/A';
+                $r->traced = $traceStatusMap[$traceKey] ?? 'N/A';
                 $r->qty = number_format($r->qty, 3);
                 $r->init_qty = number_format($r->init_qty, 3);
-                
-                $plantRec = DB::connection('eudr_ts')->select(
-                    "SELECT description FROM m_plant WHERE code_3 = ? AND status = 1 LIMIT 1",
-                    [$r->id_plant]
-                );
-                $r->plant_code = $plantRec[0]->description ?? (string) $r->id_plant;
+
+                $r->plant_code = $r->plant_description ?? (string) $r->id_plant;
             }
             unset($r);
         }
 
-        return $results;
+        $collection = collect($results);
+        $total = $collection->count();
+        $offset = ($page - 1) * $perPage;
+        $sliced = $collection->slice($offset, $perPage)->values();
+
+        return ['data' => $sliced, 'total' => $total];
+    }
+
+    public function getRmEntryById($id): ?object
+    {
+        $result = DB::connection('eudr_ts')->select(
+            "SELECT bh.id_balance_head, bh.id_material, bh.id_sloc AS id_tank,
+                    NULL AS id_tank_tail_raw, bh.status,
+                    CAST(bh.trace_no AS CHAR) AS trace_no,
+                    bh.qty, bh.created_by, bh.created_at,
+                    CONCAT(m.code, ' :: ', m.description) AS material,
+                    bh.init_qty, sl.description AS sloc_description,
+                    bh.entry_date, bh.id_plant, p.code AS plant_code, p.description AS plant_description
+               FROM t_balance_header bh
+               INNER JOIN m_material m ON bh.id_material = m.id_material
+               LEFT JOIN m_sloc sl ON (
+                    (bh.id_sloc = sl.id_sloc)
+                    OR JSON_CONTAINS(bh.id_sloc, JSON_QUOTE(CAST(sl.id_sloc AS CHAR)))
+                    OR JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS CHAR))
+               ) AND sl.status = 1
+               LEFT JOIN m_plant p ON bh.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+              WHERE bh.id_balance_head = ? AND bh.status = 1",
+            [$id]
+        );
+
+        return $result[0] ?? null;
     }
 
     public function getNewNumber($plantId): ?string
@@ -223,9 +250,9 @@ trait RmEntryQueryTrait
     {
         $plantId = $this->resolvePlantCode($plantId);
 
-        $query = "SELECT a.id_sloc_tail, a.id_sloc, a.tf_number, status,
+        $query = "SELECT a.id_sloc AS id_sloc_tail, a.id_sloc, a.description AS tf_number, status,
                          b.qty_available, b.id_balance_head
-                    FROM m_sloc_detail a
+                    FROM m_sloc a
                     LEFT JOIN (
                         SELECT id_sloc_tail, SUM(qty) AS qty_available, MAX(id_balance_head) AS id_balance_head
                           FROM t_balance_header
@@ -234,10 +261,10 @@ trait RmEntryQueryTrait
                            AND id_sloc_tail != ''
                            AND id_sloc_tail != '[]'
                          GROUP BY id_sloc_tail
-                    ) b ON b.id_sloc_tail = a.id_sloc_tail
+                    ) b ON b.id_sloc_tail = a.id_sloc
                    WHERE a.status = 1
                      AND a.id_sloc = ?
-                   ORDER BY a.tf_number";
+                   ORDER BY a.description";
 
         return DB::connection('eudr_ts')->select($query, [$tankId]);
     }

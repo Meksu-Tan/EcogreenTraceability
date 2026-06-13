@@ -15,27 +15,20 @@ class AuthService implements AuthServiceInterface
     {
         $user = $this->authRepository->findByEmail($credentials['email']);
 
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+        if (!$user || !Hash::check($credentials['password'], $user->password) || !$user->isActive) {
             return [
                 'status'  => 0,
-                'message' => 'Email atau password salah.',
+                'message' => 'Invalid email or password, or your account is inactive.',
             ];
         }
 
-        $token = $this->authRepository->createToken($user);
+        $token = $this->authRepository->createToken($user, 'auth_token');
         $userData = $this->authRepository->getUserWithPermissions($user);
 
         return [
             'status' => 1,
             'token'  => $token,
-            'data'   => [
-                'id'          => $userData->id,
-                'name'        => $userData->name,
-                'email'       => $userData->email,
-                'id_plant'    => $userData->id_plant,
-                'roles'       => $userData->getRoleNames(),
-                'permissions' => $userData->getAllPermissions()->pluck('name'),
-            ],
+            'data'   => $this->buildUserPayload($userData),
         ];
     }
 
@@ -50,14 +43,7 @@ class AuthService implements AuthServiceInterface
 
         return [
             'status' => 1,
-            'data'   => [
-                'id'          => $userData->id,
-                'name'        => $userData->name,
-                'email'       => $userData->email,
-                'id_plant'    => $userData->id_plant,
-                'roles'       => $userData->getRoleNames(),
-                'permissions' => $userData->getAllPermissions()->pluck('name'),
-            ],
+            'data'   => $this->buildUserPayload($userData),
         ];
     }
 
@@ -69,5 +55,24 @@ class AuthService implements AuthServiceInterface
     public function listPermissions(): array
     {
         return $this->authRepository->getAllPermissions();
+    }
+
+    private function buildUserPayload(object $user): array
+    {
+        $roles = $user->getRoleNames()
+            ->push($user->role)
+            ->unique()
+            ->filter()
+            ->values();
+
+        return [
+            'id'          => $user->id,
+            'name'        => $user->name,
+            'email'       => $user->email,
+            'id_plant'    => $user->id_plant,
+            'roles'       => $roles,
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'plants'      => $user->plants()->get(['m_plant.id_plant', 'm_plant.code_3', 'm_plant.description'])->toArray(),
+        ];
     }
 }

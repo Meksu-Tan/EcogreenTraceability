@@ -13,10 +13,6 @@ final class BackwardSearchQuery
 
     public function execute(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null): array
     {
-        $this->connection->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('sh', $plantId, $userId);
 
         $bindings = array_merge([$materialId], $plantFilter['bindings']);

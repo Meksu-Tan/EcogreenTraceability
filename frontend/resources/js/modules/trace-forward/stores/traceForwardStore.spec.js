@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
-vi.mock('@/modules/trace-forward/api', () => ({
+vi.mock('@/modules/trace-forward/services', () => ({
   default: {
     getForwardList: vi.fn(),
     getTraceDetail: vi.fn(),
   },
 }))
 
-import traceApi from '@/modules/trace-forward/api'
+import traceApi from '@/modules/trace-forward/services'
 import { useTraceForwardStore } from './traceForwardStore'
 
 describe('useTraceForwardStore', () => {
@@ -132,7 +132,7 @@ describe('useTraceForwardStore', () => {
 
       expect(store.list).toEqual([])
       expect(store.detail).toEqual({ initial: [], chain: [] })
-      expect(store.listMeta).toEqual({ page: 1, perPage: 25, total: 0, lastPage: 1 })
+      expect(store.listMeta).toEqual({ page: 1, perPage: 10, total: 0, lastPage: 1 })
       expect(store.error).toBeNull()
     })
   })

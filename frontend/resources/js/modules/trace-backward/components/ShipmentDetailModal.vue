@@ -1,80 +1,177 @@
 <template>
-  <Teleport to="body">
-  <div v-if="modelValue" class="fixed inset-0 z-[1050] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @mousedown.self="close">
-    <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-100">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-        <h5 class="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
-          <Icon icon="ri:ship-line" class="text-info" />
-          Shipment Overview — SO: {{ soNo }}
-        </h5>
-        <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all" @click="close">
-          <Icon icon="ri:close-line" />
-        </button>
-      </div>
-      <div class="p-5 overflow-auto flex-1">
-        <div v-if="loading" class="p-8 text-center text-gray-500">
-          <svg class="animate-spin h-8 w-8 text-info mx-auto" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-          <p class="mt-2 text-sm text-slate-500">Retrieving SAP shipment data...</p>
+  <VDialog
+    :model-value="modelValue"
+    max-width="900"
+    persistent
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
+    <VCard>
+      <VCardTitle class="d-flex justify-space-between align-center py-3 bg-surface" border="b">
+        <div class="d-flex align-center gap-2">
+          <VIcon icon="ri-ship-line" color="primary" size="24" />
+          <span class="text-h6 font-weight-bold">Shipment Overview — SO: {{ soNo }}</span>
         </div>
-        <div v-else-if="!data" class="p-8 text-center text-slate-400">Failed to fetch shipment details or empty response.</div>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="close"
+        />
+      </VCardTitle>
+
+      <VCardText class="pa-4 bg-background">
+        <div v-if="loading" class="pa-8 text-center text-medium-emphasis">
+          <VProgressCircular indeterminate color="primary" class="mb-2" />
+          <div class="text-caption">Retrieving SAP shipment data...</div>
+        </div>
+
+        <div v-else-if="!data" class="pa-8 text-center text-medium-emphasis">
+          Failed to fetch shipment details or empty response.
+        </div>
+
         <template v-else>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <h3 class="text-sm font-bold text-slate-800 mb-3 border-b pb-1">Customer & PO Information</h3>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="text-slate-500">Customer Code:</span><span class="font-semibold text-slate-800">{{ data.CUSTOMER_CODE || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Customer Name:</span><span class="font-semibold text-slate-800 text-right">{{ data.CUSTOMER_NAME || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">PO Number:</span><span class="font-semibold text-slate-800 font-mono">{{ data.PO_NUM || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Pro Invoice:</span><span class="font-semibold text-slate-800 font-mono">{{ data.PRO_INVOICE || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Inco Term PTEO:</span><span class="font-semibold text-slate-800">{{ data.INCO_PTEO || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Inco Term EOS:</span><span class="font-semibold text-slate-800">{{ data.INCO_EOS || '-' }}</span></div>
+          <VRow>
+            <VCol cols="12" md="6">
+              <VCard variant="outlined" class="pa-4 h-100">
+                <div class="text-subtitle-2 font-weight-bold mb-3 pb-1 border-b">Customer & PO Information</div>
+                <div class="d-flex flex-column gap-2 text-body-2">
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Customer Code:</span>
+                    <span class="font-weight-bold">{{ data.CUSTOMER_CODE || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Customer Name:</span>
+                    <span class="font-weight-bold text-right">{{ data.CUSTOMER_NAME || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">PO Number:</span>
+                    <span class="font-weight-bold font-mono">{{ data.PO_NUM || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Pro Invoice:</span>
+                    <span class="font-weight-bold font-mono">{{ data.PRO_INVOICE || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Inco Term PTEO:</span>
+                    <span class="font-weight-bold">{{ data.INCO_PTEO || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Inco Term EOS:</span>
+                    <span class="font-weight-bold">{{ data.INCO_EOS || '-' }}</span>
+                  </div>
+                </div>
+              </VCard>
+            </VCol>
+
+            <VCol cols="12" md="6">
+              <VCard variant="outlined" class="pa-4 h-100">
+                <div class="text-subtitle-2 font-weight-bold mb-3 pb-1 border-b">Logistic & Quality Information</div>
+                <div class="d-flex flex-column gap-2 text-body-2">
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">ZBatch (SAP):</span>
+                    <span class="font-weight-bold font-mono">{{ data.ZBATCH || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Net Weight (kg):</span>
+                    <span class="font-weight-bold">{{ data.NET_WEIGHT || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Depart Date:</span>
+                    <span class="font-weight-bold">{{ data.DATE_DEPART || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Port Discharge:</span>
+                    <span class="font-weight-bold text-right text-uppercase">{{ data.PORT_DISCHARGE || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Vessel:</span>
+                    <span class="font-weight-bold text-right text-uppercase">{{ data.VESSEL || '-' }}</span>
+                  </div>
+                  <div class="d-flex justify-space-between">
+                    <span class="text-medium-emphasis">Ship To Location:</span>
+                    <span class="font-weight-bold text-right text-uppercase">{{ data.SHIP_TO_LOC || '-' }}</span>
+                  </div>
+                </div>
+              </VCard>
+            </VCol>
+          </VRow>
+
+          <div class="d-flex flex-column gap-4 mt-4">
+            <VCard variant="outlined" class="pa-4">
+              <div class="text-subtitle-2 font-weight-bold mb-2">Container Numbers</div>
+              <div class="d-flex flex-wrap gap-2">
+                <template v-if="data.CONTAINER_NUMBER">
+                  <VChip
+                    v-for="c in data.CONTAINER_NUMBER.split(';').map(x=>x.trim()).filter(x=>x)"
+                    :key="c"
+                    color="primary"
+                    variant="tonal"
+                    size="small"
+                    class="font-weight-bold"
+                  >
+                    {{ c }}
+                  </VChip>
+                </template>
+                <div v-else class="text-caption text-medium-emphasis">No container information</div>
               </div>
-            </div>
-            <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <h3 class="text-sm font-bold text-slate-800 mb-3 border-b pb-1">Logistic & Quality Information</h3>
-              <div class="space-y-2 text-sm">
-                <div class="flex justify-between"><span class="text-slate-500">ZBatch (SAP):</span><span class="font-semibold text-slate-800 font-mono">{{ data.ZBATCH || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Net Weight (kg):</span><span class="font-semibold text-slate-800">{{ data.NET_WEIGHT || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Depart Date:</span><span class="font-semibold text-slate-800">{{ data.DATE_DEPART || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Port Discharge:</span><span class="font-semibold text-slate-800 text-right uppercase">{{ data.PORT_DISCHARGE || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Vessel:</span><span class="font-semibold text-slate-800 text-right uppercase">{{ data.VESSEL || '-' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Ship To Location:</span><span class="font-semibold text-slate-800 text-right uppercase">{{ data.SHIP_TO_LOC || '-' }}</span></div>
+            </VCard>
+
+            <VCard variant="outlined" class="pa-4">
+              <div class="text-subtitle-2 font-weight-bold mb-2">Shipment Lot Numbers</div>
+              <div class="d-flex flex-wrap gap-2">
+                <template v-if="data.SHIP_LOT">
+                  <VChip
+                    v-for="l in data.SHIP_LOT.split(';').map(x=>x.trim()).filter(x=>x)"
+                    :key="l"
+                    color="success"
+                    variant="tonal"
+                    size="small"
+                    class="font-weight-bold"
+                  >
+                    {{ l }}
+                  </VChip>
+                </template>
+                <div v-else class="text-caption text-medium-emphasis">No lot information</div>
               </div>
-            </div>
-          </div>
-          <div class="mt-4 space-y-4">
-            <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <h3 class="text-sm font-bold text-slate-800 mb-2">Container Numbers</h3>
-              <div class="flex flex-wrap gap-1.5">
-                <span v-for="c in (data.CONTAINER_NUMBER ? data.CONTAINER_NUMBER.split(';').map(x=>x.trim()).filter(x=>x) : [])" :key="c" class="px-2.5 py-1 text-xs font-semibold bg-info-soft text-info-text rounded-md border border-info/30">{{ c }}</span>
-                <span v-if="!data.CONTAINER_NUMBER" class="text-sm text-slate-400">No container information</span>
+            </VCard>
+
+            <VCard variant="outlined" class="pa-4">
+              <div class="text-subtitle-2 font-weight-bold mb-2">Batch Allocations</div>
+              <div class="d-flex flex-wrap gap-2">
+                <template v-if="data.BATCH_ALLOC">
+                  <VChip
+                    v-for="ba in data.BATCH_ALLOC.split(';').map(x=>x.trim()).filter(x=>x)"
+                    :key="ba"
+                    color="default"
+                    variant="tonal"
+                    size="small"
+                    class="font-weight-bold"
+                  >
+                    {{ ba }}
+                  </VChip>
+                </template>
+                <div v-else class="text-caption text-medium-emphasis">No batch allocation information</div>
               </div>
-            </div>
-            <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <h3 class="text-sm font-bold text-slate-800 mb-2">Shipment Lot Numbers</h3>
-              <div class="flex flex-wrap gap-1.5">
-                <span v-for="l in (data.SHIP_LOT ? data.SHIP_LOT.split(';').map(x=>x.trim()).filter(x=>x) : [])" :key="l" class="px-2.5 py-1 text-xs font-semibold bg-success-soft text-success-text rounded-md border border-success/30">{{ l }}</span>
-                <span v-if="!data.SHIP_LOT" class="text-sm text-slate-400">No lot information</span>
-              </div>
-            </div>
-            <div class="bg-slate-50 rounded-lg p-4 border border-slate-100">
-              <h3 class="text-sm font-bold text-slate-800 mb-2">Batch Allocations</h3>
-              <div class="flex flex-wrap gap-1.5">
-                <span v-for="ba in (data.BATCH_ALLOC ? data.BATCH_ALLOC.split(';').map(x=>x.trim()).filter(x=>x) : [])" :key="ba" class="px-2.5 py-1 text-xs font-semibold bg-neutral-soft text-neutral-text rounded-md border border-neutral-soft/50">{{ ba }}</span>
-                <span v-if="!data.BATCH_ALLOC" class="text-sm text-slate-400">No batch allocation information</span>
-              </div>
-            </div>
+            </VCard>
           </div>
         </template>
-      </div>
-    </div>
-  </div>
-  </Teleport>
+      </VCardText>
+    </VCard>
+  </VDialog>
 </template>
 
 <script setup>
-import { Icon } from '@iconify/vue'
-defineProps({ modelValue: { type: Boolean, default: false }, soNo: String, data: { type: Object, default: null }, loading: Boolean })
+defineProps({
+  modelValue: { type: Boolean, default: false },
+  soNo: { type: String, default: '' },
+  data: { type: Object, default: null },
+  loading: { type: Boolean, default: false }
+})
+
 const emit = defineEmits(['update:modelValue'])
-const close = () => emit('update:modelValue', false)
+
+const close = () => {
+  emit('update:modelValue', false)
+}
 </script>

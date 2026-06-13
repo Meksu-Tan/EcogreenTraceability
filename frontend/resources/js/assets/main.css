@@ -2,256 +2,96 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ── Semantic Theme Tokens (GAP-014) ───────────────────────── */
-@theme {
-  --color-success: #2E7D32;
-  --color-success-soft: #D9EDD0;
-  --color-success-text: #1B5E20;
-  --color-info: #01579B;
-  --color-info-soft: #CFFAFE;
-  --color-info-text: #155E75;
-  --color-warning: #E65100;
-  --color-warning-soft: #FDF3E3;
-  --color-warning-text: #9A5E1A;
-  --color-danger: #C62828;
-  --color-danger-soft: #FECDD3;
-  --color-danger-text: #9F1239;
-  --color-neutral-soft: #E0F2FE;
-  --color-neutral-text: #1E40AF;
-}
-
-/* ── Typography & Base Styles ─────────────────────────────── */
-:root {
-  /* Font Families */
-  --font-sans: 'Nunito', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-heading: 'Montserrat', sans-serif;
-  --font-body: 'Source Sans 3', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-
-  /* Brand Colors */
-  --color-brand: #42B240;
-  --color-brand-dark: #2A8030;
-  --color-brand-light: #65C463;
-  --color-surface: #F7F4EF;
-  --color-text: #1C2420;
-  --color-text-secondary: #5A6860;
-  --color-border: #D4DDD8;
-  --color-amber: #C8873A;
-
-  /* Spacing Scale */
-  --space-1: 0.25rem;   /* 4px */
-  --space-2: 0.5rem;    /* 8px */
-  --space-3: 0.75rem;   /* 12px */
-  --space-4: 1rem;      /* 16px */
-  --space-5: 1.25rem;   /* 20px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-8: 2rem;      /* 32px */
-  --space-10: 2.5rem;   /* 40px */
-  --space-12: 3rem;      /* 48px */
-  --space-16: 4rem;      /* 64px */
-
-  /* Border Radius */
-  --radius-sm: 0.25rem;   /* 4px */
-  --radius-md: 0.5rem;      /* 8px */
-  --radius-lg: 0.75rem;    /* 12px */
-  --radius-xl: 1rem;        /* 16px */
-  --radius-2xl: 1.5rem;     /* 24px */
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-
-  /* Typography Scale */
-  --text-xs: 0.75rem;      /* 12px */
-  --text-sm: 0.875rem;     /* 14px */
-  --text-base: 1rem;       /* 16px */
-  --text-lg: 1.125rem;     /* 18px */
-  --text-xl: 1.25rem;      /* 20px */
-  --text-2xl: 1.5rem;     /* 24px */
-  --text-3xl: 1.875rem;    /* 30px */
-  --text-4xl: 2.25rem;     /* 36px */
-
-  /* Line Heights */
-  --leading-tight: 1.25;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.625;
-
-  /* Font Weights */
-  --font-normal: 400;
-  --font-medium: 500;
-  --font-semibold: 600;
-  --font-bold: 700;
-  --font-extrabold: 800;
-}
-
 body {
-  font-family: var(--font-sans);
-  @apply bg-[#F7F4EF] text-slate-600 antialiased;
+  font-family: var(--font-body);
+  @apply bg-[var(--color-surface)] text-[var(--color-text)] antialiased;
 }
 
-html.dark body {
-  @apply bg-[#0F1410] text-slate-300;
+h1, h2, h3, h4, h5, h6,
+.text-h1, .text-h2, .text-h3, .text-h4, .text-h5, .text-h6 {
+  font-family: var(--font-heading) !important;
 }
 
 html {
   color-scheme: light;
 }
 
-html.dark {
-  color-scheme: dark;
+/* ── Dark Mode Title Fixes ──────────────────────────────────── */
+.v-theme--ecoDark h1,
+.v-theme--ecoDark h2,
+.v-theme--ecoDark h3,
+.v-theme--ecoDark h4,
+.v-theme--ecoDark h5,
+.v-theme--ecoDark h6,
+.v-theme--ecoDark .text-h1,
+.v-theme--ecoDark .text-h2,
+.v-theme--ecoDark .text-h3,
+.v-theme--ecoDark .text-h4,
+.v-theme--ecoDark .text-h5,
+.v-theme--ecoDark .text-h6,
+html.v-theme--dark h1,
+html.v-theme--dark h2,
+html.v-theme--dark h3,
+html.v-theme--dark h4,
+html.v-theme--dark h5,
+html.v-theme--dark h6,
+html.v-theme--dark .text-h1,
+html.v-theme--dark .text-h2,
+html.v-theme--dark .text-h3,
+html.v-theme--dark .text-h4,
+html.v-theme--dark .text-h5,
+html.v-theme--dark .text-h6 {
+  color: #ffffff !important;
 }
 
-/* ── Class-based dark mode bridge ─────────────────────────────
-   Many legacy views predate dark variants and use fixed light
-   utility classes. These scoped overrides let the app-wide theme
-   switch cover cards, tables, modals, forms, and page backgrounds. */
-html.dark .bg-white {
-  background-color: #0f172a !important;
+.v-theme--ecoDark .v-select,
+html.v-theme--dark .v-select {
+  color: #fff !important;
 }
 
-html.dark .bg-slate-50,
-html.dark .bg-gray-50,
-html.dark .bg-gray-50\/30,
-html.dark .bg-gray-50\/80,
-html.dark .bg-\[\#fafdfb\] {
-  background-color: #111827 !important;
+/* ── Dark Mode Pagination ─────────────────────────────────── */
+html.v-theme--dark .v-pagination__item {
+  color: #fff !important;
 }
 
-html.dark .bg-slate-100,
-html.dark .bg-gray-100 {
-  background-color: #1e293b !important;
+html.v-theme--dark .v-pagination__navigation {
+  color: #fff !important;
 }
 
-html.dark .hover\:bg-gray-50:hover,
-html.dark .hover\:bg-slate-50:hover {
-  background-color: #1e293b !important;
-}
-
-html.dark .hover\:bg-green-50:hover,
-html.dark .hover\:bg-green-50\/50:hover {
-  background-color: rgba(20, 83, 45, 0.35) !important;
-}
-
-html.dark .text-slate-900,
-html.dark .text-slate-800,
-html.dark .text-gray-900,
-html.dark .text-gray-800 {
-  color: #e5e7eb !important;
-}
-
-html.dark .text-slate-700,
-html.dark .text-slate-600,
-html.dark .text-gray-700,
-html.dark .text-gray-600 {
-  color: #cbd5e1 !important;
-}
-
-html.dark .text-slate-500,
-html.dark .text-gray-500,
-html.dark .text-gray-400 {
-  color: #94a3b8 !important;
-}
-
-html.dark .border-white,
-html.dark .border-gray-50,
-html.dark .border-gray-100,
-html.dark .border-gray-200,
-html.dark .border-gray-300,
-html.dark .border-slate-100,
-html.dark .border-slate-200,
-html.dark .border-slate-200\/80,
-html.dark .border-slate-300 {
-  border-color: #334155 !important;
-}
-
-html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
-html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #334155 !important;
-}
-
-html.dark input,
-html.dark select,
-html.dark textarea {
-  color: #e5e7eb;
-  background-color: #0f172a;
-}
-
-html.dark input::placeholder,
-html.dark textarea::placeholder {
-  color: #64748b;
-}
-
-html.dark .disabled\:bg-slate-100:disabled,
-html.dark .bg-gray-100.cursor-not-allowed {
-  background-color: #1e293b !important;
-}
-
-html.dark .shadow-slate-200\/60,
-html.dark .shadow-sm,
-html.dark .shadow-md,
-html.dark .shadow-lg,
-html.dark .shadow-xl,
-html.dark .shadow-2xl {
-  --tw-shadow-color: rgba(0, 0, 0, 0.35) !important;
-}
 
 /* ── Ecogreen Brand Color Overrides ────────────────────────── */
 /* Primary brand: #42B240 */
 
-.bg-green-500 { background-color: #42B240 !important; }
-.bg-green-600 { background-color: #3A9E37 !important; }
-.bg-green-700 { background-color: #2A8030 !important; }
+.bg-green-500 { background-color: var(--color-brand) !important; }
+.bg-green-600 { background-color: var(--color-brand-dark) !important; }
+.bg-green-700 { background-color: var(--color-brand-dark) !important; }
 
-.hover\:bg-green-500:hover { background-color: #3A9E37 !important; }
-.hover\:bg-green-600:hover { background-color: #2A8030 !important; }
-.hover\:bg-green-700:hover { background-color: #1C5A22 !important; }
+.hover\:bg-green-500:hover { background-color: var(--color-brand-dark) !important; }
+.hover\:bg-green-600:hover { background-color: var(--color-brand-dark) !important; }
+.hover\:bg-green-700:hover { background-color: var(--color-brand-dark) !important; }
 
-.text-green-500 { color: #42B240 !important; }
-.text-green-600 { color: #3A9E37 !important; }
-.text-green-700 { color: #2A8030 !important; }
-.text-green-800 { color: #1C5A22 !important; }
+.text-green-500 { color: var(--color-brand) !important; }
+.text-green-600 { color: var(--color-brand-dark) !important; }
+.text-green-700 { color: var(--color-brand-dark) !important; }
+.text-green-800 { color: var(--color-brand-dark) !important; }
 
-.hover\:text-green-600:hover { color: #3A9E37 !important; }
-.hover\:text-green-700:hover { color: #2A8030 !important; }
+.hover\:text-green-600:hover { color: var(--color-brand-dark) !important; }
+.hover\:text-green-700:hover { color: var(--color-brand-dark) !important; }
 
-.border-green-500 { border-color: #42B240 !important; }
-.border-green-600 { border-color: #3A9E37 !important; }
-.border-green-700 { border-color: #2A8030 !important; }
+.border-green-500 { border-color: var(--color-brand) !important; }
+.border-green-600 { border-color: var(--color-brand-dark) !important; }
+.border-green-700 { border-color: var(--color-brand-dark) !important; }
 
-.ring-green-500, .ring-green-600 { --tw-ring-color: #42B240 !important; }
+.ring-green-500, .ring-green-600 { --tw-ring-color: var(--color-brand) !important; }
 
-.focus\:border-green-400:focus { border-color: #65C463 !important; }
-.focus\:border-green-500:focus { border-color: #42B240 !important; }
-.focus\:ring-green-500:focus { --tw-ring-color: #42B240 !important; }
+.focus\:border-green-400:focus { border-color: var(--color-brand-light) !important; }
+.focus\:border-green-500:focus { border-color: var(--color-brand) !important; }
+.focus\:ring-green-500:focus { --tw-ring-color: var(--color-brand) !important; }
 .focus\:ring-green-500\/25:focus { --tw-ring-color: rgba(66, 178, 64, 0.25) !important; }
 
-.bg-green-100 { background-color: #D9EDD0 !important; }
-.text-green-50 { color: #F0F7ED !important; }
+.bg-green-100 { background-color: var(--color-green-100) !important; }
+.text-green-50 { color: var(--color-green-50) !important; }
 
-/* ── Custom Utilities ───────────────────────────────────────── */
-@layer utilities {
-  .glass {
-    @apply backdrop-blur-md bg-white/70 border border-white/20;
-  }
-
-  /* Brand shadow */
-  .shadow-brand {
-    box-shadow: 0 4px 14px 0 rgba(66, 178, 64, 0.25);
-  }
-
-  /* Brand border */
-  .border-brand {
-    border-color: var(--color-brand);
-  }
-
-  /* Surface background */
-  .bg-surface {
-    background-color: var(--color-surface);
-  }
-}
 
 /* ── Transitions ───────────────────────────────────────────── */
 .fade-enter-active, .fade-leave-active {
@@ -287,16 +127,4 @@ html.dark .shadow-2xl {
   }
 }
 
-/* ── Icon alignment ────────────────────────────────────────── */
-.w-5 {
-  width: 1.25rem;
-}
-.h-5 {
-  height: 1.25rem;
-}
-.w-8 {
-  width: 2rem;
-}
-.h-8 {
-  height: 2rem;
-}
+

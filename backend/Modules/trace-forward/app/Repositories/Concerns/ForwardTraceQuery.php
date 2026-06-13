@@ -10,10 +10,6 @@ final class ForwardTraceQuery
 
     public function execute(string $traceNo, ?int $idMaterial = null): array
     {
-        $this->connection->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $materialFilter = $idMaterial ? ' AND b.id_material = ?' : '';
         $materialBinding = $idMaterial ? [$traceNo, $idMaterial] : [$traceNo];
 
@@ -88,7 +84,7 @@ final class ForwardTraceQuery
                         ) e ON c.id_trace_head = e.id_trace_head
             LEFT JOIN m_supplier f ON f.id_supplier = e.id_supplier
             LEFT JOIN m_material_pck g ON c.id_material = g.id_materialpck
-            LEFT JOIN m_tank h ON c.id_sloc = h.id_tank
+            LEFT JOIN m_sloc h ON c.id_sloc = h.id_sloc
             LEFT JOIN m_warehouse i ON c.id_sloc = i.id_warehouse
             WHERE e.status <> 0
             GROUP BY trace_no, `path`

@@ -14,8 +14,10 @@ class StoreAdjustmentHeaderRequest extends FormRequest
     {
         return [
             'entry_date' => ['required', 'date'],
-            'id_plant' => ['required'],
+            'id_plant' => ['required','integer'],
             'adjustment_type' => ['required', 'string'],
+            'id_sloc' => ['required', 'array'],
+            'id_sloc.*' => ['integer'],
             'reason' => ['required', 'string'],
         ];
     }

@@ -1,8 +1,15 @@
-import RmEntryApi from '@/modules/ts-raw/api'
+/**
+ * @note Naming convention mismatch: this file lives in `repositories/` but should be in `services/`
+ *       per project convention (View → Store → Service → Axios). Rename deferred due to risk.
+ */
+import RmEntryApi from '@/modules/ts-raw/services'
 
 class RmEntryRepository {
   async getList(params = {}) {
     const res = await RmEntryApi.getList(params)
+    if (res.current_page !== undefined) {
+      return { data: res.data || [], current_page: res.current_page, per_page: res.per_page, total: res.total, last_page: res.last_page }
+    }
     return res.data?.data ?? res.data ?? res
   }
 

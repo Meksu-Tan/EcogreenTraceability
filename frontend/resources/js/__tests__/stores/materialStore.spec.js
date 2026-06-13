@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useMaterialStore } from '@/modules/m-material/stores/materialStore'
 
-vi.mock('@/modules/m-material/api', () => ({
+vi.mock('@/modules/m-material/services', () => ({
   getMaterials: vi.fn(),
   storeMaterial: vi.fn(),
   updateMaterial: vi.fn(),
 }))
 
-import * as MaterialApi from '@/modules/m-material/api'
+import * as MaterialApi from '@/modules/m-material/services'
 
 describe('materialStore', () => {
   beforeEach(() => {

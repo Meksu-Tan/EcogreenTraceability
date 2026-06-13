@@ -15,7 +15,7 @@
  */
 export function parseSoNo(soNoRaw = '', batchNo = '') {
   let soNo = soNoRaw || ''
-  let soItem = 'No Doc'
+  let soItem = ''
 
   if (soNo.includes('-')) {
     const parts = soNo.split(/[-,]/)

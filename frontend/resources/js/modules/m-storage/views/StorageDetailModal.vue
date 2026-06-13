@@ -1,23 +1,22 @@
 <template>
   <BaseModal
     :model-value="modelValue"
-    :title="isEdit ? 'Edit Storage Detail' : 'Tambah Storage Detail'"
+    :title="isEdit ? 'Edit Storage Detail' : 'Add Storage Detail'"
     :loading="loading"
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div class="space-y-4">
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">TF Number <span class="text-red-500">*</span></label>
-        <input
-          id="detail-tf-number"
-          v-model="form.tf_number"
-          type="text"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.tf_number ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
-        />
-        <div v-if="errors.tf_number" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.tf_number }}</div>
-      </div>
+    <div class="d-flex flex-column gap-4 py-2">
+      <VTextField
+        id="detail-tf-number"
+        v-model="form.tf_number"
+        label="TF Number"
+        :error-messages="errors.tf_number"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+        required
+      />
     </div>
   </BaseModal>
 </template>
@@ -39,7 +38,7 @@ watch(() => props.editData, (val) => {
 
 function validate() {
   errors.tf_number = ''
-  if (!form.tf_number) { errors.tf_number = 'TF Number wajib diisi'; return false }
+  if (!form.tf_number) { errors.tf_number = 'TF Number is required'; return false }
   return true
 }
 

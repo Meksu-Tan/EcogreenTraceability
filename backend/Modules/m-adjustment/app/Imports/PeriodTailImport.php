@@ -3,9 +3,8 @@
 namespace Modules\Adjustment\Imports;
 
 use Maatwebsite\Excel\Concerns\ToArray;
-use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
-class PeriodTailImport implements ToArray, WithHeadingRow
+class PeriodTailImport implements ToArray
 {
     public function array(array $rows): array
     {

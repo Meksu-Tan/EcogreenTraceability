@@ -22,7 +22,7 @@ class WipEntryServiceTest extends TestCase
 
         $repoMock->shouldReceive('getBalance')
             ->once()
-            ->with('101', 1002, null)
+            ->with('101', 1002, null, 1, 5)
             ->andReturn($expectedBalance);
 
         $service = new WipEntryService($repoMock);

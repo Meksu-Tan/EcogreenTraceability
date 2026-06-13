@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import adjustmentApi from '@/modules/m-adjustment/api'
+import adjustmentApi from '@/modules/m-adjustment/services'
 
 export const useAdjustmentStore = defineStore('adjustment', () => {
   // ——— State ———
@@ -8,6 +8,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   const detail = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
 
   // Lookup caches
   const activeMaterials = ref([])
@@ -16,6 +17,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   const activeSpecificTanks = ref([])
   const activeWhx = ref([])
   const supplierList = ref([])
+  const searchSuppliersList = ref([])
   const batches = ref([])
   const lockStatus = ref(null)
   const entryNo = ref(null)
@@ -31,13 +33,24 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     error.value = null
     try {
       const res = await adjustmentApi.getAdjustmentList(params)
-      data.value = res.data?.data || res.data || []
+      const payload = res.data?.data || {}
+      data.value = payload.data || (Array.isArray(payload) ? payload : [])
+      listMeta.value = {
+        page: payload.page || params.page || 1,
+        perPage: payload.per_page || params.per_page || 10,
+        total: payload.total || data.value.length,
+        lastPage: payload.last_page || 1,
+      }
     } catch (err) {
       error.value = err.message || 'Failed to fetch adjustment list'
       data.value = []
     } finally {
       loading.value = false
     }
+  }
+
+  function setPage(p) {
+    listMeta.value = { ...listMeta.value, page: p }
   }
 
   async function fetchDetail(id) {
@@ -56,6 +69,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
 
   // ——— Lookups ———
   async function fetchActiveMaterials() {
+    if (activeMaterials.value.length > 0) return
     try {
       const res = await adjustmentApi.getActiveMaterials()
       activeMaterials.value = res.data?.data || []
@@ -63,6 +77,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   }
 
   async function fetchActiveMaterialWhx() {
+    if (activeMaterialWhx.value.length > 0) return
     try {
       const res = await adjustmentApi.getActiveMaterialWhx()
       activeMaterialWhx.value = res.data?.data || []
@@ -70,6 +85,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   }
 
   async function fetchActiveTanks(params = {}) {
+    if (activeTanks.value.length > 0 && !params.id_plant) return
     try {
       const res = await adjustmentApi.getActiveTanks(params)
       activeTanks.value = res.data?.data || []
@@ -84,6 +100,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   }
 
   async function fetchActiveWhx() {
+    if (activeWhx.value.length > 0) return
     try {
       const res = await adjustmentApi.getActiveWhx()
       activeWhx.value = res.data?.data || []
@@ -95,6 +112,13 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
       const res = await adjustmentApi.getSupplierList(params)
       supplierList.value = res.data?.data || []
     } catch { supplierList.value = [] }
+  }
+
+  async function fetchSuppliers(params = {}) {
+    try {
+      const res = await adjustmentApi.searchSuppliers(params)
+      searchSuppliersList.value = res.data?.data || []
+    } catch { searchSuppliersList.value = [] }
   }
 
   async function fetchBatchBySupplier(params = {}) {
@@ -264,6 +288,15 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     return res.data
   }
 
+  async function generateBatchCode(supplierId) {
+    try {
+      const res = await adjustmentApi.generateBatchCode({ id_supplier: supplierId })
+      return res.data?.batch_code || res.data?.data?.batch_code || ''
+    } catch {
+      return ''
+    }
+  }
+
   function clearData() {
     data.value = []
     detail.value = null
@@ -274,14 +307,14 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   }
 
   return {
-    data, detail, loading, error,
+    data, detail, loading, error, listMeta,
     activeMaterials, activeMaterialWhx, activeTanks, activeSpecificTanks, activeWhx,
-    supplierList, batches, lockStatus, entryNo,
+    supplierList, searchSuppliersList, batches, lockStatus, entryNo,
     periodHeaders, periodViewData, adjustStatus,
-    fetchList, fetchDetail,
+    fetchList, fetchDetail, setPage,
     fetchActiveMaterials, fetchActiveMaterialWhx, fetchActiveTanks,
     fetchActiveSpecificTanks, fetchActiveWhx,
-    fetchSupplierList, fetchBatchBySupplier, fetchLockStatus, fetchEntryNo,
+    fetchSupplierList, fetchSuppliers, fetchBatchBySupplier, fetchLockStatus, fetchEntryNo,
     fetchPeriodHeaders, fetchPeriodViewData, fetchAdjustStatus,
     storeAdjustment, storeAdjustmentWhx, destroyAdjustment,
     addEntrySupplier, deleteSupplierTemp,
@@ -290,6 +323,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     adjustMaterialDocument,
     periodHeadersUpload, periodViewOnHand, periodViewAdjustment,
     periodHeaderLock, destroyAdjustmentPeriod,
+    generateBatchCode,
     clearData,
   }
 })

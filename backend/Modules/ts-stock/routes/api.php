@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\TsStock\Http\Controllers\StockController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('transactions/stock')->group(function () {
         Route::get('/', [StockController::class, 'index']);
         Route::get('active-materials', [StockController::class, 'getActiveMaterials']);

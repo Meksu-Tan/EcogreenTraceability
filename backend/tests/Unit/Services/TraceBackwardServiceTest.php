@@ -55,11 +55,11 @@ class TraceBackwardServiceTest extends TestCase
 
         $repoMock->shouldReceive('backwardTrace')
             ->once()
-            ->with('300001-001', 3, 1002, 1)
+            ->with('300001-001', 3)
             ->andReturn($expected);
 
         $service = new TraceBackwardService($repoMock);
-        $result = $service->backwardTrace('300001-001', 3, 1002, 1);
+        $result = $service->backwardTrace('300001-001', 3);
 
         $this->assertEquals($expected, $result);
     }

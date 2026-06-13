@@ -2,7 +2,7 @@
 use Modules\Tank\Http\Controllers\TankController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::get('tanks', [TankController::class, 'index']);
     Route::post('tanks/sync', [TankController::class, 'sync']);
     Route::post('tanks', [TankController::class, 'store']);

@@ -1,92 +1,166 @@
 <template>
-  <Teleport to="body">
-    <div v-if="modelValue" class="fixed inset-0 z-[1050] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" @mousedown.self="close">
-      <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden border border-gray-100">
-        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h5 class="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
-            <Icon :icon="mode === 'forward' ? 'ri:arrow-right-double-line' : 'ri:arrow-left-double-line'"
-                  :class="mode === 'forward' ? 'text-primary' : 'text-info'" />
+  <VDialog
+    :model-value="modelValue"
+    max-width="1200"
+    persistent
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
+    <VCard>
+      <VCardTitle class="d-flex justify-space-between align-center py-3 bg-surface" border="b">
+        <div class="d-flex align-center gap-2">
+          <VIcon
+            :icon="mode === 'forward' ? 'ri-arrow-right-double-line' : 'ri-arrow-left-double-line'"
+            :color="mode === 'forward' ? 'primary' : 'info'"
+            size="24"
+          />
+          <span class="text-h6 font-weight-bold">
             {{ mode === 'forward' ? 'Forward' : 'Backward' }} Trace Detail — {{ traceNo }}
-          </h5>
-          <button class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all" @click="close">
-            <Icon icon="ri:close-line" />
-          </button>
+          </span>
+        </div>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="close"
+        />
+      </VCardTitle>
+
+      <VCardText class="pa-4 bg-background">
+        <div v-if="loading" class="pa-8 text-center text-medium-emphasis">
+          <VProgressCircular indeterminate color="primary" class="mb-2" />
+          <div class="text-caption">Loading trace detail...</div>
         </div>
 
-        <div class="px-6 py-6 overflow-y-auto flex-1">
-          <div v-if="loading" class="p-8 text-center text-slate-500">
-            <Icon icon="ri:loader-4-line" class="animate-spin text-3xl text-primary" />
-            <p class="mt-2 text-sm">Loading trace detail...</p>
-          </div>
-          <div v-else-if="items.length === 0" class="p-8 text-center text-slate-400">
-            <Icon icon="ri:inbox-line" class="text-4xl text-slate-300" />
-            <p class="mt-2">No trace chain data.</p>
-          </div>
-          <div v-else class="overflow-x-auto border border-slate-200 rounded-lg">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="bg-slate-50 border-b border-slate-200 text-left">
-                  <th class="px-3 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-12">No</th>
-                  <th class="px-3 py-2 text-center text-xs font-semibold text-slate-500 uppercase w-20">Type</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Prev Batch</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Curr Batch</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Batch Date</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Material</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase">In Qty</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">SLoc</th>
-                  <th class="px-3 py-2 text-right text-xs font-semibold text-slate-500 uppercase">Out Qty</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase max-w-xs">Supplier</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Matl Doc</th>
-                  <th class="px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Created</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100 text-slate-700">
-                <tr v-for="(t, idx) in items" :key="idx" class="hover:bg-slate-50">
-                  <td class="px-3 py-2 text-center text-slate-400">{{ idx + 1 }}</td>
-                  <td class="px-3 py-2 text-center">
-                    <span :class="badgeClass(idx)" class="inline-flex px-2 py-0.5 text-xs rounded-full font-semibold">
-                      {{ badgeLabel(idx) }}
-                    </span>
-                  </td>
-                  <td class="px-3 py-2 font-mono text-slate-600">{{ t.prev_trace || '-' }}</td>
-                  <td class="px-3 py-2 font-mono font-semibold text-slate-800">{{ t.curr_trace || '-' }}</td>
-                  <td class="px-3 py-2 text-slate-600">{{ t.batch_date || '-' }}</td>
-                  <td class="px-3 py-2 font-medium text-slate-800 max-w-xs truncate" :title="t.material">{{ t.material }}</td>
-                  <td class="px-3 py-2 text-right font-mono text-success font-semibold">{{ t.in_qty || '0.000' }}</td>
-                  <td class="px-3 py-2 text-slate-600">{{ t.sloc || '-' }}</td>
-                  <td class="px-3 py-2 text-right font-mono text-danger font-semibold">{{ t.out_qty || '0.000' }}</td>
-                  <td class="px-3 py-2 max-w-xs truncate text-xs" :title="t.supplier">{{ t.supplier || '-' }}</td>
-                  <td class="px-3 py-2 font-mono text-slate-600">{{ t.material_document || '-' }}</td>
-                  <td class="px-3 py-2 text-xs text-slate-500">{{ t.created_at || '-' }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div v-else-if="items.length === 0" class="pa-8 text-center text-medium-emphasis">
+          <VIcon icon="ri-inbox-line" size="48" class="mb-2 text-disabled" />
+          <div class="text-body-2">No trace chain data.</div>
         </div>
-      </div>
-    </div>
-  </Teleport>
-</template>
 
-<script setup>
-import { Icon } from '@iconify/vue'
+        <div v-else>
+          <VCard variant="outlined" class="mb-4">
+            <div class="overflow-x-auto">
+              <VTable density="comfortable" class="text-caption">
+                <thead>
+                  <tr class="bg-surface-variant">
+                    <th class="text-center font-weight-bold" style="width: 48px;">No</th>
+                    <th class="text-center font-weight-bold" style="width: 80px;">Type</th>
+                    <th class="text-left font-weight-bold">Prev Batch</th>
+                    <th class="text-left font-weight-bold">Curr Batch</th>
+                    <th class="text-left font-weight-bold">Batch Date</th>
+                    <th class="text-left font-weight-bold" style="max-width: 200px;">Material</th>
+                    <th class="text-right font-weight-bold">In Qty</th>
+                    <th class="text-left font-weight-bold">SLoc</th>
+                    <th class="text-right font-weight-bold">Out Qty</th>
+                    <th class="text-left font-weight-bold" style="max-width: 200px;">Supplier</th>
+                    <th class="text-left font-weight-bold">Matl Doc</th>
+                    <th class="text-left font-weight-bold">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(t, idx) in paginatedItems" :key="idx" class="hover-row">
+                    <td class="text-center text-medium-emphasis">{{ getGlobalIndex(idx) }}</td>
+                    <td class="text-center">
+                      <VChip
+                        size="x-small"
+                        :color="badgeColor(getGlobalIndex(idx) - 1)"
+                        variant="tonal"
+                        class="font-weight-bold"
+                      >
+                        {{ badgeLabel(getGlobalIndex(idx) - 1) }}
+                      </VChip>
+                    </td>
+                    <td class="font-mono text-medium-emphasis">{{ t.prev_trace || '-' }}</td>
+                    <td class="font-mono font-weight-bold">{{ t.curr_trace || '-' }}</td>
+                    <td class="text-medium-emphasis">{{ t.batch_date || '-' }}</td>
+                    <td class="font-weight-medium" style="max-width: 200px;">
+                      <div class="text-truncate" :title="t.material">{{ t.material }}</div>
+                    </td>
+                    <td class="text-right font-mono font-weight-bold text-success">{{ t.in_qty || '0.000' }}</td>
+                    <td class="text-medium-emphasis">{{ t.sloc || '-' }}</td>
+                    <td class="text-right font-mono font-weight-bold text-error">{{ t.out_qty || '0.000' }}</td>
+                    <td style="max-width: 200px;" class="text-caption text-medium-emphasis">
+                      <div class="text-truncate" :title="t.supplier">{{ t.supplier || '-' }}</div>
+                    </td>
+                    <td class="font-mono text-medium-emphasis">{{ t.material_document || '-' }}</td>
+                    <td class="text-medium-emphasis" style="font-size: 11px;">{{ t.created_at || '-' }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </div>
+          </VCard>
 
-const props = defineProps({
-  modelValue: { type: Boolean, default: false },
-  traceNo:    { type: String, default: '' },
-  items:      { type: Array,  default: () => [] },
-  loading:    { type: Boolean, default: false },
-  mode:       { type: String, default: 'backward', validator: v => ['forward', 'backward'].includes(v) },
+          <div v-if="items.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer rounded border gap-2 mt-2">
+            <span class="text-caption text-medium-emphasis">
+              Showing {{ (page - 1) * itemsPerPage + 1 }} - {{ Math.min(page * itemsPerPage, items.length) }} of {{ items.length }} records
+            </span>
+            <VPagination
+              v-if="totalPages > 1"
+              v-model="page"
+              :length="totalPages"
+              :total-visible="5"
+              density="comfortable"
+              size="small"
+              show-first-last-page
+            />
+          </div>
+          </div>
+        </VCardText>
+      </VCard>
+    </VDialog>
+  </template>
+  
+  <script setup>
+  import { ref, computed, watch } from 'vue'
+  
+  const props = defineProps({
+    modelValue: { type: Boolean, default: false },
+    traceNo:    { type: String, default: '' },
+    items:      { type: Array,  default: () => [] },
+    loading:    { type: Boolean, default: false },
+    mode:       { type: String, default: 'backward', validator: v => ['forward', 'backward'].includes(v) },
+  })
+  
+  const emit = defineEmits(['update:modelValue'])
+  
+  const close = () => {
+    emit('update:modelValue', false)
+  }
+  
+  // Pagination Logic
+  const page = ref(1)
+  const itemsPerPage = ref(5)
+
+// Reset page when modal opens
+watch(() => props.modelValue, (val) => {
+  if (val) page.value = 1
 })
-const emit = defineEmits(['update:modelValue'])
-const close = () => emit('update:modelValue', false)
+
+const totalPages = computed(() => Math.ceil(props.items.length / itemsPerPage.value))
+
+const paginatedItems = computed(() => {
+  const start = (page.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return props.items.slice(start, end)
+})
+
+function getGlobalIndex(localIndex) {
+  return (page.value - 1) * itemsPerPage.value + localIndex + 1
+}
 
 function badgeLabel(idx) {
   if (props.mode === 'forward') return idx === 0 ? 'Initial' : 'Forward'
   return idx === 0 ? 'Target' : 'Source'
 }
-function badgeClass(idx) {
-  if (props.mode === 'forward') return idx === 0 ? 'bg-success-soft text-success-text' : 'bg-info-soft text-info-text'
-  return idx === 0 ? 'bg-danger-soft text-danger-text' : 'bg-neutral-soft text-neutral-text'
+
+function badgeColor(idx) {
+  if (props.mode === 'forward') return idx === 0 ? 'success' : 'info'
+  return idx === 0 ? 'error' : 'default'
 }
 </script>
+
+<style scoped>
+.hover-row:hover {
+  background-color: rgba(var(--v-theme-on-surface), 0.04);
+}
+</style>

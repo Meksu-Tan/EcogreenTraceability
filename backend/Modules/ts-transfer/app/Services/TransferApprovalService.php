@@ -4,12 +4,15 @@ namespace Modules\TsTransfer\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Modules\TsTransfer\Repositories\Contracts\TransferApprovalRepositoryInterface;
 use Modules\Shared\Services\AuditService;
 use Modules\Shared\Services\PeriodLockService;
 
 class TransferApprovalService
 {
-    protected string $connection = 'eudr_ts';
+    public function __construct(
+        protected TransferApprovalRepositoryInterface $approvalRepo
+    ) {}
 
     /**
      * Submit transfer for approval.
@@ -18,22 +21,14 @@ class TransferApprovalService
     public function submit(string $idBalanceHead, string $user): array
     {
         try {
-            $transfer = DB::connection($this->connection)->select(
-                'SELECT th.id_trace_head, bh.trace_no, bh.entry_date
-                   FROM t_balance_header bh
-                   LEFT JOIN t_trace_header th ON bh.id_balance_head = th.id_balance_head
-                                                AND th.status = 1
-                   WHERE bh.id_balance_head = ? AND bh.status = 1
-                   LIMIT 1',
-                [$idBalanceHead]
-            );
+            $transfer = $this->approvalRepo->findTransferForApproval($idBalanceHead);
 
-            if (empty($transfer)) {
+            if (!$transfer) {
                 return ['response' => 98, 'message' => 'Transfer not found'];
             }
 
-            $traceNo = $transfer[0]->trace_no ?? '';
-            $entryDate = $transfer[0]->entry_date ?? '';
+            $traceNo = $transfer->trace_no ?? '';
+            $entryDate = $transfer->entry_date ?? '';
 
             // Check period lock
             if (PeriodLockService::isLocked($entryDate)) {
@@ -46,39 +41,35 @@ class TransferApprovalService
                 return ['response' => 2, 'message' => 'Only DRAFT transfers can be submitted. Current: ' . $currentStatus];
             }
 
-            // Update status to PENDING
-            DB::connection($this->connection)->update(
-                'UPDATE t_balance_header SET approval_status = "PENDING", updated_by = ?
-                 WHERE id_balance_head = ?',
-                [$user, $idBalanceHead]
-            );
+            return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $traceNo, $entryDate, $transfer) {
+                // Update status to PENDING
+                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'PENDING', $user);
 
-            // Insert or update approval record
-            $existingApproval = DB::connection($this->connection)->select(
-                'SELECT id_approval FROM t_transfer_approval WHERE id_balance_head = ? AND status = 1',
-                [$idBalanceHead]
-            );
+                // Insert or update approval record
+                $existingApproval = $this->approvalRepo->findApprovalRecord($idBalanceHead);
 
-            if (empty($existingApproval)) {
-                DB::connection($this->connection)->insert(
-                    'INSERT INTO t_transfer_approval (id_balance_head, id_trace_head, entry_no, entry_date, status, submitted_by, submitted_at, created_by)
-                     VALUES (?, ?, ?, ?, "PENDING", ?, NOW(), ?)',
-                    [$idBalanceHead, $transfer[0]->id_trace_head ?? '', $traceNo, $entryDate, $user, $user]
-                );
-            } else {
-                DB::connection($this->connection)->update(
-                    'UPDATE t_transfer_approval SET status = "PENDING", submitted_by = ?, submitted_at = NOW(), updated_by = ?
-                     WHERE id_balance_head = ? AND status = 1',
-                    [$user, $user, $idBalanceHead]
-                );
-            }
+                if (!$existingApproval) {
+                    $this->approvalRepo->insertApprovalRecord([
+                        'id_balance_head' => $idBalanceHead,
+                        'id_trace_head' => $transfer->id_trace_head ?? '',
+                        'entry_no' => $traceNo,
+                        'entry_date' => $entryDate,
+                        'status' => 'PENDING',
+                        'submitted_by' => $user,
+                        'submitted_at' => now(),
+                        'created_by' => $user,
+                    ]);
+                } else {
+                    $this->approvalRepo->updateApprovalStatus($idBalanceHead, 'PENDING', $user);
+                }
 
-            // Audit log
-            AuditService::log('TRANSFER', 'SUBMIT',
-                'Transfer submitted for approval | ID: ' . $idBalanceHead . ' | TraceNo: ' . $traceNo,
-                $user, ['id_balance_head' => $idBalanceHead, 'trace_no' => $traceNo]);
+                // Audit log
+                AuditService::log('TRANSFER', 'SUBMIT',
+                    'Transfer submitted for approval | ID: ' . $idBalanceHead . ' | TraceNo: ' . $traceNo,
+                    $user, ['id_balance_head' => $idBalanceHead, 'trace_no' => $traceNo]);
 
-            return ['response' => 1, 'message' => 'Transfer submitted for approval'];
+                return ['response' => 1, 'message' => 'Transfer submitted for approval'];
+            });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::submit failed', ['error' => $e->getMessage()]);
             return ['response' => 0, 'message' => 'Failed to submit: ' . $e->getMessage()];
@@ -93,12 +84,9 @@ class TransferApprovalService
     {
         try {
             // Check period lock
-            $entryDate = DB::connection($this->connection)->select(
-                'SELECT entry_date FROM t_balance_header WHERE id_balance_head = ?',
-                [$idBalanceHead]
-            );
+            $entryDate = $this->approvalRepo->findBalanceEntryDate((int) $idBalanceHead);
 
-            if (!empty($entryDate) && PeriodLockService::isLocked($entryDate[0]->entry_date)) {
+            if ($entryDate && PeriodLockService::isLocked($entryDate)) {
                 return ['response' => 99, 'message' => 'Period is locked'];
             }
 
@@ -108,26 +96,20 @@ class TransferApprovalService
                 return ['response' => 2, 'message' => 'Only PENDING transfers can be approved. Current: ' . $currentStatus];
             }
 
-            // Update balance header status
-            DB::connection($this->connection)->update(
-                'UPDATE t_balance_header SET approval_status = "APPROVED", approved_by = ?, approved_at = NOW(), updated_by = ?
-                 WHERE id_balance_head = ?',
-                [$user, $user, $idBalanceHead]
-            );
+            return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $notes) {
+                // Update balance header status
+                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'APPROVED', $user);
 
-            // Update approval record
-            DB::connection($this->connection)->update(
-                'UPDATE t_transfer_approval SET status = "APPROVED", approved_by = ?, approved_at = NOW(), notes = ?, updated_by = ?
-                 WHERE id_balance_head = ? AND status = 1',
-                [$user, $notes, $user, $idBalanceHead]
-            );
+                // Update approval record
+                $this->approvalRepo->updateApprovalStatus($idBalanceHead, 'APPROVED', $user, $notes);
 
-            // Audit log
-            AuditService::log('TRANSFER', 'APPROVE',
-                'Transfer approved | ID: ' . $idBalanceHead . ' | By: ' . $user,
-                $user, ['id_balance_head' => $idBalanceHead, 'approved_by' => $user]);
+                // Audit log
+                AuditService::log('TRANSFER', 'APPROVE',
+                    'Transfer approved | ID: ' . $idBalanceHead . ' | By: ' . $user,
+                    $user, ['id_balance_head' => $idBalanceHead, 'approved_by' => $user]);
 
-            return ['response' => 1, 'message' => 'Transfer approved'];
+                return ['response' => 1, 'message' => 'Transfer approved'];
+            });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::approve failed', ['error' => $e->getMessage()]);
             return ['response' => 0, 'message' => 'Failed to approve: ' . $e->getMessage()];
@@ -147,26 +129,20 @@ class TransferApprovalService
                 return ['response' => 2, 'message' => 'Only PENDING transfers can be rejected. Current: ' . $currentStatus];
             }
 
-            // Update balance header status
-            DB::connection($this->connection)->update(
-                'UPDATE t_balance_header SET approval_status = "REJECTED", updated_by = ?
-                 WHERE id_balance_head = ?',
-                [$user, $idBalanceHead]
-            );
+            return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $reason) {
+                // Update balance header status
+                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'REJECTED', $user);
 
-            // Update approval record
-            DB::connection($this->connection)->update(
-                'UPDATE t_transfer_approval SET status = "REJECTED", rejected_by = ?, rejected_at = NOW(), rejection_reason = ?, updated_by = ?
-                 WHERE id_balance_head = ? AND status = 1',
-                [$user, $reason, $user, $idBalanceHead]
-            );
+                // Update approval record
+                $this->approvalRepo->updateApprovalStatus($idBalanceHead, 'REJECTED', $user, null, $reason);
 
-            // Audit log
-            AuditService::log('TRANSFER', 'REJECT',
-                'Transfer rejected | ID: ' . $idBalanceHead . ' | Reason: ' . $reason,
-                $user, ['id_balance_head' => $idBalanceHead, 'rejected_by' => $user, 'reason' => $reason]);
+                // Audit log
+                AuditService::log('TRANSFER', 'REJECT',
+                    'Transfer rejected | ID: ' . $idBalanceHead . ' | Reason: ' . $reason,
+                    $user, ['id_balance_head' => $idBalanceHead, 'rejected_by' => $user, 'reason' => $reason]);
 
-            return ['response' => 1, 'message' => 'Transfer rejected'];
+                return ['response' => 1, 'message' => 'Transfer rejected'];
+            });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::reject failed', ['error' => $e->getMessage()]);
             return ['response' => 0, 'message' => 'Failed to reject: ' . $e->getMessage()];
@@ -181,12 +157,9 @@ class TransferApprovalService
     {
         try {
             // Check period lock
-            $entryDate = DB::connection($this->connection)->select(
-                'SELECT entry_date FROM t_balance_header WHERE id_balance_head = ?',
-                [$idBalanceHead]
-            );
+            $entryDate = $this->approvalRepo->findBalanceEntryDate((int) $idBalanceHead);
 
-            if (!empty($entryDate) && PeriodLockService::isLocked($entryDate[0]->entry_date)) {
+            if ($entryDate && PeriodLockService::isLocked($entryDate)) {
                 return ['response' => 99, 'message' => 'Period is locked'];
             }
 
@@ -196,26 +169,20 @@ class TransferApprovalService
                 return ['response' => 2, 'message' => 'Only DRAFT or REJECTED transfers can be cancelled. Current: ' . $currentStatus];
             }
 
-            // Update balance header status
-            DB::connection($this->connection)->update(
-                'UPDATE t_balance_header SET approval_status = "CANCELLED", updated_by = ?
-                 WHERE id_balance_head = ?',
-                [$user, $idBalanceHead]
-            );
+            return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user) {
+                // Update balance header status
+                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'CANCELLED', $user);
 
-            // Update approval record
-            DB::connection($this->connection)->update(
-                'UPDATE t_transfer_approval SET status = "CANCELLED", updated_by = ?
-                 WHERE id_balance_head = ? AND status = 1',
-                [$user, $idBalanceHead]
-            );
+                // Update approval record
+                $this->approvalRepo->updateApprovalStatus($idBalanceHead, 'CANCELLED', $user);
 
-            // Audit log
-            AuditService::log('TRANSFER', 'CANCEL',
-                'Transfer cancelled | ID: ' . $idBalanceHead,
-                $user, ['id_balance_head' => $idBalanceHead]);
+                // Audit log
+                AuditService::log('TRANSFER', 'CANCEL',
+                    'Transfer cancelled | ID: ' . $idBalanceHead,
+                    $user, ['id_balance_head' => $idBalanceHead]);
 
-            return ['response' => 1, 'message' => 'Transfer cancelled'];
+                return ['response' => 1, 'message' => 'Transfer cancelled'];
+            });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::cancel failed', ['error' => $e->getMessage()]);
             return ['response' => 0, 'message' => 'Failed to cancel: ' . $e->getMessage()];
@@ -227,22 +194,7 @@ class TransferApprovalService
      */
     public function getPendingApprovals(int $plantId = 0): array
     {
-        $plantFilter = $plantId > 0 ? 'AND bh.id_plant = ?' : '';
-        $bindings = $plantId > 0 ? [$plantId] : [];
-
-        return DB::connection($this->connection)->select(
-            'SELECT ta.id_approval, ta.id_balance_head, ta.entry_no, ta.entry_date,
-                    ta.id_material, ta.material_name, ta.qty, ta.source_sloc, ta.dest_sloc,
-                    ta.status, ta.submitted_by, ta.submitted_at,
-                    bh.trace_no, p.description AS plant_name
-               FROM t_transfer_approval ta
-               LEFT JOIN t_balance_header bh ON ta.id_balance_head = bh.id_balance_head
-               LEFT JOIN m_plant p ON bh.id_plant = p.code_3
-              WHERE ta.status = "PENDING" AND ta.approval_status != "CANCELLED"
-                ' . $plantFilter . '
-              ORDER BY ta.submitted_at DESC',
-            $bindings
-        );
+        return $this->approvalRepo->getPendingApprovals($plantId);
     }
 
     /**
@@ -250,14 +202,7 @@ class TransferApprovalService
      */
     public function getApprovalHistory(string $idBalanceHead): array
     {
-        return DB::connection($this->connection)->select(
-            'SELECT ta.*, bh.trace_no
-               FROM t_transfer_approval ta
-               LEFT JOIN t_balance_header bh ON ta.id_balance_head = bh.id_balance_head
-              WHERE ta.id_balance_head = ?
-              ORDER BY ta.created_at DESC',
-            [$idBalanceHead]
-        );
+        return $this->approvalRepo->getApprovalHistory($idBalanceHead);
     }
 
     /**
@@ -265,14 +210,7 @@ class TransferApprovalService
      */
     public function getCurrentStatus(string $idBalanceHead): ?string
     {
-        $result = DB::connection($this->connection)->select(
-            'SELECT COALESCE(approval_status, "APPROVED") AS approval_status
-               FROM t_balance_header
-              WHERE id_balance_head = ?',
-            [$idBalanceHead]
-        );
-
-        return $result[0]->approval_status ?? null;
+        return $this->approvalRepo->getCurrentApprovalStatus($idBalanceHead);
     }
 
     /**
@@ -289,8 +227,7 @@ class TransferApprovalService
      */
     public function canDelete(string $idBalanceHead): bool
     {
-        $status = $this->getCurrentStatus($idBalanceHead);
-        return in_array($status, ['DRAFT', 'REJECTED', 'CANCELLED']);
+        return $this->approvalRepo->canDelete($idBalanceHead);
     }
 
     /**
@@ -309,22 +246,24 @@ class TransferApprovalService
         string $user
     ): void {
         // Check if already exists
-        $existing = DB::connection($this->connection)->select(
-            'SELECT id_approval FROM t_transfer_approval WHERE id_balance_head = ? AND status = 1',
-            [$idBalanceHead]
-        );
+        $existing = $this->approvalRepo->findApprovalRecord($idBalanceHead);
 
-        if (!empty($existing)) {
+        if ($existing) {
             return;
         }
 
-        DB::connection($this->connection)->insert(
-            'INSERT INTO t_transfer_approval
-             (id_balance_head, entry_no, entry_date, id_material, material_name, qty,
-              source_sloc, dest_sloc, id_plant, status, created_by)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "DRAFT", ?)',
-            [$idBalanceHead, $traceNo, $entryDate, $idMaterial, $materialName, $qty,
-             $sourceSloc, $destSloc, $plantId, $user]
-        );
+        $this->approvalRepo->insertApprovalRecord([
+            'id_balance_head' => $idBalanceHead,
+            'entry_no' => $traceNo,
+            'entry_date' => $entryDate,
+            'id_material' => $idMaterial,
+            'material_name' => $materialName,
+            'qty' => $qty,
+            'source_sloc' => $sourceSloc,
+            'dest_sloc' => $destSloc,
+            'id_plant' => $plantId,
+            'status' => 'DRAFT',
+            'created_by' => $user,
+        ]);
     }
 }

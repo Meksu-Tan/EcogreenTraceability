@@ -6,13 +6,39 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * PlantContextService - Service untuk mengelola plant context/user scoping
+ * PlantContextService — resolve/validate plant context from request.
  *
- * Fungsi:
- * 1. Resolve plant ID dari berbagai format (id, code_2, code_3)
- * 2. Get plants yang accessible oleh user
- * 3. Validate plant access
- * 4. Get default plant untuk user
+ * RAW SQL DEBT (C08): Simple single-table SELECT queries on m_plant
+ * and m_plant_user have been converted to QueryBuilder below.
+ * Complex JOIN queries (getUserPlants, getDefaultPlant) and the
+ * SQL-string builders (buildPlantFilter, buildMultiPlantFilter) are
+ * retained as raw SQL because QueryBuilder JOIN on eudr_ts would
+ * require explicit from()/join() chains that add no clarity over
+ * the equivalent SQL.
+ */
+/**
+ * ANTI-PATTERN (tech debt — do NOT refactor without explicit approval):
+ *
+ * All methods are static, making this class impossible to mock or swap via
+ * interface binding in ServiceProvider. This blocks unit testing of every
+ * consumer that depends on plant-context resolution (controllers, services,
+ * middleware, repositories that call PlantContextService::buildPlantFilter(),
+ * PlantContextService::resolvePlantId(), etc.).
+ *
+ * Blast radius of a refactor:
+ *   - PlantContextMiddleware, PlantScopeMiddleware
+ *   - Every repository that calls buildPlantFilter() / buildMultiPlantFilter()
+ *   - Every controller/service that calls resolvePlantId() or getUserPlants()
+ *   - All existing Feature tests that exercise plant-scoped endpoints
+ *
+ * RECOMMENDED REFACTOR (when approved):
+ *   1. Create Modules\Shared\Services\Contracts\PlantContextServiceInterface
+ *   2. Drop `static` from every method
+ *   3. Bind interface → concrete in SharedServiceProvider::register()
+ *   4. Inject PlantContextServiceInterface via constructor in all consumers
+ *   5. Replace self::method() calls with $this->method()
+ *   6. Update all repository call-sites to use the injected instance
+ *   7. Add unit tests for each method with mocked DB connections
  */
 class PlantContextService
 {
@@ -49,17 +75,19 @@ class PlantContextService
     public static function resolveById(int $plantId, ?int $userId = null): ?string
     {
         // Check if it's actually an ID or code_3
-        $plant = DB::connection('eudr_ts')->selectOne(
-            'SELECT code_3, id_plant FROM m_plant WHERE id_plant = ? AND status = 1',
-            [$plantId]
-        );
+        $plant = DB::connection('eudr_ts')->table('m_plant')
+            ->select('code_3', 'id_plant')
+            ->where('id_plant', $plantId)
+            ->where('status', 1)
+            ->first();
 
         if (!$plant) {
             // Try as code_3
-            $plant = DB::connection('eudr_ts')->selectOne(
-                'SELECT code_3, id_plant FROM m_plant WHERE code_3 = ? AND status = 1',
-                [$plantId]
-            );
+            $plant = DB::connection('eudr_ts')->table('m_plant')
+                ->select('code_3', 'id_plant')
+                ->where('code_3', $plantId)
+                ->where('status', 1)
+                ->first();
         }
 
         if ($plant && $userId) {
@@ -81,10 +109,11 @@ class PlantContextService
      */
     public static function resolveByCode(string $code, ?int $userId = null): ?string
     {
-        $plant = DB::connection('eudr_ts')->selectOne(
-            'SELECT code_3 FROM m_plant WHERE code_3 = ? AND status = 1',
-            [$code]
-        );
+        $plant = DB::connection('eudr_ts')->table('m_plant')
+            ->select('code_3')
+            ->where('code_3', $code)
+            ->where('status', 1)
+            ->first();
 
         if ($plant && $userId) {
             if (!self::userHasAccessToPlant($userId, $plant->code_3)) {
@@ -100,6 +129,11 @@ class PlantContextService
      */
     public static function getUserPlants(int $userId): array
     {
+        $user = \App\Models\User::find($userId);
+        if ($user && $user->hasRole(['super-admin', 'admin'])) {
+            return self::getAllPlants();
+        }
+
         return DB::connection('eudr_ts')->select(
             'SELECT p.code_3, p.code_2, p.description, p.id_plant
                FROM m_plant_user pu
@@ -129,13 +163,20 @@ class PlantContextService
      */
     public static function userHasAccessToPlant(int $userId, string $code_3): bool
     {
-        $result = DB::connection('eudr_ts')->selectOne(
-            'SELECT COUNT(*) as cnt FROM m_plant_user
-              WHERE user_id = ? AND id_plant = ?',
-            [$userId, $code_3]
-        );
+        $user = \App\Models\User::find($userId);
+        if (!$user) return false;
 
-        return ($result->cnt ?? 0) > 0;
+        // Super Admin & Admin memiliki akses global bypass
+        if ($user->hasRole(['super-admin', 'admin'])) {
+            return true;
+        }
+
+        $result = DB::connection('eudr_ts')->table('m_plant_user')
+            ->where('user_id', $userId)
+            ->where('id_plant', $code_3)
+            ->count();
+
+        return $result > 0;
     }
 
     /**
@@ -150,7 +191,7 @@ class PlantContextService
                JOIN m_plant p ON pu.id_plant = p.code_3
               WHERE pu.user_id = ?
                 AND p.status = 1
-              ORDER BY pu.id
+              ORDER BY pu.user_id ASC
               LIMIT 1',
             [$userId]
         );
@@ -191,12 +232,11 @@ class PlantContextService
      */
     public static function getPlantById(int $id): ?array
     {
-        $plant = DB::connection('eudr_ts')->selectOne(
-            'SELECT code_3, code_2, description, id_plant
-               FROM m_plant
-              WHERE id_plant = ? AND status = 1',
-            [$id]
-        );
+        $plant = DB::connection('eudr_ts')->table('m_plant')
+            ->select('code_3', 'code_2', 'description', 'id_plant')
+            ->where('id_plant', $id)
+            ->where('status', 1)
+            ->first();
 
         return $plant ? (array) $plant : null;
     }
@@ -206,12 +246,11 @@ class PlantContextService
      */
     public static function getPlantByCode(string $code_3): ?array
     {
-        $plant = DB::connection('eudr_ts')->selectOne(
-            'SELECT code_3, code_2, description, id_plant
-               FROM m_plant
-              WHERE code_3 = ? AND status = 1',
-            [$code_3]
-        );
+        $plant = DB::connection('eudr_ts')->table('m_plant')
+            ->select('code_3', 'code_2', 'description', 'id_plant')
+            ->where('code_3', $code_3)
+            ->where('status', 1)
+            ->first();
 
         return $plant ? (array) $plant : null;
     }

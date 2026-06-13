@@ -1,110 +1,167 @@
 <template>
-  <div class="p-6">
-    <div class="bg-gray-900 rounded-lg shadow-sm mb-6 p-4">
-      <h1 class="text-white text-2xl font-bold text-center tracking-wide">EUDR-TS BACKWARD TRACING</h1>
-    </div>
+  <div class="pa-6">
+    <VRow justify="space-between" align="center" class="mb-4">
+      <VCol cols="12">
+        <h1 class="text-h5 font-weight-bold">EUDR-TS BACKWARD TRACING</h1>
+      </VCol>
+    </VRow>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Plant</label>
-          <select v-model="filters.id_plant" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500">
-            <option value="">All Plants</option>
-          </select>
+    <VCard class="mb-6">
+      <VCardText>
+        <VRow align="end">
+          <VCol cols="12" md="3">
+            <VSelect
+              v-model="filters.id_plant"
+              :items="[{ title: 'All Plants', value: '' }]"
+              label="Plant"
+              density="compact"
+              variant="outlined"
+              hide-details
+            />
+          </VCol>
+          <VCol cols="12" md="auto" class="d-flex gap-2">
+            <VBtn
+              color="primary"
+              prepend-icon="ri-search-line"
+              @click="loadData"
+            >
+              Search
+            </VBtn>
+            <VBtn
+              variant="outlined"
+              @click="resetFilters"
+            >
+              Reset
+            </VBtn>
+          </VCol>
+        </VRow>
+      </VCardText>
+    </VCard>
+
+    <VCard>
+      <VCardTitle class="bg-neutral-50 text-uppercase text-body-2 font-weight-bold py-3 d-flex justify-space-between align-center">
+        <span>Backward Trace List — Shipments</span>
+        <VChip size="small">Total: {{ meta.total }}</VChip>
+      </VCardTitle>
+      <VDivider />
+
+      <VCardText class="pa-0">
+        <div v-if="loading" class="pa-8 text-center text-medium-emphasis">
+          <VProgressCircular indeterminate color="primary" class="mb-2" />
+          <div class="text-caption">Loading data...</div>
         </div>
-        <div class="flex items-end gap-2">
-          <button @click="loadData" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-primary-darken-1">
-            <Icon icon="ri:search-line" class="w-4 h-4 inline mr-1" />Search
-          </button>
-          <button @click="resetFilters" class="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">Reset</button>
+
+        <div v-else-if="error" class="pa-8 text-center text-error">
+          <VIcon icon="ri-error-warning-line" size="40" class="mb-2" />
+          <div class="text-body-2">{{ error }}</div>
         </div>
-      </div>
-    </div>
 
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-      <div class="p-3 border-b border-gray-200 flex items-center justify-between">
-        <span class="text-sm font-semibold text-slate-700">Backward Trace List — Shipments</span>
-        <span class="text-xs text-gray-500">Total: {{ meta.total }}</span>
-      </div>
+        <div v-else-if="list.length === 0" class="pa-8 text-center text-medium-emphasis">
+          <VIcon icon="ri-arrow-left-double-line" size="40" class="mb-2" />
+          <div class="text-caption">No backward trace records found.</div>
+        </div>
 
-      <div v-if="loading" class="p-8 text-center text-gray-500">
-        <Icon icon="ri:loader-4-line" class="animate-spin text-3xl text-primary" />
-        <p class="mt-2 text-sm">Loading data...</p>
-      </div>
-
-      <div v-else-if="error" class="p-8 text-center text-error">
-        <Icon icon="ri:error-warning-line" class="text-4xl text-danger-soft" />
-        <p class="mt-2">{{ error }}</p>
-      </div>
-
-      <div v-else-if="list.length === 0" class="p-8 text-center text-gray-400">
-        <Icon icon="ri:arrow-left-double-line" class="text-4xl text-gray-300" />
-        <p>No backward trace records found.</p>
-      </div>
-
-      <template v-else>
-        <div class="overflow-x-auto">
-          <table class="w-full">
+        <div v-else class="overflow-x-auto">
+          <VTable density="compact" class="text-body-2">
             <thead>
-              <tr class="bg-gray-50 border-b">
-                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-12">No</th>
-                <th class="px-3 py-3 text-center text-xs font-semibold text-gray-500 uppercase w-20">Action</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Entry Date</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Trace No</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SO No</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Batch No</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Sloc</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Product Desc</th>
-                <th class="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Qty (MT)</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase max-w-xs">Supplier / Batch SAP / Qty (MT)</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Source Trace</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase max-w-xs">Source (PO/SO & RM Trace)</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Created At</th>
-                <th class="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Created By</th>
+              <tr>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date')">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('trace_no')">Trace No<VIcon v-if="sortKey==='trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'so_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('so_no')">SO No<VIcon v-if="sortKey==='so_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'batch_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('batch_no')">Batch No<VIcon v-if="sortKey==='batch_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc')">Sloc<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material')">Product Desc<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty')">Qty (MT)<VIcon v-if="sortKey==='qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap;max-width:240px" @click="toggleSort('supplier')">Supplier / Batch SAP / Qty (MT)<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'source_trace' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('source_trace')">Source Trace<VIcon v-if="sortKey==='source_trace'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'source' }" style="cursor:pointer;user-select:none;white-space:nowrap;max-width:240px" @click="toggleSort('source')">Source (PO/SO & RM Trace)<VIcon v-if="sortKey==='source'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'created_at' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_at')">Created At<VIcon v-if="sortKey==='created_at'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'created_by' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_by')">Created By<VIcon v-if="sortKey==='created_by'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-gray-200">
-              <tr v-for="(row, i) in list" :key="row.id_shipment_head" class="hover:bg-gray-50 text-sm">
-                <td class="px-3 py-3 text-center text-gray-500">{{ (meta.page - 1) * meta.perPage + i + 1 }}</td>
-                <td class="px-3 py-3">
-                  <div class="flex items-center justify-center gap-1">
-                    <button @click="openTraceModal(row)" class="p-1.5 text-xs bg-info text-white rounded hover:bg-info-text flex items-center justify-center transition-colors duration-150" title="View Trace">
-                      <Icon icon="ri:network-line" class="w-4 h-4" />
-                    </button>
-                    <button @click="openShipmentDetailModal(row)" class="p-1.5 text-xs bg-info text-white rounded hover:bg-info-text flex items-center justify-center transition-colors duration-150" title="View Shipment Detail">
-                      <Icon icon="ri:ship-line" class="w-4 h-4" />
-                    </button>
-                    <button @click="openBatchPackagingModal(row)" class="p-1.5 text-xs bg-warning text-white rounded hover:bg-warning-text flex items-center justify-center transition-colors duration-150" title="View Batch Packaging">
-                      <Icon icon="ri:archive-line" class="w-4 h-4" />
-                    </button>
+            <tbody>
+              <tr v-for="(row, i) in sortedList" :key="row.id_shipment_head">
+                <td class="text-center text-caption text-medium-emphasis">{{ (meta.page - 1) * meta.perPage + i + 1 }}</td>
+                <td class="text-caption text-medium-emphasis">{{ row.entry_date }}</td>
+                <td class="font-weight-medium font-mono text-caption">{{ row.trace_no }}</td>
+                <td class="font-weight-medium font-mono text-caption">{{ row.so_no || '-' }}</td>
+                <td class="font-weight-medium font-mono text-caption">{{ row.batch_no || '-' }}</td>
+                <td class="text-caption text-medium-emphasis">{{ row.sloc || '-' }}</td>
+                <td class="font-weight-medium text-caption" style="max-width:240px" :title="row.material">
+                  <div class="text-truncate">{{ row.material }}</div>
+                </td>
+                <td class="text-right font-weight-bold font-mono text-caption">{{ row.qty }}</td>
+                <td style="max-width:240px" class="text-caption" :title="row.supplier">
+                  <div class="text-truncate">{{ row.supplier || '-' }}</div>
+                </td>
+                <td class="text-caption text-medium-emphasis">{{ row.source_trace || '-' }}</td>
+                <td style="max-width:240px" class="text-caption text-medium-emphasis" :title="row.source">
+                  <div class="text-truncate">{{ row.source || row.po_so || '-' }}</div>
+                </td>
+                <td class="text-caption text-medium-emphasis">{{ row.created_at || '-' }}</td>
+                <td class="text-caption text-medium-emphasis">{{ row.created_by || '-' }}</td>
+                <td class="text-center">
+                  <div class="d-flex justify-center gap-1">
+                    <VBtn
+                      icon="ri-eye-line"
+                      size="x-small"
+                      color="primary"
+                      variant="tonal"
+                      title="View Trace"
+                      @click="openTraceModal(row)"
+                    />
+                    <VBtn
+                      icon="ri-ship-line"
+                      size="x-small"
+                      color="primary"
+                      variant="tonal"
+                      title="View Shipment Detail"
+                      @click="openShipmentDetailModal(row)"
+                    />
+                    <VBtn
+                      icon="ri-archive-line"
+                      size="x-small"
+                      color="primary"
+                      variant="tonal"
+                      title="View Batch Packaging"
+                      @click="openBatchPackagingModal(row)"
+                    />
                   </div>
                 </td>
-                <td class="px-3 py-3 text-slate-600">{{ row.entry_date }}</td>
-                <td class="px-3 py-3 font-mono text-slate-700">{{ row.trace_no }}</td>
-                <td class="px-3 py-3 font-mono text-slate-700">{{ row.so_no || '-' }}</td>
-                <td class="px-3 py-3 font-mono text-slate-700">{{ row.batch_no || '-' }}</td>
-                <td class="px-3 py-3 text-slate-600">{{ row.sloc || '-' }}</td>
-                <td class="px-3 py-3 font-medium text-slate-800 max-w-xs truncate" :title="row.material">{{ row.material }}</td>
-                <td class="px-3 py-3 text-right font-mono font-semibold text-slate-800">{{ row.qty }}</td>
-                <td class="px-3 py-3 max-w-xs truncate text-xs" :title="row.supplier">{{ row.supplier || '-' }}</td>
-                <td class="px-3 py-3 text-xs text-slate-600">{{ row.source_trace || '-' }}</td>
-                <td class="px-3 py-3 text-xs text-slate-600 max-w-xs truncate" :title="row.source">{{ row.source || row.po_so || '-' }}</td>
-                <td class="px-3 py-3 text-xs text-gray-500">{{ row.created_at || '-' }}</td>
-                <td class="px-3 py-3 text-slate-600">{{ row.created_by || '-' }}</td>
               </tr>
             </tbody>
-          </table>
+          </VTable>
         </div>
 
-        <div class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-          <span class="text-xs text-gray-500">Page {{ meta.page }} of {{ meta.lastPage }} ({{ meta.total }} records)</span>
-          <div class="flex gap-1">
-            <button @click="changePage(meta.page - 1)" :disabled="meta.page <= 1" class="px-3 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-40">Prev</button>
-            <button @click="changePage(meta.page + 1)" :disabled="meta.page >= meta.lastPage" class="px-3 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-40">Next</button>
+        <div v-if="meta.total > 0 && !loading" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+          <div class="d-flex align-center gap-3">
+            <span class="text-caption text-medium-emphasis">
+              Showing {{ (meta.page - 1) * perPage + 1 }} - {{ Math.min(meta.page * perPage, meta.total) }} of {{ meta.total }} records
+            </span>
+            <VSelect
+              v-model="perPage"
+              :items="[5, 10, 15, 20]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 80px; max-width: 100px;"
+            />
           </div>
+          <VPagination
+            v-if="meta.lastPage > 1"
+            v-model="meta.page"
+            :length="meta.lastPage"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="changePage"
+          />
         </div>
-      </template>
-    </div>
+      </VCardText>
+    </VCard>
 
     <TraceDetailModal
       v-model="showModal"
@@ -133,9 +190,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Icon } from '@iconify/vue'
 import { useTraceBackwardStore } from '../stores/traceBackwardStore'
 import { parseSoNo } from '../utils/parseSoNo'
 import TraceDetailModal from '@/modules/shared/components/TraceDetailModal.vue'
@@ -152,7 +208,60 @@ const showShipmentModal = ref(false)
 const showBatchModal = ref(false)
 const selectedRow = ref(null)
 
+const sortKey = ref(null)
+const sortDir = ref(null)
+const perPage = ref(meta.value.perPage)
+
 onMounted(() => loadData())
+
+function detectColumnType(colKey) {
+  const rows = list.value
+  if (!rows || rows.length === 0) return 'text'
+  for (const row of rows) {
+    const val = row[colKey]
+    if (val !== null && val !== undefined && val !== '') {
+      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
+    }
+  }
+  return 'text'
+}
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    if (sortDir.value === 'asc') {
+      sortDir.value = 'desc'
+    } else if (sortDir.value === 'desc') {
+      sortKey.value = null
+      sortDir.value = null
+    }
+  } else {
+    sortKey.value = key
+    sortDir.value = detectColumnType(key) === 'text' ? 'asc' : 'desc'
+  }
+}
+
+const sortedList = computed(() => {
+  if (!sortKey.value || !sortDir.value) return list.value
+  const key = sortKey.value
+  const dir = sortDir.value
+  const rows = [...list.value]
+  const type = detectColumnType(key)
+  return rows.sort((a, b) => {
+    const va = a[key]
+    const vb = b[key]
+    if (va == null && vb == null) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    if (type === 'number') return dir === 'asc' ? va - vb : vb - va
+    return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va))
+  })
+})
+
+watch(perPage, (newVal) => {
+  meta.value.perPage = newVal
+  meta.value.page = 1
+  loadData()
+})
 
 async function loadData() {
   const params = { page: meta.value.page, per_page: meta.value.perPage }
@@ -162,7 +271,7 @@ async function loadData() {
 
 async function changePage(p) {
   if (p < 1 || p > meta.value.lastPage) return
-  meta.value.page = p
+  store.setPage(p)
   await loadData()
 }
 
@@ -191,3 +300,10 @@ async function openBatchPackagingModal(row) {
   await store.fetchBatchPackaging({ batchNo: row.batch_no || '' })
 }
 </script>
+
+<style scoped>
+.sort-icon { vertical-align: middle; transition: opacity 0.15s; opacity: 0.35; }
+.sortable-th:hover .sort-icon { opacity: 0.7; }
+.sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
+</style>
+

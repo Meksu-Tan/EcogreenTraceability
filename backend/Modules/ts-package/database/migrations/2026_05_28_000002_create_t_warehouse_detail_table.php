@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    protected $connection = 'eudr_ts';
+
     public function up(): void
     {
-        Schema::create('t_warehouse_detail', function (Blueprint $table) {
+        Schema::connection('eudr_ts')->create('t_warehouse_detail', function (Blueprint $table) {
             $table->bigIncrements('id_whx_tail');
             $table->unsignedBigInteger('id_whx_head')->index();
             $table->unsignedBigInteger('id_material_feed')->nullable()->index();
@@ -17,6 +19,8 @@ return new class extends Migration
             $table->unsignedBigInteger('id_supplier')->index();
             $table->string('id_plant', 10)->nullable()->index();
             $table->string('batch_sap', 20)->nullable();
+            $table->unsignedBigInteger('id_tank')->nullable()->index();
+            $table->json('id_tank_tail')->nullable();
             $table->double('qty')->default('0');
             $table->double('in_qty')->default('0');
             $table->double('out_qty')->default('0');
@@ -30,12 +34,12 @@ return new class extends Migration
             $table->charset = 'utf8mb4';
             $table->collation = 'utf8mb4_general_ci';
 
-            $table->foreign('id_whx_head')->references('id_whx_head')->on('t_warehouse_header')->onDelete('restrict');
+            $table->foreign('id_whx_head')->references('id_whx_head')->on('t_warehouse_header')->connection('eudr_ts')->onDelete('restrict');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('t_warehouse_detail');
+        Schema::connection('eudr_ts')->dropIfExists('t_warehouse_detail');
     }
 };

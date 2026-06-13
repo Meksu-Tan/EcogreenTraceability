@@ -17,123 +17,128 @@ class RmEntryService implements RmEntryServiceInterface
         protected RmEntryRepositoryInterface $rmEntryRepo
     ) {}
 
-    public function getRmList($plantId)
+    public function getRmList($plantId, int $page = 1, int $perPage = 5): array
     {
-        return $this->rmEntryRepo->getRmList($plantId);
+        return $this->rmEntryRepo->getRmList($plantId, $page, $perPage);
     }
 
-    public function getRmEntryById($id)
+    public function getRmEntryById($id): ?array
     {
         return $this->rmEntryRepo->getRmEntryById($id);
     }
 
-    public function generateRmNumber($plantId)
+    public function generateRmNumber($plantId): ?string
     {
         return $this->rmEntryRepo->getNewNumber($plantId);
     }
 
-    public function generateTransferNumber($plantId)
+    public function generateTransferNumber($plantId): ?string
     {
         return $this->rmEntryRepo->getTransferNumber($plantId);
     }
 
-    public function getTanks($plantId)
+    public function getTanks($plantId): array
     {
         return $this->rmEntryRepo->getTanks($plantId);
     }
 
-    public function getTankDetails($tankId, $plantId)
+    public function getTankDetails($tankId, $plantId): array
     {
         return $this->rmEntryRepo->getTankDetails($tankId, $plantId);
     }
 
-    public function getMaterials()
+    public function getMaterials(): array
     {
         return $this->rmEntryRepo->getMaterials();
     }
 
-    public function searchSuppliers($query)
+    public function searchSuppliers($query): array
     {
         return $this->rmEntryRepo->searchSuppliers($query);
     }
 
-    public function addSupplierTemp($data, $user)
+    public function addSupplierTemp($data, $user): array
     {
         return $this->rmEntryRepo->addSupplierTemp($data, $user);
     }
 
-    public function getSupplierList($entryNo)
+    public function getSupplierList($entryNo): array
     {
         return $this->rmEntryRepo->getSupplierList($entryNo);
     }
 
-    public function deleteSupplierTemp($id, $user)
+    public function deleteSupplierTemp($id, $user): void
     {
-        return $this->rmEntryRepo->deleteSupplierTemp($id, $user);
+        $this->rmEntryRepo->deleteSupplierTemp($id, $user);
     }
 
-    public function getTotalQtyTemp($entryNo)
+    public function getTotalQtyTemp($entryNo): float
     {
         return $this->rmEntryRepo->getTotalQtyTemp($entryNo);
     }
 
-    public function generateBatchCode($supplierId)
+    public function generateBatchCode($supplierId): ?string
     {
         return $this->rmEntryRepo->generateBatchCode($supplierId);
     }
 
-    public function saveRmEntry($data, $user)
+    public function saveRmEntry($data, $user): array
     {
         return $this->rmEntryRepo->saveRmEntry($data, $user);
     }
 
-    public function saveRmTrfEntry($data, $user)
+    public function saveRmTrfEntry($data, $user): array
     {
         return $this->rmEntryRepo->saveRmTrfEntry($data, $user);
     }
 
-    public function checkStockSynchronization($entryNo, $materialId = null)
+    public function checkStockSynchronization($entryNo, $materialId = null): array
     {
         return $this->rmEntryRepo->checkStockSynchronization($entryNo, $materialId);
     }
 
-    public function debugFifoStock($params)
+    public function debugFifoStock($params): array
     {
         return $this->rmEntryRepo->debugFifoStock($params);
     }
 
-    public function verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack = 24)
+    public function verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack = 24): array
     {
         return $this->rmEntryRepo->verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack);
     }
 
-    public function deactivateRmEntry($id, $user)
+    public function deactivateRmEntry($id, $user): array
     {
         return $this->rmEntryRepo->deactivateRmEntry($id, $user);
     }
 
-    public function updateRmEntry($id, $data, $user)
+    public function deactivateFeedLogEntry($id, $user): array
+    {
+        return $this->rmEntryRepo->deactivateFeedLogEntry($id, $user);
+    }
+
+    public function updateRmEntry($id, $data, $user): array
     {
         return $this->rmEntryRepo->updateRmEntry($id, $data, $user);
     }
 
     // Storage and Feed Log Methods (moved from ts-transfer)
-    public function getStorageLog($plantId)
+    public function getStorageLog($plantId): array
     {
         return $this->rmEntryRepo->getStorageLog($plantId);
     }
 
-    public function getFeedLog($plantId)
+    public function getFeedLog($plantId): array
     {
         return $this->rmEntryRepo->getFeedLog($plantId);
     }
 
-    public function debugFeedLog($plantId)
+    public function debugFeedLog($plantId): array
     {
         return $this->rmEntryRepo->debugFeedLog($plantId);
     }
 
-    public function getTransferList($plantId)
+    public function getTransferList($plantId): array
     {
         return $this->rmEntryRepo->getTransferList($plantId);
     }
@@ -142,7 +147,11 @@ class RmEntryService implements RmEntryServiceInterface
     protected $movSeqTransfer = '000';
     protected $typeTransfer = '7';
 
-    public function transfer($data, $user)
+    /**
+     * NOTE: Uses BalanceHeader::findOrFail() directly instead of repository.
+     * Should ideally delegate to repository for consistency with architecture.
+     */
+    public function transfer($data, $user): array
     {
         $data['id_plant'] = $this->resolvePlantCode($data['id_plant'] ?? 0);
 
@@ -150,7 +159,11 @@ class RmEntryService implements RmEntryServiceInterface
         $connection->beginTransaction();
 
         try {
-            $sourceBalance = BalanceHeader::findOrFail($data['id_balance_head']);
+            $sourceBalance = $this->rmEntryRepo->findBalanceHeaderById($data['id_balance_head']);
+            if (!$sourceBalance) {
+                throw new Exception('Source balance not found');
+            }
+
             $sourceTrace = $this->rmEntryRepo->findTraceByBalanceHeadId($data['id_balance_head']);
 
             if ($sourceBalance->qty < $data['qty']) {
@@ -164,7 +177,6 @@ class RmEntryService implements RmEntryServiceInterface
                 'trace_no' => $transferNo,
                 'id_material' => $sourceBalance->id_material,
                 'id_sloc' => $data['id_dest_tank'],
-                'id_sloc_tail' => $data['id_dest_tank_tail'],
                 'id_plant' => $data['id_plant'],
                 'qty' => $data['qty'],
                 'created_by' => $user,
@@ -177,7 +189,6 @@ class RmEntryService implements RmEntryServiceInterface
                 'to_trace_no' => $transferNo,
                 'id_material' => $sourceBalance->id_material,
                 'id_sloc' => $data['id_dest_tank'],
-                'id_tank_tail' => $data['id_dest_tank_tail'],
                 'id_plant' => $data['id_plant'],
                 'qty' => $data['qty'],
                 'created_by' => $user,
@@ -248,6 +259,9 @@ class RmEntryService implements RmEntryServiceInterface
     /**
      * Execute a full transfer entry using Feed::generalFeed() + Rundown::generalRundown()
      * Matching the reference Transfer::post_transferEntry() algorithm.
+     *
+     * @todo Technical Debt: Directly uses Feed::generalFeed() and Rundown::generalRundown() helpers.
+     * Recommended: Extract to repository methods for better testability.
      */
     public function executeTransferEntry(array $data, string $user): array
     {
@@ -270,8 +284,8 @@ class RmEntryService implements RmEntryServiceInterface
         $plantCode = $this->resolvePlantCode($idPlant);
 
         // Get tank plants
-        $srcTank = DB::connection('eudr_ts')->table('m_tank')->where('id_tank', $trfSource)->first();
-        $destTank = DB::connection('eudr_ts')->table('m_tank')->where('id_tank', $trfDestination)->first();
+        $srcTank = DB::connection('eudr_ts')->table('m_sloc')->where('id_sloc', $trfSource)->first();
+        $destTank = DB::connection('eudr_ts')->table('m_sloc')->where('id_sloc', $trfDestination)->first();
         $srcPlant = $srcTank->id_plant ?? $plantCode;
         $destPlant = $destTank->id_plant ?? $plantCode;
 
@@ -282,11 +296,11 @@ class RmEntryService implements RmEntryServiceInterface
                LEFT JOIN t_balance_detail bd
                  ON bh.id_balance_head = bd.id_balance_head
                 AND bd.status = 1
-                AND bd.qty > "0.0001"
+                AND bd.qty > 0.0001
               WHERE bh.status = 1
-                AND bh.qty > "0.0001"
+                AND bh.qty > 0.0001
                 AND bh.id_material = ?
-                AND bh.id_tank = ?
+                AND JSON_CONTAINS(bh.id_sloc, JSON_ARRAY(?))
                 AND bh.id_plant = ?
                 AND bd.id_balance_tail IS NULL',
             [$idMaterial, $trfSource, $srcPlant]
@@ -304,10 +318,10 @@ class RmEntryService implements RmEntryServiceInterface
                             FROM m_material b) b
                  ON a.code = b.code
                LEFT JOIN t_balance_header c
-                 ON b.id_material = c.id_material AND c.status = 1 AND c.id_tank = ?
+                 ON b.id_material = c.id_material AND c.status = 1 AND JSON_CONTAINS(c.id_sloc, JSON_ARRAY(?))
               WHERE a.id_material = ?
                 AND a.status = 1
-                AND c.qty > "0.0001"
+                AND c.qty > 0.0001
                 AND (SUBSTRING(c.trace_no,1,1) = 1 OR SUBSTRING(c.trace_no,1,1) = 2 OR
                      SUBSTRING(c.trace_no,1,1) = 7 OR SUBSTRING(c.trace_no,1,1) = 8 OR
                      SUBSTRING(c.trace_no,1,1) = 9)',
@@ -336,8 +350,7 @@ class RmEntryService implements RmEntryServiceInterface
                 $feedResult = Feed::generalFeed([
                     'qty'          => $qty,
                     'id_material'  => $idMaterial,
-                    'id_tank'      => $trfSource,
-                    'id_tank_tail' => $srcTailJson,
+                    'id_sloc'      => $trfSource,
                     'id_plant'     => $srcPlant,
                     'to_trace_no'  => $feedEntryNo,
                     'entry_date'   => $entryDate,
@@ -389,8 +402,7 @@ class RmEntryService implements RmEntryServiceInterface
                     'trace_no'      => $entryNo,
                     'from_trace_no' => $feedEntryNo,
                     'id_material'   => $idMaterial,
-                    'id_tank'       => $trfDestination,
-                    'id_tank_tail'  => $destTailJson,
+                    'id_sloc'       => $trfDestination,
                     'id_plant'      => $destPlant,
                     'in_qty'        => $actualQty,
                     'last_qtf'      => 0,
@@ -447,7 +459,7 @@ class RmEntryService implements RmEntryServiceInterface
     /**
      * Enhanced deactivate with lock period check (matching reference)
      */
-    public function deactivateTransfer($id, $user)
+    public function deactivateTransfer($id, $user): array
     {
         $connection = app('db')->connection('eudr_ts');
         $connection->beginTransaction();
@@ -465,16 +477,16 @@ class RmEntryService implements RmEntryServiceInterface
 
             // Lock period check
             $entryDate = $traceHead->entry_date ?? null;
-            if ($entryDate && $this->getLockStatus($entryDate)) {
+            if ($entryDate && $this->getLockStatus((string) $entryDate)) {
                 throw new Exception('Cannot deactivate: period is locked');
             }
 
-            $toTraceNo = $traceHead->to_trace_no ?? '';
+            $toTraceNo = (string) ($traceHead->to_trace_no ?? '');
             if (substr($toTraceNo, 0, 1) !== '7') {
                 throw new Exception('Only transfer entries (prefix 7) can be deactivated');
             }
 
-            $sourceTraceNo = $traceHead->from_trace_no;
+            $sourceTraceNo = (string) ($traceHead->from_trace_no ?? '');
             $sourceBalance = $this->rmEntryRepo->findBalanceByTraceNo($sourceTraceNo);
 
             if ($sourceBalance) {
@@ -510,7 +522,7 @@ class RmEntryService implements RmEntryServiceInterface
     {
         if ($plantId) {
             if (is_numeric($plantId)) {
-                $plant = Plant::find($plantId);
+                $plant = $this->rmEntryRepo->findPlantById($plantId);
                 if ($plant && $plant->code_3) {
                     $plantId = $plant->code_3;
                 }
@@ -533,7 +545,7 @@ class RmEntryService implements RmEntryServiceInterface
     {
         if ($plantId) {
             if (is_numeric($plantId)) {
-                $plant = Plant::find($plantId);
+                $plant = $this->rmEntryRepo->findPlantById($plantId);
                 if ($plant && $plant->code_3) {
                     $plantId = $plant->code_3;
                 }
@@ -581,17 +593,7 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function searchSuppliersList(string $search): array
     {
-        return \Modules\Supplier\Models\Supplier::where('status', 1)
-            ->where('description', 'like', '%' . $search . '%')
-            ->orderBy('description')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'id' => $item->id_supplier,
-                    'text' => $item->code . ' :: ' . $item->description
-                ];
-            })
-            ->toArray();
+        return $this->rmEntryRepo->getSuppliersSearch($search);
     }
 
     public function getSourceEntriesList($plantId): array
@@ -660,27 +662,10 @@ class RmEntryService implements RmEntryServiceInterface
         return ['success' => true, 'status' => 1];
     }
 
-    public function updateSubTankSlocTail(int $idHead, $idTankTail): array
+    public function updateSubTankSlocTail(int $idHead, $idTankTail, string $user): array
     {
-        $tankTailJson = null;
-        if (!empty($idTankTail)) {
-            if (is_array($idTankTail)) {
-                $tankTailJson = json_encode(array_map('strval', array_values($idTankTail)));
-            } else {
-                $decoded = json_decode($idTankTail, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    $tankTailJson = json_encode(array_map('strval', array_values($decoded)));
-                } else {
-                    $tankTailJson = json_encode([(string)$idTankTail]);
-                }
-            }
-        }
-
-        DB::connection('eudr_ts')->table('t_balance_header')
-            ->where('id_balance_head', $idHead)
-            ->update(['id_sloc_tail' => $tankTailJson]);
-
-        return ['success' => true, 'status' => 1];
+        $tails = is_array($idTankTail) ? $idTankTail : [$idTankTail];
+        return $this->rmEntryRepo->updateEntrySubTank($user, $idHead, $tails);
     }
 
     protected function resolvePlantCode($plantId)
@@ -694,8 +679,8 @@ class RmEntryService implements RmEntryServiceInterface
         return $plantId;
     }
 
-    public function clearTempData($entryNo, $user)
+    public function clearTempData($entryNo, $user): void
     {
-        return $this->rmEntryRepo->clearTempData($entryNo, $user);
+        $this->rmEntryRepo->clearTempData($entryNo, $user);
     }
 }

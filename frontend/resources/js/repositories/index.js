@@ -1,11 +1,10 @@
-import { materialRepository as MaterialRepository } from './MaterialRepository'
-import { rmEntryRepository as RmEntryRepository } from './RmEntryRepository'
-import { tankRepository as TankRepository } from './TankRepository'
-import { supplierRepository as SupplierRepository } from './SupplierRepository'
-
-export {
-  MaterialRepository,
-  RmEntryRepository,
-  TankRepository,
-  SupplierRepository,
-}
+/**
+ * @note Naming convention mismatch: this folder is `repositories/` but should be `services/`
+ *       per project convention (View → Store → Service → Axios). Renaming is deferred
+ *       due to risk; treat these files as service-layer API wrappers.
+ */
+export { materialRepository } from './MaterialRepository'
+export { rmEntryRepository } from './RmEntryRepository'
+export { tankRepository } from './TankRepository'
+export { supplierRepository } from './SupplierRepository'
+export { wipEntryRepository } from './WipEntryRepository'

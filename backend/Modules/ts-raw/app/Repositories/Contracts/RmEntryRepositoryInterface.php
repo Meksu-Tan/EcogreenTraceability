@@ -4,8 +4,9 @@ namespace Modules\TsRaw\Repositories\Contracts;
 interface RmEntryRepositoryInterface
 {
     // List & Fetch
-    public function getRmList($plantId): array;
+    public function getRmList($plantId, int $page = 1, int $perPage = 5): array;
     public function getNewNumber($plantId): ?string;
+    public function getRmEntryById($id): ?object;
     public function getTanks($plantId): array;
     public function getTankDetails($tankId, $plantId): array;
     public function getMaterials(): array;
@@ -32,6 +33,10 @@ interface RmEntryRepositoryInterface
     public function saveRmEntry(array $data, string $user): array;
     public function saveRmTrfEntry(array $data, string $user): array;
     public function deactivateRmEntry(int $id, string $user): array;
+    public function deactivateFeedLogEntry(int $id, string $user): array;
+
+    // Sub Tank
+    public function updateEntrySubTank(string $user, int $idHead, array $tails): array;
 
     // Temp Data
     public function getTempData(string $entryNo): array;
@@ -75,4 +80,11 @@ interface RmEntryRepositoryInterface
     public function getTotalStockMaterial(int $materialId, int $tankId): float;
     public function getSupplierMaterial(int $materialId, int $tankId, $plantId): ?object;
     public function getLockStatus(string $entryDate): bool;
+
+    // Model access methods (to avoid direct model queries in Service)
+    public function findBalanceHeaderById(int $id): ?object;
+    public function findPlantById(int $plantId): ?object;
+    public function getActiveMaterialsSearch(): array;
+    public function getSuppliersSearch(string $search): array;
+    public function getSourceEntriesList($plantId): array;
 }

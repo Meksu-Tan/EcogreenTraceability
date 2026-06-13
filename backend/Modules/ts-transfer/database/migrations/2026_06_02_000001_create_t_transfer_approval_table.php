@@ -38,7 +38,6 @@ return new class extends Migration
 
                 // Additional fields
                 $table->text('notes')->nullable();
-                $table->integer('status')->default(1)->index();
                 $table->string('created_by', 50)->nullable();
                 $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'))->nullable();
                 $table->string('updated_by', 50)->nullable();

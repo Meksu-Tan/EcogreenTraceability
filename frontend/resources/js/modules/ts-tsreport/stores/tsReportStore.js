@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import tsReportApi from '@/modules/ts-tsreport/api'
+import tsReportApi from '@/modules/ts-tsreport/services'
 export const useTsReportStore = defineStore('tsReport', () => {
   const tsReportData = ref([]), rmSection = ref([]), pckSection = ref([]), shipmentSection = ref([]), transferSection = ref([]), wipSection = ref([]), loading = ref(false), error = ref(null)
   async function fetchTsReport(params = {}) { loading.value = true; error.value = null; try { const r = await tsReportApi.getTsReport(params); tsReportData.value = r.data?.data || r.data || [] } catch (e) { error.value = e.message; tsReportData.value = [] } finally { loading.value = false } }
@@ -9,5 +9,6 @@ export const useTsReportStore = defineStore('tsReport', () => {
   async function fetchShipmentSection(params = {}) { loading.value = true; try { const r = await tsReportApi.getShipmentSection(params); shipmentSection.value = r.data?.data || [] } catch { shipmentSection.value = [] } finally { loading.value = false } }
   async function fetchTransferSection(params = {}) { loading.value = true; try { const r = await tsReportApi.getTransferSection(params); transferSection.value = r.data?.data || [] } catch { transferSection.value = [] } finally { loading.value = false } }
   async function fetchWipSection(params = {}) { loading.value = true; try { const r = await tsReportApi.getWipSection(params); wipSection.value = r.data?.data || [] } catch { wipSection.value = [] } finally { loading.value = false } }
-  return { tsReportData, rmSection, pckSection, shipmentSection, transferSection, wipSection, loading, error, fetchTsReport, fetchRmSection, fetchPckSection, fetchShipmentSection, fetchTransferSection, fetchWipSection }
+  async function fetchAllSections(params = {}) { loading.value = true; error.value = null; try { const r = await tsReportApi.getAllSections(params); const d = r.data?.data || {}; rmSection.value = d.rm || []; wipSection.value = d.wip || []; transferSection.value = d.transfer || []; pckSection.value = d.pck || []; shipmentSection.value = d.shipment || []; return d } catch (e) { error.value = e.message; rmSection.value = []; wipSection.value = []; transferSection.value = []; pckSection.value = []; shipmentSection.value = []; return {} } finally { loading.value = false } }
+  return { tsReportData, rmSection, pckSection, shipmentSection, transferSection, wipSection, loading, error, fetchTsReport, fetchRmSection, fetchPckSection, fetchShipmentSection, fetchTransferSection, fetchWipSection, fetchAllSections }
 })

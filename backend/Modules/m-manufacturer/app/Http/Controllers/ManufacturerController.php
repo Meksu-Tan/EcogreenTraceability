@@ -30,7 +30,11 @@ class ManufacturerController extends Controller
         $validated = $request->validated();
         $data   = array_merge($validated, ['created_by' => $request->user()->name ?? 'System']);
         $result = $this->manufacturerService->storeManufacturer($data);
-        return response()->json($result, $result['status'] === 1 ? 201 : 422);
+
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, 'Manufacturer created', 201);
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to create manufacturer', 422);
     }
 
     public function update(UpdateManufacturerRequest $request, int $id): JsonResponse
@@ -38,7 +42,11 @@ class ManufacturerController extends Controller
         $validated = $request->validated();
         $data   = array_merge($validated, ['updated_by' => $request->user()->name ?? 'System']);
         $result = $this->manufacturerService->updateManufacturer($id, $data);
-        return response()->json($result);
+
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, 'Manufacturer updated');
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to update manufacturer', 422);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -48,6 +56,10 @@ class ManufacturerController extends Controller
         $result = $action === 'activate'
             ? $this->manufacturerService->activateManufacturer($id, $user)
             : $this->manufacturerService->deactivateManufacturer($id, $user);
-        return response()->json($result);
+
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, $action === 'activate' ? 'Manufacturer activated' : 'Manufacturer deactivated');
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to process manufacturer', 422);
     }
 }

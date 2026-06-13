@@ -1,22 +1,19 @@
 <template>
-  <nav class="flex items-center gap-2 text-sm text-slate-600 mb-4">
-    <a href="/" class="hover:text-primary transition-colors">Home</a>
-    <Icon icon="ri:arrow-right-s-line" class="w-4 h-4 text-slate-400" />
+  <nav class="d-flex align-center gap-1 mb-4">
+    <RouterLink to="/" class="text-caption text-medium-emphasis text-decoration-none hover:text-primary">Home</RouterLink>
+    <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
     <template v-for="(crumb, i) in crumbs" :key="i">
-      <a v-if="crumb.to" :href="crumb.to" class="hover:text-primary transition-colors">{{ crumb.label }}</a>
-      <span v-else class="text-slate-800 font-medium">{{ crumb.label }}</span>
-      <Icon v-if="i < crumbs.length - 1" icon="ri:arrow-right-s-line" class="w-4 h-4 text-slate-400" />
+      <RouterLink v-if="crumb.to" :to="crumb.to" class="text-caption text-medium-emphasis text-decoration-none hover:text-primary">
+        {{ crumb.label }}
+      </RouterLink>
+      <span v-else class="text-caption font-weight-semibold">{{ crumb.label }}</span>
+      <VIcon v-if="i < crumbs.length - 1" icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
     </template>
   </nav>
 </template>
 
 <script setup>
-import { Icon } from '@iconify/vue'
-
 defineProps({
-  crumbs: {
-    type: Array,
-    required: true,
-  },
+  crumbs: { type: Array, required: true },
 })
 </script>

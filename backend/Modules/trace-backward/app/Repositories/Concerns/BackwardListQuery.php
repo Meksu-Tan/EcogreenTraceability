@@ -13,10 +13,6 @@ final class BackwardListQuery
 
     public function execute(array $filters = []): array
     {
-        $this->connection->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantId = $filters['id_plant'] ?? null;
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('sh', $plantId, $userId);

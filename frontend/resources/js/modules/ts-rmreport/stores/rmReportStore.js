@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import rmReportApi from '@/modules/ts-rmreport/api'
+import rmReportApi from '@/modules/ts-rmreport/services'
 
 export const useRmReportStore = defineStore('rmReport', () => {
   const rmReportData = ref([])

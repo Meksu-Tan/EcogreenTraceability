@@ -1,81 +1,88 @@
 <template>
   <BaseModal
     :model-value="modelValue"
-    :title="isEdit ? 'Edit Tank' : 'Tambah Tank'"
+    :title="isEdit ? 'Edit Tank' : 'Add Tank'"
     :loading="loading"
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div v-if="!isEdit" class="flex flex-col gap-1.5 mb-4">
-      <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">ID Tank (Optional)</label>
-      <input
+    <div class="d-flex flex-column gap-4 py-2">
+      <VTextField
+        v-if="!isEdit"
         id="tank-id"
         v-model="form.id"
         type="number"
-        placeholder="Biarkan kosong untuk auto-generate"
-        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
+        label="Tank ID (Optional)"
+        placeholder="Leave empty to auto-generate"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
       />
-    </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Plant <span class="text-red-500">*</span></label>
-        <select
-          id="tank-plant-select"
-          v-model="form.plant_code"
-          @change="onPlantChange"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.plant_code ? 'border-red-300 bg-red-50' : 'border-gray-300'"
-        >
-          <option value="">Pilih Plant</option>
-          <option v-for="p in plantStore.plants" :key="p.id_plant" :value="p.code_2">
-            {{ p.code_2 }} - {{ p.description }}
-          </option>
-        </select>
-        <div v-if="errors.plant_code" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.plant_code }}</div>
-      </div>
+      <VRow dense>
+        <VCol cols="12" sm="6">
+          <VSelect
+            id="tank-plant-select"
+            v-model="form.plant_code"
+            :items="plantOptions"
+            label="Plant"
+            :error-messages="errors.plant_code"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            required
+            @update:model-value="onPlantChange"
+          />
+        </VCol>
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Nama Plant <span class="text-red-500">*</span></label>
-        <input
-          id="tank-plant-name"
-          v-model="form.plant_name"
-          type="text"
-          placeholder="Nama Plant"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.plant_name ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
-        />
-        <div v-if="errors.plant_name" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.plant_name }}</div>
-      </div>
-    </div>
+        <VCol cols="12" sm="6">
+          <VTextField
+            id="tank-plant-name"
+            v-model="form.plant_name"
+            type="text"
+            label="Plant Name"
+            placeholder="Plant Name"
+            :error-messages="errors.plant_name"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            required
+          />
+        </VCol>
+      </VRow>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Nomor Tank <span class="text-red-500">*</span></label>
-        <input
-          id="tank-number"
-          v-model="form.tank_number"
-          type="text"
-          placeholder="e.g. 210T01"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.tank_number ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
-        />
-        <div v-if="errors.tank_number" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.tank_number }}</div>
-      </div>
+      <VRow dense>
+        <VCol cols="12" sm="6">
+          <VTextField
+            id="tank-number"
+            v-model="form.tank_number"
+            type="text"
+            label="Tank Number"
+            placeholder="e.g. 210T01"
+            :error-messages="errors.tank_number"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            required
+          />
+        </VCol>
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Tinggi Tank (Height) <span class="text-red-500">*</span></label>
-        <input
-          id="tank-height-input"
-          v-model="form.tank_height"
-          type="number"
-          step="0.01"
-          placeholder="e.g. 1460.00"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.tank_height ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
-        />
-        <div v-if="errors.tank_height" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.tank_height }}</div>
-      </div>
+        <VCol cols="12" sm="6">
+          <VTextField
+            id="tank-height-input"
+            v-model="form.tank_height"
+            type="number"
+            step="0.01"
+            label="Tank Height"
+            placeholder="e.g. 1460.00"
+            :error-messages="errors.tank_height"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            required
+          />
+        </VCol>
+      </VRow>
     </div>
   </BaseModal>
 </template>
@@ -90,6 +97,13 @@ const emit   = defineEmits(['update:modelValue', 'submit'])
 
 const plantStore = useSetupPlantStore()
 const isEdit = computed(() => !!props.editData)
+
+const plantOptions = computed(() => {
+  return (plantStore.plants || []).map(p => ({
+    value: p.code_2,
+    title: `${p.code_2} - ${p.description}`
+  }))
+})
 
 const form = reactive({ id: '', plant_code: '', plant_name: '', tank_number: '', tank_height: '' })
 const errors = reactive({ plant_code: '', plant_name: '', tank_number: '', tank_height: '' })
@@ -118,10 +132,10 @@ function onPlantChange() {
 function validate() {
   let ok = true
   Object.assign(errors, { plant_code: '', plant_name: '', tank_number: '', tank_height: '' })
-  if (!form.plant_code)  { errors.plant_code = 'Wajib diisi'; ok = false }
-  if (!form.plant_name)  { errors.plant_name = 'Wajib diisi'; ok = false }
-  if (!form.tank_number) { errors.tank_number = 'Wajib diisi'; ok = false }
-  if (form.tank_height === '' || form.tank_height === null) { errors.tank_height = 'Wajib diisi'; ok = false }
+  if (!form.plant_code)  { errors.plant_code = 'Required'; ok = false }
+  if (!form.plant_name)  { errors.plant_name = 'Required'; ok = false }
+  if (!form.tank_number) { errors.tank_number = 'Required'; ok = false }
+  if (form.tank_height === '' || form.tank_height === null) { errors.tank_height = 'Required'; ok = false }
   return ok
 }
 

@@ -1,163 +1,136 @@
 <template>
-  <div class="flex flex-col gap-4">
-    <!-- DataTable toolbar -->
-    <div class="flex items-center justify-between gap-4 flex-wrap">
-      <div class="relative max-w-xs w-full">
-        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Icon icon="ri:search-line" class="text-gray-400 text-sm" />
-        </div>
-        <input
-          id="dt-search"
-          v-model="search"
-          type="text"
-          class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 sm:text-sm transition-all"
-          placeholder="Search data..."
+  <div>
+    <!-- Toolbar: Search + count -->
+    <div v-if="(showSearch && !serverSide) || showTopInfo" class="d-flex align-center justify-space-between gap-4 pa-4 flex-wrap">
+      <VTextField
+        v-if="showSearch && !serverSide"
+        id="dt-search"
+        v-model="search"
+        placeholder="Search data..."
+        prepend-inner-icon="ri-search-line"
+        density="compact"
+        hide-details
+        style="max-width: 280px;"
+      />
+      <span v-if="showTopInfo" class="text-caption text-medium-emphasis">
+        {{ serverSide ? `Showing ${(currentPage - 1) * perPageLocal + 1}–${Math.min(currentPage * perPageLocal, totalItems)} of ${totalItems} entries` : `Showing ${displayData.length} of ${sortedData.length} entries` }}
+      </span>
+    </div>
+
+    <VDivider v-if="(showSearch && !serverSide) || showTopInfo" />
+
+    <!-- Table -->
+    <VTable density="compact" class="data-table">
+      <thead>
+        <tr>
+          <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="width: 48px;">#</th>
+          <th
+            v-for="col in columns"
+            :key="col.key"
+            class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th"
+            :class="{ 'sort-active': sortKey === col.key }"
+            style="cursor: pointer; user-select: none; white-space: nowrap;"
+            @click="toggleSort(col.key)"
+          >
+            {{ col.label }}
+            <VIcon
+              v-if="sortKey === col.key"
+              :icon="sortDir === 'asc' ? 'ri-arrow-up-s-line' : 'ri-arrow-down-s-line'"
+              size="16"
+              class="sort-icon"
+            />
+            <VIcon
+              v-else
+              icon="ri-arrow-up-down-line"
+              size="14"
+              class="sort-icon"
+            />
+          </th>
+          <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width: 120px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Loading -->
+        <tr v-if="loading">
+          <td :colspan="columns.length + 2" class="pa-0">
+            <VSkeletonLoader type="table-tbody@5" :loading="true" />
+          </td>
+        </tr>
+
+        <!-- Empty -->
+        <tr v-else-if="displayData.length === 0">
+          <td :colspan="columns.length + 2" class="text-center pa-8">
+            <VIcon icon="ri-inbox-2-line" size="40" color="neutral-200" class="d-block mx-auto mb-2" />
+            <span class="text-caption text-medium-emphasis">No data found</span>
+          </td>
+        </tr>
+
+        <!-- Rows -->
+        <tr v-for="(row, i) in displayData" :key="row[rowKey]">
+          <td class="text-caption text-medium-emphasis">{{ (currentPage - 1) * perPageLocal + i + 1 }}</td>
+          <td v-for="col in columns" :key="col.key">
+            <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
+              <span v-if="col.key === 'status'">
+                <VChip
+                  :color="row.status == 1 ? 'success' : 'error'"
+                  variant="tonal"
+                  size="x-small"
+                >
+                  {{ row.status == 1 ? 'Active' : 'Inactive' }}
+                </VChip>
+              </span>
+              <span v-else class="text-body-2">{{ row[col.key] ?? '—' }}</span>
+            </slot>
+          </td>
+          <td class="text-center">
+            <slot name="actions" :row="row">
+              <div class="d-flex justify-center gap-1">
+                <VBtn size="x-small" icon="ri-edit-line" color="primary" variant="tonal" @click="$emit('edit', row)" />
+                <VBtn
+                  size="x-small"
+                  :icon="row.status == 1 ? 'ri-close-line' : 'ri-check-line'"
+                  :color="row.status == 1 ? 'error' : 'success'"
+                  variant="tonal"
+                  @click="$emit('toggle-status', row)"
+                />
+              </div>
+            </slot>
+          </td>
+        </tr>
+      </tbody>
+    </VTable>
+
+    <!-- Pagination + Per-page selector -->
+    <div v-if="totalPages >= 1 && (serverSide ? totalItems > 0 : totalRows > 0)" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+      <div class="d-flex align-center gap-3">
+        <span v-if="showBottomInfo" class="text-caption text-medium-emphasis">
+          {{ serverSide ? `Showing ${(currentPage - 1) * perPageLocal + 1} - ${Math.min(currentPage * perPageLocal, totalItems)} of ${totalItems} records` : `Showing ${(currentPage - 1) * perPageLocal + 1} - ${Math.min(currentPage * perPageLocal, totalRows)} of ${totalRows} records` }}
+        </span>
+        <VSelect
+          v-model="perPageLocal"
+          :items="perPageOptions"
+          density="compact"
+          variant="outlined"
+          hide-details
+          style="min-width: 80px; max-width: 100px;"
         />
       </div>
-      <div class="text-xs font-medium text-gray-500">
-        Showing <span class="text-slate-800">{{ paginatedData.length }}</span> of <span class="text-slate-800">{{ filtered.length }}</span> entries
-      </div>
-    </div>
-
-    <!-- Table Container -->
-    <div class="overflow-x-auto rounded-lg border border-gray-100">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th scope="col" class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-12">#</th>
-            <th
-              v-for="col in columns"
-              :key="col.key"
-              scope="col"
-              class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider"
-            >
-              <div class="flex items-center gap-1 cursor-pointer group">
-                {{ col.label }}
-                <Icon icon="ri:sort-asc" class="text-[10px] opacity-0 group-hover:opacity-50 transition-opacity" />
-              </div>
-            </th>
-            <th scope="col" class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Action</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-100">
-          <tr v-if="loading">
-            <td :colspan="columns.length + 2" class="px-6 py-12 text-center">
-              <div class="flex flex-col items-center gap-3">
-                <Icon icon="ri:loader-4-line" class="animate-spin text-2xl text-green-600" />
-                <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Loading data...</span>
-              </div>
-            </td>
-          </tr>
-          <tr v-else-if="paginatedData.length === 0">
-            <td :colspan="columns.length + 2" class="px-6 py-12 text-center">
-              <div class="flex flex-col items-center gap-3">
-                <Icon icon="ri:inbox-2-line" class="text-4xl text-gray-200" />
-                <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tidak ada data ditemukan</span>
-              </div>
-            </td>
-          </tr>
-          <tr
-            v-for="(row, i) in paginatedData"
-            :key="row[rowKey]"
-            class="hover:bg-slate-50/50 transition-colors"
-          >
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-400 font-medium">
-              {{ (currentPage - 1) * perPage + i + 1 }}
-            </td>
-            <td v-for="col in columns" :key="col.key" class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">
-              <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]">
-                <span v-if="col.key === 'status'">
-                  <span
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold"
-                    :class="row.status == 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
-                  >
-                    {{ row.status == 1 ? 'Active' : 'Inactive' }}
-                  </span>
-                </span>
-                <span v-else>{{ row[col.key] ?? '—' }}</span>
-              </slot>
-            </td>
-            <td class="px-4 py-3 whitespace-nowrap text-center text-sm font-medium">
-              <slot name="actions" :row="row">
-                <div class="flex items-center justify-center gap-1.5">
-                  <button
-                    class="p-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm active:scale-90"
-                    title="Edit"
-                    @click="$emit('edit', row)"
-                  >
-                    <Icon icon="ri:edit-line" class="text-[11px]" />
-                  </button>
-                  <button
-                    class="p-1.5 rounded-md transition-colors shadow-sm active:scale-90 text-white"
-                    :class="row.status == 1 ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'"
-                    :title="row.status == 1 ? 'Deactivate' : 'Activate'"
-                    @click="$emit('toggle-status', row)"
-                  >
-                    <Icon :icon="row.status == 1 ? 'ri:close-line' : 'ri:check-line'" class="text-[11px]" />
-                  </button>
-                </div>
-              </slot>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Pagination -->
-    <div v-if="totalPages > 1" class="flex items-center justify-between mt-2 pt-4 border-t border-gray-100 gap-4 flex-wrap">
-      <div class="text-xs font-medium text-gray-500 italic">
-        Page <span class="text-slate-800 font-bold">{{ currentPage }}</span> of <span class="text-slate-800 font-bold">{{ totalPages }}</span>
-      </div>
-      <div class="flex items-center gap-1">
-        <button
-          class="w-8 h-8 flex items-center justify-center rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          :disabled="currentPage === 1"
-          @click="currentPage = 1"
-        >
-          <Icon icon="ri:arrow-left-s-line" class="text-xs" />
-        </button>
-        <button
-          class="w-8 h-8 flex items-center justify-center rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          :disabled="currentPage === 1"
-          @click="currentPage--"
-        >
-          <Icon icon="ri:arrow-left-line" class="text-xs" />
-        </button>
-
-        <div class="flex items-center gap-1 mx-1">
-          <button
-            v-for="p in visiblePages"
-            :key="p"
-            class="w-8 h-8 flex items-center justify-center rounded-md text-xs font-bold transition-all shadow-sm"
-            :class="p === currentPage ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'"
-            @click="currentPage = p"
-          >
-            {{ p }}
-          </button>
-        </div>
-
-        <button
-          class="w-8 h-8 flex items-center justify-center rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          :disabled="currentPage === totalPages"
-          @click="currentPage++"
-        >
-          <Icon icon="ri:arrow-right-line" class="text-xs" />
-        </button>
-        <button
-          class="w-8 h-8 flex items-center justify-center rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-          :disabled="currentPage === totalPages"
-          @click="currentPage = totalPages"
-        >
-          <Icon icon="ri:arrow-right-s-line" class="text-xs" />
-        </button>
-      </div>
+      <VPagination
+        v-if="totalPages > 1"
+        v-model="currentPage"
+        :length="totalPages"
+        :total-visible="5"
+        density="comfortable"
+        size="small"
+        show-first-last-page
+      />
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Icon } from '@iconify/vue'
+import { debounce } from '@/utils/debounce'
 
 const props = defineProps({
   columns: { type: Array, required: true },
@@ -165,31 +138,136 @@ const props = defineProps({
   loading: { type: Boolean, default: false },
   rowKey:  { type: String, default: 'id' },
   perPage: { type: Number, default: 10 },
+  serverSide: { type: Boolean, default: false },
+  totalItems: { type: Number, default: 0 },
+  showSearch: { type: Boolean, default: true },
+  showTopInfo: { type: Boolean, default: true },
+  showBottomInfo: { type: Boolean, default: true },
 })
-defineEmits(['edit', 'toggle-status'])
+const emit = defineEmits(['edit', 'toggle-status', 'page-change'])
 
-const search      = ref('')
-const currentPage = ref(1)
-watch(search, () => { currentPage.value = 1 })
+const search       = ref('')
+const currentPage  = ref(1)
+const sortKey      = ref(null)
+const sortDir      = ref(null)
+const perPageLocal = ref(props.perPage)
+const perPageOptions = [5, 10, 15, 20]
+
+const debouncedResetPage = debounce(() => {
+  currentPage.value = 1
+}, 300)
+
+watch(search, () => {
+  debouncedResetPage()
+})
+
+function detectColumnType(colKey) {
+  const rows = props.data
+  if (!rows || rows.length === 0) return 'text'
+  for (const row of rows) {
+    const val = row[colKey]
+    if (val !== null && val !== undefined && val !== '') {
+      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
+    }
+  }
+  return 'text'
+}
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    if (sortDir.value === 'asc') {
+      sortDir.value = 'desc'
+    } else if (sortDir.value === 'desc') {
+      sortKey.value = null
+      sortDir.value = null
+    }
+  } else {
+    sortKey.value = key
+    const type = detectColumnType(key)
+    sortDir.value = type === 'text' ? 'asc' : 'desc'
+  }
+  currentPage.value = 1
+}
+
+const totalRows = computed(() => {
+  return props.serverSide ? props.totalItems : props.data.length
+})
+
+const sortedData = computed(() => {
+  if (props.serverSide) return props.data
+  if (!sortKey.value || !sortDir.value) return props.data
+  const key = sortKey.value
+  const dir = sortDir.value
+  const rows = [...(props.data)]
+  return rows.sort((a, b) => {
+    const va = a[key]
+    const vb = b[key]
+    if (va == null && vb == null) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    const type = detectColumnType(key)
+    if (type === 'number') {
+      return dir === 'asc' ? va - vb : vb - va
+    }
+    return dir === 'asc'
+      ? String(va).localeCompare(String(vb))
+      : String(vb).localeCompare(String(va))
+  })
+})
 
 const filtered = computed(() => {
-  if (!search.value) return props.data
+  if (props.serverSide) return sortedData.value
+  if (!search.value) return sortedData.value
   const q = search.value.toLowerCase()
-  return props.data.filter(row =>
+  return sortedData.value.filter(row =>
     Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q))
   )
 })
-const totalPages    = computed(() => Math.max(1, Math.ceil(filtered.value.length / props.perPage)))
+
+const totalPages = computed(() => {
+  const count = props.serverSide ? props.totalItems : filtered.value.length
+  return Math.max(1, Math.ceil(count / perPageLocal.value))
+})
+
 const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * props.perPage
-  return filtered.value.slice(start, start + props.perPage)
+  if (props.serverSide) return filtered.value
+  const start = (currentPage.value - 1) * perPageLocal.value
+  return filtered.value.slice(start, start + perPageLocal.value)
 })
-const visiblePages = computed(() => {
-  const t = totalPages.value, c = currentPage.value
-  let s = Math.max(1, c - 2), e = Math.min(t, s + 4)
-  if (e - s < 4) s = Math.max(1, e - 4)
-  const pages = []
-  for (let i = s; i <= e; i++) pages.push(i)
-  return pages
+
+const displayData = computed(() => paginatedData.value)
+
+watch(currentPage, (val) => {
+  if (props.serverSide) {
+    emit('page-change', { page: val, perPage: perPageLocal.value })
+  }
 })
+
+watch(perPageLocal, (val) => {
+  currentPage.value = 1
+  if (props.serverSide) {
+    emit('page-change', { page: 1, perPage: val })
+  }
+})
+
+function resetPage() {
+  currentPage.value = 1
+}
+
+defineExpose({ resetPage })
 </script>
+
+<style scoped>
+.sort-icon {
+  vertical-align: middle;
+  transition: opacity 0.15s;
+  opacity: 0.35;
+}
+.sortable-th:hover .sort-icon {
+  opacity: 0.7;
+}
+.sortable-th.sort-active .sort-icon {
+  opacity: 1 !important;
+  color: rgb(var(--v-theme-primary));
+}
+</style>

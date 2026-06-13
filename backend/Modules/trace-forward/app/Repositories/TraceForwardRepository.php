@@ -9,6 +9,13 @@ use Modules\TraceForward\Repositories\Concerns\ForwardSearchQuery;
 use Modules\TraceForward\Repositories\Concerns\ForwardTraceQuery;
 use Modules\TraceForward\Repositories\Contracts\TraceForwardRepositoryInterface;
 
+/**
+ * @todo Technical Debt: This class is 61 lines in this file but delegates to 4 Concern classes
+ * (ForwardListQuery, ForwardDetailQuery, ForwardTraceQuery, ForwardSearchQuery).
+ * The effective class size across all concerns likely exceeds 200 lines. Requires audit of concern line counts.
+ * - Split into: TraceForwardListQuery, TraceForwardDetailQuery, TraceForwardSearchQuery
+ * Current concern-based decomposition is already a good pattern — verify each concern stays under 200 lines.
+ */
 class TraceForwardRepository implements TraceForwardRepositoryInterface
 {
     public function __construct(
@@ -19,9 +26,9 @@ class TraceForwardRepository implements TraceForwardRepositoryInterface
         private readonly ForwardSearchQuery $searchQuery,
     ) {}
 
-    public function forwardTrace(string $traceNo, ?int $idMaterial = null, ?int $plantId = null, ?int $userId = null): array
+    public function forwardTrace(string $traceNo, ?int $idMaterial = null): array
     {
-        return $this->traceQuery->execute($traceNo, $idMaterial, $plantId, $userId);
+        return $this->traceQuery->execute($traceNo, $idMaterial);
     }
 
     public function searchTraces(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null): array
@@ -34,6 +41,10 @@ class TraceForwardRepository implements TraceForwardRepositoryInterface
         return $this->listQuery->execute($filters);
     }
 
+    /**
+     * @todo Refactor: Filtering and restructuring logic below should ideally be moved to the Service layer
+     * to keep the Repository strictly focused on data retrieval.
+     */
     public function getForwardTraceDetail(int $idHeader, string $traceNo, int $idMaterial, ?int $plantId = null, ?int $userId = null): array
     {
         $rows = $this->detailQuery->execute($traceNo, $idMaterial, $plantId, $userId);

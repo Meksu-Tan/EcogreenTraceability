@@ -17,7 +17,11 @@ return new class extends Migration
             $table->string('created_by', 50)->nullable();
             $table->timestamp('created_at')->default(DB::raw('CURRENT_TIMESTAMP'))->nullable();
             $table->string('updated_by', 50)->nullable();
-            $table->timestamp('updated_at')->default(DB::raw('null on update CURRENT_TIMESTAMP'))->nullable();
+            if (DB::getDriverName() === 'sqlite') {
+                $table->timestamp('updated_at')->nullable();
+            } else {
+                $table->timestamp('updated_at')->default(DB::raw('null on update CURRENT_TIMESTAMP'))->nullable();
+            }
             
             $table->charset = 'utf8mb4';
             $table->collation = 'utf8mb4_general_ci';

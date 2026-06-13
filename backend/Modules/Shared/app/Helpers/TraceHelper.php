@@ -1,0 +1,90 @@
+<?php declare(strict_types=1);
+
+namespace Modules\Shared\Helpers;
+
+/**
+ * SQL fragment builder for trace number field extraction.
+ *
+ * The system has two trace number formats in the database:
+ *   11-digit (legacy): type(1) + YYMMDD(6) + plant(2)     + seq(2)
+ *   14-digit (current): type(1) + YYMMDD(6) + warehouse(3) + plant(2) + seq(2)
+ *
+ * Queries that parse positional fields must handle both.
+ */
+class TraceHelper
+{
+    /**
+     * Build a SQL condition comparing the warehouse/section field.
+     *
+     * 11-digit: warehouse doesn't exist; pos 8-9 = plant code (2 digits)
+     * 14-digit: pos 8-10 = warehouse code (3 digits, e.g. "000", "001")
+     *
+     * @param string $col   Column expression, e.g. "a.to_trace_no" or "bb.trace_no"
+     * @param string $op    '=' or '<>'
+     * @param string $value 3-digit warehouse value to compare against, e.g. '000'
+     */
+    public static function warehouseCondition(string $col, string $op = '<>', string $value = '000'): string
+    {
+        $v2 = substr($value, 0, 2);
+
+        return "(
+            (CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14 AND SUBSTRING(CAST({$col} AS CHAR),8,3) {$op} '{$value}')
+            OR
+            (CHAR_LENGTH(CAST({$col} AS CHAR)) < 14 AND SUBSTRING(CAST({$col} AS CHAR),8,2) {$op} '{$v2}')
+        )";
+    }
+
+    /**
+     * Build a SQL condition comparing the plant code field.
+     *
+     * 11-digit: plant at pos 8-9
+     * 14-digit: plant at pos 11-12
+     *
+     * @param string   $col    Column expression, e.g. "a.to_trace_no"
+     * @param string[] $plants 2-digit plant codes, e.g. ['01', '02']
+     * @param string   $op     'IN' or 'NOT IN'
+     */
+    public static function plantCondition(string $col, array $plants, string $op = 'IN'): string
+    {
+        $list = implode(',', array_map(fn(string $p): string => "'{$p}'", $plants));
+
+        return "(
+            (CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14 AND SUBSTRING(CAST({$col} AS CHAR),11,2) {$op} ({$list}))
+            OR
+            (CHAR_LENGTH(CAST({$col} AS CHAR)) < 14 AND SUBSTRING(CAST({$col} AS CHAR),8,2) {$op} ({$list}))
+        )";
+    }
+
+    /**
+     * Build a SQL condition that restricts to 14-digit trace numbers only.
+     *
+     * Use for WIP/Blending rundown matching where the warehouse field must exist
+     * (pos 8-10) and 11-digit legacy data should be silently excluded.
+     *
+     * @param string $col Column expression, e.g. "a.to_trace_no"
+     */
+    public static function only14Digit(string $col): string
+    {
+        return "CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14";
+    }
+
+    /**
+     * Match storage / RM-entry records for both formats.
+     *
+     * 14-digit: warehouse at pos 8-10 must equal '000' (storage tank, not production line)
+     * 11-digit: no warehouse field — every 11-digit record was a storage-tank entry by definition
+     *
+     * Use wherever the original code had SUBSTRING(col,8,3) = '000' as a
+     * "this is a storage entry, not a line/production entry" filter.
+     *
+     * @param string $col Column expression, e.g. "trace_no" or "a.trace_no"
+     */
+    public static function isStorageOrLegacy(string $col): string
+    {
+        return "(
+            (CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14 AND SUBSTRING(CAST({$col} AS CHAR),8,3) = '000')
+            OR
+            CHAR_LENGTH(CAST({$col} AS CHAR)) < 14
+        )";
+    }
+}

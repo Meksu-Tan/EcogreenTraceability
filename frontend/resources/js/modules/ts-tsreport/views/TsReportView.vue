@@ -1,96 +1,491 @@
 <template>
-  <div class="p-6">
-    <div class="bg-white rounded-lg shadow-sm border p-6 mb-6">
-      <h1 class="text-xl font-bold mb-4 flex items-center gap-2"><Icon icon="ri:file-list-3-line" class="w-6 h-6 text-blue-600" /> Summary of Daily Transaction</h1>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div><label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Select Entry Date</label><input v-model="entryDate" type="date" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500" @change="loadAll" /></div>
-        <div class="flex items-end"><button @click="loadAll" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 flex items-center gap-1"><Icon icon="ri:search-line" class="w-4 h-4" /> Search</button></div>
-      </div>
-    </div>
-    <div v-if="loading" class="text-center py-8 text-gray-500"><svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg><p class="mt-2">Loading report data...</p></div>
+  <div class="pa-6">
+    <VCard class="mb-4">
+      <VCardTitle class="d-flex align-center ga-2 pa-5">
+        <VIcon icon="ri-file-list-3-line" color="primary" size="24" />
+        <span class="text-h6 font-weight-bold">Summary of Daily Transaction</span>
+      </VCardTitle>
+      <VCardText>
+        <VRow dense>
+          <VCol cols="12" md="4">
+            <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Select Entry Date</label>
+            <VTextField
+              v-model="entryDate"
+              type="date"
+              rounded="md"
+              color="primary"
+              density="compact"
+              variant="outlined"
+              class="mt-1"
+              @update:model-value="loadAll"
+            />
+          </VCol>
+          <VCol cols="12" md="2" class="d-flex align-end">
+            <VBtn color="primary" prepend-icon="ri-search-line" block @click="loadAll">Search</VBtn>
+          </VCol>
+        </VRow>
+      </VCardText>
+    </VCard>
+
+    <VCard v-if="loading" class="d-flex flex-column align-center justify-center pa-8 mb-4">
+      <VProgressCircular indeterminate color="primary" size="32" />
+      <span class="mt-3 text-body-2 text-medium-emphasis">Loading report data...</span>
+    </VCard>
+
     <template v-else>
-      <!-- RM -->
-      <div class="bg-white rounded-lg shadow-sm border mb-6">
-        <div class="p-4 border-b flex items-center justify-between"><span class="inline-flex px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded items-center gap-1"><Icon icon="ri:oil-line" class="w-4 h-4" /> RM Transaction</span><span class="text-xs text-gray-500">{{ rm.length }} records</span></div>
-        <div class="overflow-x-auto">
-          <table class="w-full"><thead><tr class="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-3 text-center w-12">No</th><th class="px-3 py-3 text-left">Entry Date</th><th class="px-3 py-3 text-left">Prev Trace</th><th class="px-3 py-3 text-left">Trace</th><th class="px-3 py-3 text-left">Material</th><th class="px-3 py-3 text-right">Qty In (MT)</th><th class="px-3 py-3 text-left">SLoc</th><th class="px-3 py-3 text-right">Qty Out (MT)</th><th class="px-3 py-3 text-right">Qty Supplier (MT)</th><th class="px-3 py-3 text-left max-w-xs">Supplier / Batch SAP / Qty (MT)</th></tr></thead>
-          <tbody v-if="rm.length === 0">
-            <tr><td colspan="10" class="p-8 text-center text-gray-400"><Icon icon="ri:inbox-line" class="w-10 h-10 mx-auto mb-2 text-gray-300" /><p class="text-sm">No RM transactions for this date.</p></td></tr>
-          </tbody>
-          <tbody v-else class="divide-y text-sm">
-            <tr v-for="(r,i) in rm" :key="i" class="hover:bg-gray-50"><td class="px-3 py-3 text-center">{{ i + 1 }}</td><td class="px-3 py-3">{{ r.entry_date }}</td><td class="px-3 py-3 font-mono">{{ r.from_trace_no || '-' }}</td><td class="px-3 py-3 font-mono">{{ r.to_trace_no }}</td><td class="px-3 py-3 max-w-xs truncate font-medium">{{ r.material }}</td><td class="px-3 py-3 text-right font-mono">{{ r.in_qty }}</td><td class="px-3 py-3">{{ r.sloc || '-' }}</td><td class="px-3 py-3 text-right font-mono">{{ r.out_qty }}</td><td class="px-3 py-3 text-right font-mono" :class="qtyColor(r)">{{ r.balance_supplier }}</td><td class="px-3 py-3 max-w-xs truncate text-xs" :title="r.supplier">{{ r.supplier || '-' }}</td></tr>
-          </tbody></table>
-        </div>
-      </div>
-      <!-- WIP -->
-      <div class="bg-white rounded-lg shadow-sm border mb-6">
-        <div class="p-4 border-b flex items-center justify-between"><span class="inline-flex px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded items-center gap-1"><Icon icon="ri:settings-4-line" class="w-4 h-4" /> WIP Transaction</span><span class="text-xs text-gray-500">{{ wip.length }} records</span></div>
-        <div class="overflow-x-auto">
-          <table class="w-full"><thead><tr class="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-3 text-center w-12">No</th><th class="px-3 py-3 text-left">Entry Date</th><th class="px-3 py-3 text-left">Prev Trace</th><th class="px-3 py-3 text-left">Trace</th><th class="px-3 py-3 text-left">Material</th><th class="px-3 py-3 text-right">WIP Out (MT)</th><th class="px-3 py-3 text-left">Section</th><th class="px-3 py-3 text-right">WIP In (MT)</th><th class="px-3 py-3 text-right">WIP Supplier (MT)</th><th class="px-3 py-3 text-left max-w-xs">Supplier</th></tr></thead>
-          <tbody v-if="wip.length === 0">
-            <tr><td colspan="10" class="p-8 text-center text-gray-400"><Icon icon="ri:inbox-line" class="w-10 h-10 mx-auto mb-2 text-gray-300" /><p class="text-sm">No WIP transactions for this date.</p></td></tr>
-          </tbody>
-          <tbody v-else class="divide-y text-sm">
-            <tr v-for="(r,i) in wip" :key="i" class="hover:bg-gray-50"><td class="px-3 py-3 text-center">{{ i + 1 }}</td><td class="px-3 py-3">{{ r.entry_date }}</td><td class="px-3 py-3 font-mono">{{ r.from_trace_no || '-' }}</td><td class="px-3 py-3 font-mono">{{ r.to_trace_no }}</td><td class="px-3 py-3 max-w-xs truncate font-medium">{{ r.material }}</td><td class="px-3 py-3 text-right font-mono">{{ r.wip_out || r.out_qty }}</td><td class="px-3 py-3">{{ r.section || '-' }}</td><td class="px-3 py-3 text-right font-mono">{{ r.wip_in || r.in_qty }}</td><td class="px-3 py-3 text-right font-mono" :class="qtyColor(r)">{{ r.balance_supplier }}</td><td class="px-3 py-3 max-w-xs truncate text-xs" :title="r.supplier">{{ r.supplier || '-' }}</td></tr>
-          </tbody></table>
-        </div>
-      </div>
-      <!-- TRANSFER -->
-      <div class="bg-white rounded-lg shadow-sm border mb-6">
-        <div class="p-4 border-b flex items-center justify-between"><span class="inline-flex px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded items-center gap-1"><Icon icon="ri:swap-line" class="w-4 h-4" /> TRANSFER Transaction</span><span class="text-xs text-gray-500">{{ transfer.length }} records</span></div>
-        <div class="overflow-x-auto">
-          <table class="w-full"><thead><tr class="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-3 text-center w-12">No</th><th class="px-3 py-3 text-left">Entry Date</th><th class="px-3 py-3 text-left">Prev Trace</th><th class="px-3 py-3 text-left">Trace</th><th class="px-3 py-3 text-left">Material</th><th class="px-3 py-3 text-right">Qty In (MT)</th><th class="px-3 py-3 text-left">SLOC</th><th class="px-3 py-3 text-right">Qty Out (MT)</th><th class="px-3 py-3 text-right">Qty Supplier (MT)</th><th class="px-3 py-3 text-left max-w-xs">Supplier</th></tr></thead>
-          <tbody v-if="transfer.length === 0">
-            <tr><td colspan="10" class="p-8 text-center text-gray-400"><Icon icon="ri:inbox-line" class="w-10 h-10 mx-auto mb-2 text-gray-300" /><p class="text-sm">No Transfer transactions for this date.</p></td></tr>
-          </tbody>
-          <tbody v-else class="divide-y text-sm">
-            <tr v-for="(r,i) in transfer" :key="i" class="hover:bg-gray-50"><td class="px-3 py-3 text-center">{{ i + 1 }}</td><td class="px-3 py-3">{{ r.entry_date }}</td><td class="px-3 py-3 font-mono">{{ r.from_trace_no || '-' }}</td><td class="px-3 py-3 font-mono">{{ r.to_trace_no }}</td><td class="px-3 py-3 max-w-xs truncate font-medium">{{ r.material }}</td><td class="px-3 py-3 text-right font-mono">{{ r.in_qty }}</td><td class="px-3 py-3">{{ r.sloc || '-' }}</td><td class="px-3 py-3 text-right font-mono">{{ r.out_qty }}</td><td class="px-3 py-3 text-right font-mono" :class="qtyColor(r)">{{ r.balance_supplier }}</td><td class="px-3 py-3 max-w-xs truncate text-xs" :title="r.supplier">{{ r.supplier || '-' }}</td></tr>
-          </tbody></table>
-        </div>
-      </div>
-      <!-- PCK -->
-      <div class="bg-white rounded-lg shadow-sm border mb-6">
-        <div class="p-4 border-b flex items-center justify-between"><span class="inline-flex px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded items-center gap-1"><Icon icon="ri:package-line" class="w-4 h-4" /> PACKAGING Transaction</span><span class="text-xs text-gray-500">{{ pck.length }} records</span></div>
-        <div class="overflow-x-auto">
-          <table class="w-full"><thead><tr class="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-3 text-center w-12">No</th><th class="px-3 py-3 text-left">Entry Date</th><th class="px-3 py-3 text-left">Prev Trace</th><th class="px-3 py-3 text-left">Trace</th><th class="px-3 py-3 text-left">PPH Batch</th><th class="px-3 py-3 text-left">Material</th><th class="px-3 py-3 text-right">Qty In (MT)</th><th class="px-3 py-3 text-right">Qty Out (MT)</th><th class="px-3 py-3 text-right">Qty Supplier (MT)</th><th class="px-3 py-3 text-left max-w-xs">Supplier</th></tr></thead>
-          <tbody v-if="pck.length === 0">
-            <tr><td colspan="10" class="p-8 text-center text-gray-400"><Icon icon="ri:inbox-line" class="w-10 h-10 mx-auto mb-2 text-gray-300" /><p class="text-sm">No Packaging transactions for this date.</p></td></tr>
-          </tbody>
-          <tbody v-else class="divide-y text-sm">
-            <tr v-for="(r,i) in pck" :key="i" class="hover:bg-gray-50"><td class="px-3 py-3 text-center">{{ i + 1 }}</td><td class="px-3 py-3">{{ r.entry_date }}</td><td class="px-3 py-3 font-mono">{{ r.from_trace_no || '-' }}</td><td class="px-3 py-3 font-mono">{{ r.to_trace_no }}</td><td class="px-3 py-3 font-mono">{{ r.batch_no || '-' }}</td><td class="px-3 py-3 max-w-xs truncate font-medium">{{ r.material }}</td><td class="px-3 py-3 text-right font-mono">{{ r.in_qty }}</td><td class="px-3 py-3 text-right font-mono">{{ r.out_qty }}</td><td class="px-3 py-3 text-right font-mono" :class="qtyColor(r)">{{ r.balance_supplier }}</td><td class="px-3 py-3 max-w-xs truncate text-xs" :title="r.supplier">{{ r.supplier || '-' }}</td></tr>
-          </tbody></table>
-        </div>
-      </div>
-      <!-- SHIPMENT -->
-      <div class="bg-white rounded-lg shadow-sm border mb-6">
-        <div class="p-4 border-b flex items-center justify-between"><span class="inline-flex px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded items-center gap-1"><Icon icon="ri:ship-line" class="w-4 h-4" /> SHIPMENT Transaction</span><span class="text-xs text-gray-500">{{ shipment.length }} records</span></div>
-        <div class="overflow-x-auto">
-          <table class="w-full"><thead><tr class="bg-gray-50 border-b text-xs font-semibold text-gray-500 uppercase"><th class="px-3 py-3 text-center w-12">No</th><th class="px-3 py-3 text-left">Entry Date</th><th class="px-3 py-3 text-left">Prev Trace</th><th class="px-3 py-3 text-left">Trace</th><th class="px-3 py-3 text-left">SO No</th><th class="px-3 py-3 text-left">Material</th><th class="px-3 py-3 text-right">Qty In (MT)</th><th class="px-3 py-3 text-right">Qty Out (MT)</th><th class="px-3 py-3 text-right">Qty Supplier (MT)</th><th class="px-3 py-3 text-left max-w-xs">Supplier</th></tr></thead>
-          <tbody v-if="shipment.length === 0">
-            <tr><td colspan="10" class="p-8 text-center text-gray-400"><Icon icon="ri:inbox-line" class="w-10 h-10 mx-auto mb-2 text-gray-300" /><p class="text-sm">No Shipment transactions for this date.</p></td></tr>
-          </tbody>
-          <tbody v-else class="divide-y text-sm">
-            <tr v-for="(r,i) in shipment" :key="i" class="hover:bg-gray-50"><td class="px-3 py-3 text-center">{{ i + 1 }}</td><td class="px-3 py-3">{{ r.entry_date }}</td><td class="px-3 py-3 font-mono">{{ r.from_trace_no || '-' }}</td><td class="px-3 py-3 font-mono">{{ r.to_trace_no }}</td><td class="px-3 py-3 font-mono">{{ r.so_no || '-' }}</td><td class="px-3 py-3 max-w-xs truncate font-medium">{{ r.material }}</td><td class="px-3 py-3 text-right font-mono">{{ r.in_qty }}</td><td class="px-3 py-3 text-right font-mono">{{ r.out_qty }}</td><td class="px-3 py-3 text-right font-mono" :class="qtyColor(r)">{{ r.balance_supplier }}</td><td class="px-3 py-3 max-w-xs truncate text-xs" :title="r.supplier">{{ r.supplier || '-' }}</td></tr>
-          </tbody></table>
-        </div>
-      </div>
+      <VCard class="mb-4">
+        <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
+          <VChip color="primary" variant="flat" prepend-icon="ri-oil-line">
+            RM Transaction
+          </VChip>
+          <span class="text-caption text-medium-emphasis">{{ rm.length }} records</span>
+        </VCardTitle>
+        <VCardText class="pa-0">
+          <div class="overflow-x-auto">
+            <VTable density="compact" class="text-body-2">
+              <thead>
+                <tr>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date', rm)">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'from_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('from_trace_no', rm)">Prev Trace<VIcon v-if="sortKey==='from_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'to_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('to_trace_no', rm)">Trace<VIcon v-if="sortKey==='to_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material', rm)">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'in_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('in_qty', rm)">Qty In (MT)<VIcon v-if="sortKey==='in_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc', rm)">SLoc<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'out_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('out_qty', rm)">Qty Out (MT)<VIcon v-if="sortKey==='out_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier', rm)">Qty Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('supplier', rm)">Supplier / Batch SAP / Qty (MT)<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                </tr>
+              </thead>
+              <tbody v-if="rm.length === 0">
+                <tr>
+                  <td colspan="10" class="text-center pa-8">
+                    <VIcon icon="ri-inbox-line" size="40" class="text-disabled mb-2" />
+                    <p class="text-body-2 text-medium-emphasis">No RM transactions for this date.</p>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr v-for="(r, i) in paginatedRm" :key="i">
+                  <td class="text-center">{{ (pageRm - 1) * perPage + i + 1 }}</td>
+                  <td>{{ r.entry_date }}</td>
+                  <td class="font-monospace">{{ r.from_trace_no || '-' }}</td>
+                  <td class="font-monospace">{{ r.to_trace_no }}</td>
+                  <td class="font-weight-medium text-truncate" style="max-width:200px">{{ r.material }}</td>
+                  <td class="text-right font-monospace">{{ r.in_qty }}</td>
+                  <td>{{ r.sloc || '-' }}</td>
+                  <td class="text-right font-monospace">{{ r.out_qty }}</td>
+                  <td class="text-right font-monospace" :class="qtyColor(r)">{{ r.balance_supplier }}</td>
+                  <td class="text-caption text-truncate" style="max-width:200px" :title="r.supplier">{{ r.supplier || '-' }}</td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+          <VDivider />
+          <div v-if="rm.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 gap-2">
+            <div class="d-flex align-center ga-3">
+              <span class="text-caption text-medium-emphasis">Showing {{ (pageRm - 1) * perPage + 1 }} - {{ Math.min(pageRm * perPage, rm.length) }} of {{ rm.length }} records</span>
+              <VSelect v-model="perPage" :items="[5,10,15,20]" rounded="md" color="primary" density="compact" variant="outlined" hide-details style="min-width:80px;max-width:100px" />
+            </div>
+            <VPagination
+              v-if="totalPagesRm > 1"
+              v-model="pageRm"
+              :length="totalPagesRm"
+              :total-visible="5"
+              density="comfortable"
+              size="small"
+              show-first-last-page
+            />
+          </div>
+        </VCardText>
+      </VCard>
+
+      <VCard class="mb-4">
+        <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
+          <VChip color="primary" variant="flat" prepend-icon="ri-settings-line">
+            WIP Transaction
+          </VChip>
+          <span class="text-caption text-medium-emphasis">{{ wip.length }} records</span>
+        </VCardTitle>
+        <VCardText class="pa-0">
+          <div class="overflow-x-auto">
+            <VTable density="compact" class="text-body-2">
+              <thead>
+                <tr>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date', wip)">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'from_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('from_trace_no', wip)">Prev Trace<VIcon v-if="sortKey==='from_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'to_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('to_trace_no', wip)">Trace<VIcon v-if="sortKey==='to_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material', wip)">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'out_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('out_qty', wip)">WIP Out (MT)<VIcon v-if="sortKey==='out_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'section' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('section', wip)">Section<VIcon v-if="sortKey==='section'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'in_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('in_qty', wip)">WIP In (MT)<VIcon v-if="sortKey==='in_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier', wip)">WIP Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('supplier', wip)">Supplier / Batch SAP / Qty (MT)<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                </tr>
+              </thead>
+              <tbody v-if="wip.length === 0">
+                <tr>
+                  <td colspan="10" class="text-center pa-8">
+                    <VIcon icon="ri-inbox-line" size="40" class="text-disabled mb-2" />
+                    <p class="text-body-2 text-medium-emphasis">No WIP transactions for this date.</p>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr v-for="(r, i) in paginatedWip" :key="i">
+                  <td class="text-center">{{ (pageWip - 1) * perPage + i + 1 }}</td>
+                  <td>{{ r.entry_date }}</td>
+                  <td class="font-monospace">{{ r.from_trace_no || '-' }}</td>
+                  <td class="font-monospace">{{ r.to_trace_no }}</td>
+                  <td class="font-weight-medium text-truncate" style="max-width:200px">{{ r.material }}</td>
+                  <td class="text-right font-monospace">{{ r.wip_out || r.out_qty }}</td>
+                  <td>{{ r.section || '-' }}</td>
+                  <td class="text-right font-monospace">{{ r.wip_in || r.in_qty }}</td>
+                  <td class="text-right font-monospace" :class="qtyColor(r)">{{ r.balance_supplier }}</td>
+                  <td class="text-caption text-truncate" style="max-width:200px" :title="r.supplier">{{ r.supplier || '-' }}</td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+          <VDivider />
+          <div v-if="wip.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 gap-2">
+            <div class="d-flex align-center ga-3">
+              <span class="text-caption text-medium-emphasis">Showing {{ (pageWip - 1) * perPage + 1 }} - {{ Math.min(pageWip * perPage, wip.length) }} of {{ wip.length }} records</span>
+              <VSelect v-model="perPage" :items="[5,10,15,20]" rounded="md" color="primary" density="compact" variant="outlined" hide-details style="min-width:80px;max-width:100px" />
+            </div>
+            <VPagination
+              v-if="totalPagesWip > 1"
+              v-model="pageWip"
+              :length="totalPagesWip"
+              :total-visible="5"
+              density="comfortable"
+              size="small"
+              show-first-last-page
+            />
+          </div>
+        </VCardText>
+      </VCard>
+
+      <VCard class="mb-4">
+        <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
+          <VChip color="primary" variant="flat" prepend-icon="ri-swap-line">
+            TRANSFER Transaction
+          </VChip>
+          <span class="text-caption text-medium-emphasis">{{ transfer.length }} records</span>
+        </VCardTitle>
+        <VCardText class="pa-0">
+          <div class="overflow-x-auto">
+            <VTable density="compact" class="text-body-2">
+              <thead>
+                <tr>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date', transfer)">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'from_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('from_trace_no', transfer)">Prev Trace<VIcon v-if="sortKey==='from_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'to_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('to_trace_no', transfer)">Trace<VIcon v-if="sortKey==='to_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material', transfer)">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'in_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('in_qty', transfer)">Qty In (MT)<VIcon v-if="sortKey==='in_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc', transfer)">SLOC<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'out_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('out_qty', transfer)">Qty Out (MT)<VIcon v-if="sortKey==='out_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier', transfer)">Qty Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('supplier', transfer)">Supplier<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                </tr>
+              </thead>
+              <tbody v-if="transfer.length === 0">
+                <tr>
+                  <td colspan="10" class="text-center pa-8">
+                    <VIcon icon="ri-inbox-line" size="40" class="text-disabled mb-2" />
+                    <p class="text-body-2 text-medium-emphasis">No Transfer transactions for this date.</p>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr v-for="(r, i) in paginatedTransfer" :key="i">
+                  <td class="text-center">{{ (pageTransfer - 1) * perPage + i + 1 }}</td>
+                  <td>{{ r.entry_date }}</td>
+                  <td class="font-monospace">{{ r.from_trace_no || '-' }}</td>
+                  <td class="font-monospace">{{ r.to_trace_no }}</td>
+                  <td class="font-weight-medium text-truncate" style="max-width:200px">{{ r.material }}</td>
+                  <td class="text-right font-monospace">{{ r.in_qty }}</td>
+                  <td>{{ r.sloc || '-' }}</td>
+                  <td class="text-right font-monospace">{{ r.out_qty }}</td>
+                  <td class="text-right font-monospace" :class="qtyColor(r)">{{ r.balance_supplier }}</td>
+                  <td class="text-caption text-truncate" style="max-width:200px" :title="r.supplier">{{ r.supplier || '-' }}</td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+          <VDivider />
+          <div v-if="transfer.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 gap-2">
+            <div class="d-flex align-center ga-3">
+              <span class="text-caption text-medium-emphasis">Showing {{ (pageTransfer - 1) * perPage + 1 }} - {{ Math.min(pageTransfer * perPage, transfer.length) }} of {{ transfer.length }} records</span>
+              <VSelect v-model="perPage" :items="[5,10,15,20]" rounded="md" color="primary" density="compact" variant="outlined" hide-details style="min-width:80px;max-width:100px" />
+            </div>
+            <VPagination
+              v-if="totalPagesTransfer > 1"
+              v-model="pageTransfer"
+              :length="totalPagesTransfer"
+              :total-visible="5"
+              density="comfortable"
+              size="small"
+              show-first-last-page
+            />
+          </div>
+        </VCardText>
+      </VCard>
+
+      <VCard class="mb-4">
+        <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
+          <VChip color="primary" variant="flat" prepend-icon="ri-package-line">
+            PACKAGING Transaction
+          </VChip>
+          <span class="text-caption text-medium-emphasis">{{ pck.length }} records</span>
+        </VCardTitle>
+        <VCardText class="pa-0">
+          <div class="overflow-x-auto">
+            <VTable density="compact" class="text-body-2">
+              <thead>
+                <tr>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date', pck)">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'from_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('from_trace_no', pck)">Prev Trace<VIcon v-if="sortKey==='from_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'to_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('to_trace_no', pck)">Trace<VIcon v-if="sortKey==='to_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'batch_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('batch_no', pck)">PPH Batch<VIcon v-if="sortKey==='batch_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material', pck)">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'in_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('in_qty', pck)">Qty In (MT)<VIcon v-if="sortKey==='in_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'out_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('out_qty', pck)">Qty Out (MT)<VIcon v-if="sortKey==='out_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier', pck)">Qty Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('supplier', pck)">Supplier<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                </tr>
+              </thead>
+              <tbody v-if="pck.length === 0">
+                <tr>
+                  <td colspan="10" class="text-center pa-8">
+                    <VIcon icon="ri-inbox-line" size="40" class="text-disabled mb-2" />
+                    <p class="text-body-2 text-medium-emphasis">No Packaging transactions for this date.</p>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr v-for="(r, i) in paginatedPck" :key="i">
+                  <td class="text-center">{{ (pagePck - 1) * perPage + i + 1 }}</td>
+                  <td>{{ r.entry_date }}</td>
+                  <td class="font-monospace">{{ r.from_trace_no || '-' }}</td>
+                  <td class="font-monospace">{{ r.to_trace_no }}</td>
+                  <td class="font-monospace">{{ r.batch_no || '-' }}</td>
+                  <td class="font-weight-medium text-truncate" style="max-width:200px">{{ r.material }}</td>
+                  <td class="text-right font-monospace">{{ r.in_qty }}</td>
+                  <td class="text-right font-monospace">{{ r.out_qty }}</td>
+                  <td class="text-right font-monospace" :class="qtyColor(r)">{{ r.balance_supplier }}</td>
+                  <td class="text-caption text-truncate" style="max-width:200px" :title="r.supplier">{{ r.supplier || '-' }}</td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+          <VDivider />
+          <div v-if="pck.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 gap-2">
+            <div class="d-flex align-center ga-3">
+              <span class="text-caption text-medium-emphasis">Showing {{ (pagePck - 1) * perPage + 1 }} - {{ Math.min(pagePck * perPage, pck.length) }} of {{ pck.length }} records</span>
+              <VSelect v-model="perPage" :items="[5,10,15,20]" rounded="md" color="primary" density="compact" variant="outlined" hide-details style="min-width:80px;max-width:100px" />
+            </div>
+            <VPagination
+              v-if="totalPagesPck > 1"
+              v-model="pagePck"
+              :length="totalPagesPck"
+              :total-visible="5"
+              density="comfortable"
+              size="small"
+              show-first-last-page
+            />
+          </div>
+        </VCardText>
+      </VCard>
+
+      <VCard class="mb-4">
+        <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
+          <VChip color="primary" variant="flat" prepend-icon="ri-ship-line">
+            SHIPMENT Transaction
+          </VChip>
+          <span class="text-caption text-medium-emphasis">{{ shipment.length }} records</span>
+        </VCardTitle>
+        <VCardText class="pa-0">
+          <div class="overflow-x-auto">
+            <VTable density="compact" class="text-body-2">
+              <thead>
+                <tr>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date', shipment)">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'from_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('from_trace_no', shipment)">Prev Trace<VIcon v-if="sortKey==='from_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'to_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('to_trace_no', shipment)">Trace<VIcon v-if="sortKey==='to_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'so_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('so_no', shipment)">SO No<VIcon v-if="sortKey==='so_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material', shipment)">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'in_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('in_qty', shipment)">Qty In (MT)<VIcon v-if="sortKey==='in_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'out_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('out_qty', shipment)">Qty Out (MT)<VIcon v-if="sortKey==='out_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier', shipment)">Qty Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('supplier', shipment)">Supplier<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                </tr>
+              </thead>
+              <tbody v-if="shipment.length === 0">
+                <tr>
+                  <td colspan="10" class="text-center pa-8">
+                    <VIcon icon="ri-inbox-line" size="40" class="text-disabled mb-2" />
+                    <p class="text-body-2 text-medium-emphasis">No Shipment transactions for this date.</p>
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr v-for="(r, i) in paginatedShipment" :key="i">
+                  <td class="text-center">{{ (pageShipment - 1) * perPage + i + 1 }}</td>
+                  <td>{{ r.entry_date }}</td>
+                  <td class="font-monospace">{{ r.from_trace_no || '-' }}</td>
+                  <td class="font-monospace">{{ r.to_trace_no }}</td>
+                  <td class="font-monospace">{{ r.so_no || '-' }}</td>
+                  <td class="font-weight-medium text-truncate" style="max-width:200px">{{ r.material }}</td>
+                  <td class="text-right font-monospace">{{ r.in_qty }}</td>
+                  <td class="text-right font-monospace">{{ r.out_qty }}</td>
+                  <td class="text-right font-monospace" :class="qtyColor(r)">{{ r.balance_supplier }}</td>
+                  <td class="text-caption text-truncate" style="max-width:200px" :title="r.supplier">{{ r.supplier || '-' }}</td>
+                </tr>
+              </tbody>
+            </VTable>
+          </div>
+          <VDivider />
+          <div v-if="shipment.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 gap-2">
+            <div class="d-flex align-center ga-3">
+              <span class="text-caption text-medium-emphasis">Showing {{ (pageShipment - 1) * perPage + 1 }} - {{ Math.min(pageShipment * perPage, shipment.length) }} of {{ shipment.length }} records</span>
+              <VSelect v-model="perPage" :items="[5,10,15,20]" rounded="md" color="primary" density="compact" variant="outlined" hide-details style="min-width:80px;max-width:100px" />
+            </div>
+            <VPagination
+              v-if="totalPagesShipment > 1"
+              v-model="pageShipment"
+              :length="totalPagesShipment"
+              :total-visible="5"
+              density="comfortable"
+              size="small"
+              show-first-last-page
+            />
+          </div>
+        </VCardText>
+      </VCard>
     </template>
   </div>
 </template>
+
+<style scoped>
+.sort-icon { vertical-align: middle; transition: opacity 0.15s; opacity: 0.35; }
+.sortable-th:hover .sort-icon { opacity: 0.7; }
+.sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
+</style>
+
 <script setup>
-import { ref } from 'vue'
-import { Icon } from '@iconify/vue'
-import tsReportApi from '@/modules/ts-tsreport/api'
-const entryDate = ref(new Date().toISOString().split('T')[0]), loading = ref(false)
-const rm = ref([]), wip = ref([]), transfer = ref([]), pck = ref([]), shipment = ref([])
+import { ref, computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useTsReportStore } from '@/modules/ts-tsreport/stores/tsReportStore'
+
+const store = useTsReportStore()
+const { rmSection: rm, wipSection: wip, transferSection: transfer, pckSection: pck, shipmentSection: shipment, loading } = storeToRefs(store)
+
+const entryDate = ref(new Date().toISOString().split('T')[0])
+
+// Sort state
+const sortKey = ref(null)
+const sortDir = ref(null)
+
+function detectColumnType(rows, colKey) {
+  if (!rows || rows.length === 0) return 'text'
+  for (const row of rows) {
+    const val = row[colKey]
+    if (val !== null && val !== undefined && val !== '') {
+      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
+    }
+  }
+  return 'text'
+}
+
+function toggleSort(key, rows) {
+  if (sortKey.value === key) {
+    if (sortDir.value === 'asc') {
+      sortDir.value = 'desc'
+    } else if (sortDir.value === 'desc') {
+      sortKey.value = null
+      sortDir.value = null
+    }
+  } else {
+    sortKey.value = key
+    sortDir.value = detectColumnType(rows, key) === 'text' ? 'asc' : 'desc'
+  }
+}
+
+function sortData(rows) {
+  if (!sortKey.value || !sortDir.value) return rows
+  const key = sortKey.value
+  const dir = sortDir.value
+  const list = [...rows]
+  const type = detectColumnType(rows, key)
+  return list.sort((a, b) => {
+    const va = a[key]
+    const vb = b[key]
+    if (va == null && vb == null) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    if (type === 'number') return dir === 'asc' ? va - vb : vb - va
+    return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va))
+  })
+}
+
+// Pagination state
+const perPage = ref(10)
+const pageRm = ref(1)
+const pageWip = ref(1)
+const pageTransfer = ref(1)
+const pagePck = ref(1)
+const pageShipment = ref(1)
+
+// Sorted & paginated computed arrays
+const sortedRm = computed(() => sortData(rm.value))
+const paginatedRm = computed(() => sortedRm.value.slice((pageRm.value - 1) * perPage.value, pageRm.value * perPage.value))
+const sortedWip = computed(() => sortData(wip.value))
+const paginatedWip = computed(() => sortedWip.value.slice((pageWip.value - 1) * perPage.value, pageWip.value * perPage.value))
+const sortedTransfer = computed(() => sortData(transfer.value))
+const paginatedTransfer = computed(() => sortedTransfer.value.slice((pageTransfer.value - 1) * perPage.value, pageTransfer.value * perPage.value))
+const sortedPck = computed(() => sortData(pck.value))
+const paginatedPck = computed(() => sortedPck.value.slice((pagePck.value - 1) * perPage.value, pagePck.value * perPage.value))
+const sortedShipment = computed(() => sortData(shipment.value))
+const paginatedShipment = computed(() => sortedShipment.value.slice((pageShipment.value - 1) * perPage.value, pageShipment.value * perPage.value))
+
+// Total pages computed values
+const totalPagesRm = computed(() => Math.ceil(rm.value.length / perPage.value))
+const totalPagesWip = computed(() => Math.ceil(wip.value.length / perPage.value))
+const totalPagesTransfer = computed(() => Math.ceil(transfer.value.length / perPage.value))
+const totalPagesPck = computed(() => Math.ceil(pck.value.length / perPage.value))
+const totalPagesShipment = computed(() => Math.ceil(shipment.value.length / perPage.value))
+
 const loadAll = async () => {
-  loading.value = true
-  try { const r = await tsReportApi.getAllSections({ entry_date: entryDate.value }); const d = r.data?.data || {}; rm.value = d.rm || []; wip.value = d.wip || []; transfer.value = d.transfer || []; pck.value = d.pck || []; shipment.value = d.shipment || [] }
-  catch { rm.value = []; wip.value = []; transfer.value = []; pck.value = []; shipment.value = [] }
-  finally { loading.value = false }
+  pageRm.value = 1
+  pageWip.value = 1
+  pageTransfer.value = 1
+  pagePck.value = 1
+  pageShipment.value = 1
+  await store.fetchAllSections({ entry_date: entryDate.value })
 }
+
 const qtyColor = (row) => {
-  const inQty = parseFloat(row.in_qty || row.wip_in || 0), outQty = parseFloat(row.out_qty || row.wip_out || 0), sup = parseFloat(row.balance_supplier || 0), cmp = outQty > 0 ? outQty : inQty
-  return cmp > 0 && Math.abs(cmp - sup) < 0.001 ? 'text-green-600' : cmp > 0 ? 'text-red-500' : ''
+  const inQty = parseFloat(row.in_qty || row.wip_in || 0)
+  const outQty = parseFloat(row.out_qty || row.wip_out || 0)
+  const sup = parseFloat(row.balance_supplier || 0)
+  const cmp = outQty > 0 ? outQty : inQty
+  return cmp > 0 && Math.abs(cmp - sup) < 0.001
+    ? 'text-success'
+    : cmp > 0
+      ? 'text-error'
+      : ''
 }
+
+watch(perPage, () => {
+  pageRm.value = 1
+  pageWip.value = 1
+  pageTransfer.value = 1
+  pagePck.value = 1
+  pageShipment.value = 1
+})
 </script>

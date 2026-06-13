@@ -1,7 +1,7 @@
 {
     "name": "TsShipment",
     "alias": "tsshipment",
-    "description": "",
+    "description": "Transaction module for shipment entry management",
     "keywords": [],
     "priority": 0,
     "providers": [

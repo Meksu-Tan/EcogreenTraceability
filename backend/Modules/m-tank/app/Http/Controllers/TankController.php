@@ -28,7 +28,10 @@ class TankController extends Controller
             'created_by' => $request->user()->name ?? 'System'
         ]));
 
-        return response()->json($result, $result['status'] === 1 ? 201 : 400);
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, 'Tank created', 201);
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to create tank', 400);
     }
 
     public function update(UpdateTankRequest $request, int $id): JsonResponse
@@ -38,7 +41,10 @@ class TankController extends Controller
             'updated_by' => $request->user()->name ?? 'System'
         ]));
 
-        return response()->json($result, $result['status'] === 1 ? 200 : 400);
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, 'Tank updated');
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to update tank', 400);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -50,7 +56,10 @@ class TankController extends Controller
             ? $this->tankService->activateTank($id, $user)
             : $this->tankService->deactivateTank($id, $user);
 
-        return response()->json($result, $result['status'] === 1 ? 200 : 400);
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, $action === 'activate' ? 'Tank activated' : 'Tank deactivated');
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to process tank', 400);
     }
 
     public function sync(Request $request): JsonResponse
@@ -58,6 +67,9 @@ class TankController extends Controller
         $user = $request->user()->name ?? 'System';
         $result = $this->tankService->syncFromExternal($user);
 
-        return response()->json($result, in_array($result['status'], [1, 2]) ? 200 : 400);
+        if (in_array($result['status'], [1, 2])) {
+            return ApiResponse::success($result, $result['message'] ?? 'Tank sync completed');
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to sync tanks', 400);
     }
 }

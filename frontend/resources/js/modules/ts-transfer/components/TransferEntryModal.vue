@@ -1,221 +1,250 @@
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition duration-300 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div v-show="isOpen" class="fixed inset-0 z-[105] overflow-y-auto" role="dialog" aria-modal="true" :aria-hidden="!isOpen">
-      <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
-        <div class="fixed inset-0 z-[1] bg-black/40 backdrop-blur-sm" aria-hidden="true" @click="closeModal" />
+  <VDialog
+    :model-value="isOpen"
+    max-width="960"
+    scrollable
+    @update:model-value="$emit('update:isOpen', $event)"
+  >
+    <VCard>
+      <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+        <span class="text-h6 font-weight-bold">Transfer Inter-Plant Entry</span>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="closeModal"
+        />
+      </VCardTitle>
 
-        <div class="relative z-[2] mx-auto flex w-full max-w-5xl max-h-[min(92vh,940px)] flex-col overflow-hidden rounded-2xl bg-white text-left shadow-xl">
-          <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 to-green-600 px-6 py-4 sm:px-8">
-            <div>
-              <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">Transfer</p>
-              <h3 class="text-lg font-bold text-white sm:text-xl">Transfer Inter-Plant Entry</h3>
-            </div>
-            <button type="button" @click="closeModal" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white hover:bg-white/25">
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+      <VDivider />
 
-          <div class="relative min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white px-5 py-5 sm:px-8 sm:py-6">
-            <div
-              v-if="loading"
-              class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-xl bg-white/75 backdrop-blur-sm"
-            >
-              <svg class="h-11 w-11 animate-spin text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <p class="text-sm font-semibold text-slate-600">Processing...</p>
-            </div>
+      <VCardText class="pa-5 bg-neutral-50">
+        <div v-if="loading" class="d-flex flex-column align-center justify-center pa-8">
+          <VProgressCircular indeterminate color="primary" size="48" />
+          <span class="mt-3 text-body-2 text-medium-emphasis">Processing...</span>
+        </div>
 
-            <p v-if="formError" class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ formError }}</p>
 
-            <form @submit.prevent="handleSubmit" :class="{ 'pointer-events-none opacity-45': loading }" class="space-y-5">
-              <!-- Row 1: Header Fields -->
-              <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Entry Mode</label>
-                    <input :value="mode" type="text" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-slate-700" />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Entry Number (Auto)</label>
-                    <input :value="form.entry_no" type="text" readonly class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm font-bold text-slate-900" />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Date (Auto Detect)</label>
-                    <input v-model="form.entry_date" type="date" required class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25" />
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Material Document (SAP)</label>
-                    <input v-model="form.material_doc" type="text" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm uppercase shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25" />
-                  </div>
-                </div>
-              </div>
 
-              <!-- Row 2: Material + Trf Type -->
-              <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-6">
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Transfer Material</label>
-                    <select
-                      v-model="form.id_material"
-                      required
-                      @change="onMaterialChange"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                    >
-                      <option value="">- Select Material -</option>
-                      <option v-for="mat in store.activeMaterials" :key="mat.id_material" :value="mat.id_material">
-                        {{ mat.material_code || mat.description || mat.material }}
-                      </option>
-                    </select>
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Trf Type (<em>Trf ALL</em> only for TRF non-EOB1 to Adjust OUT)
-                    </label>
-                    <select
-                      v-model="form.trf_type"
-                      required
-                      @change="onTrfTypeChange"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                    >
-                      <option value="">- Select Trf -</option>
-                      <option value="in">{{ trfInLabel }}</option>
-                      <option value="out">{{ trfOutLabel }}</option>
-                      <option value="all">- Trf ALL -</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+        <form @submit.prevent="handleSubmit" :class="{ 'opacity-50': loading }" class="d-flex flex-column gap-4">
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" sm="6" md="3">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Mode</label>
+                  <VTextField
+                    :model-value="mode"
+                    readonly
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
+                <VCol cols="12" sm="6" md="3">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Trace No</label>
+                  <VTextField
+                    :model-value="form.entry_no"
+                    readonly
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
+                <VCol cols="12" sm="6" md="3">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Date (Auto Detect)</label>
+                  <VTextField
+                    v-model="form.entry_date"
+                    type="date"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
+                <VCol cols="12" sm="6" md="3">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Material Document (SAP)</label>
+                  <VTextField
+                    v-model="form.material_doc"
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1 text-uppercase"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
 
-              <!-- Row 3: SLoc + Qty (shown after material + trf type selected) -->
-              <div v-if="showSloc" class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:gap-6">
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Source SLoc <span class="text-[10px] font-normal text-slate-400">(change this for TRF IN)</span>
-                    </label>
-                    <select
-                      v-model="form.source_sloc"
-                      @change="onSourceChange"
-                      :disabled="form.trf_type === 'out'"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-                    >
-                      <option value="">- Select Sloc -</option>
-                      <option v-for="tank in sourceTanks" :key="tank.id_tank" :value="tank.id_tank">
-                        {{ tank.tank || tank.description }}
-                      </option>
-                    </select>
-                    <p class="mt-1 text-xs text-slate-500">{{ sourceStockLabel }}</p>
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      Transfer SLoc <span class="text-[10px] font-normal text-slate-400">(change this for TRF OUT)</span>
-                    </label>
-                    <select
-                      v-model="form.trf_sloc"
-                      @change="onDestinationChange"
-                      :disabled="form.trf_type === 'in'"
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-                    >
-                      <option value="">- Select Sloc -</option>
-                      <option v-for="tank in destTanks" :key="tank.id_tank" :value="tank.id_tank">
-                        {{ tank.tank || tank.description }}
-                      </option>
-                    </select>
-                    <p class="mt-1 text-xs text-slate-500">{{ destStockLabel }}</p>
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Trf Qty (MT)</label>
-                    <input
-                      v-model="form.trf_qty"
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" md="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Transfer Material</label>
+                  <VSelect
+                    v-model="form.id_material"
+                    :items="materialOptions"
+                    item-title="label"
+                    item-value="value"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @update:model-value="onMaterialChange"
+                  />
+                </VCol>
+                <VCol cols="12" md="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
+                    Trf Type (<em>Trf ALL</em> only for TRF non-EOB1 to Adjust OUT)
+                  </label>
+                  <VSelect
+                    v-model="form.trf_type"
+                    :items="trfTypeOptions"
+                    item-title="label"
+                    item-value="value"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @update:model-value="onTrfTypeChange"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
+
+          <VCard v-if="showSloc" variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
+                    Source SLoc <span class="text-caption font-weight-regular text-disabled">(change this for TRF IN)</span>
+                  </label>
+                  <VSelect
+                    v-model="form.source_sloc"
+                    :items="sourceTankOptions"
+                    item-title="label"
+                    item-value="value"
+                    :disabled="form.trf_type === 'out'"
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @update:model-value="onSourceChange"
+                  />
+                  <p class="mt-1 text-caption text-medium-emphasis">{{ sourceStockLabel }}</p>
+                </VCol>
+                <VCol cols="12" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">
+                    Transfer SLoc <span class="text-caption font-weight-regular text-disabled">(change this for TRF OUT)</span>
+                  </label>
+                  <VSelect
+                    v-model="form.trf_sloc"
+                    :items="destTankOptions"
+                    item-title="label"
+                    item-value="value"
+                    :disabled="form.trf_type === 'in'"
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @update:model-value="onDestinationChange"
+                  />
+                  <p class="mt-1 text-caption text-medium-emphasis">{{ destStockLabel }}</p>
+                </VCol>
+                <VCol cols="12" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Trf Qty (MT)</label>
+<VTextField
+                      v-model.number="form.trf_qty"
                       type="number"
                       step="0.001"
                       min="0"
                       required
-                      class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                      rounded="md"
+                      color="primary"
+                      density="compact"
+                      variant="outlined"
+                      class="mt-1"
                     />
-                  </div>
-                </div>
-              </div>
+                    <VBtn color="primary" variant="outlined" size="small" @click="fetchTransferQty">Fetch Qty</VBtn>
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
 
-              <!-- Row 4: Specific SLoc (shown after sloc selected) -->
-              <div v-if="showSpecificSlocRow" class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-                <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:gap-6">
-                  <div v-if="showSpecificSourceSloc" class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Specific Source Sloc</label>
-                    <div class="max-h-32 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
-                      <div v-if="specificSourceTanks.length === 0" class="px-2 py-1 text-xs text-slate-400">No specific sloc</div>
-                      <label
-                        v-for="tank in specificSourceTanks"
-                        :key="tank.id_tank_tail"
-                        class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer rounded"
-                      >
-                        <input
-                          type="checkbox"
-                          :value="String(tank.id_tank_tail)"
-                          v-model="selectedSourceTails"
-                          class="h-3.5 w-3.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span class="text-xs text-slate-700">{{ tank.tankNo || tank.tf_number }}</span>
-                      </label>
-                    </div>
-                  </div>
-                  <div v-if="showSpecificDestSloc" class="space-y-1.5">
-                    <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Specific Transfer Sloc</label>
-                    <div class="max-h-32 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2">
-                      <div v-if="specificDestTanks.length === 0" class="px-2 py-1 text-xs text-slate-400">No specific sloc</div>
-                      <label
-                        v-for="tank in specificDestTanks"
-                        :key="tank.id_tank_tail"
-                        class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer rounded"
-                      >
-                        <input
-                          type="checkbox"
-                          :value="String(tank.id_tank_tail)"
-                          v-model="selectedDestTails"
-                          class="h-3.5 w-3.5 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                        />
-                        <span class="text-xs text-slate-700">{{ tank.tankNo || tank.tf_number }}</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <VCard v-if="showSpecificSlocRow" variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol v-if="showSpecificSourceSloc" cols="12" md="6">
+                  <VSelect
+                    v-model="selectedSourceTails"
+                    label="Specific Source Sloc"
+                    :items="specificSourceOptions"
+                    item-title="title"
+                    item-value="value"
+                    multiple
+                    chips
+                    closable-chips
+                    rounded="md"
+                    color="primary"
+                    variant="outlined"
+                    density="compact"
+                  />
+                </VCol>
+                <VCol v-if="showSpecificDestSloc" cols="12" md="6">
+                  <VSelect
+                    v-model="selectedDestTails"
+                    label="Specific Transfer Sloc"
+                    :items="specificDestOptions"
+                    item-title="title"
+                    item-value="value"
+                    multiple
+                    chips
+                    closable-chips
+                    rounded="md"
+                    color="primary"
+                    variant="outlined"
+                    density="compact"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
 
-              <div v-if="showSloc" class="flex items-center gap-3">
-                <button
-                  type="submit"
-                  :disabled="loading"
-                  class="rounded-xl bg-green-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
-                >
-                  <Icon icon="ri:check-line" class="w-4 h-4 mr-1" /> Save Entry
-                </button>
-              </div>
-            </form>
+          <div v-if="showSloc" class="d-flex align-center gap-3">
+            <VBtn
+              type="submit"
+              color="primary"
+              prepend-icon="ri-check-line"
+              :loading="loading"
+            >
+              Save Entry
+            </VBtn>
           </div>
-        </div>
-      </div>
-    </div>
-  </Transition>
-</Teleport>
+        </form>
+      </VCardText>
+    </VCard>
+  </VDialog>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-import { Icon } from '@iconify/vue'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useTsTransferStore } from '../stores'
+import { useToastStore } from '@/stores/toast'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false }
@@ -225,9 +254,9 @@ const emit = defineEmits(['update:isOpen', 'success'])
 
 const plantSelectionStore = usePlantSelectionStore()
 const store = useTsTransferStore()
+const toastStore = useToastStore()
 
 const mode = 'ADD'
-const formError = ref(null)
 const loading = ref(false)
 
 const sourceTanks = ref([])
@@ -267,6 +296,33 @@ const trfOutLabel = computed(() => {
   return `- Trf OUT from ${name} -`
 })
 
+const trfTypeOptions = computed(() => [
+  { value: 'in', label: trfInLabel.value },
+  { value: 'out', label: trfOutLabel.value },
+  { value: 'all', label: '- Trf ALL -' }
+])
+
+const materialOptions = computed(() => {
+  return (store.activeMaterials || []).map(m => ({
+    value: m.id_material,
+    label: m.material_code || m.description || m.material
+  }))
+})
+
+const sourceTankOptions = computed(() => {
+  return (sourceTanks.value || []).map(t => ({
+    value: String(t.id_sloc || t.id_tank),
+    label: String(t.tank || t.description || t.id_sloc || t.id_tank || 'Unknown')
+  }))
+})
+
+const destTankOptions = computed(() => {
+  return (destTanks.value || []).map(t => ({
+    value: String(t.id_sloc || t.id_tank),
+    label: String(t.tank || t.description || t.id_sloc || t.id_tank || 'Unknown')
+  }))
+})
+
 const showSloc = computed(() => {
   return form.id_material && form.trf_type
 })
@@ -283,15 +339,27 @@ const showSpecificSlocRow = computed(() => {
   return showSpecificSourceSloc.value || showSpecificDestSloc.value
 })
 
+const specificSourceOptions = computed(() =>
+  (specificSourceTanks.value || []).map(t => ({
+    value: String(t.id_sloc || t.id_tank_tail),
+    title: String(t.tankName || t.tankNo || t.tf_number || t.description || t.id_sloc || t.id_tank_tail || 'Unknown'),
+  }))
+)
+
+const specificDestOptions = computed(() =>
+  (specificDestTanks.value || []).map(t => ({
+    value: String(t.id_sloc || t.id_tank_tail),
+    title: String(t.tankName || t.tankNo || t.tf_number || t.description || t.id_sloc || t.id_tank_tail || 'Unknown'),
+  }))
+)
+
 async function bootstrap() {
-  formError.value = null
   loading.value = true
   try {
     await store.fetchActiveMaterials()
     resetForm()
   } catch (err) {
-    /* error logged */
-    formError.value = 'Failed to load form data: ' + err.message
+    toastStore.error('Failed to load form data: ' + err.message)
   }
   loading.value = false
 }
@@ -320,14 +388,13 @@ async function onMaterialChange() {
   if (!form.id_material) return
 
   try {
-    form.entry_no = '' // Reset entry no until sloc is filled
+    form.entry_no = ''
 
     if (form.trf_type) {
       await populateTanks()
     }
   } catch (err) {
-    /* error logged */
-    formError.value = err.message
+    toastStore.error(err.message)
   }
 }
 
@@ -343,7 +410,7 @@ async function onTrfTypeChange() {
   }
 
   if (!form.id_material) {
-    formError.value = 'Select Material first!'
+    toastStore.error('Select Material first!')
     form.trf_type = ''
     return
   }
@@ -356,10 +423,11 @@ async function populateTanks() {
   const idMat = form.id_material
   const currentPlant = plantId.value
 
+  sourceStockLabel.value = 'Stock : N/A'
+  destStockLabel.value = 'Stock : N/A'
+
   try {
     if (trfType === 'in') {
-      // Source = choices of SLoc of each plant (active plant SLocs)
-      // Destination = Automatically EOMB (plant 1001) SLocs
       const [sourceRes, destRes] = await Promise.all([
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant }),
         store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: 1001 })
@@ -367,8 +435,6 @@ async function populateTanks() {
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
     } else if (trfType === 'out') {
-      // Source = Automatically EOMB (plant 1001) SLocs
-      // Destination = Choices of SLoc of active plant
       const [sourceRes, destRes] = await Promise.all([
         store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: 1001 }),
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant })
@@ -376,7 +442,6 @@ async function populateTanks() {
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
     } else {
-      // 'all' - both = all tanks of active plant
       const [sourceRes, destRes] = await Promise.all([
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant }),
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant })
@@ -385,19 +450,18 @@ async function populateTanks() {
       destTanks.value = destRes?.data || []
     }
 
-    // Auto-select logic
     const autoSelectSource = trfType === 'out' && sourceTanks.value.length > 0
     const autoSelectDest = trfType === 'in' && destTanks.value.length > 0
 
     if (autoSelectSource) {
-      form.source_sloc = sourceTanks.value[0].id_tank
+      form.source_sloc = sourceTanks.value[0].id_sloc || sourceTanks.value[0].id_tank
       await onSourceChange()
     } else {
       form.source_sloc = ''
     }
 
     if (autoSelectDest) {
-      form.trf_sloc = destTanks.value[0].id_tank
+      form.trf_sloc = destTanks.value[0].id_sloc || destTanks.value[0].id_tank
       await onDestinationChange()
     } else {
       form.trf_sloc = ''
@@ -405,20 +469,16 @@ async function populateTanks() {
 
     if (trfType === 'all') {
       if (sourceTanks.value.length > 0) {
-        form.source_sloc = sourceTanks.value[0].id_tank
+        form.source_sloc = sourceTanks.value[0].id_sloc || sourceTanks.value[0].id_tank
         await onSourceChange()
       }
       if (destTanks.value.length > 0) {
-        form.trf_sloc = destTanks.value[0].id_tank
+        form.trf_sloc = destTanks.value[0].id_sloc || destTanks.value[0].id_tank
         await onDestinationChange()
       }
     }
-
-    sourceStockLabel.value = 'Stock : N/A'
-    destStockLabel.value = 'Stock : N/A'
   } catch (err) {
-    /* error logged */
-    formError.value = err.message
+    toastStore.error(err.message)
   }
 }
 
@@ -428,13 +488,12 @@ async function onSourceChange() {
     return
   }
   try {
-    const response = await store.fetchActiveSpecificTanksRundown({ sloc: form.source_sloc })
-    specificSourceTanks.value = response?.data || []
+    await store.fetchActiveSpecificTanksRundown({ sloc: form.source_sloc })
+    specificSourceTanks.value = store.activeSpecificTanks
 
     await updateStock('source')
     await updateEntryNoFromSloc()
   } catch (err) {
-    /* error logged */
     specificSourceTanks.value = []
   }
 }
@@ -445,13 +504,12 @@ async function onDestinationChange() {
     return
   }
   try {
-    const response = await store.fetchActiveSpecificTanksRundown({ sloc: form.trf_sloc })
-    specificDestTanks.value = response?.data || []
+    await store.fetchActiveSpecificTanksRundown({ sloc: form.trf_sloc })
+    specificDestTanks.value = store.activeSpecificTanks
 
     await updateStock('dest')
     await updateEntryNoFromSloc()
   } catch (err) {
-    /* error logged */
     specificDestTanks.value = []
   }
 }
@@ -464,14 +522,14 @@ async function updateEntryNoFromSloc() {
     form.entry_no = ''
     return
   }
-  
+
   if (!form.source_sloc) {
     form.entry_no = ''
     return
   }
 
   let activePlantId = plantId.value
-  const t = sourceTanks.value.find(x => x.id_tank === form.source_sloc)
+  const t = sourceTanks.value.find(x => String(x.id_sloc || x.id_tank) === String(form.source_sloc))
   if (t && t.id_plant) activePlantId = t.id_plant
 
   if (activePlantId && activePlantId !== 0) {
@@ -482,11 +540,28 @@ async function updateEntryNoFromSloc() {
       })
       if (entryResponse?.data?.[0]?.entryNo) {
         form.entry_no = entryResponse.data[0].entryNo
-      } else {
       }
-    } catch (e) {
-      /* error logged */
+    } catch (e) {}
+  }
+}
+
+async function fetchTransferQty() {
+  if (!form.id_material) {
+    toastStore.error('Select material first')
+    return
+  }
+  try {
+    const res = await store.fetchTransferQty({
+      idMaterial: form.id_material,
+      idPlant: plantId.value
+    })
+    if (res?.status === 1) {
+      form.trf_qty = res.data?.qty || 0
+    } else {
+      toastStore.error(res?.message || 'Fetch failed')
     }
+  } catch (err) {
+    toastStore.error(err.message || 'Fetch failed')
   }
 }
 
@@ -523,7 +598,6 @@ async function updateStock(type) {
       }
     }
   } catch (err) {
-    /* error logged */
     if (type === 'source') {
       sourceStockLabel.value = 'Stock (MT): N/A'
     } else {
@@ -533,10 +607,8 @@ async function updateStock(type) {
 }
 
 async function handleSubmit() {
-  formError.value = null
-
   if (!form.trf_qty || parseFloat(form.trf_qty) <= 0) {
-    formError.value = 'Entry Qty must be greater than 0'
+    toastStore.error('Entry Qty must be greater than 0')
     return
   }
 
@@ -561,11 +633,10 @@ async function handleSubmit() {
       emit('success')
       closeModal()
     } else {
-      formError.value = response?.message || 'Transfer failed'
+      toastStore.error(response?.message || 'Transfer failed')
     }
   } catch (err) {
-    /* error logged */
-    formError.value = err.response?.data?.message || err.message || 'Error'
+    toastStore.error(err.response?.data?.message || err.message || 'Error')
   }
   loading.value = false
 }

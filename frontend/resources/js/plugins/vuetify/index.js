@@ -1,8 +1,8 @@
+import { h } from 'vue'
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
-import '@mdi/font/css/materialdesignicons.css'
 
 const ecoTheme = {
   dark: false,
@@ -58,9 +58,53 @@ const ecoDarkTheme = {
   },
 }
 
+const iconify = {
+  component: props => h(props.tag || 'i', { class: [props.icon] }),
+}
+
+const aliases = {
+  info:      'ri-information-line',
+  success:   'ri-checkbox-circle-line',
+  warning:   'ri-alert-line',
+  error:     'ri-error-warning-line',
+  close:     'ri-close-line',
+  clear:     'ri-close-line',
+  cancel:    'ri-close-line',
+  delete:    'ri-close-circle-fill',
+  complete:  'ri-check-line',
+  prev:      'ri-arrow-left-s-line',
+  next:      'ri-arrow-right-s-line',
+  expand:    'ri-arrow-down-s-line',
+  collapse:  'ri-arrow-up-s-line',
+  sort:      'ri-arrow-up-line',
+  sortAsc:   'ri-arrow-up-line',
+  sortDesc:  'ri-arrow-down-line',
+  dropdown:  'ri-arrow-down-s-line',
+  menu:      'ri-menu-line',
+  subgroup:  'ri-arrow-down-s-fill',
+  edit:      'ri-pencil-line',
+  first:     'ri-skip-back-mini-line',
+  last:      'ri-skip-forward-mini-line',
+  plus:      'ri-add-line',
+  minus:     'ri-subtract-line',
+  calendar:  'ri-calendar-2-line',
+  delimiter: 'ri-circle-line',
+  unfold:    'ri-split-cells-vertical',
+  file:      'ri-attachment-2',
+  loading:   'ri-refresh-line',
+  ratingEmpty: 'ri-star-line',
+  ratingFull:  'ri-star-fill',
+  ratingHalf:  'ri-star-half-line',
+}
+
 export default createVuetify({
   components,
   directives,
+  icons: {
+    defaultSet: 'iconify',
+    aliases,
+    sets: { iconify },
+  },
   theme: {
     defaultTheme: 'eco',
     themes: {
@@ -78,11 +122,13 @@ export default createVuetify({
       elevation: 1,
     },
     VTextField: {
+      color: 'primary',
       rounded: 'md',
       variant: 'outlined',
       density: 'comfortable',
     },
     VSelect: {
+      color: 'primary',
       rounded: 'md',
       variant: 'outlined',
       density: 'comfortable',

@@ -18,10 +18,6 @@ class PsPaReportRepository implements PsPaReportRepositoryInterface
      */
     public function getReportHeadList(mixed $plantId, ?int $userId = null, ?string $dateFrom = null, ?string $dateTo = null): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('r', $plantId, $userId);
 
         $where = [$plantFilter['sql']];
@@ -238,10 +234,6 @@ class PsPaReportRepository implements PsPaReportRepositoryInterface
      */
     public function getMaterialStock(array $filters): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantId = $filters['plant_id'] ?? null;
         $userId = $filters['user_id'] ?? null;
         $materialId = $filters['material_id'] ?? null;

@@ -13,6 +13,7 @@ class StoreSupplierTempRequest extends FormRequest
             'entry_no'      => 'required|string',
             'id_supplier'   => 'nullable|integer',
             'id_material'   => 'required|integer',
+            'id_manufacturer' => 'nullable',
             'qty'          => 'required|numeric|min:0.001',
             'batch_sap'    => 'nullable|string',
         ];

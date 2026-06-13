@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import * as MaterialApi from '../api'
+import * as MaterialApi from '../services'
 
 export const useMaterialStore = defineStore('moduleMaterial', () => {
   const items = ref([])
@@ -12,7 +12,6 @@ export const useMaterialStore = defineStore('moduleMaterial', () => {
       const res = await MaterialApi.getMaterials()
       items.value = res.data ?? res ?? []
     } catch (error) {
-      console.error('Failed to fetch materials:', error)
       items.value = []
     } finally {
       loading.value = false

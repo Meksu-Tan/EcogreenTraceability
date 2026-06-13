@@ -6,42 +6,24 @@
       :data="store.tanks"
       :loading="store.loading"
       row-key="id_tank"
+      :show-top-info="false"
     >
       <template #cell-total_tank="{ row, value }">
-        <button
-          class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-50 text-green-600 border border-green-100 hover:bg-green-100 transition-colors"
-          @click.stop="onViewDetail(row)"
-        >
+        <VChip size="x-small" color="primary" variant="tonal" @click.stop="onViewDetail(row)" style="cursor: pointer;">
           {{ value }} detail
-        </button>
+        </VChip>
       </template>
       <template #actions="{ row }">
-        <div class="flex items-center justify-center gap-1.5">
-          <button
-            type="button"
-            class="p-1.5 rounded-md bg-green-500 text-white hover:bg-green-600 transition-colors shadow-sm active:scale-90 cursor-pointer"
-            title="View Details"
-            @click.stop="onViewDetail(row)"
-          >
-            <Icon icon="ri:list-check-2" class="text-[11px] pointer-events-none w-3 h-3" />
-          </button>
-          <button
-            type="button"
-            class="p-1.5 rounded-md bg-green-400 text-white hover:bg-green-500 transition-colors shadow-sm active:scale-90 cursor-pointer"
-            title="Edit"
-            @click.stop="onEditTank(row)"
-          >
-            <Icon icon="ri:edit-line" class="text-[11px] pointer-events-none w-3 h-3" />
-          </button>
-          <button
-            type="button"
-            class="p-1.5 rounded-md transition-colors shadow-sm active:scale-90 text-white cursor-pointer"
-            :class="row.status == 1 ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'"
-            :title="row.status == 1 ? 'Deactivate' : 'Activate'"
+        <div class="d-flex justify-center gap-1">
+          <VBtn size="x-small" icon="ri-list-check-2" color="primary" variant="tonal" @click.stop="onViewDetail(row)" />
+          <VBtn size="x-small" icon="ri-edit-line" color="primary" variant="tonal" @click.stop="onEditTank(row)" />
+          <VBtn
+            size="x-small"
+            :icon="row.status == 1 ? 'ri-close-line' : 'ri-check-line'"
+            :color="row.status == 1 ? 'error' : 'success'"
+            variant="tonal"
             @click.stop="onToggleTank(row)"
-          >
-            <Icon :icon="row.status == 1 ? 'ri:close-line' : 'ri:check-line'" class="text-[11px] pointer-events-none w-3 h-3" />
-          </button>
+          />
         </div>
       </template>
     </DataTable>
@@ -54,17 +36,18 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Icon } from '@iconify/vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import StorageTankModal   from './StorageTankModal.vue'
 import { useSetupStorageStore } from '@/modules/m-storage/stores'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
 
 defineExpose({ openTankModal })
 
 const router         = useRouter()
 const store          = useSetupStorageStore()
 const toast          = useToastStore()
+const confirmStore = useConfirmStore()
 const showTankModal  = ref(false)
 const editTank       = ref(null)
 const submitting     = ref(false)
@@ -97,7 +80,8 @@ function onEditTank(row) {
 }
 
 async function onToggleTank(row) {
-  if (!confirm(`${row.status==1?'Deactivate':'Activate'} tank "${row.description}"?`)) return
+  const isConfirmed = await confirmStore.show({ message: `${row.status==1?'Deactivate':'Activate'} tank "${row.description}"?` })
+  if (!isConfirmed) return
   const r = await store.toggleTank(row.id_tank, row.status)
   r.status===1 ? toast.success(r.message) : toast.error(r.message)
 }

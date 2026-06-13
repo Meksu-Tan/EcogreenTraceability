@@ -3,6 +3,7 @@ namespace Modules\TsWip\Services;
 
 use Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 use Modules\TsWip\Services\Contracts\WipEntryServiceInterface;
 
@@ -20,19 +21,19 @@ class WipEntryService implements WipEntryServiceInterface
         ];
     }
 
-    public function getBalance(string $rundownId, $plantId, ?string $subgroup = null): array
+    public function getBalance(string $rundownId, $plantId, ?string $subgroup = null, int $page = 1, int $perPage = 5): array
     {
-        return $this->wipEntryRepo->getBalance($rundownId, $plantId, $subgroup);
+        return $this->wipEntryRepo->getBalance($rundownId, $plantId, $subgroup, $page, $perPage);
     }
 
-    public function getFeed(string $feedId, string $mode, $plantId): array
+    public function getFeed(string $feedId, string $mode, $plantId, int $page = 1, int $perPage = 5): array
     {
-        return $this->wipEntryRepo->getFeed($feedId, $mode, $plantId);
+        return $this->wipEntryRepo->getFeed($feedId, $mode, $plantId, $page, $perPage);
     }
 
-    public function getRundown(string $rundownId, string $mode, $plantId): array
+    public function getRundown(string $rundownId, string $mode, $plantId, int $page = 1, int $perPage = 5): array
     {
-        return $this->wipEntryRepo->getRundown($rundownId, $mode, $plantId);
+        return $this->wipEntryRepo->getRundown($rundownId, $mode, $plantId, $page, $perPage);
     }
 
     public function getFeedNewBatchNumber(string $feedId, $plantId): ?string
@@ -122,6 +123,31 @@ class WipEntryService implements WipEntryServiceInterface
         return $this->formatResponse($result, 'RUNDOWN ' . $traceNo, 'CANCEL');
     }
 
+    /**
+     * Cancel a WIP entry by its header ID.
+     * Looks up the trace header, determines cancel type from trace_no prefix, delegates to cancelFeed/cancelRundown.
+     */
+    public function cancelById(int $id, string $user): array
+    {
+        $traceHead = DB::connection('eudr_ts')->selectOne(
+            'SELECT to_trace_no FROM t_trace_header WHERE id_trace_head = ? AND status = 1',
+            [$id]
+        );
+
+        if (!$traceHead) {
+            return ['status' => 0, 'message' => 'Record not found'];
+        }
+
+        $traceNo = $traceHead->to_trace_no;
+        $prefix = substr($traceNo, 0, 1);
+
+        return match ($prefix) {
+            '3' => $this->cancelFeed($traceNo, $user),
+            '2' => $this->cancelRundown($traceNo, $user),
+            default => ['status' => 0, 'message' => 'Unknown trace type'],
+        };
+    }
+
     public function updateEntrySubTank(int $idHead, array $tails, string $user): array
     {
         $result = $this->wipEntryRepo->updateEntrySubTank($idHead, $tails, $user);
@@ -174,8 +200,7 @@ class WipEntryService implements WipEntryServiceInterface
 
     protected function resolvePlant($plantId)
     {
-        if ($plantId) return $plantId;
-        return session('selected_plant');
+        return $plantId;
     }
 }
 

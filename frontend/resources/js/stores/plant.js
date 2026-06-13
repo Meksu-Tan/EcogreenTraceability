@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import * as plantApi from '@/modules/m-plant/api'
+import * as plantApi from '@/modules/m-plant/services'
 
 // Cache reset callback for dependent stores
 let cacheResetCallback = null
@@ -18,8 +18,7 @@ export const useSetupPlantStore = defineStore('setupPlant', () => {
     try {
       const res = await plantApi.getPlants()
       plants.value = res.data.data
-    } catch (error) {
-      console.error('Failed to fetch plants:', error)
+    } catch {
       plants.value = []
     } finally {
       loading.value = false

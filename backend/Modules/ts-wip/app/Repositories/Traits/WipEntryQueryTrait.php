@@ -6,13 +6,11 @@ use Modules\Plant\Models\Plant;
 
 trait WipEntryQueryTrait
 {
-    public function getBalance(string $rundownId, $plantId, ?string $subgroup = null): array
+    public function getBalance(string $rundownId, $plantId, ?string $subgroup = null, int $page = 1, int $perPage = 5): array
     {
         $idPlant = $this->resolvePlantId($plantId);
         $dbRundownId = $this->mapFrontendSectionToDbRundownId($rundownId, $subgroup);
         $column = (strpos($dbRundownId, '00') === 0) ? 'id_feed' : 'id_rundown';
-
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         // Handle "all plants" case
         $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'd.id_plant = ?';
@@ -43,20 +41,14 @@ trait WipEntryQueryTrait
                                          a.id_plant
                                     FROM m_sloc d
                                     LEFT JOIN (
-                                         SELECT a.id_sloc, a.id_tank, a.id_balance_head, a.id_material, a.status, a.trace_no,
+                                         SELECT a.id_sloc, a.id_balance_head, a.id_material, a.status, a.trace_no,
                                                 a.created_by, a.created_at, a.entry_date, a.id_plant
                                            FROM t_balance_header a
                                           WHERE a.status = 1 AND a.id_sloc IS NOT NULL
                                             AND (SUBSTRING(a.trace_no,1,1) = 1 OR SUBSTRING(a.trace_no,1,1) = 2 OR SUBSTRING(a.trace_no,1,1) = 7 OR
                                                  SUBSTRING(a.trace_no,1,1) = 8 OR SUBSTRING(a.trace_no,1,1) = 9)
                                          UNION ALL
-                                         SELECT (
-                                             SELECT ms.id_sloc FROM m_sloc ms
-                                               JOIN m_tank mt ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci 
-                                                             AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci
-                                              WHERE mt.id_tank = a.id_tank
-                                              LIMIT 1
-                                         ) AS id_sloc, a.id_tank, a.id_balance_head, a.id_material, a.status, a.trace_no,
+                                         SELECT a.id_sloc, a.id_balance_head, a.id_material, a.status, a.trace_no,
                                                 a.created_by, a.created_at, a.entry_date, a.id_plant
                                            FROM t_balance_header a
                                           WHERE a.status = 1 AND a.id_sloc IS NULL
@@ -71,7 +63,7 @@ trait WipEntryQueryTrait
                                                 GROUP BY trace_no) aa
                                       ON a.id_balance_head = aa.id_balance_head
                                     LEFT JOIN t_balance_detail b
-                                      ON a.id_balance_head = b.id_balance_head AND b.init_qty > "0.0001"
+                                      ON a.id_balance_head = b.id_balance_head AND b.init_qty > 0.0001
                                     LEFT JOIN m_material c
                                       ON a.id_material = c.id_material
                                     LEFT JOIN m_supplier e
@@ -99,13 +91,11 @@ trait WipEntryQueryTrait
         return $rows;
     }
 
-    public function getFeed(string $feedId, string $mode, $plantId): array
+    public function getFeed(string $feedId, string $mode, $plantId, int $page = 1, int $perPage = 5): array
     {
         $feedId = $this->mapFrontendSectionToDbFeedId($feedId);
         $feedPrefix = substr($feedId, 0, 3);
         $idPlant = $this->resolvePlantId($plantId);
-
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         if (strlen($feedId) >= 6) {
             return $this->getFeedWithMaterialSign($feedId, $feedPrefix, $mode, $idPlant);
@@ -124,7 +114,7 @@ trait WipEntryQueryTrait
 
             $rows = DB::connection('eudr_ts')->select('
                  SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no,
-                        a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_sloc_tail,
+                        a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_sloc AS id_sloc_tail,
                         FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                         GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
                         b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
@@ -133,9 +123,9 @@ trait WipEntryQueryTrait
                         CONCAT(
                             COALESCE(i.description, ""),
                             IF(
-                                GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & ") IS NULL,
+                                GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & ") IS NULL,
                                 "",
-                                CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & "))
+                                CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & "))
                             )
                         ) AS sloc,
                         a.id_plant, p.description AS plant_name
@@ -148,18 +138,11 @@ trait WipEntryQueryTrait
                                 FROM t_trace_header a
                                WHERE a.status = 1 AND ' . $subqueryPlantFilter . '
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                   LEFT JOIN m_sloc i ON 
+                   LEFT JOIN m_sloc i ON
                        (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                       OR
-                       (a.id_sloc IS NULL AND i.id_sloc = (
-                           SELECT ms.id_sloc FROM m_sloc ms 
-                           JOIN m_tank mt ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci 
-                           WHERE mt.id_tank = a.id_tank 
-                           LIMIT 1
-                       ))
-                   LEFT JOIN m_sloc j ON 
+                   LEFT JOIN m_sloc j ON
                        (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                   LEFT JOIN m_sloc_detail jd ON JSON_CONTAINS(a.id_sloc_tail, JSON_QUOTE(CAST(jd.id_sloc_tail AS CHAR)))
+                   LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
                    LEFT JOIN (SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
                                 FROM t_trace_header h
                                 JOIN t_trace_detail d ON h.id_trace_head = d.id_trace_head
@@ -202,9 +185,9 @@ trait WipEntryQueryTrait
                         CONCAT(
                             COALESCE(i.description, ""),
                             IF(
-                                GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & ") IS NULL,
+                                GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & ") IS NULL,
                                 "",
-                                CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & "))
+                                CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & "))
                             )
                         ) AS sloc,
                         CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
@@ -227,18 +210,11 @@ trait WipEntryQueryTrait
                                 FROM t_trace_header a
                                WHERE a.status = 1 AND ' . $subqueryPlantFilter . '
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                   LEFT JOIN m_sloc i ON 
+                   LEFT JOIN m_sloc i ON
                        (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                       OR
-                       (a.id_sloc IS NULL AND i.id_sloc = (
-                           SELECT ms.id_sloc FROM m_sloc ms 
-                           JOIN m_tank mt ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci 
-                           WHERE mt.id_tank = a.id_tank 
-                           LIMIT 1
-                       ))
-                   LEFT JOIN m_sloc j ON 
+                   LEFT JOIN m_sloc j ON
                        (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                   LEFT JOIN m_sloc_detail jd ON JSON_CONTAINS(a.id_sloc_tail, JSON_QUOTE(CAST(jd.id_sloc_tail AS CHAR)))
+                   LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
                    LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                   WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                     AND a.out_qty > 0 AND b.out_qty > 0
@@ -258,25 +234,19 @@ trait WipEntryQueryTrait
         $idMatlSign = substr($feedId, 4, 2);
         $feedIdShort = $feedPrefix;
 
-        if ($feedIdShort === '009') {
-            $idMaterial = null;
-            $idMaterial1 = null;
-            $idMaterial2 = null;
-            if ($idMatlSign === '01') $idMaterial = '12';
-            elseif ($idMatlSign === '02') $idMaterial = '25';
-            elseif ($idMatlSign === '03') { $idMaterial1 = '18'; $idMaterial2 = '22'; }
-            elseif ($idMatlSign === '04') $idMaterial = '14';
+        /** @var array<string, array<string, array{id_material: string|null, id_material1: string|null, id_material2: string|null}>> $feedMaterialMap */
+        $feedMaterialMap = config('wip_material_mapping.feed_material_map', []);
 
-            return $this->execFeedQuery($mode, $feedIdShort, $idPlant, $idMaterial, $idMaterial1, $idMaterial2);
-
-        } elseif ($feedIdShort === '006') {
-            $idMaterial = null;
-            $idMaterial1 = null;
-            $idMaterial2 = null;
-            if ($idMatlSign === '01') { $idMaterial1 = '6'; $idMaterial2 = '31'; }
-            elseif ($idMatlSign === '02') $idMaterial = '66';
-
-            return $this->execFeedQuery($mode, $feedIdShort, $idPlant, $idMaterial, $idMaterial1, $idMaterial2);
+        if (isset($feedMaterialMap[$feedIdShort][$idMatlSign])) {
+            $entry = $feedMaterialMap[$feedIdShort][$idMatlSign];
+            return $this->execFeedQuery(
+                $mode,
+                $feedIdShort,
+                $idPlant,
+                $entry['id_material'],
+                $entry['id_material1'],
+                $entry['id_material2']
+            );
         }
 
         return [];
@@ -293,7 +263,7 @@ trait WipEntryQueryTrait
         if ($mode === 'LATEST') {
             $sql = '
                 SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no,
-                       a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_sloc_tail,
+                       a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_sloc AS id_sloc_tail,
                        FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                        GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
                        b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
@@ -302,9 +272,9 @@ trait WipEntryQueryTrait
                        CONCAT(
                            COALESCE(i.description, ""),
                            IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & ") IS NULL,
+                               GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & ") IS NULL,
                                "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & "))
+                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & "))
                            )
                         ) AS sloc,
                        a.id_plant, p.description AS plant_name
@@ -315,18 +285,11 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                FROM t_trace_header a WHERE a.status = 1 AND a.id_plant = ? GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON 
+                  LEFT JOIN m_sloc i ON
                       (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                      OR
-                      (a.id_sloc IS NULL AND i.id_sloc = (
-                          SELECT ms.id_sloc FROM m_sloc ms 
-                          JOIN m_tank mt ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci 
-                          WHERE mt.id_tank = a.id_tank 
-                          LIMIT 1
-                      ))
                   LEFT JOIN m_sloc j ON 
                       (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc_detail jd ON JSON_CONTAINS(a.id_sloc_tail, JSON_QUOTE(CAST(jd.id_sloc_tail AS CHAR)))
+                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
                   LEFT JOIN (SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
                                FROM t_trace_header h JOIN t_trace_detail d ON h.id_trace_head = d.id_trace_head
                               WHERE d.out_qty > 0 AND h.status = 1 GROUP BY h.to_trace_no) bs ON bs.to_trace_no = a.to_trace_no
@@ -354,9 +317,9 @@ trait WipEntryQueryTrait
                        CONCAT(
                            COALESCE(i.description, ""),
                            IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & ") IS NULL,
+                               GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & ") IS NULL,
                                "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & "))
+                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & "))
                            )
                        ) AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
@@ -378,18 +341,11 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                FROM t_trace_header a WHERE a.status = 1 AND a.id_plant = ? GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON 
+                  LEFT JOIN m_sloc i ON
                       (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                      OR
-                      (a.id_sloc IS NULL AND i.id_sloc = (
-                          SELECT ms.id_sloc FROM m_sloc ms 
-                          JOIN m_tank mt ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci 
-                          WHERE mt.id_tank = a.id_tank 
-                          LIMIT 1
-                      ))
                   LEFT JOIN m_sloc j ON 
                       (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc_detail jd ON JSON_CONTAINS(a.id_sloc_tail, JSON_QUOTE(CAST(jd.id_sloc_tail AS CHAR)))
+                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.out_qty > 0 AND b.out_qty > 0
@@ -429,11 +385,10 @@ trait WipEntryQueryTrait
         return DB::connection('eudr_ts')->select($sql, $params);
     }
 
-    public function getRundown(string $rundownId, string $mode, $plantId): array
+    public function getRundown(string $rundownId, string $mode, $plantId, int $page = 1, int $perPage = 5): array
     {
         $rundownId = $this->mapFrontendSectionToDbRundownId($rundownId);
         $idPlant = $this->resolvePlantId($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         $limit = ($mode === 'LOG') ? 50 : 1;
         $offset = 0;
@@ -447,7 +402,7 @@ trait WipEntryQueryTrait
 
             $rows = DB::connection('eudr_ts')->select('
                 SELECT a.id_trace_head, a.entry_date, a.to_trace_no AS rundown_trace_no,
-                       a.id_balance_head, a.id_material, a.id_sloc, a.id_sloc_tail,
+                       a.id_balance_head, a.id_material, a.id_sloc, a.id_sloc AS id_sloc_tail,
                        FORMAT(ROUND(h.in_qty,3),3) AS in_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
                        CONCAT(c.code, " :: ", c.description) AS material, g.material_document,
                        FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf, b.batch_sap,
@@ -456,9 +411,9 @@ trait WipEntryQueryTrait
                        CONCAT(
                            COALESCE(i.description, ""),
                            IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & ") IS NULL,
+                               GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & ") IS NULL,
                                "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & "))
+                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & "))
                            )
                        ) AS sloc,
                        a.id_plant, p.description AS plant_name
@@ -469,18 +424,11 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.in_qty) AS in_qty
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON 
+                  LEFT JOIN m_sloc i ON
                       (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                      OR
-                      (a.id_sloc IS NULL AND i.id_sloc = (
-                          SELECT ms.id_sloc FROM m_sloc ms 
-                          JOIN m_tank mt ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci 
-                          WHERE mt.id_tank = a.id_tank 
-                          LIMIT 1
-                      ))
                   LEFT JOIN m_sloc j ON 
                       (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc_detail jd ON JSON_CONTAINS(a.id_sloc_tail, JSON_QUOTE(CAST(jd.id_sloc_tail AS CHAR)))
+                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
                   LEFT JOIN (SELECT id_trace_head, SUM(in_qty) AS supplier_qty
                                FROM t_trace_detail WHERE in_qty > 0 GROUP BY id_trace_head) bs ON bs.id_trace_head = a.id_trace_head
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
@@ -510,9 +458,9 @@ trait WipEntryQueryTrait
                        CONCAT(
                            COALESCE(i.description, ""),
                            IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & ") IS NULL,
+                               GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & ") IS NULL,
                                "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.tf_number) ORDER BY COALESCE(j.id_tank, jd.tf_number) ASC SEPARATOR " & "))
+                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & "))
                            )
                        ) AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
@@ -532,18 +480,11 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.in_qty) AS in_qty
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON 
+                  LEFT JOIN m_sloc i ON
                       (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                      OR
-                      (a.id_sloc IS NULL AND i.id_sloc = (
-                          SELECT ms.id_sloc FROM m_sloc ms 
-                          JOIN m_tank mt ON ms.code COLLATE utf8mb4_unicode_ci = mt.code COLLATE utf8mb4_unicode_ci AND ms.id_plant COLLATE utf8mb4_unicode_ci = mt.id_plant COLLATE utf8mb4_unicode_ci 
-                          WHERE mt.id_tank = a.id_tank 
-                          LIMIT 1
-                      ))
                   LEFT JOIN m_sloc j ON 
                       (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc_detail jd ON JSON_CONTAINS(a.id_sloc_tail, JSON_QUOTE(CAST(jd.id_sloc_tail AS CHAR)))
+                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.in_qty > 0 AND b.in_qty > 0
@@ -561,15 +502,12 @@ trait WipEntryQueryTrait
     public function getActiveTanksForFeed(string $feedId, $plantId): array
     {
         $idPlant = $this->resolvePlantId($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
-
         return $this->getActiveTanksBySlocType('FEED', $idPlant, $plantId);
     }
 
     public function getActiveTanksForRundown(string $rundownId, $plantId, ?string $subgroup = null): array
     {
         $idPlant = $this->resolvePlantId($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         return $this->getActiveTanksBySlocType('WIP', $idPlant, $plantId);
     }
@@ -586,7 +524,7 @@ trait WipEntryQueryTrait
 
         $rows = DB::connection('eudr_ts')->select("
             SELECT id_sloc, id_sloc AS id_tank, description AS tank, id_plant,
-                   (SELECT COUNT(*) FROM m_sloc_detail sd WHERE sd.id_sloc = m_sloc.id_sloc AND sd.status = 1) AS details_count
+                   0 AS details_count
               FROM m_sloc
              WHERE status = 1
                AND (
@@ -618,7 +556,7 @@ trait WipEntryQueryTrait
              WHERE status = 1
                AND description = (SELECT description FROM m_sloc WHERE id_sloc = ?)
                AND id_plant = (SELECT id_plant FROM m_sloc WHERE id_sloc = ?)
-             ORDER BY id_tank ASC
+             ORDER BY id_sloc ASC
         ', [$slocId, $slocId]);
     }
 
@@ -645,7 +583,6 @@ trait WipEntryQueryTrait
     public function getWipTree($plantId): array
     {
         $idPlant = $this->resolvePlantId($plantId);
-        DB::connection('eudr_ts')->select('SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))');
 
         // Handle "all plants" case
         $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'id_plant = ?';
@@ -825,45 +762,8 @@ trait WipEntryQueryTrait
 
     protected function mapRundownToFeedSectionId(string $rundownId): string
     {
-        $rundownToFeedMap = [
-            '101' => '101',
-            '102' => '103',
-            '103' => '104',
-            '104' => '105',
-            '110' => '111',
-            '111' => '112',
-            '114' => '114',
-            '011' => '001',
-            '021' => '001',
-            '012' => '002',
-            '022' => '002',
-            '033' => '003',
-            '023' => '003',
-            '043' => '006-01',
-            '053' => '003',
-            '063' => '003',
-            '026' => '006-02',
-            '078' => '009-02',
-            '088' => '009-02',
-            '014' => '004',
-            '017' => '007',
-            '016' => '008',
-            '018' => '009',
-            '028' => '009',
-            '038' => '009',
-            '048' => '009',
-            '058' => '009',
-            '068' => '009',
-            '069' => '009-01',
-            '039' => '009-01',
-            '079' => '009-02',
-            '059' => '009-02',
-            '029' => '009-03',
-            '049' => '009-03',
-            '019' => '009-04',
-            '015' => '006-01',
-            '025' => '006-01',
-        ];
+        /** @var array<string, string> $rundownToFeedMap */
+        $rundownToFeedMap = config('wip_material_mapping.rundown_to_feed_map', []);
 
         return $this->mapFrontendSectionToDbFeedId($rundownToFeedMap[$rundownId] ?? $rundownId);
     }

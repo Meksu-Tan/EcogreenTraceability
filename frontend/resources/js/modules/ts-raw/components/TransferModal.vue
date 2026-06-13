@@ -1,378 +1,334 @@
-﻿<template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition duration-300 ease-out"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-show="isOpen"
-        class="fixed inset-0 z-[100] overflow-y-auto"
-    aria-labelledby="modal-title"
-    role="dialog"
-    aria-modal="true"
-    :aria-hidden="!isOpen"
+<template>
+  <VDialog
+    :model-value="isOpen"
+    max-width="960"
+    scrollable
+    @update:model-value="$emit('update:isOpen', $event)"
   >
-    <div class="relative flex min-h-full items-center justify-center py-10 px-4 sm:px-6">
-      <div
-        class="fixed inset-0 z-[1] bg-black/50 backdrop-blur-sm transition-opacity duration-300"
-        aria-hidden="true"
-        @click="closeModal"
-      />
+    <VCard>
+      <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+        <span class="text-h6 font-weight-bold">Transfer to feed tank</span>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="closeModal"
+        />
+      </VCardTitle>
 
-      <div
-        class="relative z-[2] mx-auto flex w-full max-w-5xl max-h-[min(92vh,940px)] flex-col overflow-hidden rounded-2xl bg-white text-left shadow-[0_25px_50px_-12px_rgba(15,23,42,0.22)] ring-1 ring-slate-900/[0.05]"
-      >
-        <!-- Header -->
-        <div class="flex shrink-0 items-center justify-between gap-4 bg-gradient-to-r from-green-600 via-green-600 to-green-600 px-6 py-4 sm:px-8">
-          <div class="min-w-0">
-            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-green-100/90">Transfer</p>
-            <h3 id="modal-title" class="truncate text-lg font-bold tracking-tight text-white sm:text-xl">
-              Transfer ke feed tank
-            </h3>
-          </div>
-          <button
-            type="button"
-            @click="closeModal"
-            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white transition hover:bg-white/25"
-            aria-label="Tutup"
-          >
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <VDivider />
+
+      <VCardText class="pa-5 bg-neutral-50">
+        <div v-if="initLoading" class="d-flex flex-column align-center justify-center pa-8">
+          <VProgressCircular indeterminate color="primary" size="48" />
+          <span class="mt-3 text-body-2 text-medium-emphasis">Loading transfer form...</span>
         </div>
 
-        <!-- Body -->
-        <div class="relative min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white px-5 py-5 sm:px-8 sm:py-6">
-          <div
-            v-if="initLoading"
-            class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 rounded-xl bg-white/75 backdrop-blur-sm"
-          >
-            <svg class="h-11 w-11 animate-spin text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <p class="text-sm font-semibold text-slate-600">Memuat form transfer…</p>
+        <VAlert
+          v-if="initError && !initLoading"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+          density="comfortable"
+        >
+          <div class="d-flex flex-wrap align-center justify-space-between ga-2">
+            <span>{{ initError }}</span>
+            <VBtn color="error" variant="flat" size="small" @click="bootstrap">Try again</VBtn>
           </div>
-          <div
-            v-if="initError && !initLoading"
-            class="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200/80 bg-red-50/95 px-4 py-3.5 text-sm text-red-800 shadow-sm"
-          >
-            <span class="min-w-0 flex-1 leading-snug">{{ initError }}</span>
-            <button
-              type="button"
-              class="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-red-700"
-              @click="bootstrap"
-            >
-              Coba lagi
-            </button>
-          </div>
-          <form @submit.prevent="handleSubmit" :class="{ 'pointer-events-none opacity-45': initLoading }" class="space-y-5">
-            <div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
-              <div class="mb-5 border-b border-slate-100 pb-4">
-                <h4 class="text-sm font-bold text-slate-800 sm:text-base">Ringkasan transfer</h4>
-                <p class="mt-1 text-xs text-slate-500">Dari storage ke feed tank — isi tangki sumber &amp; tujuan lalu tambahkan material.</p>
-              </div>
+        </VAlert>
 
-              <div
+        <form @submit.prevent="handleSubmit" :class="{ 'opacity-50': initLoading }" class="d-flex flex-column gap-4">
+          <VCard variant="outlined">
+            <VCardTitle class="d-flex align-center justify-space-between border-b pa-4">
+              <span class="text-body-1 font-weight-bold">Transfer summary</span>
+            </VCardTitle>
+            <VCardText class="pt-4">
+              <p class="text-caption text-medium-emphasis mb-4">From storage to feed tank — fill source &amp; destination tanks, then add material.</p>
+
+              <VAlert
                 v-if="isPlantLocked"
-                class="mb-4 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3.5 py-2.5 text-xs font-semibold text-green-800"
+                type="success"
+                variant="tonal"
+                density="compact"
+                class="mb-4"
+                icon="ri-lock-line"
               >
-                <Icon icon="ri:lock-line" class="w-4 h-4 opacity-70" />
-                Sloc terkunci ke plant: {{ plantSelectionStore.selectedPlantName }}
-              </div>
+                Sloc locked to plant: {{ plantSelectionStore.selectedPlantName }}
+              </VAlert>
 
-              <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-                <div class="space-y-1.5">
-                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Nomor entri (auto)</label>
-                  <input
-                    :value="form.entry_no"
-                    type="text"
-                    readonly
+              <VRow dense>
+                <VCol cols="12" sm="6" md="4">
+                  <VTextField
+                    :model-value="form.entry_no"
+                    label="Entry number (auto)"
                     :placeholder="entryNoPlaceholder"
-                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal"
+                    readonly
+                    density="compact"
+                    variant="outlined"
                   />
-                </div>
-                <div class="space-y-1.5">
-                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tanggal transfer</label>
-                  <input
+                </VCol>
+                <VCol cols="12" sm="6" md="4">
+                  <VTextField
                     v-model="form.entry_date"
+                    label="Transfer date"
                     type="date"
                     required
-                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                    density="compact"
+                    variant="outlined"
                   />
-                </div>
-                <div class="space-y-1.5 sm:col-span-2 lg:col-span-1">
-                  <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Material document</label>
-                  <input
+                </VCol>
+                <VCol cols="12" sm="6" md="4">
+                  <VTextField
                     v-model="form.material_document"
-                    type="text"
-                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm uppercase shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
+                    label="Material document"
+                    density="compact"
+                    variant="outlined"
+                    class="text-uppercase"
                   />
-                </div>
-              </div>
+                </VCol>
+              </VRow>
 
-              <div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-                <div class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 sm:p-5">
-                  <h4 class="mb-4 flex items-center gap-2 border-b border-slate-200/80 pb-2 text-xs font-bold uppercase tracking-wide text-slate-700">
-                    <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-green-600 text-[10px] text-white">1</span>
-                    Tangki sumber (storage)
-                  </h4>
-                  <div class="space-y-4">
-                    <div class="space-y-1.5">
-                      <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Sloc sumber</label>
-                      <select
-                        v-model="form.source_tank"
-                        required
-                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                        @change="onSourceTankChange"
-                      >
-                        <option value="">— Pilih Sloc —</option>
-                        <option v-for="tank in tanks" :key="tank.tank" :value="tank.tank">
-                          {{ tank.tank }}
-                        </option>
-                      </select>
-                    </div>
-                    <div class="space-y-1.5">
-                      <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Sub-Sloc</label>
-                      <div class="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-inner">
-                        <div class="grid grid-cols-2 gap-2">
-                          <label
-                            v-for="detail in sourceTankDetails"
-                            :key="detail.id_tank_tail"
-                            class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-slate-700 transition hover:border-green-200 hover:bg-green-50/60"
-                          >
-                            <input
-                              v-model="form.source_tank_id"
-                              type="checkbox"
-                              :value="detail.id_sloc"
-                              class="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                            />
-                            <span>{{ detail.tankNo }}</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
+              <VRow dense class="mt-2">
+                <VCol cols="12" md="6">
+                  <VCard variant="outlined" class="bg-neutral-50">
+                    <VCardTitle class="d-flex align-center ga-2 border-b pa-3 py-2">
+                      <VAvatar size="24" color="primary">
+                        <span class="text-caption font-weight-bold text-on-primary">1</span>
+                      </VAvatar>
+                      <span class="text-caption font-weight-bold text-uppercase">Source tank (storage)</span>
+                    </VCardTitle>
+                    <VCardText>
+                      <VRow dense>
+                        <VCol cols="12">
+                          <VSelect
+                            v-model="form.source_tank"
+                            label="Source Sloc"
+                            :items="tankOptions"
+                            item-title="label"
+                            item-value="value"
+                            required
+                            density="compact"
+                            variant="outlined"
+                            @update:model-value="onSourceTankChange"
+                          />
+                        </VCol>
+                        <VCol cols="12">
+                          <VSelect
+                            v-model="form.source_tank_id"
+                            label="Sub-Sloc"
+                            :items="sourceTankDetails"
+                            item-title="tankNo"
+                            item-value="id_sloc"
+                            multiple
+                            chips
+                            closable-chips
+                            variant="outlined"
+                            density="compact"
+                            :disabled="!form.source_tank"
+                            placeholder="Select Sloc first"
+                          />
+                        </VCol>
+                      </VRow>
+                    </VCardText>
+                  </VCard>
+                </VCol>
+
+                <VCol cols="12" md="6">
+                  <VCard variant="outlined" class="bg-neutral-50">
+                    <VCardTitle class="d-flex align-center ga-2 border-b pa-3 py-2">
+                      <VAvatar size="24" color="primary">
+                        <span class="text-caption font-weight-bold text-on-primary">2</span>
+                      </VAvatar>
+                      <span class="text-caption font-weight-bold text-uppercase">Destination tank (feed)</span>
+                    </VCardTitle>
+                    <VCardText>
+                      <VRow dense>
+                        <VCol cols="12">
+                          <VSelect
+                            v-model="form.trf_tank"
+                            label="Destination Sloc"
+                            :items="destTankOptions"
+                            item-title="label"
+                            item-value="value"
+                            required
+                            density="compact"
+                            variant="outlined"
+                            @update:model-value="onTrfTankChange"
+                          />
+                        </VCol>
+                        <VCol cols="12">
+                          <VSelect
+                            v-model="form.trf_tank_id"
+                            label="Sub-Sloc"
+                            :items="trfTankDetails"
+                            item-title="tankNo"
+                            item-value="id_sloc"
+                            multiple
+                            chips
+                            closable-chips
+                            variant="outlined"
+                            density="compact"
+                            :disabled="!form.trf_tank"
+                            placeholder="Select Sloc first"
+                          />
+                        </VCol>
+                      </VRow>
+                    </VCardText>
+                  </VCard>
+                </VCol>
+              </VRow>
+
+              <VRow class="mt-2" dense>
+                <VCol cols="12" class="d-flex flex-wrap align-center justify-space-between ga-3 border-t pt-4">
+                  <div class="d-flex flex-wrap ga-2">
+                    <VBtn
+                      color="secondary"
+                      prepend-icon="ri-layers-line"
+                      @click="isMaterialModalOpen = true"
+                    >
+                      Material &amp; Qty
+                    </VBtn>
+                    <VBtn
+                      type="button"
+                      color="primary"
+                      :disabled="!canSubmit || loading"
+                      @click="handleSubmit"
+                    >
+                      Confirm transfer
+                    </VBtn>
                   </div>
-                </div>
-
-                <div class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 sm:p-5">
-                  <h4 class="mb-4 flex items-center gap-2 border-b border-slate-200/80 pb-2 text-xs font-bold uppercase tracking-wide text-slate-700">
-                    <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-green-600 text-[10px] text-white">2</span>
-                    Tangki tujuan (feed)
-                  </h4>
-                  <div class="space-y-4">
-                    <div class="space-y-1.5">
-                      <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Sloc tujuan</label>
-                      <select
-                        v-model="form.trf_tank"
-                        required
-                        class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                        @change="onTrfTankChange"
-                      >
-                        <option value="">— Pilih Sloc —</option>
-                        <option v-for="tank in destTanks" :key="tank.tank" :value="tank.tank">
-                          {{ tank.tank }}
-                        </option>
-                      </select>
-                    </div>
-                    <div class="space-y-1.5">
-                      <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Sub-Sloc</label>
-                      <div class="max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 shadow-inner">
-                        <div class="grid grid-cols-2 gap-2">
-                          <label
-                            v-for="detail in trfTankDetails"
-                            :key="detail.id_tank_tail"
-                            class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-xs font-medium text-slate-700 transition hover:border-green-200 hover:bg-green-50/60"
-                          >
-                            <input
-                              v-model="form.trf_tank_id"
-                              type="checkbox"
-                              :value="detail.id_sloc"
-                              class="h-4 w-4 rounded border-slate-300 text-green-600 focus:ring-green-500"
-                            />
-                            <span>{{ detail.tankNo }}</span>
-                          </label>
-                        </div>
-                      </div>
-                    </div>
+                  <div class="d-flex align-center ga-3">
+                    <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Total (MT)</span>
+                    <VTextField
+                      :model-value="totalQty"
+                      readonly
+                      density="compact"
+                      variant="outlined"
+                      style="width:144px"
+                      class="text-right"
+                    />
                   </div>
-                </div>
-              </div>
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
 
-              <div class="mt-6 flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-slate-900"
-                    @click="isMaterialModalOpen = true"
-                  >
-                    <Icon icon="ri:layers-line" class="w-4 h-4 text-xs opacity-90" />
-                    Material &amp; Qty
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                    :disabled="!canSubmit || loading"
-                    @click="handleSubmit"
-                  >
-                    Konfirmasi transfer
-                  </button>
-                </div>
-                <div class="flex items-center justify-end gap-3 sm:min-w-[200px]">
-                  <span class="text-xs font-bold uppercase tracking-wide text-slate-500">Total (MT)</span>
-                  <input
-                    :value="totalQty"
-                    type="text"
-                    readonly
-                    class="w-36 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-bold tabular-nums text-slate-900"
-                  />
-                </div>
-              </div>
-            </div>
+          <VCard variant="outlined">
+            <VCardTitle class="bg-neutral-50 text-caption font-weight-bold text-uppercase pa-3">
+              Transferred material
+            </VCardTitle>
+            <VTable density="compact" class="text-body-2">
+              <thead>
+                <tr class="bg-neutral-50">
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Manufacturer</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Qty (MT)</th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:80px">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="materialList.length === 0">
+                  <td colspan="5" class="text-center text-disabled py-6 text-body-2">
+                    No material yet — use "Material &amp; Qty".
+                  </td>
+                </tr>
+                <tr v-for="(mat, index) in materialList" :key="mat.id">
+                  <td class="text-center text-caption text-medium-emphasis">{{ index + 1 }}</td>
+                  <td class="text-caption">{{ mat.material }}</td>
+                  <td class="text-caption">{{ mat.manufacturer }}</td>
+                  <td class="text-right font-weight-medium text-caption font-mono">{{ mat.qty }}</td>
+                  <td class="text-center">
+                    <VBtn
+                      icon="ri-delete-bin-line"
+                      size="x-small"
+                      color="error"
+                      variant="tonal"
+                      @click="removeMaterial(mat.id)"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </VTable>
+          </VCard>
+        </form>
+      </VCardText>
 
-            <div class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-              <div class="border-b border-slate-100 bg-slate-50/90 px-4 py-3 sm:px-5">
-                <h4 class="text-xs font-bold uppercase tracking-wide text-slate-600">Material yang ditransfer</h4>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-100 text-sm">
-                  <thead>
-                    <tr class="bg-slate-50/80 text-left text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      <th class="w-12 px-4 py-3">No</th>
-                      <th class="px-4 py-3">Aksi</th>
-                      <th class="min-w-[160px] px-4 py-3">Material</th>
-                      <th class="px-4 py-3 text-right">Qty (MT)</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100 bg-white">
-                    <tr v-if="materialList.length === 0">
-                      <td colspan="4" class="px-4 py-10 text-center text-sm text-slate-400">
-                        Belum ada material — gunakan "Material &amp; Qty".
-                      </td>
-                    </tr>
-                    <tr v-for="(mat, index) in materialList" :key="mat.id" class="transition hover:bg-slate-50/80">
-                      <td class="px-4 py-3 text-center text-slate-500">{{ index + 1 }}</td>
-                      <td class="px-4 py-3">
-                        <button
-                          type="button"
-                          class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition hover:bg-red-50 hover:text-red-800"
-                          @click="removeMaterial(mat.id)"
-                        >
-                          <Icon icon="ri:delete-bin-line" class="w-4 h-4" />
-                        </button>
-                      </td>
-                      <td class="max-w-[280px] px-4 py-3 text-slate-800">{{ mat.material }}</td>
-                      <td class="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{{ mat.qty }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </form>
-        </div>
+      <VDivider />
 
-        <!-- Material (nested) -->
-        <div v-if="isMaterialModalOpen" class="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6">
-          <div
-            class="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            aria-hidden="true"
-            @click="isMaterialModalOpen = false"
+      <VCardActions class="pa-5 pt-3 justify-end gap-2">
+        <VBtn variant="outlined" color="medium-emphasis" @click="closeModal">Close</VBtn>
+        <VBtn
+          color="primary"
+          prepend-icon="ri-save-line"
+          :loading="loading"
+          @click="handleSubmit"
+        >
+          {{ loading ? 'Saving...' : 'Confirm transfer' }}
+        </VBtn>
+      </VCardActions>
+    </VCard>
+  </VDialog>
+
+  <VDialog v-model="isMaterialModalOpen" max-width="500">
+    <VCard>
+      <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+        <span class="text-h6 font-weight-bold">Add material &amp; qty</span>
+        <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="isMaterialModalOpen = false" />
+      </VCardTitle>
+      <VDivider />
+      <VCardText class="pa-5">
+        <div class="d-flex flex-column ga-3">
+          <VSelect
+            v-model="materialForm.id_material"
+            label="Material"
+            :items="materialOptions"
+            item-title="label"
+            item-value="value"
+            density="compact"
+            variant="outlined"
           />
-          <div class="relative z-[1] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/10">
-            <div class="flex items-center justify-between bg-gradient-to-r from-green-700 to-green-700 px-5 py-4">
-              <h3 class="text-base font-bold text-white">Tambah material &amp; qty</h3>
-              <button
-                type="button"
-                class="flex h-9 w-9 items-center justify-center rounded-lg text-green-100 transition hover:bg-white/10 hover:text-white"
-                @click="isMaterialModalOpen = false"
-              >
-                <Icon icon="ri:close-line" class="w-4 h-4" />
-              </button>
-            </div>
-            <div class="space-y-4 p-5 sm:p-6">
-              <div class="space-y-1.5">
-                <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Material</label>
-                <select
-                  v-model="materialForm.id_material"
-                  class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                >
-                  <option value="">— Pilih material —</option>
-                  <option v-for="material in materials" :key="material.id_material" :value="material.id_material">
-                    {{ material.material }}
-                  </option>
-                </select>
-              </div>
-              <div class="space-y-1.5">
-                <label class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Qty (MT)</label>
-                <input
-                  v-model="materialForm.qty"
-                  type="number"
-                  step="0.001"
-                  placeholder="0.000"
-                  class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-right text-sm font-bold tabular-nums shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25"
-                />
-              </div>
-              <div class="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  class="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-200"
-                  @click="isMaterialModalOpen = false"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  class="rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                  :disabled="!canAddMaterial"
-                  @click="addMaterial"
-                >
-                  Tambahkan
-                </button>
-              </div>
-            </div>
+          <VCombobox
+            v-model="materialForm.id_manufacturer"
+            label="Manufacturer"
+            :items="manufacturerOptions"
+            item-title="label"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            placeholder="Select or type manufacturer"
+            clearable
+            :return-object="false"
+          />
+          <VTextField
+            v-model="materialForm.qty"
+            label="Qty (MT)"
+            type="number"
+            step="0.001"
+            placeholder="0.000"
+            density="compact"
+            variant="outlined"
+            class="text-right"
+          />
+          <div class="d-flex flex-row-reverse ga-2 pt-2">
+            <VBtn variant="outlined" color="medium-emphasis" @click="isMaterialModalOpen = false">Cancel</VBtn>
+            <VBtn color="primary" :disabled="!canAddMaterial" @click="addMaterial">Add</VBtn>
           </div>
         </div>
-
-        <!-- Footer -->
-        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200/90 bg-white px-5 py-4 sm:px-8">
-          <button
-            type="button"
-            @click="closeModal"
-            class="rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-200"
-          >
-            Tutup
-          </button>
-          <button
-            type="button"
-            @click="handleSubmit"
-            :disabled="!canSubmit || loading"
-            class="inline-flex items-center gap-2 rounded-xl bg-green-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            <svg v-if="loading" class="animate-spin h-5 w-5" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span>{{ loading ? 'Menyimpan…' : 'Konfirmasi transfer' }}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-  </Transition>
-</Teleport>
+      </VCardText>
+    </VCard>
+  </VDialog>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Icon } from '@iconify/vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
 import { usePlantSelectionStore } from '@/stores/plant'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
+
+const confirmStore = useConfirmStore()
 
 const props = defineProps({
   isOpen: { type: Boolean, required: true }
@@ -384,7 +340,6 @@ const store = useTsRawRmEntryStore()
 const plantSelectionStore = usePlantSelectionStore()
 const toastStore = useToastStore()
 
-// State
 const isMaterialModalOpen = ref(false)
 const initLoading = ref(false)
 const initError = ref(null)
@@ -403,10 +358,10 @@ const form = ref({
 
 const materialForm = ref({
   id_material: '',
+  id_manufacturer: null,
   qty: ''
 })
 
-// Computed
 const loading = computed(() => store.loading)
 const tanks = computed(() => store.tanks)
 const destTanks = computed(() => {
@@ -421,6 +376,22 @@ const destTanks = computed(() => {
 const materials = computed(() => store.materials)
 const materialList = computed(() => store.supplierList)
 const totalQty = computed(() => store.totalQty)
+
+const tankOptions = computed(() => {
+  return (tanks.value || []).map(t => ({ value: t.tank, label: t.tank }))
+})
+
+const destTankOptions = computed(() => {
+  return (destTanks.value || []).map(t => ({ value: t.tank, label: t.tank }))
+})
+
+const materialOptions = computed(() => {
+  return (materials.value || []).map(m => ({ value: m.id_material, label: m.material }))
+})
+
+const manufacturerOptions = computed(() => {
+  return (store.manufacturers || []).map(m => ({ value: m.id_manufacturer, label: m.manufacturer }))
+})
 
 const canAddMaterial = computed(() => {
   return !initLoading.value &&
@@ -450,8 +421,8 @@ const isPlantLocked = computed(() => {
 
 const entryNoPlaceholder = computed(() => {
   if (form.value.entry_no) return ''
-  if (isPlantLocked.value) return 'Menghasilkan nomor…'
-  return 'Pilih plant atau sloc sumber'
+  if (isPlantLocked.value) return 'Generating number...'
+  return 'Select source plant or sloc'
 })
 
 async function generateEntryNumber(extra = {}) {
@@ -480,7 +451,6 @@ async function autoSelectTanksWhenSingle() {
   }
 }
 
-// Methods
 async function bootstrap() {
   initLoading.value = true
   initError.value = null
@@ -495,7 +465,7 @@ async function bootstrap() {
     trf_tank_id: [],
     material_document: ''
   }
-  materialForm.value = { id_material: '', qty: '' }
+  materialForm.value = { id_material: '', id_manufacturer: null, qty: '' }
   sourceTankDetails.value = []
   trfTankDetails.value = []
   isMaterialModalOpen.value = false
@@ -515,7 +485,7 @@ async function bootstrap() {
     initError.value =
       error.response?.data?.message ||
       error.message ||
-      'Gagal memuat data form. Pastikan API Laravel (Sanctum) dan MySQL dapat dijangkau dari frontend.'
+      'Failed to load form data. Ensure Laravel API (Sanctum) and MySQL are accessible from frontend.'
   } finally {
     initLoading.value = false
   }
@@ -528,7 +498,7 @@ async function bootstrap() {
       initError.value =
         error.response?.data?.message ||
         error.message ||
-        'Gagal memuat daftar material sementara.'
+        'Failed to load temporary material list.'
     }
   }
 }
@@ -541,8 +511,7 @@ async function onSourceTankChange() {
     if (sourceTankDetails.value.length === 1) {
       form.value.source_tank_id = [sourceTankDetails.value[0].id_sloc]
     }
-    
-    // Automatically set destination feed tank
+
     form.value.trf_tank = form.value.source_tank.replace('Storage', 'Feed')
     await onTrfTankChange()
 
@@ -581,10 +550,11 @@ async function addMaterial() {
     await store.addSupplier({
       entry_no: form.value.entry_no,
       id_material: materialForm.value.id_material,
+      id_manufacturer: materialForm.value.id_manufacturer,
       qty: parseFloat(materialForm.value.qty),
       id_plant: plantSelectionStore.selectedPlantId || autoPlantId
     })
-    materialForm.value = { id_material: '', qty: '' }
+    materialForm.value = { id_material: '', id_manufacturer: null, qty: '' }
     isMaterialModalOpen.value = false
   } catch (error) {
     toastStore.error('Add material error:', error)
@@ -592,7 +562,8 @@ async function addMaterial() {
 }
 
 async function removeMaterial(id) {
-  if (confirm('Remove this material?')) {
+  const isConfirmed = await confirmStore.show({ message: 'Remove this material?' })
+  if (isConfirmed) {
     await store.deleteSupplier(id, form.value.entry_no)
   }
 }
@@ -657,6 +628,17 @@ watch(
   },
   { flush: 'post' }
 )
+
+watch(isMaterialModalOpen, async (open) => {
+  if (!open) return
+  if (store.manufacturers.length === 0) {
+    try {
+      await store.fetchManufacturers()
+    } catch (e) {
+      toastStore.error('Failed to load manufacturers')
+    }
+  }
+})
 
 watch(
   () => plantSelectionStore.selectedPlantId,

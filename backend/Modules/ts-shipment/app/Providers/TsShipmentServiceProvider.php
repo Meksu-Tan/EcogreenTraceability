@@ -7,7 +7,14 @@ class TsShipmentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // No repository bindings needed for placeholder
+        $this->app->bind(
+            \Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface::class,
+            \Modules\TsShipment\Repositories\EloquentShipmentRepository::class
+        );
+        $this->app->bind(
+            \Modules\TsShipment\Services\Contracts\ShipmentServiceInterface::class,
+            \Modules\TsShipment\Services\ShipmentService::class
+        );
     }
 
     public function boot(): void

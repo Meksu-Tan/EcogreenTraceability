@@ -2,27 +2,24 @@
 namespace Modules\Dashboard\Repositories;
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Modules\Dashboard\Repositories\Contracts\DashboardRepositoryInterface;
-use Modules\Material\Models\Material;
-use Modules\Storage\Models\StorageTank;
-use Modules\Supplier\Models\Supplier;
-use Modules\TsRaw\Models\BalanceHeader;
 
 class DashboardRepository implements DashboardRepositoryInterface
 {
     public function getMaterialCount(): int
     {
-        return Material::count();
+        return DB::connection('mysql')->table('m_material')->where('status', 1)->count();
     }
 
     public function getStorageCount(): int
     {
-        return StorageTank::count();
+        return DB::connection('mysql')->table('m_sloc')->where('status', 1)->count();
     }
 
     public function getSupplierCount(): int
     {
-        return Supplier::count();
+        return DB::connection('mysql')->table('m_supplier')->where('status', 1)->count();
     }
 
     public function getUserCount(): int
@@ -33,8 +30,10 @@ class DashboardRepository implements DashboardRepositoryInterface
     public function getTransactionCounts(): array
     {
         return [
-            'rm_entries' => BalanceHeader::rmEntry()->count(),
-            'transfers'  => BalanceHeader::transfer()->count(),
+            'rm_entries' => DB::connection('eudr_ts')->table('t_balance_header')->where(function ($q): void {
+                $q->where('trace_no', 'LIKE', '1%')->orWhere('trace_no', 'LIKE', '9%');
+            })->count(),
+            'transfers'  => DB::connection('eudr_ts')->table('t_balance_header')->where('trace_no', 'LIKE', '7%')->count(),
         ];
     }
 }

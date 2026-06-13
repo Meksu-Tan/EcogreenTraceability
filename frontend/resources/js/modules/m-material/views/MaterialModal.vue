@@ -1,86 +1,124 @@
 <template>
   <BaseModal
     :model-value="modelValue"
-    :title="isEdit ? 'Edit Material' : 'Tambah Material'"
+    :title="isEdit ? 'Edit Material' : 'Add Material'"
     :loading="loading"
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div class="space-y-4">
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Material <span class="text-red-500">*</span></label>
-          <input
+    <div class="d-flex flex-column gap-4 py-2">
+      <VRow dense>
+        <VCol cols="12" sm="6">
+          <VTextField
             id="mat-code"
             v-model="form.code"
-            type="text"
-            class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-            :class="errors.code ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
+            label="Material Code"
             placeholder="RM-001"
+            :error-messages="errors.code"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            required
           />
-          <div v-if="errors.code" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code }}</div>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Non-EUDR</label>
-          <input id="mat-code-noneudr" v-model="form.code_noneudr" type="text" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500" placeholder="Opsional" />
-        </div>
-      </div>
+        </VCol>
+        <VCol cols="12" sm="6">
+          <VTextField
+            id="mat-code-noneudr"
+            v-model="form.code_noneudr"
+            label="Non-EUDR Code"
+            placeholder="Optional"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+          />
+        </VCol>
+      </VRow>
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Deskripsi <span class="text-red-500">*</span></label>
-        <input
-          id="mat-description"
-          v-model="form.description"
-          type="text"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
-          placeholder="Nama material"
-        />
-        <div v-if="errors.description" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.description }}</div>
-      </div>
+      <VTextField
+        id="mat-description"
+        v-model="form.description"
+        label="Description"
+        placeholder="Material Name"
+        :error-messages="errors.description"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+        required
+      />
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Tipe <span class="text-red-500">*</span></label>
-          <select
+      <VRow dense>
+        <VCol cols="12" sm="6">
+          <VSelect
             id="mat-type"
             v-model="form.type"
-            class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-            :class="errors.type ? 'border-red-300 bg-red-50' : 'border-gray-300'"
-          >
-            <option value="">-- Pilih --</option>
-            <option value="WIP">WIP</option>
-            <option value="RM">Raw Material</option>
-            <option value="FG">Finished Good</option>
-          </select>
-          <div v-if="errors.type" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.type }}</div>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Yield (%)</label>
-          <input id="mat-yield" v-model="form.yield" type="number" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500" min="0" max="100" step="0.1" />
-        </div>
-      </div>
+            :items="typeOptions"
+            label="Type"
+            placeholder="Select Type"
+            :error-messages="errors.type"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            required
+          />
+        </VCol>
+        <VCol cols="12" sm="6">
+          <VTextField
+            id="mat-yield"
+            v-model="form.yield"
+            type="number"
+            label="Yield (%)"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+            min="0"
+            max="100"
+            step="0.1"
+          />
+        </VCol>
+      </VRow>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">QTF Feed</label>
-          <input id="mat-qtf-feed" v-model="form.qtf_feed" type="text" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500" />
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">QTF Rundown</label>
-          <input id="mat-qtf-rundown" v-model="form.qtf_rundown" type="text" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500" />
-        </div>
-      </div>
+      <VRow dense>
+        <VCol cols="12" sm="6">
+          <VTextField
+            id="mat-qtf-feed"
+            v-model="form.qtf_feed"
+            label="QTF Feed"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+          />
+        </VCol>
+        <VCol cols="12" sm="6">
+          <VTextField
+            id="mat-qtf-rundown"
+            v-model="form.qtf_rundown"
+            label="QTF Rundown"
+            density="compact"
+            variant="outlined"
+            hide-details="auto"
+          />
+        </VCol>
+      </VRow>
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode Supplier Material</label>
-        <input id="mat-code-supplier" v-model="form.code_matl_supplier" type="text" class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500" />
-      </div>
+      <VTextField
+        id="mat-code-supplier"
+        v-model="form.code_matl_supplier"
+        label="Supplier Material Code"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+      />
 
-      <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
-        <input id="mat-status-packaging" v-model="form.status_packaging" type="checkbox" true-value="1" false-value="0" class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500" />
-        <label for="mat-status-packaging" class="text-sm font-bold text-slate-700 cursor-pointer">Aktif untuk Packaging</label>
-      </div>
+      <VCheckbox
+        id="mat-status-packaging"
+        v-model="form.status_packaging"
+        true-value="1"
+        false-value="0"
+        label="Active for Packaging"
+        density="comfortable"
+        color="primary"
+        hide-details
+      />
     </div>
   </BaseModal>
 </template>
@@ -97,6 +135,12 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'submit'])
 
 const isEdit = computed(() => !!props.editData)
+
+const typeOptions = [
+  { value: 'WIP', title: 'WIP' },
+  { value: 'RM', title: 'Raw Material' },
+  { value: 'FG', title: 'Finished Good' }
+]
 
 const form = reactive({
   code: '', code_noneudr: '', description: '', type: '',
@@ -125,9 +169,9 @@ watch(() => props.editData, (val) => {
 function validate() {
   errors.code = errors.description = errors.type = ''
   let ok = true
-  if (!form.code)        { errors.code = 'Kode wajib diisi'; ok = false }
-  if (!form.description) { errors.description = 'Deskripsi wajib diisi'; ok = false }
-  if (!form.type)        { errors.type = 'Tipe wajib dipilih'; ok = false }
+  if (!form.code)        { errors.code = 'Code is required'; ok = false }
+  if (!form.description) { errors.description = 'Description is required'; ok = false }
+  if (!form.type)        { errors.type = 'Type must be selected'; ok = false }
   return ok
 }
 

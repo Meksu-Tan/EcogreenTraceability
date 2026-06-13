@@ -1,56 +1,52 @@
 <template>
   <BaseModal
     :model-value="modelValue"
-    :title="isEdit ? 'Edit Supplier' : 'Tambah Supplier'"
+    :title="isEdit ? 'Edit Supplier' : 'Add Supplier'"
     :loading="loading"
     @update:modelValue="$emit('update:modelValue', $event)"
     @submit="handleSubmit"
   >
-    <div class="space-y-4">
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Kode <span class="text-red-500">*</span></label>
-        <input
-          id="sup-code"
-          v-model="form.code"
-          type="text"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.code ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
-        />
-        <div v-if="errors.code" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.code }}</div>
-      </div>
+    <div class="d-flex flex-column gap-4 py-2">
+      <VTextField
+        id="sup-code"
+        v-model="form.code"
+        label="Code"
+        :error-messages="errors.code"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+        required
+      />
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Deskripsi <span class="text-red-500">*</span></label>
-        <input
-          id="sup-description"
-          v-model="form.description"
-          type="text"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          :class="errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300 bg-white'"
-        />
-        <div v-if="errors.description" class="text-[10px] font-bold text-red-500 mt-1 uppercase">{{ errors.description }}</div>
-      </div>
+      <VTextField
+        id="sup-description"
+        v-model="form.description"
+        label="Description"
+        :error-messages="errors.description"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+        required
+      />
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Tipe (ID Tank/Sloc)</label>
-        <input
-          id="sup-type"
-          v-model="form.type"
-          type="text"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-          placeholder="ID Tank atau kosongkan"
-        />
-      </div>
+      <VTextField
+        id="sup-type"
+        v-model="form.type"
+        label="Type (Tank ID/Sloc)"
+        placeholder="Tank ID or leave empty"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+      />
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide">Batch Code</label>
-        <input
-          id="sup-batch-code"
-          v-model="form.batch_code"
-          type="text"
-          class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm shadow-sm focus:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/25 disabled:bg-slate-100 disabled:text-slate-500"
-        />
-      </div>
+      <VTextField
+        id="sup-batch-code"
+        v-model="form.batch_code"
+        label="Batch Code"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+      />
     </div>
   </BaseModal>
 </template>
@@ -73,8 +69,8 @@ watch(() => props.editData, (val) => {
 function validate() {
   errors.code = errors.description = ''
   let ok = true
-  if (!form.code)        { errors.code = 'Kode wajib diisi'; ok = false }
-  if (!form.description) { errors.description = 'Deskripsi wajib diisi'; ok = false }
+  if (!form.code)        { errors.code = 'Code is required'; ok = false }
+  if (!form.description) { errors.description = 'Description is required'; ok = false }
   return ok
 }
 

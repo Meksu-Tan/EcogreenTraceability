@@ -9,7 +9,6 @@ use Modules\TsWip\Http\Requests\StoreWipEntryRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class WipEntryController extends Controller
 {
@@ -32,10 +31,7 @@ class WipEntryController extends Controller
 
             return ApiResponse::success($data, 'OK', 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -46,6 +42,10 @@ class WipEntryController extends Controller
     public function store(StoreWipEntryRequest $request): JsonResponse
     {
         try {
+            /**
+             * @todo Move this inline permission check to a middleware
+             * (e.g. middleware('can:task-update') in routes)
+             */
             if (!Auth::user()?->can('task-update')) {
                 return ApiResponse::error('Forbidden', 403);
             }
@@ -61,13 +61,10 @@ class WipEntryController extends Controller
                 'post_cancelRundown' => $this->handleCancelRundown($request, $user),
                 'post_materialRundown' => $this->handleMaterialRundown($request, $user, $plantId),
                 'post_updateEntrySubTank' => $this->handleUpdateSubTank($request, $user),
-                default => response()->json(['status' => 0, 'message' => 'Unknown flag'], 400),
+                default => ApiResponse::error('Unknown flag', 400),
             };
         } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -101,13 +98,10 @@ class WipEntryController extends Controller
                 'get_wipTree'          => $this->handleWipTree($request),
                 'get_newFeedNumber'    => $this->handleFeedNewNumber($request, $plantId),
                 'get_newRundownNumber' => $this->handleRundownNewNumber($request, $plantId),
-                default => response()->json(['status' => 0, 'message' => 'Unknown flag'], 400),
+                default => ApiResponse::error('Unknown flag', 400),
             };
         } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -123,7 +117,7 @@ class WipEntryController extends Controller
             $request->input('number'),
             $user
         );
-        return response()->json($result);
+        return ApiResponse::success($result, 'OK', 200);
     }
 
     protected function handleMaterialFeed(Request $request, string $user, $plantId): JsonResponse
@@ -131,50 +125,20 @@ class WipEntryController extends Controller
         $data = $request->all();
         $data['id_plant'] = $plantId;
 
-        DB::beginTransaction();
-        try {
-            $result = $this->wipEntryService->postMaterialFeed($data, $user);
-            DB::commit();
-            return response()->json($result);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        $result = $this->wipEntryService->postMaterialFeed($data, $user);
+        return ApiResponse::success($result, 'OK', 200);
     }
 
     protected function handleCancelFeed(Request $request, string $user): JsonResponse
     {
-        DB::beginTransaction();
-        try {
-            $result = $this->wipEntryService->cancelFeed($request->input('traceNo'), $user);
-            DB::commit();
-            return response()->json($result);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        $result = $this->wipEntryService->cancelFeed($request->input('traceNo'), $user);
+        return ApiResponse::success($result, 'OK', 200);
     }
 
     protected function handleCancelRundown(Request $request, string $user): JsonResponse
     {
-        DB::beginTransaction();
-        try {
-            $result = $this->wipEntryService->cancelRundown($request->input('traceNo'), $user);
-            DB::commit();
-            return response()->json($result);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        $result = $this->wipEntryService->cancelRundown($request->input('traceNo'), $user);
+        return ApiResponse::success($result, 'OK', 200);
     }
 
     protected function handleMaterialRundown(Request $request, string $user, $plantId): JsonResponse
@@ -182,18 +146,8 @@ class WipEntryController extends Controller
         $data = $request->all();
         $data['id_plant'] = $plantId;
 
-        DB::beginTransaction();
-        try {
-            $result = $this->wipEntryService->postMaterialRundown($data, $user);
-            DB::commit();
-            return response()->json($result);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        $result = $this->wipEntryService->postMaterialRundown($data, $user);
+        return ApiResponse::success($result, 'OK', 200);
     }
 
     protected function handleUpdateSubTank(Request $request, string $user): JsonResponse
@@ -203,37 +157,67 @@ class WipEntryController extends Controller
             $request->input('idTankTail', []),
             $user
         );
-        return response()->json($result);
+        return ApiResponse::success($result, 'OK', 200);
     }
 
     protected function handleBalance(Request $request, $plantId): JsonResponse
     {
-        $data = $this->wipEntryService->getBalance(
+        $page    = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, (int) $request->input('per_page', 5));
+
+        $result = $this->wipEntryService->getBalance(
             (string) $request->input('rundownId'),
             $plantId,
-            $request->input('subgroup')
+            $request->input('subgroup'),
+            $page,
+            $perPage
         );
-        return ApiResponse::success($data, 'OK', 200);
+
+        return ApiResponse::paginated($result['data'], $result['total'], $result['page'], $result['per_page']);
     }
 
     protected function handleFeedData(Request $request, $plantId): JsonResponse
     {
-        $data = $this->wipEntryService->getFeed(
+        $mode    = $request->input('mode', 'LATEST');
+        $page    = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, (int) $request->input('per_page', 5));
+
+        $result = $this->wipEntryService->getFeed(
             $request->input('feedId'),
-            $request->input('mode', 'LATEST'),
-            $plantId
+            $mode,
+            $plantId,
+            $page,
+            $perPage
         );
-        return ApiResponse::success($data, 'OK', 200);
+
+        // LATEST mode: return simple array for backward-compat
+        if ($mode !== 'LOG') {
+            return ApiResponse::success($result['data'] ?? $result, 'OK', 200);
+        }
+
+        return ApiResponse::paginated($result['data'], $result['total'], $result['page'], $result['per_page']);
     }
 
     protected function handleRundownData(Request $request, $plantId): JsonResponse
     {
-        $data = $this->wipEntryService->getRundown(
+        $mode    = $request->input('mode', 'LATEST');
+        $page    = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, (int) $request->input('per_page', 5));
+
+        $result = $this->wipEntryService->getRundown(
             $request->input('rundownId'),
-            $request->input('mode', 'LATEST'),
-            $plantId
+            $mode,
+            $plantId,
+            $page,
+            $perPage
         );
-        return ApiResponse::success($data, 'OK', 200);
+
+        // LATEST mode: return simple array for backward-compat
+        if ($mode !== 'LOG') {
+            return ApiResponse::success($result['data'] ?? $result, 'OK', 200);
+        }
+
+        return ApiResponse::paginated($result['data'], $result['total'], $result['page'], $result['per_page']);
     }
 
     protected function handleFeedNewBatch(Request $request, $plantId): JsonResponse
@@ -339,38 +323,20 @@ class WipEntryController extends Controller
     public function destroy(Request $request, $id): JsonResponse
     {
         try {
+            /**
+             * @todo Move this inline permission check to a middleware
+             * (e.g. middleware('can:task-update') in routes)
+             */
             if (!Auth::user()?->can('task-update')) {
                 return ApiResponse::error('Forbidden', 403);
             }
 
             $user = Auth::user()->name ?? 'System';
 
-            // Determine type based on trace_no prefix
-            $traceHead = DB::connection('eudr_ts')->selectOne(
-                'SELECT to_trace_no FROM t_trace_header WHERE id_trace_head = ? AND status = 1',
-                [$id]
-            );
-
-            if (!$traceHead) {
-                return ApiResponse::error('Record not found', 404);
-            }
-
-            $traceNo = $traceHead->to_trace_no;
-            $prefix = substr($traceNo, 0, 1);
-
-            // Cancel based on trace type (3 = feed, 2 = rundown)
-            $result = match ($prefix) {
-                '3' => $this->wipEntryService->cancelFeed($traceNo, $user),
-                '2' => $this->wipEntryService->cancelRundown($traceNo, $user),
-                default => ['status' => 0, 'message' => 'Unknown trace type'],
-            };
-
-            return response()->json($result);
+            $result = $this->wipEntryService->cancelById((int) $id, $user);
+            return ApiResponse::success($result, 'OK', 200);
         } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 0,
-                'message' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 }

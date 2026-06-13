@@ -5,7 +5,7 @@ namespace Modules\Adjustment\Services\Contracts;
 interface AdjustmentServiceInterface extends AdjustmentPeriodServiceInterface
 {
     // ——— List & detail ———
-    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip'): array;
+    public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array;
     public function getAdjustmentDetail(int $headerId): ?array;
 
     // ——— Lookups ———

@@ -11,9 +11,9 @@ class TraceBackwardService implements TraceBackwardServiceInterface
         protected TraceBackwardRepositoryInterface $traceBackwardRepository
     ) {}
 
-    public function backwardTrace(string $traceNo, ?int $idMaterial = null, ?int $plantId = null, ?int $userId = null): array
+    public function backwardTrace(string $traceNo, ?int $idMaterial = null): array
     {
-        return $this->traceBackwardRepository->backwardTrace($traceNo, $idMaterial, $plantId, $userId);
+        return $this->traceBackwardRepository->backwardTrace($traceNo, $idMaterial);
     }
 
     public function getBackwardList(array $filters = []): array

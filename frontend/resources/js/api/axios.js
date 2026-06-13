@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-const apiBaseURL = import.meta.env.VITE_API_BASE_URL
+const apiBaseURL = import.meta.env.VITE_API_URL
+
+if (!apiBaseURL) {
+  throw new Error('VITE_API_URL environment variable is not set')
+}
 
 const api = axios.create({
   baseURL: apiBaseURL,
@@ -30,9 +34,8 @@ api.interceptors.response.use(
       const message = error.code === 'ECONNABORTED'
         ? 'Request timeout. Please check your connection.'
         : 'Network error. Please check your connection and try again.'
-      console.error('Network Error:', message)
       // Reject with structured error for callers to handle
-      return Promise.reject(new Error(message))
+      return Promise.reject({ message, networkError: true })
     }
 
     if (error.response?.status === 401 && window.location.pathname !== '/login') {

@@ -1,87 +1,77 @@
 <template>
   <div>
     <div class="mb-6">
-      <h4 class="text-xl font-bold text-slate-800">Welcome Back</h4>
-      <p class="text-gray-500 text-sm mt-1">Please enter your details to sign in.</p>
+      <h2 class="text-h6 font-weight-bold">Welcome Back</h2>
+      <p class="text-body-2 text-medium-emphasis mt-1">Please enter your details to sign in.</p>
     </div>
 
-    <form @submit.prevent="handleLogin" class="space-y-5">
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide" for="email">Email Address</label>
-        <div class="relative">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Icon icon="ri:mail-line" class="text-gray-400 text-sm" />
-          </div>
-          <input
-            id="email"
-            v-model="form.email"
-            type="email"
-            class="block w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm transition-all focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
-            :class="errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'"
-            placeholder="name@company.com"
-            autocomplete="email"
-            autofocus
-          />
-        </div>
-        <span v-if="errors.email" class="text-[10px] font-bold text-red-500 uppercase tracking-tight mt-1">{{ errors.email }}</span>
-      </div>
+    <VForm @submit.prevent="handleLogin">
+      <VTextField
+        v-model="form.email"
+        label="Email Address"
+        type="email"
+        prepend-inner-icon="ri-mail-line"
+        autocomplete="email"
+        autofocus
+        :error-messages="errors.email"
+        class="mb-4"
+      />
 
-      <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-bold text-slate-700 uppercase tracking-wide" for="password">Password</label>
-        <div class="relative">
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Icon icon="ri:lock-line" class="text-gray-400 text-sm" />
-          </div>
-          <input
-            id="password"
-            v-model="form.password"
-            type="password"
-            class="block w-full pl-10 pr-3 py-2.5 border rounded-lg text-sm transition-all focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none"
-            :class="errors.password ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'"
-            placeholder="********"
-            autocomplete="current-password"
-          />
-        </div>
-        <span v-if="errors.password" class="text-[10px] font-bold text-red-500 uppercase tracking-tight mt-1">{{ errors.password }}</span>
-      </div>
+      <VTextField
+        v-model="form.password"
+        label="Password"
+        :type="showPassword ? 'text' : 'password'"
+        prepend-inner-icon="ri-lock-line"
+        :append-inner-icon="showPassword ? 'ri-eye-off-line' : 'ri-eye-line'"
+        autocomplete="current-password"
+        :error-messages="errors.password"
+        class="mb-4"
+        @click:append-inner="showPassword = !showPassword"
+      />
 
-      <!-- Error alert -->
-      <div v-if="loginError" class="bg-red-50 border border-red-100 rounded-lg p-3 flex items-center gap-3 text-red-600 text-xs font-medium">
-        <Icon icon="ri:error-warning-line" class="text-sm" />
-        <span>{{ loginError }}</span>
-      </div>
+      <VAlert
+        v-if="loginError"
+        type="error"
+        variant="tonal"
+        density="compact"
+        :prepend-icon="'ri-error-warning-line'"
+        class="mb-4"
+      >
+        {{ loginError }}
+      </VAlert>
 
-      <button
+      <VBtn
         id="btn-login"
         type="submit"
-        class="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold text-sm shadow-lg shadow-green-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="authStore.loading"
+        color="primary"
+        block
+        size="large"
+        :loading="authStore.loading"
+        :prepend-icon="'ri-login-box-line'"
       >
-        <Icon v-if="authStore.loading" icon="ri:loader-4-line" class="animate-spin" />
-        <Icon v-else icon="ri:login-box-line" />
-        <span>{{ authStore.loading ? 'Authenticating...' : 'Sign In' }}</span>
-      </button>
-    </form>
+        Sign In
+      </VBtn>
+    </VForm>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 
-const authStore  = useAuthStore()
-const router     = useRouter()
-const loginError = ref('')
-const form       = reactive({ email: '', password: '' })
-const errors     = reactive({ email: '', password: '' })
+const authStore    = useAuthStore()
+const router       = useRouter()
+const loginError   = ref('')
+const showPassword = ref(false)
+const form         = reactive({ email: '', password: '' })
+const errors       = reactive({ email: '', password: '' })
 
 function validate() {
   errors.email = errors.password = ''
   let ok = true
-  if (!form.email)    { errors.email    = 'Email wajib diisi.'; ok = false }
-  if (!form.password) { errors.password = 'Password wajib diisi.'; ok = false }
+  if (!form.email)    { errors.email    = 'Email is required.'; ok = false }
+  if (!form.password) { errors.password = 'Password is required.'; ok = false }
   return ok
 }
 

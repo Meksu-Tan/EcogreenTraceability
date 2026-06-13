@@ -35,10 +35,8 @@ class TraceBackwardController extends Controller
     {
         try {
             $data = $request->validated();
-            $userId = $request->user()?->id;
-            $plantId = $data['id_plant'] ?? null;
             $idMaterial = isset($data['id_material']) ? (int) $data['id_material'] : null;
-            $result = $this->traceBackwardService->backwardTrace($traceNo, $idMaterial, $plantId, $userId);
+            $result = $this->traceBackwardService->backwardTrace($traceNo, $idMaterial);
             return ApiResponse::success($result, 'Backward trace retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceBackward backward failed', ['trace_no' => $traceNo, 'exception' => $e]);
@@ -50,11 +48,9 @@ class TraceBackwardController extends Controller
     {
         try {
             $data = $request->validated();
-            $userId = $request->user()?->id;
-            $plantId = $data['id_plant'] ?? null;
             $materialId = (int) $data['id_material'];
             $batchNo = $data['batch_no'] ?? null;
-            $result = $this->traceBackwardService->searchTraces($materialId, $batchNo, $plantId, $userId);
+            $result = $this->traceBackwardService->searchTraces($materialId, $batchNo);
             return ApiResponse::success($result, 'Backward search results retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceBackward search failed', ['exception' => $e]);

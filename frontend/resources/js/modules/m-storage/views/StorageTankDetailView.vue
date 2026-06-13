@@ -1,57 +1,49 @@
 <template>
-  <div class="space-y-6">
-    <!-- Section header -->
-    <div class="flex items-center justify-between">
+  <div>
+    <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Setup Storage - Detail</h1>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="text-sm text-gray-500">TS Setup</span>
-          <span class="text-gray-300">/</span>
-          <router-link :to="{ name: 'setup.storage' }" class="text-sm text-gray-500 hover:text-green-600 transition-colors">Storage</router-link>
-          <span class="text-gray-300">/</span>
-          <span class="text-sm font-semibold text-green-500">Detail</span>
+        <h1 class="text-h5 font-weight-bold">Setup Storage - Detail</h1>
+        <div class="d-flex align-center gap-1 mt-1">
+          <span class="text-caption text-medium-emphasis">TS Setup</span>
+          <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
+          <RouterLink :to="{ name: 'setup.storage' }" class="text-caption text-medium-emphasis text-decoration-none">Storage</RouterLink>
+          <VIcon icon="ri-arrow-right-s-line" size="14" class="text-medium-emphasis" />
+          <span class="text-caption font-weight-semibold text-primary">Detail</span>
         </div>
       </div>
-      <button
-        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95"
-        @click="$router.push({ name: 'setup.storage' })"
-      >
-        <Icon icon="ri:eye-line" class="w-4 h-4" /> Back to Storage
-      </button>
+      <VBtn variant="outlined" color="medium-emphasis" prepend-icon="ri-arrow-left-line" @click="$router.push({ name: 'setup.storage' })">
+        Back to Storage
+      </VBtn>
     </div>
 
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
-          <Icon icon="ri:database-2-line" class="text-green-500 w-4 h-4" />
-          Detail Tank: {{ selectedTank?.description || 'Loading...' }}
-        </h4>
-        <button
-          id="storageDetail-add"
-          class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md font-bold text-sm transition-all flex items-center gap-2 shadow-sm active:scale-95"
-          @click="openDetailModal"
-        >
-          <Icon icon="ri:add-line" class="w-4 h-4" /> New Tank
-        </button>
+    <VCard rounded="lg" elevation="1">
+      <div class="d-flex align-center justify-space-between pa-5 pb-3">
+        <div class="d-flex align-center gap-2">
+          <VIcon icon="ri-database-2-line" color="primary" size="20" />
+          <span class="text-body-1 font-weight-bold">Detail Tank: {{ selectedTank?.description || 'Loading...' }}</span>
+        </div>
+        <VBtn id="storageDetail-add" color="primary" prepend-icon="ri-add-line" @click="openDetailModal">New Tank</VBtn>
       </div>
-      <div class="p-6">
+      <VDivider />
+      <VCardText class="pa-0">
         <DataTable
           :columns="detailColumns"
           :data="store.details"
           :loading="store.loading"
           row-key="id_tank_tail"
+          :show-top-info="false"
           @edit="onEditDetail"
           @toggle-status="onToggleDetail"
         >
           <template #cell-id_plant>
-            <span class="text-sm text-slate-600">{{ selectedTank?.id_plant }}</span>
+            <span class="text-body-2">{{ selectedTank?.id_plant }}</span>
           </template>
           <template #cell-storage>
-            <span class="text-sm font-bold text-slate-700">{{ selectedTank?.code }}</span>
+            <span class="text-body-2 font-weight-bold">{{ selectedTank?.code }}</span>
           </template>
         </DataTable>
-      </div>
-    </div>
+      </VCardText>
+    </VCard>
 
     <!-- Modal -->
     <StorageDetailModal
@@ -66,11 +58,11 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { Icon } from '@iconify/vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import StorageDetailModal from './StorageDetailModal.vue'
 import { useSetupStorageStore } from '@/modules/m-storage/stores'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
 
 const props = defineProps({
   id: { type: String, required: true }
@@ -78,6 +70,7 @@ const props = defineProps({
 
 const store           = useSetupStorageStore()
 const toast           = useToastStore()
+const confirmStore    = useConfirmStore()
 const showDetailModal = ref(false)
 const editDetail      = ref(null)
 const submitting      = ref(false)
@@ -117,7 +110,10 @@ function onEditDetail(row) {
 }
 
 async function onToggleDetail(row) {
-  if (!confirm(`${row.status==1?'Deactivate':'Activate'} detail "${row.tf_number}"?`)) return
+  const isConfirmed = await confirmStore.show({
+    message: `${row.status==1?'Deactivate':'Activate'} detail "${row.tf_number}"?`
+  })
+  if (!isConfirmed) return
   const r = await store.toggleDetail(row.id_tank_tail, row.status, props.id)
   r.status===1 ? toast.success(r.message) : toast.error(r.message)
 }

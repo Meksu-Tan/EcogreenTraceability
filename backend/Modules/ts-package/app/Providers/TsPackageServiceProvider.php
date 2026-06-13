@@ -7,7 +7,14 @@ class TsPackageServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // No repository bindings needed for placeholder
+        $this->app->bind(
+            \Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface::class,
+            \Modules\TsPackage\Repositories\EloquentPackageRepository::class
+        );
+        $this->app->bind(
+            \Modules\TsPackage\Services\Contracts\PackageServiceInterface::class,
+            \Modules\TsPackage\Services\PackageService::class
+        );
     }
 
     public function boot(): void

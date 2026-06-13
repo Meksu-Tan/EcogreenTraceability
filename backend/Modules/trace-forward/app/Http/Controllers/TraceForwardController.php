@@ -35,10 +35,8 @@ class TraceForwardController extends Controller
     {
         try {
             $data = $request->validated();
-            $userId = $request->user()?->id;
-            $plantId = $data['id_plant'] ?? null;
             $idMaterial = isset($data['id_material']) ? (int) $data['id_material'] : null;
-            $result = $this->traceForwardService->forwardTrace($traceNo, $idMaterial, $plantId, $userId);
+            $result = $this->traceForwardService->forwardTrace($traceNo, $idMaterial);
             return ApiResponse::success($result, 'Forward trace retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceForward forward failed', ['trace_no' => $traceNo, 'exception' => $e]);
@@ -50,11 +48,9 @@ class TraceForwardController extends Controller
     {
         try {
             $data = $request->validated();
-            $userId = $request->user()?->id;
-            $plantId = $data['id_plant'] ?? null;
             $materialId = (int) $data['id_material'];
             $batchNo = $data['batch_no'] ?? null;
-            $result = $this->traceForwardService->searchTraces($materialId, $batchNo, $plantId, $userId);
+            $result = $this->traceForwardService->searchTraces($materialId, $batchNo);
             return ApiResponse::success($result, 'Trace search results retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceForward search failed', ['exception' => $e]);

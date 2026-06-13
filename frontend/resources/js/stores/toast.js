@@ -5,7 +5,7 @@ export const useToastStore = defineStore('toast', () => {
   const toasts = ref([])
   let counter  = 0
 
-  function show(message, type = 'success', duration = 3000) {
+  function show(message, type = 'success', duration = 5000) {
     const id = ++counter
     toasts.value.push({ id, message, type })
     setTimeout(() => {
@@ -13,9 +13,9 @@ export const useToastStore = defineStore('toast', () => {
     }, duration)
   }
 
-  const success = (msg) => show(msg, 'success')
-  const error   = (msg) => show(msg, 'error')
-  const info    = (msg) => show(msg, 'info')
+  const success = (msg, duration = 5000) => show(msg, 'success', duration)
+  const error   = (msg, duration = 5000) => show(msg, 'error', duration)
+  const info    = (msg, duration = 5000) => show(msg, 'info', duration)
 
   return { toasts, success, error, info }
 })

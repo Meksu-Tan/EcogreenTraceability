@@ -29,14 +29,22 @@ class SupplierController extends Controller
     {
         $data   = array_merge($request->validated(), ['created_by' => $request->user()->name]);
         $result = $this->supplierService->storeSupplier($data);
-        return response()->json($result, $result['status'] === 1 ? 201 : 422);
+
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, 'Supplier created', 201);
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to create supplier', 422);
     }
 
     public function update(UpdateSupplierRequest $request, int $id): JsonResponse
     {
         $data   = array_merge($request->validated(), ['updated_by' => $request->user()->name]);
         $result = $this->supplierService->updateSupplier($id, $data);
-        return response()->json($result);
+
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, 'Supplier updated');
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to update supplier', 422);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
@@ -46,6 +54,10 @@ class SupplierController extends Controller
         $result = $action === 'activate'
             ? $this->supplierService->activateSupplier($id, $user)
             : $this->supplierService->deactivateSupplier($id, $user);
-        return response()->json($result);
+
+        if ($result['status'] === 1) {
+            return ApiResponse::success($result, $action === 'activate' ? 'Supplier activated' : 'Supplier deactivated');
+        }
+        return ApiResponse::error($result['message'] ?? 'Failed to process supplier', 422);
     }
 }

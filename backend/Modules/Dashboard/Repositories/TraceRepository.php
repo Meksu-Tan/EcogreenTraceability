@@ -18,10 +18,6 @@ class TraceRepository
      */
     public function forwardTrace(string $traceNo, mixed $plantId = null, ?int $userId = null): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
         $sql = "
@@ -35,8 +31,8 @@ class TraceRepository
               FROM t_trace_header th
               LEFT JOIN m_material m ON th.id_material = m.id_material
               LEFT JOIN m_sloc sl ON th.id_sloc = sl.id_sloc
-              LEFT JOIN m_tank t ON th.id_tank = t.id_tank
-              LEFT JOIN m_sloc sl2 ON t.id_sloc = sl2.id_sloc
+              LEFT JOIN m_sloc t ON th.id_sloc = t.id_sloc
+              LEFT JOIN m_sloc sl2 ON th.id_sloc = sl2.id_sloc
               LEFT JOIN t_material_document md ON th.id_trace_head = md.id_trace_head AND md.status = 1
               LEFT JOIN t_trace_detail td ON th.id_trace_head = td.id_trace_head AND td.status = 1
               LEFT JOIN m_supplier s ON td.id_supplier = s.id_supplier
@@ -56,10 +52,6 @@ class TraceRepository
      */
     public function backwardTrace(string $traceNo, mixed $plantId = null, ?int $userId = null): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
         $sql = "
@@ -75,8 +67,8 @@ class TraceRepository
               LEFT JOIN t_trace_header parent ON th.from_trace_no = parent.to_trace_no AND parent.status = 1
               LEFT JOIN t_balance_header bh ON th.id_balance_head = bh.id_balance_head
               LEFT JOIN m_sloc sl ON th.id_sloc = sl.id_sloc
-              LEFT JOIN m_tank t ON th.id_tank = t.id_tank
-              LEFT JOIN m_sloc sl2 ON t.id_sloc = sl2.id_sloc
+              LEFT JOIN m_sloc t ON th.id_sloc = t.id_sloc
+              LEFT JOIN m_sloc sl2 ON th.id_sloc = sl2.id_sloc
               LEFT JOIN t_balance_detail bd ON bh.id_balance_head = bd.id_balance_head AND bd.status = 1
               LEFT JOIN m_supplier s ON bd.id_supplier = s.id_supplier
              WHERE th.to_trace_no = ?
@@ -94,10 +86,6 @@ class TraceRepository
      */
     public function getTraceHeader(string $traceNo, mixed $plantId = null, ?int $userId = null): ?object
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
         $sql = "
@@ -109,8 +97,8 @@ class TraceRepository
               LEFT JOIN m_material m ON th.id_material = m.id_material
               LEFT JOIN m_plant p ON th.id_plant = p.code_3
               LEFT JOIN t_material_document md ON th.id_trace_head = md.id_trace_head AND md.status = 1
-              LEFT JOIN m_tank t ON th.id_tank = t.id_tank
-              LEFT JOIN m_sloc sl ON t.id_sloc = sl.id_sloc
+              LEFT JOIN m_sloc t ON th.id_sloc = t.id_sloc
+              LEFT JOIN m_sloc sl ON th.id_sloc = sl.id_sloc
              WHERE th.to_trace_no = ?
                AND th.status = 1
                AND (" . $plantFilter['sql'] . ")
@@ -127,10 +115,6 @@ class TraceRepository
      */
     public function getForwardChain(string $traceNo, mixed $plantId = null, ?int $userId = null): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
         $sql = "
@@ -154,10 +138,6 @@ class TraceRepository
      */
     public function getBackwardChain(string $traceNo, mixed $plantId = null, ?int $userId = null): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
         $sql = "
@@ -183,10 +163,6 @@ class TraceRepository
      */
     public function searchTraces(mixed $materialId, ?string $batchNo = null, mixed $plantId = null, ?int $userId = null): array
     {
-        DB::connection($this->connection)->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
         $bindings = array_merge([$materialId], $plantFilter['bindings']);

@@ -9,52 +9,68 @@ class AdminRepository implements AdminRepositoryInterface
 {
     public function getAllUsers(): array
     {
-        return User::with('roles')->get()->toArray();
+        return User::with(['roles', 'plants'])->get()->toArray();
     }
 
     public function findUserById(int $id): ?object
     {
-        return User::with('roles')->find($id);
+        return User::with(['roles', 'plants'])->find($id);
     }
 
     public function createUser(array $data): object
     {
-        $user = User::create([
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'password' => bcrypt($data['password']),
-            'id_plant' => $data['id_plant'] ?? null,
-        ]);
+        return \DB::transaction(function () use ($data) {
+            $user = User::create([
+                'name'     => $data['name'],
+                'email'    => $data['email'],
+                'password' => $data['password'],
+                'id_plant' => $data['plants'][0] ?? null,
+            ]);
 
-        if (!empty($data['role'])) {
-            $user->assignRole($data['role']);
-        }
+            if (!empty($data['role'])) {
+                $user->assignRole($data['role']);
+            }
 
-        return $user;
+            if (!empty($data['plants'])) {
+                $user->plants()->sync($data['plants']);
+            }
+
+            return $user;
+        });
     }
 
     public function updateUser(int $id, array $data): bool
     {
-        $user = User::find($id);
-        if (!$user) return false;
+        return \DB::transaction(function () use ($id, $data) {
+            $user = User::find($id);
+            if (!$user) return false;
 
-        $updateData = [
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'id_plant' => $data['id_plant'] ?? $user->id_plant,
-        ];
+            $updateData = [
+                'name'     => $data['name'],
+                'email'    => $data['email'],
+            ];
 
-        if (!empty($data['password'])) {
-            $updateData['password'] = bcrypt($data['password']);
-        }
+            if (!empty($data['password'])) {
+                $updateData['password'] = $data['password'];
+            }
 
-        $user->update($updateData);
+            $user->update($updateData);
 
-        if (!empty($data['role'])) {
-            $user->syncRoles([$data['role']]);
-        }
+            if (!empty($data['role'])) {
+                $user->syncRoles([$data['role']]);
+            }
 
-        return true;
+            if (isset($data['plants'])) {
+                $user->plants()->sync($data['plants']);
+                if (!empty($data['plants'])) {
+                    $user->update(['id_plant' => $data['plants'][0]]);
+                } else {
+                    $user->update(['id_plant' => null]);
+                }
+            }
+
+            return true;
+        });
     }
 
     public function deleteUser(int $id): bool

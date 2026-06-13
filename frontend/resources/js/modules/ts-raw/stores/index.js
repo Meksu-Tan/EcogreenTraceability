@@ -1,23 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { RmEntryRepository, TankRepository, MaterialRepository, SupplierRepository } from '@/repositories'
-import transactionRmEntryApi from '../api'
+import { rmEntryRepository, tankRepository, materialRepository, supplierRepository } from '@/repositories'
+import transactionRmEntryApi from '../services'
 import { useToastStore } from '@/stores/toast'
 import { registerCacheResetCallback } from '@/stores/plant'
 
 export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const toastStore = useToastStore()
 
-  // Register cache reset callback for plant change scenarios
-  registerCacheResetCallback(() => {
-    resetCache()
-  })
-
   // Repository instances
-  const rmEntryRepo = RmEntryRepository
-  const tankRepo = TankRepository
-  const materialRepo = MaterialRepository
-  const supplierRepo = SupplierRepository
+  const rmEntryRepo = rmEntryRepository
+  const tankRepo = tankRepository
+  const materialRepo = materialRepository
+  const supplierRepo = supplierRepository
 
   // State
   const entries = ref([])
@@ -28,6 +23,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const materials = ref([])
   const suppliers = ref([])
   const supplierList = ref([])
+  const manufacturers = ref([])
   const currentEntry = ref(null)
   const rmNumber = ref('')
   const trfNumber = ref('')
@@ -37,17 +33,42 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   // Transfer state (moved from ts-transfer)
   const transferList = ref([])
   const destTanks = ref([])
+  const pagination = ref({ currentPage: 1, perPage: 5, total: 0, lastPage: 1 })
+
+  const STALE_TIME = 30 * 1000
+  const _cache = { entries: 0, materials: 0, tanks: 0 }
+  function _isFresh(key) { return Date.now() - (_cache[key] || 0) < STALE_TIME }
+  function _touch(key) { _cache[key] = Date.now() }
+  function resetCache() { 
+    Object.keys(_cache).forEach(k => { _cache[k] = 0 })
+    manufacturers.value = []
+  }
+
+  // Register cache reset for plant change
+  registerCacheResetCallback(resetCache)
 
   // Getters
   const entriesCount = computed(() => entries.value.length)
   const hasEntries = computed(() => entries.value.length > 0)
 
   // Actions
-  async function fetchEntries(params = {}) {
+  async function fetchEntries(params = {}, force = false) {
+    if (!force && _isFresh('entries') && entries.value.length > 0) return
     loading.value = true
     try {
       const response = await rmEntryRepo.getList(params)
-      entries.value = response || []
+      if (response && typeof response === 'object' && response.current_page !== undefined) {
+        entries.value = response.data || []
+        pagination.value = {
+          currentPage: response.current_page || 1,
+          perPage: response.per_page || 5,
+          total: response.total || 0,
+          lastPage: response.last_page || 1
+        }
+      } else {
+        entries.value = Array.isArray(response) ? response : []
+      }
+      _touch('entries')
       return response
     } catch (error) {
       toastStore.error('Failed to fetch RM entries:')
@@ -70,7 +91,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
 
       const response = await rmEntryRepo.save(data)
       toastStore.success('RM Entry created successfully')
-      await fetchEntries()
+      _cache.entries = 0
       return response
     } catch (error) {
       toastStore.error('Failed to create RM entry:')
@@ -98,7 +119,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     try {
       const response = await rmEntryRepo.deactivate(id)
       toastStore.success('RM Entry deactivated successfully')
-      await fetchEntries()
+      _cache.entries = 0
       return response
     } catch (error) {
       toastStore.error('Failed to deactivate RM entry:')
@@ -113,7 +134,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     try {
       const response = await rmEntryRepo.update(id, data)
       toastStore.success('RM Entry updated successfully')
-      await fetchEntries()
+      _cache.entries = 0
       return response
     } catch (error) {
       toastStore.error('Failed to update RM entry:')
@@ -146,10 +167,11 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   }
 
   async function fetchTanks(params = {}, force = false) {
-    if (!force && tanks.value.length > 0) return
+    if (!force && _isFresh('tanks') && tanks.value.length > 0) return
     try {
       const response = await tankRepo.getAvailable(params)
       tanks.value = response || []
+      _touch('tanks')
       return response
     } catch (error) {
       tanks.value = []
@@ -169,15 +191,27 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   }
 
   async function fetchMaterials(force = false) {
-    if (!force && materials.value.length > 0) return
+    if (!force && _isFresh('materials') && materials.value.length > 0) return
     try {
       const response = await transactionRmEntryApi.getMaterials()
-      // endpoint returns { success, data: [{id_material, material}] }
       const list = response?.data ?? response ?? []
       materials.value = Array.isArray(list) ? list : []
+      _touch('materials')
       return materials.value
     } catch (error) {
       materials.value = []
+    }
+  }
+
+  async function fetchManufacturers(force = false) {
+    if (!force && manufacturers.value.length > 0) return
+    try {
+      const response = await transactionRmEntryApi.getActiveManufacturers()
+      const list = response?.data ?? response ?? []
+      manufacturers.value = Array.isArray(list) ? list : []
+      return manufacturers.value
+    } catch (error) {
+      manufacturers.value = []
     }
   }
 
@@ -269,7 +303,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     try {
       const response = await transactionRmEntryApi.transfer(data)
       toastStore.success('RM Transfer processed successfully')
-      await fetchEntries(refreshParams)
+      _cache.entries = 0
       return response
     } catch (error) {
       toastStore.error('Failed to process RM transfer:')
@@ -406,6 +440,19 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     }
   }
 
+  async function deleteFeedLog(id) {
+    loading.value = true
+    try {
+      const response = await transactionRmEntryApi.deactivateFeedLog(id)
+      return response
+    } catch (err) {
+      toastStore.error('Failed to delete feed log entry:')
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // State
     entries,
@@ -416,6 +463,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     materials,
     suppliers,
     supplierList,
+    manufacturers,
     currentEntry,
     rmNumber,
     trfNumber,
@@ -424,6 +472,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     feedLogs,
     transferList,
     destTanks,
+    pagination,
 
     // Getters
     entriesCount,
@@ -440,6 +489,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     fetchTanks,
     fetchTankDetails,
     fetchMaterials,
+    fetchManufacturers,
     searchSuppliers,
     generateBatchCode,
     addSupplier,
@@ -456,7 +506,8 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     fetchTransferList,
     fetchDestTanks,
     performTransfer,
-    deleteTransfer
+    deleteTransfer,
+    deleteFeedLog
   }
 })
 

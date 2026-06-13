@@ -5,6 +5,7 @@
       :data="store.warehouses"
       :loading="store.loading"
       row-key="id_warehouse"
+      :show-top-info="false"
       @edit="onEdit"
       @toggle-status="onToggle"
     />
@@ -18,11 +19,13 @@ import DataTable from '@/modules/shared/components/DataTable.vue'
 import StorageWarehouseModal from './StorageWarehouseModal.vue'
 import { useSetupStorageStore } from '@/modules/m-storage/stores'
 import { useToastStore } from '@/stores/toast'
+import { useConfirmStore } from '@/stores/confirm'
 
 defineExpose({ openModal })
 
 const store      = useSetupStorageStore()
 const toast      = useToastStore()
+const confirmStore = useConfirmStore()
 const showModal  = ref(false)
 const editRow    = ref(null)
 const submitting = ref(false)
@@ -46,7 +49,8 @@ function openModal() { editRow.value = null; showModal.value = true }
 function onEdit(row) { editRow.value = row; showModal.value = true }
 
 async function onToggle(row) {
-  if (!confirm(`${row.status==1?'Deactivate':'Activate'} warehouse "${row.description}"?`)) return
+  const isConfirmed = await confirmStore.show({ message: `${row.status==1?'Deactivate':'Activate'} warehouse "${row.description}"?` })
+  if (!isConfirmed) return
   const r = await store.toggleWarehouse(row.id_warehouse, row.status)
   r.status===1 ? toast.success(r.message) : toast.error(r.message)
 }

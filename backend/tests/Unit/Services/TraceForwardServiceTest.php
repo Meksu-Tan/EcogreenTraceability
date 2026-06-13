@@ -55,11 +55,11 @@ class TraceForwardServiceTest extends TestCase
 
         $repoMock->shouldReceive('forwardTrace')
             ->once()
-            ->with('100001-001', 5, 1002, 1)
+            ->with('100001-001', 5)
             ->andReturn($expected);
 
         $service = new TraceForwardService($repoMock);
-        $result = $service->forwardTrace('100001-001', 5, 1002, 1);
+        $result = $service->forwardTrace('100001-001', 5);
 
         $this->assertEquals($expected, $result);
     }

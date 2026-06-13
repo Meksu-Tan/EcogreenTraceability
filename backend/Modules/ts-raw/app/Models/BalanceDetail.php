@@ -2,6 +2,7 @@
 namespace Modules\TsRaw\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Shared\Helpers\ResponseCode;
 
 class BalanceDetail extends Model
 {
@@ -57,6 +58,6 @@ class BalanceDetail extends Model
 
     public function scopeAvailable($query)
     {
-        return $query->whereRaw('qty > 0.0001');
+        return $query->where('qty', '>', ResponseCode::QUANTITY_PRECISION_THRESHOLD);
     }
 }

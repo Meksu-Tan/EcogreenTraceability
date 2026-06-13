@@ -5,33 +5,33 @@ namespace Modules\Auth\Http\Controllers;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\Auth\Http\Requests\LoginRequest;
+use Modules\Auth\Services\Contracts\AuthServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        protected AuthServiceInterface $authService
+    ) {}
+
     /**
      * POST /api/login
-     * Cookie-based Sanctum SPA auth — no token returned
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        if (!Auth::attempt(['email' => $request->email, 'password' => $request->password, 'isActive' => 1])) {
-            return ApiResponse::error('Email atau password salah, atau akun Anda tidak aktif.', 401);
+        $result = $this->authService->login($request->validated());
+
+        if (!$result['status']) {
+            return ApiResponse::error($result['message'], 401);
         }
 
-        $user = Auth::user();
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return ApiResponse::success([
-            'id'          => $user->id,
-            'name'        => $user->name,
-            'email'       => $user->email,
-            'id_plant'    => $user->id_plant,
-            'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
-            'permissions' => $user->getAllPermissions()->pluck('name'),
-        ], 'Login berhasil.', 200, ['token' => $token]);
+        return ApiResponse::success(
+            $result['data'],
+            'Login successful.',
+            200,
+            ['token' => $result['token']]
+        );
     }
 
     /**
@@ -39,9 +39,9 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $this->authService->logout($request->user());
 
-        return ApiResponse::success(null, 'Logout berhasil.');
+        return ApiResponse::success(null, 'Logout successful.');
     }
 
     /**
@@ -49,15 +49,8 @@ class AuthController extends Controller
      */
     public function user(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $result = $this->authService->getUserData($request->user());
 
-        return ApiResponse::success([
-            'id'          => $user->id,
-            'name'        => $user->name,
-            'email'       => $user->email,
-            'id_plant'    => $user->id_plant,
-            'roles'       => $user->getRoleNames()->push($user->role)->unique()->filter()->values(),
-            'permissions' => $user->getAllPermissions()->pluck('name'),
-        ]);
+        return ApiResponse::success($result['data']);
     }
 }

@@ -38,7 +38,7 @@ class User extends Authenticatable
     {
         return $this->morphToMany(
             config('permission.models.role'),
-            'user',
+            'model',
             config('permission.table_names.model_has_roles'),
             config('permission.column_names.model_morph_key', 'user_id'),
             config('permission.column_names.role_pivot_key', 'role_id')
@@ -49,10 +49,22 @@ class User extends Authenticatable
     {
         return $this->morphToMany(
             config('permission.models.permission'),
-            'user',
+            'model',
             config('permission.table_names.model_has_permissions'),
             config('permission.column_names.model_morph_key', 'user_id'),
             config('permission.column_names.permission_pivot_key', 'permission_id')
+        );
+    }
+
+    public function plants(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            \Modules\Plant\Models\Plant::class,
+            'm_plant_user',
+            'user_id',
+            'id_plant',
+            'id',
+            'code_3'
         );
     }
 }

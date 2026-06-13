@@ -1,23 +1,18 @@
-<template>
-  <div class="p-6">
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
-      <div class="flex items-center gap-3 mb-4">
-        <Icon icon="ri:settings-3-line" class="text-green-500 text-2xl w-6 h-6" />
-        <h1 class="text-2xl font-bold text-slate-800">Adjustment Setup</h1>
-      </div>
-      <p class="text-gray-500 mb-4">
-        Configure adjustment parameters and stock correction settings.
-      </p>
-      <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-        <p class="text-green-700 text-sm flex items-center gap-2">
-          <Icon icon="ri:information-line" class="w-4 h-4" />
-          This module is under development. Full functionality will be available soon.
-        </p>
-      </div>
-    </div>
-  </div>
+﻿<template>
+  <VCard rounded="lg" elevation="1">
+    <VCardTitle class="pa-5 pb-3 d-flex align-center gap-2">
+      <VIcon icon="ri-settings-line" color="primary" size="22" />
+      <span class="text-h6 font-weight-bold">Adjustment Setup</span>
+    </VCardTitle>
+    <VDivider />
+    <VCardText class="pa-6">
+      <p class="text-body-2 text-medium-emphasis mb-4">Configure adjustment parameters and stock correction settings.</p>
+      <VAlert type="info" variant="tonal" prepend-icon="ri-information-line">
+        This module is under development. Full functionality will be available soon.
+      </VAlert>
+    </VCardText>
+  </VCard>
 </template>
 
 <script setup>
-import { Icon } from '@iconify/vue'
 </script>

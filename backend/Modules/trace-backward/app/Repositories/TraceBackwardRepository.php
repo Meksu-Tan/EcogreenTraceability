@@ -9,6 +9,13 @@ use Modules\TraceBackward\Repositories\Concerns\BackwardSearchQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardTraceQuery;
 use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterface;
 
+/**
+ * @todo Technical Debt: This class is 42 lines in this file but delegates to 4 Concern classes
+ * (BackwardListQuery, BackwardDetailQuery, BackwardTraceQuery, BackwardSearchQuery).
+ * The effective class size across all concerns likely exceeds 200 lines. Requires audit of concern line counts.
+ * - Split into: TraceBackwardListQuery, TraceBackwardDetailQuery, TraceBackwardSearchQuery
+ * Current concern-based decomposition is already a good pattern — verify each concern stays under 200 lines.
+ */
 class TraceBackwardRepository implements TraceBackwardRepositoryInterface
 {
     public function __construct(
@@ -19,9 +26,9 @@ class TraceBackwardRepository implements TraceBackwardRepositoryInterface
         private readonly BackwardSearchQuery $searchQuery,
     ) {}
 
-    public function backwardTrace(string $traceNo, ?int $idMaterial = null, ?int $plantId = null, ?int $userId = null): array
+    public function backwardTrace(string $traceNo, ?int $idMaterial = null): array
     {
-        return $this->traceQuery->execute($traceNo, $idMaterial, $plantId, $userId);
+        return $this->traceQuery->execute($traceNo, $idMaterial);
     }
 
     public function getBackwardList(array $filters = []): array

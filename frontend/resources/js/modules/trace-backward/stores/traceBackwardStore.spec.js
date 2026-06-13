@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 
-vi.mock('@/modules/trace-backward/api', () => ({
+vi.mock('@/modules/trace-backward/services', () => ({
   default: {
     getBackwardList: vi.fn(),
     getTraceDetail: vi.fn(),
+  },
+}))
+
+vi.mock('@/modules/ts-shipment/services/shipmentService', () => ({
+  default: {
     getDatShipment: vi.fn(),
     getShipmentBatchPackaging: vi.fn(),
     getPreparationRecord: vi.fn(),
@@ -12,7 +17,8 @@ vi.mock('@/modules/trace-backward/api', () => ({
   },
 }))
 
-import traceApi from '@/modules/trace-backward/api'
+import traceApi from '@/modules/trace-backward/services'
+import shipmentService from '@/modules/ts-shipment/services/shipmentService'
 import { useTraceBackwardStore } from './traceBackwardStore'
 
 describe('useTraceBackwardStore', () => {
@@ -79,7 +85,7 @@ describe('useTraceBackwardStore', () => {
 
   describe('fetchShipmentDetail', () => {
     it('populates shipmentData from nested response', async () => {
-      traceApi.getDatShipment.mockResolvedValue({
+      shipmentService.getDatShipment.mockResolvedValue({
         data: { data: { data: { SO_NO: 'SO-001', BATCH: 'B-001' } } },
       })
 
@@ -91,7 +97,7 @@ describe('useTraceBackwardStore', () => {
     })
 
     it('sets null shipmentData on error', async () => {
-      traceApi.getDatShipment.mockRejectedValue(new Error('SAP down'))
+      shipmentService.getDatShipment.mockRejectedValue(new Error('SAP down'))
 
       const store = useTraceBackwardStore()
       await store.fetchShipmentDetail({})
@@ -103,13 +109,13 @@ describe('useTraceBackwardStore', () => {
 
   describe('fetchBatchPackaging', () => {
     it('orchestrates 3 parallel api calls', async () => {
-      traceApi.getShipmentBatchPackaging.mockResolvedValue({
+      shipmentService.getShipmentBatchPackaging.mockResolvedValue({
         data: { data: [{ batch_no: 'B-001', packaging: 'drum' }] },
       })
-      traceApi.getPreparationRecord.mockResolvedValue({
+      shipmentService.getPreparationRecord.mockResolvedValue({
         data: { data: [{ prep_no: 'P-001' }, { prep_no: 'P-002' }] },
       })
-      traceApi.getDatSoAllocation.mockResolvedValue({
+      shipmentService.getDatSoAllocation.mockResolvedValue({
         data: { data: { data: { IT_EXPORT: [{ so_item: '00010' }, { so_item: '00020' }] } } },
       })
 
@@ -123,9 +129,9 @@ describe('useTraceBackwardStore', () => {
     })
 
     it('handles empty batch packaging result', async () => {
-      traceApi.getShipmentBatchPackaging.mockResolvedValue({ data: { data: [] } })
-      traceApi.getPreparationRecord.mockResolvedValue({ data: { data: [] } })
-      traceApi.getDatSoAllocation.mockResolvedValue({
+      shipmentService.getShipmentBatchPackaging.mockResolvedValue({ data: { data: [] } })
+      shipmentService.getPreparationRecord.mockResolvedValue({ data: { data: [] } })
+      shipmentService.getDatSoAllocation.mockResolvedValue({
         data: { data: { data: { IT_EXPORT: [] } } },
       })
 

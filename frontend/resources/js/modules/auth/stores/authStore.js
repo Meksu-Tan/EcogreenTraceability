@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as apiLogin, logout as apiLogout, getAuthUser } from '@/modules/auth/api'
+import { login as apiLogin, logout as apiLogout, getAuthUser } from '@/modules/auth/services'
 
 export const useAuthStore = defineStore('auth', () => {
   const user        = ref(null)
@@ -39,7 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       return { success: false, message: response.data.message }
     } catch (error) {
-      const message = error.response?.data?.message || 'Login gagal. Silakan coba lagi.'
+      const message = error.response?.data?.message || 'Login failed. Please try again.'
       return { success: false, message }
     } finally {
       loading.value = false

@@ -4,9 +4,9 @@ namespace Modules\TsWip\Repositories\Contracts;
 interface WipEntryRepositoryInterface
 {
     // List & Fetch
-    public function getBalance(string $rundownId, $plantId, ?string $subgroup = null): array;
-    public function getFeed(string $feedId, string $mode, $plantId): array;
-    public function getRundown(string $rundownId, string $mode, $plantId): array;
+    public function getBalance(string $rundownId, $plantId, ?string $subgroup = null, int $page = 1, int $perPage = 5): array;
+    public function getFeed(string $feedId, string $mode, $plantId, int $page = 1, int $perPage = 5): array;
+    public function getRundown(string $rundownId, string $mode, $plantId, int $page = 1, int $perPage = 5): array;
 
     // Batch Number Generation
     public function getFeedNewBatchNumber(string $feedId, $plantId): ?string;

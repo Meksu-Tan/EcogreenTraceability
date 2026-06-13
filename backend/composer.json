@@ -43,7 +43,7 @@
             "Modules\\TsBlending\\": "Modules/ts-blending/app/",
             "Modules\\TsPackage\\": "Modules/ts-package/app/",
             "Modules\\TsShipment\\": "Modules/ts-shipment/app/",
-            "Modules\\Inquiry\\": "Modules/Inquiry/app/",
+            "Modules\\Inquiry\\": ["Modules/Inquiry/app/", "Modules/Inquiry/"],
             "Modules\\TsStock\\": "Modules/ts-stock/app/",
             "Modules\\TsTsreport\\": "Modules/ts-tsreport/app/",
             "Modules\\TsRmreport\\": "Modules/ts-rmreport/app/",

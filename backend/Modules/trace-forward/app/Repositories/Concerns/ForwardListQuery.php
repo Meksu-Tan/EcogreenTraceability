@@ -13,10 +13,6 @@ final class ForwardListQuery
 
     public function execute(array $filters = []): array
     {
-        $this->connection->select(
-            'SET sql_mode=(SELECT REPLACE(@@sql_mode,"ONLY_FULL_GROUP_BY",""))'
-        );
-
         $plantId = $filters['id_plant'] ?? null;
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('bh', $plantId, $userId);
@@ -35,7 +31,7 @@ final class ForwardListQuery
                    GROUP_CONCAT(DISTINCT CONCAT(s.code, ' :: ', s.description,
                        ' / ', bd.batch_sap, ' / Qty: ', FORMAT(bd.init_qty,3), ' MT') SEPARATOR ' | ') AS supplier,
                    MAX(bd.batch_sap) AS batch_sap,
-                   GROUP_CONCAT(DISTINCT h.tf_number ORDER BY h.tf_number ASC SEPARATOR ', ') AS tf_number,
+                   GROUP_CONCAT(DISTINCT h.description ORDER BY h.description ASC SEPARATOR ', ') AS tf_number,
                    IF(SUM(bd.out_qty) = 0, 'N/A', 'TRACED') AS traced,
                    md.material_document,
                    md.po_so,
@@ -43,10 +39,10 @@ final class ForwardListQuery
                    bh.id_material
               FROM t_balance_header bh
               LEFT JOIN m_material m ON bh.id_material = m.id_material
-              LEFT JOIN m_tank t ON bh.id_tank = t.id_tank
+              LEFT JOIN m_sloc t ON bh.id_sloc = t.id_sloc
               LEFT JOIN t_balance_detail bd ON bh.id_balance_head = bd.id_balance_head AND bd.status = 1
               LEFT JOIN m_supplier s ON bd.id_supplier = s.id_supplier
-              LEFT JOIN m_tank_detail h ON JSON_CONTAINS(bh.id_tank_tail, JSON_QUOTE(CAST(h.id_tank_tail AS CHAR)))
+              LEFT JOIN m_sloc h ON bh.id_sloc = h.id_sloc
               LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so
                            FROM t_trace_header f
                            LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head

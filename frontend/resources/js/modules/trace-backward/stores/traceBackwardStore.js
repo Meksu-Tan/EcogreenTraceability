@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import traceApi from '@/modules/trace-backward/api'
+import traceApi from '@/modules/trace-backward/services'
 import shipmentService from '@/modules/ts-shipment/services/shipmentService'
 
 export const useTraceBackwardStore = defineStore('traceBackward', () => {
   const list = ref([])
-  const listMeta = ref({ page: 1, perPage: 25, total: 0, lastPage: 1 })
+  const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
   const detail = ref([])
   const shipmentData = ref(null)
   const batchData = ref(null)
@@ -26,7 +26,7 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
       list.value = payload.data || (Array.isArray(payload) ? payload : [])
       listMeta.value = {
         page: payload.page || params.page || 1,
-        perPage: payload.per_page || params.per_page || 25,
+        perPage: payload.per_page || params.per_page || 10,
         total: payload.total || list.value.length,
         lastPage: payload.last_page || 1,
       }
@@ -58,7 +58,9 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     error.value = null
     try {
       const res = await shipmentService.getDatShipment(params)
-      shipmentData.value = res.data?.data?.data || null
+      // ApiResponse::success() wraps in data.data (2 levels deep)
+      const payload = res.data?.data
+      shipmentData.value = (Array.isArray(payload) ? payload[0] : payload) || null
     } catch (err) {
       error.value = err.message || 'Failed to load shipment data'
       shipmentData.value = null
@@ -71,17 +73,26 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     loadingBatch.value = true
     error.value = null
     try {
+      // Get batch packaging data
       const batchRes = await shipmentService.getShipmentBatchPackaging(params)
-      const records = batchRes.data?.data || []
-      batchData.value = records.length > 0 ? records[0] : null
+      const batchRecords = batchRes.data?.data || []
+      batchData.value = batchRecords.length > 0 ? batchRecords[0] : null
 
+      // Get preparation records
       const prepRes = await shipmentService.getPreparationRecord(params)
       preparationRecords.value = prepRes.data?.data || []
 
+      // Get SAP allocations — IT_EXPORT is nested inside data.data.IT_EXPORT
       const allocRes = await shipmentService.getDatSoAllocation(params)
-      sapAllocations.value = allocRes.data?.data?.data?.IT_EXPORT || []
+      const allocPayload = allocRes.data?.data
+      sapAllocations.value = Array.isArray(allocPayload?.IT_EXPORT)
+        ? allocPayload.IT_EXPORT
+        : []
     } catch (err) {
       error.value = err.message || 'Failed to load batch packaging data'
+      batchData.value = null
+      preparationRecords.value = []
+      sapAllocations.value = []
     } finally {
       loadingBatch.value = false
     }
@@ -94,8 +105,12 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     batchData.value = null
     preparationRecords.value = []
     sapAllocations.value = []
-    listMeta.value = { page: 1, perPage: 25, total: 0, lastPage: 1 }
+    listMeta.value = { page: 1, perPage: 10, total: 0, lastPage: 1 }
     error.value = null
+  }
+
+  function setPage(p) {
+    listMeta.value = { ...listMeta.value, page: p }
   }
 
   return {
@@ -115,6 +130,7 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     fetchDetail,
     fetchShipmentDetail,
     fetchBatchPackaging,
+    setPage,
     clear,
   }
 })
