@@ -19,7 +19,7 @@ trait RmEntrySupplierTrait
         );
     }
 
-    public function addSupplierTemp(array $data, string $user): object
+    public function addSupplierTemp(array $data, string $user): array
     {
         $requiredKeys = ['entry_no', 'id_material', 'qty'];
         foreach ($requiredKeys as $key) {
@@ -83,7 +83,7 @@ trait RmEntrySupplierTrait
 
         $result = DB::connection('eudr_ts')->table('t_balance_temporary')->insertGetId($insertData);
 
-        return (object) ['id_balance_temp' => $result];
+        return ['id_balance_temp' => $result];
     }
 
     public function getSupplierList(string $entryNo): array

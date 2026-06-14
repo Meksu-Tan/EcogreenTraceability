@@ -15,7 +15,6 @@ class GenerateTraceNoRequest extends FormRequest
     {
         return [
             'warehouse' => ['required', 'integer'],
-            'id_plant' => ['required', 'integer'],
         ];
     }
 }

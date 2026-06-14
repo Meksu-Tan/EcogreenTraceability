@@ -33,7 +33,7 @@ trait WipEntryQueryTrait
                        LEFT JOIN (SELECT a.id_balance_head, a.id_material, a.id_sloc, a.status,
                                          a.trace_no, aa.qty, a.created_by, a.created_at, aa.init_qty,
                                          GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
-                                         d.description AS tf_number, a.entry_date,
+                                         a.id_sloc AS tf_number, a.entry_date,
                                          GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
                                          GROUP_CONCAT(DISTINCT CONCAT(e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty,3), " MT / Qty : ", FORMAT(b.qty,3), " MT") SEPARATOR " | ") AS supplier,
                                          FORMAT(SUM(b.init_qty),3) AS balance_supplier,
@@ -78,7 +78,7 @@ trait WipEntryQueryTrait
                                                 GROUP BY f.id_balance_head) f
                                       ON f.id_balance_head = a.id_balance_head
                                    WHERE ' . $plantFilter . '
-                                     AND d.code_3 <> "STORAGE"
+                                     AND 1=1
                                    GROUP BY a.trace_no) e
                        ON d.id_material = e.id_material
                        LEFT JOIN m_plant p ON e.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
@@ -88,7 +88,7 @@ trait WipEntryQueryTrait
               ORDER BY entry_date DESC
         ', $bindings);
 
-        return $rows;
+        return $this->mapSlocDescriptions($rows);
     }
 
     public function getFeed(string $feedId, string $mode, $plantId, int $page = 1, int $perPage = 5): array
@@ -120,14 +120,7 @@ trait WipEntryQueryTrait
                         b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
                         GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
                         IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
-                        CONCAT(
-                            COALESCE(i.description, ""),
-                            IF(
-                                GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & ") IS NULL,
-                                "",
-                                CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & "))
-                            )
-                        ) AS sloc,
+                        a.id_sloc AS sloc,
                         a.id_plant, p.description AS plant_name
                    FROM t_trace_header a
                    LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
@@ -138,11 +131,7 @@ trait WipEntryQueryTrait
                                 FROM t_trace_header a
                                WHERE a.status = 1 AND ' . $subqueryPlantFilter . '
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                   LEFT JOIN m_sloc i ON
-                       (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                   LEFT JOIN m_sloc j ON
-                       (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                   LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
+                   
                    LEFT JOIN (SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
                                 FROM t_trace_header h
                                 JOIN t_trace_detail d ON h.id_trace_head = d.id_trace_head
@@ -182,14 +171,7 @@ trait WipEntryQueryTrait
                         g.material_document, b.batch_sap,
                         GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
                         IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
-                        CONCAT(
-                            COALESCE(i.description, ""),
-                            IF(
-                                GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & ") IS NULL,
-                                "",
-                                CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & "))
-                            )
-                        ) AS sloc,
+                        a.id_sloc AS sloc,
                         CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
                                                     WHERE SUBSTRING(to_trace_no, 8, 3) = ?
                                                       AND SUBSTRING(to_trace_no, 1, 1) = ?
@@ -210,11 +192,7 @@ trait WipEntryQueryTrait
                                 FROM t_trace_header a
                                WHERE a.status = 1 AND ' . $subqueryPlantFilter . '
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                   LEFT JOIN m_sloc i ON
-                       (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                   LEFT JOIN m_sloc j ON
-                       (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                   LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
+                   
                    LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                   WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                     AND a.out_qty > 0 AND b.out_qty > 0
@@ -226,7 +204,59 @@ trait WipEntryQueryTrait
             ', $bindings);
         }
 
-        return $rows;
+        return $this->mapSlocDescriptions($rows);
+    }
+
+    
+    protected function mapSlocDescriptions(array $rows, string $slocField = 'sloc'): array
+    {
+        if (empty($rows)) return $this->mapSlocDescriptions($rows);
+        
+        $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
+            ->table('m_sloc')
+            ->select('id_sloc', 'description', 'id_tank')
+            ->get()
+            ->keyBy('id_sloc');
+
+        foreach ($rows as $row) {
+            $row->{$slocField} = '';
+            
+            // For getBalance where we use tf_number
+            $sourceField = isset($row->tf_number) ? 'tf_number' : 'id_sloc';
+            $slocVal = $row->{$sourceField} ?? null;
+            
+            if ($slocVal !== null && $slocVal !== '') {
+                $decoded = json_decode((string)$slocVal, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $firstDesc = '';
+                    $tanks = [];
+                    foreach ($decoded as $id) {
+                        if (isset($slocs[$id])) {
+                            if (!$firstDesc) $firstDesc = $slocs[$id]->description;
+                            if ($slocs[$id]->id_tank) $tanks[] = $slocs[$id]->id_tank;
+                        }
+                    }
+                    if (!empty($tanks)) {
+                        sort($tanks);
+                        $tanks = array_unique($tanks);
+                        $row->{$slocField} = $firstDesc . ' | ' . implode(' & ', $tanks);
+                    } elseif ($firstDesc) {
+                        $row->{$slocField} = $firstDesc;
+                    }
+                } else {
+                    if (isset($slocs[$slocVal])) {
+                        $s = $slocs[$slocVal];
+                        $row->{$slocField} = $s->id_tank ? ($s->description . ' | ' . $s->id_tank) : $s->description;
+                    }
+                }
+            }
+            
+            // Cleanup tf_number if we hijacked it
+            if ($slocField === 'tf_number') {
+                // it is already stored in tf_number
+            }
+        }
+        return $this->mapSlocDescriptions($rows);
     }
 
     protected function getFeedWithMaterialSign(string $feedId, string $feedPrefix, string $mode, $idPlant): array
@@ -269,14 +299,7 @@ trait WipEntryQueryTrait
                        b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
                        GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
                        IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
-                       CONCAT(
-                           COALESCE(i.description, ""),
-                           IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & ") IS NULL,
-                               "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.id_tank, jd.id_tank) ORDER BY COALESCE(j.id_tank, jd.id_tank) ASC SEPARATOR " & "))
-                           )
-                        ) AS sloc,
+                       a.id_sloc AS sloc,
                        a.id_plant, p.description AS plant_name
                   FROM t_trace_header a
                   LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
@@ -285,11 +308,7 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                FROM t_trace_header a WHERE a.status = 1 AND a.id_plant = ? GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON
-                      (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc j ON 
-                      (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
+                  
                   LEFT JOIN (SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
                                FROM t_trace_header h JOIN t_trace_detail d ON h.id_trace_head = d.id_trace_head
                               WHERE d.out_qty > 0 AND h.status = 1 GROUP BY h.to_trace_no) bs ON bs.to_trace_no = a.to_trace_no
@@ -314,14 +333,7 @@ trait WipEntryQueryTrait
                        g.material_document, b.batch_sap,
                        GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
                        IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
-                       CONCAT(
-                           COALESCE(i.description, ""),
-                           IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & ") IS NULL,
-                               "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & "))
-                           )
-                       ) AS sloc,
+                       a.id_sloc AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
                                                    WHERE SUBSTRING(to_trace_no, 8, 3) = ?
                                                      AND SUBSTRING(to_trace_no, 1, 1) = ?
@@ -341,11 +353,7 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                FROM t_trace_header a WHERE a.status = 1 AND a.id_plant = ? GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON
-                      (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc j ON 
-                      (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
+                  
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.out_qty > 0 AND b.out_qty > 0
@@ -382,7 +390,7 @@ trait WipEntryQueryTrait
             $params = $filteredParams;
         }
         
-        return DB::connection('eudr_ts')->select($sql, $params);
+        return $this->mapSlocDescriptions(DB::connection('eudr_ts')->select($sql, $params));
     }
 
     public function getRundown(string $rundownId, string $mode, $plantId, int $page = 1, int $perPage = 5): array
@@ -408,14 +416,7 @@ trait WipEntryQueryTrait
                        FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf, b.batch_sap,
                        GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(b.in_qty,3), " MT") SEPARATOR " | ") AS supplier,
                        FORMAT(ROUND(bs.supplier_qty,3),3) AS balance_supplier,
-                       CONCAT(
-                           COALESCE(i.description, ""),
-                           IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & ") IS NULL,
-                               "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & "))
-                           )
-                       ) AS sloc,
+                       a.id_sloc AS sloc,
                        a.id_plant, p.description AS plant_name
                   FROM t_trace_header a
                   LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
@@ -424,11 +425,7 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.in_qty) AS in_qty
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON
-                      (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc j ON 
-                      (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
+                  
                   LEFT JOIN (SELECT id_trace_head, SUM(in_qty) AS supplier_qty
                                FROM t_trace_detail WHERE in_qty > 0 GROUP BY id_trace_head) bs ON bs.id_trace_head = a.id_trace_head
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
@@ -455,14 +452,7 @@ trait WipEntryQueryTrait
                        FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf, b.batch_sap,
                        GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(b.in_qty,3), " MT") SEPARATOR " | ") AS supplier,
                        FORMAT(ROUND(SUM(b.in_qty),3),3) AS balance_supplier,
-                       CONCAT(
-                           COALESCE(i.description, ""),
-                           IF(
-                               GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & ") IS NULL,
-                               "",
-                               CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(j.description, jd.description) ORDER BY COALESCE(j.description, jd.description) ASC SEPARATOR " & "))
-                           )
-                       ) AS sloc,
+                       a.id_sloc AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
                                                    WHERE (SUBSTRING(to_trace_no, 1, 1) = ? OR SUBSTRING(to_trace_no, 1, 1) = ?)
                                                      AND SUBSTRING(to_trace_no, 8, 3) = ?
@@ -480,11 +470,7 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.in_qty) AS in_qty
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  LEFT JOIN m_sloc i ON
-                      (a.id_sloc IS NOT NULL AND (i.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(i.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(i.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc j ON 
-                      (a.id_sloc IS NOT NULL AND (j.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(j.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(j.id_sloc AS CHAR)))))))
-                  LEFT JOIN m_sloc jd ON a.id_sloc = jd.id_sloc
+                  
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.in_qty > 0 AND b.in_qty > 0
@@ -496,7 +482,7 @@ trait WipEntryQueryTrait
             ', [$this->movType1, $this->movType2, $rundownId, $idPlant, $idPlant, $rundownId, $this->movType1, $idPlant], $idPlant);
         }
 
-        return $rows;
+        return $this->mapSlocDescriptions($rows);
     }
 
     public function getActiveTanksForFeed(string $feedId, $plantId): array
@@ -545,7 +531,7 @@ trait WipEntryQueryTrait
             'sample' => $rows[0] ?? null,
         ]);
 
-        return $rows;
+        return $this->mapSlocDescriptions($rows);
     }
 
     public function getActiveSpecificTanks(int $slocId): array

@@ -278,12 +278,16 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             $eobUrl = $sapReqUrl . $sapClient . $sapFm . $input1 . $input2 . $input3;
         }
 
-        $response = Http::timeout(30)->get($eobUrl);
-        if ($response->failed()) {
+        try {
+            $response = Http::timeout(30)->get($eobUrl);
+            if ($response->failed()) {
+                return [];
+            }
+
+            return $response->json() ?? [];
+        } catch (\Exception $e) {
             return [];
         }
-
-        return $response->json() ?? [];
     }
 
     public function getDatSoAllocation(array $data): array
@@ -301,12 +305,16 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
         $eobUrl = $sapReqUrl . $sapClient . $sapFm . $input1;
 
-        $response = Http::timeout(30)->get($eobUrl);
-        if ($response->failed()) {
+        try {
+            $response = Http::timeout(30)->get($eobUrl);
+            if ($response->failed()) {
+                return [];
+            }
+
+            return $response->json() ?? [];
+        } catch (\Exception $e) {
             return [];
         }
-
-        return $response->json() ?? [];
     }
 
     public function store(string $user, array $data): array

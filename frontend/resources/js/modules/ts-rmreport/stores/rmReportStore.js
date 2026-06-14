@@ -38,6 +38,33 @@ export const useRmReportStore = defineStore('rmReport', () => {
     }
   }
 
+  async function fetchDetailOnTank(params) {
+    try {
+      const res = await rmReportApi.getDetailOnTank(params)
+      return res.data?.data || []
+    } catch (err) {
+      return []
+    }
+  }
+
+  async function fetchDetailOnAdjOut(params) {
+    try {
+      const res = await rmReportApi.getDetailOnAdjOut(params)
+      return res.data?.data || []
+    } catch (err) {
+      return []
+    }
+  }
+
+  async function fetchDetailOnWarehouse(params) {
+    try {
+      const res = await rmReportApi.getDetailOnWarehouse(params)
+      return res.data?.data || []
+    } catch (err) {
+      return []
+    }
+  }
+
   return {
     rmReportData,
     rmReportSummary,
@@ -45,5 +72,8 @@ export const useRmReportStore = defineStore('rmReport', () => {
     error,
     fetchRmReport,
     fetchRmReportSummary,
+    fetchDetailOnTank,
+    fetchDetailOnAdjOut,
+    fetchDetailOnWarehouse,
   }
 })

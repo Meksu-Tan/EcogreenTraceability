@@ -47,8 +47,10 @@ trait RmEntryQueryTrait
         $slocConditions = [];
         $slocConditions[] = "id_sloc IN ($inClause)";
         foreach ($idTankStorageIds as $slocId) {
-            $slocConditions[] = "JSON_CONTAINS(id_sloc, JSON_QUOTE('" . $slocId . "'))";
-            $slocConditions[] = "JSON_CONTAINS(id_sloc, '" . $slocId . "')";
+            $slocConditions[] = "id_sloc LIKE CONCAT('%\"', '" . $slocId . "', '\"%')";
+            $slocConditions[] = "id_sloc LIKE CONCAT('%[', '" . $slocId . "', ',%')";
+            $slocConditions[] = "id_sloc LIKE CONCAT('%,', '" . $slocId . "', ']%')";
+            $slocConditions[] = "id_sloc LIKE CONCAT('%[', '" . $slocId . "', ']%')";
         }
         $slocFilterSql = '(' . implode(' OR ', $slocConditions) . ')';
 
@@ -80,8 +82,10 @@ trait RmEntryQueryTrait
                     INNER JOIN m_material m ON bh.id_material = m.id_material AND m.type = ?
                     LEFT JOIN m_sloc sl ON (
                          (bh.id_sloc = sl.id_sloc)
-                         OR JSON_CONTAINS(bh.id_sloc, JSON_QUOTE(CAST(sl.id_sloc AS CHAR)))
-                         OR JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS CHAR))
+                         OR bh.id_sloc LIKE CONCAT('%\"', sl.id_sloc, '\"%')
+                         OR bh.id_sloc LIKE CONCAT('%[', sl.id_sloc, ',%')
+                         OR bh.id_sloc LIKE CONCAT('%,', sl.id_sloc, ']%')
+                         OR bh.id_sloc LIKE CONCAT('%[', sl.id_sloc, ']%')
                     ) AND sl.status = 1
                     LEFT JOIN (
                         SELECT f.id_balance_head, MAX(g.material_document) AS material_document,
@@ -198,8 +202,10 @@ trait RmEntryQueryTrait
                INNER JOIN m_material m ON bh.id_material = m.id_material
                LEFT JOIN m_sloc sl ON (
                     (bh.id_sloc = sl.id_sloc)
-                    OR JSON_CONTAINS(bh.id_sloc, JSON_QUOTE(CAST(sl.id_sloc AS CHAR)))
-                    OR JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS CHAR))
+                    OR bh.id_sloc LIKE CONCAT('%\"', sl.id_sloc, '\"%')
+                    OR bh.id_sloc LIKE CONCAT('%[', sl.id_sloc, ',%')
+                    OR bh.id_sloc LIKE CONCAT('%,', sl.id_sloc, ']%')
+                    OR bh.id_sloc LIKE CONCAT('%[', sl.id_sloc, ']%')
                ) AND sl.status = 1
                LEFT JOIN m_plant p ON bh.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
               WHERE bh.id_balance_head = ? AND bh.status = 1",

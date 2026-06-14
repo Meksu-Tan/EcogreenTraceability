@@ -115,6 +115,17 @@ function closeModal() {
   emit('update:isOpen', false)
 }
 
+function onMaterialChange() {
+  if (form.idMaterialSource) {
+    blendingStore.fetchTotalStockMaterial({
+      idMaterial: form.idMaterialSource,
+      idTank: props.idTank
+    })
+  } else {
+    blendingStore.totalStock = 0
+  }
+}
+
 function fetchQty(){
     if(!form.idMaterialSource){toastStore.error('Select material first');return}
     blendingStore.fetchQty({idMaterial: form.idMaterialSource, idPlant: props.idPlant})

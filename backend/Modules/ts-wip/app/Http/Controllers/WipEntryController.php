@@ -42,14 +42,6 @@ class WipEntryController extends Controller
     public function store(StoreWipEntryRequest $request): JsonResponse
     {
         try {
-            /**
-             * @todo Move this inline permission check to a middleware
-             * (e.g. middleware('can:task-update') in routes)
-             */
-            if (!Auth::user()?->can('task-update')) {
-                return ApiResponse::error('Forbidden', 403);
-            }
-
             $flag = $request->input('flag');
             $user = Auth::user()->name ?? 'System';
             $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
@@ -75,11 +67,6 @@ class WipEntryController extends Controller
     public function show(Request $request, $action): JsonResponse
     {
         try {
-            // GAP #7: Add permission check for GET/show
-            if (!Auth::user()?->can('task-read')) {
-                return ApiResponse::error('Forbidden', 403);
-            }
-
             $flag = $request->input('flag', $action);
             $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
 
@@ -285,11 +272,15 @@ class WipEntryController extends Controller
 
     protected function handleQuantifierData(Request $request): JsonResponse
     {
-        $data = $this->wipEntryService->getQuantifierData(
-            $request->input('date'),
-            $request->input('tagNumber')
-        );
-        return ApiResponse::success($data, 'OK', 200);
+        try {
+            $data = $this->wipEntryService->getQuantifierData(
+                $request->input('date'),
+                $request->input('tagNumber')
+            );
+            return ApiResponse::success($data, 'OK', 200);
+        } catch (\Exception $e) {
+            return ApiResponse::error("Gagal terhubung ke database Quantifier (dwsql). Silakan periksa koneksi atau coba lagi nanti. Pesan: " . $e->getMessage(), 200);
+        }
     }
 
     // B8: WIP Tree/Dashboard endpoint
@@ -323,14 +314,6 @@ class WipEntryController extends Controller
     public function destroy(Request $request, $id): JsonResponse
     {
         try {
-            /**
-             * @todo Move this inline permission check to a middleware
-             * (e.g. middleware('can:task-update') in routes)
-             */
-            if (!Auth::user()?->can('task-update')) {
-                return ApiResponse::error('Forbidden', 403);
-            }
-
             $user = Auth::user()->name ?? 'System';
 
             $result = $this->wipEntryService->cancelById((int) $id, $user);

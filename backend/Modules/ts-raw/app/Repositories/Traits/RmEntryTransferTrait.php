@@ -46,11 +46,7 @@ trait RmEntryTransferTrait
                          md.material_document, md.po_so, p.code AS plant_code
                     FROM t_trace_header a
                     JOIN m_material c ON a.id_material = c.id_material
-                    LEFT JOIN m_sloc d ON (
-                          (a.id_sloc = d.id_sloc)
-                          OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))
-                          OR JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR))
-                     )
+                    LEFT JOIN m_sloc d ON a.id_sloc = d.id_sloc
                     LEFT JOIN t_balance_header bh ON a.id_balance_head = bh.id_balance_head
                     LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
                     LEFT JOIN m_plant p ON d.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
@@ -179,11 +175,7 @@ trait RmEntryTransferTrait
                      FROM t_trace_header a
                      LEFT JOIN t_trace_header th ON a.from_trace_no = th.to_trace_no
                      JOIN m_material c ON a.id_material = c.id_material
-                     LEFT JOIN m_sloc d ON (
-                          (a.id_sloc = d.id_sloc)
-                          OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))
-                          OR JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR))
-                     )
+                     LEFT JOIN m_sloc d ON a.id_sloc = d.id_sloc
                      LEFT JOIN t_balance_header bh ON a.id_balance_head = bh.id_balance_head
                      LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
                      LEFT JOIN m_plant p ON d.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci

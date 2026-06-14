@@ -13,7 +13,7 @@ interface RmEntryRepositoryInterface
 
     // Suppliers
     public function searchSuppliers(string $query): array;
-    public function addSupplierTemp(array $data, string $user): object;
+    public function addSupplierTemp(array $data, string $user): array;
     public function getSupplierList(string $entryNo): array;
     public function deleteSupplierTemp(int $id, string $user): bool;
     public function getTotalQtyTemp(string $entryNo): float;

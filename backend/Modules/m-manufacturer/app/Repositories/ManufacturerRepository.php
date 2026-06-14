@@ -110,6 +110,7 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
     public function getActive(): array
     {
         return Manufacturer::selectRaw('a.id_manufacturer, CONCAT(a.code, " / ", a.description) AS manufacturer')
+            ->from('m_manufacturer as a')
             ->where('a.status', '1')
             ->orderBy('a.description')
             ->get()

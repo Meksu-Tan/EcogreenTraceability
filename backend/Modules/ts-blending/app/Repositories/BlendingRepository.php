@@ -251,7 +251,7 @@ class BlendingRepository implements BlendingRepositoryInterface
                       AND SUBSTRING(b.from_trace_no,1,1) = 8
                ) b ON a.id_balance_head = b.id_balance_head
                LEFT JOIN m_material c ON c.id_material = a.id_material
-                LEFT JOIN m_sloc d ON (d.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))))) AND d.id_plant = a.id_plant COLLATE utf8mb4_unicode_ci
+                LEFT JOIN m_sloc d ON d.id_sloc = a.id_sloc AND d.id_plant = a.id_plant COLLATE utf8mb4_unicode_ci
                 LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci AND p.status = 1
                 LEFT JOIN t_balance_detail e ON a.id_balance_head = e.id_balance_head
                 LEFT JOIN (
@@ -262,8 +262,8 @@ class BlendingRepository implements BlendingRepositoryInterface
                      GROUP BY ee1.trace_no
                 ) ee ON a.trace_no = ee.trace_no
                 LEFT JOIN m_supplier f ON e.id_supplier = f.id_supplier
-                LEFT JOIN m_sloc h ON (h.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(h.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(h.id_sloc AS CHAR))))))
-                LEFT JOIN m_sloc h_sloc ON (h_sloc.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(h_sloc.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(h_sloc.id_sloc AS CHAR))))))
+                LEFT JOIN m_sloc h ON h.id_sloc = a.id_sloc
+                LEFT JOIN m_sloc h_sloc ON h_sloc.id_sloc = a.id_sloc
               WHERE a.status = 1
                 AND SUBSTRING(a.trace_no,1,1) = 8
                 AND (a.id_plant = ? OR ? = 0)
@@ -324,15 +324,20 @@ class BlendingRepository implements BlendingRepositoryInterface
         $formattedName = $this->formatTankName($tank[0]->description);
         $plantId = $tank[0]->id_plant;
 
-        return collect(DB::connection($this->connection)->select(
-            'SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo
+        $results = DB::connection($this->connection)->select(
+            'SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo, description
                FROM m_sloc
               WHERE status = 1
                 AND description = ?
                 AND id_plant = ?
               ORDER BY id_sloc ASC',
             [$formattedName, $plantId]
-        ));
+        );
+
+        return collect($results)->map(function ($item) {
+            $item->tankName = $item->description . ' (' . $item->tankNo . ')';
+            return $item;
+        });
     }
 
     public function addBlendingEntryMaterial(string $user, string $entryNo, int $idMaterial, float $qty, int $idTank, int $plantId): array

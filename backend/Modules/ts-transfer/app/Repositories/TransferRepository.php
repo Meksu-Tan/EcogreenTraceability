@@ -146,9 +146,9 @@ class TransferRepository implements TransferRepositoryInterface
             "SELECT a.entry_date, b.material_document,
                     th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_tank,
                     t_from.description AS from_sloc_name,
-                    GROUP_CONCAT(DISTINCT h_from.id_tank ORDER BY h_from.id_tank SEPARATOR ', ') AS from_tf_number,
+                    
                     t_to.description AS to_sloc_name,
-                    GROUP_CONCAT(DISTINCT h_to.id_tank ORDER BY h_to.id_tank SEPARATOR ', ') AS to_tf_number,
+                    
                     CAST(a.trace_no AS CHAR) AS trace_no,
                     FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty,
                     a.id_balance_head AS idHead,
@@ -173,8 +173,8 @@ class TransferRepository implements TransferRepositoryInterface
                         ' >>> ',
                         COALESCE(GROUP_CONCAT(DISTINCT h_to.description ORDER BY h_to.description SEPARATOR ' & '), t_to.description, '')
                     ) AS raw_sloc,
-                    t_from.description AS raw_from_desc,
-                    t_to.description AS raw_to_desc,
+                    a.id_sloc AS raw_id_sloc_to, th_from.id_sloc AS raw_id_sloc_from,
+                    
                     t_from.id_plant AS from_plant_id,
                     t_to.id_plant AS to_plant_id
                FROM t_balance_header a
@@ -206,9 +206,9 @@ class TransferRepository implements TransferRepositoryInterface
                  ON a.id_balance_head = b.id_balance_head
                LEFT JOIN m_material c ON c.id_material = a.id_material
                LEFT JOIN t_trace_header th_from ON th_from.to_trace_no = b.from_trace_no AND th_from.status = 1
-               LEFT JOIN m_sloc t_to ON (t_to.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(t_to.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(t_to.id_sloc AS CHAR))))))
-               LEFT JOIN m_sloc t_from ON (t_from.id_sloc = th_from.id_sloc OR (JSON_VALID(th_from.id_sloc) AND (JSON_CONTAINS(th_from.id_sloc, CAST(t_from.id_sloc AS CHAR)) OR JSON_CONTAINS(th_from.id_sloc, JSON_QUOTE(CAST(t_from.id_sloc AS CHAR))))))
-               LEFT JOIN m_plant p ON (t_from.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci OR (t_from.id_plant IS NULL AND SUBSTRING(a.trace_no, 11, 2) = RIGHT(p.code_3, 2) COLLATE utf8mb4_unicode_ci)) AND p.status = 1
+               
+               
+               LEFT JOIN m_plant p ON (SUBSTRING(a.trace_no, 11, 2) = RIGHT(p.code_3, 2) COLLATE utf8mb4_unicode_ci) AND p.status = 1
                LEFT JOIN t_balance_detail e ON a.id_balance_head = e.id_balance_head AND e.status = 1
                LEFT JOIN m_supplier f ON e.id_supplier = f.id_supplier
                LEFT JOIN (SELECT h.trace_no, ROUND(SUM(d.init_qty),3) AS init_qty, ROUND(SUM(d.qty),3) AS qty
@@ -216,8 +216,8 @@ class TransferRepository implements TransferRepositoryInterface
                             JOIN t_balance_detail d ON d.id_balance_head = h.id_balance_head
                            WHERE d.status = 1 AND d.init_qty > 0.0001
                            GROUP BY h.trace_no) bs ON bs.trace_no = a.trace_no
-               LEFT JOIN m_sloc h_to ON (h_to.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(h_to.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(h_to.id_sloc AS CHAR))))))
-               LEFT JOIN m_sloc h_from ON (h_from.id_sloc = th_from.id_sloc OR (JSON_VALID(th_from.id_sloc) AND (JSON_CONTAINS(th_from.id_sloc, CAST(h_from.id_sloc AS CHAR)) OR JSON_CONTAINS(th_from.id_sloc, JSON_QUOTE(CAST(h_from.id_sloc AS CHAR))))))
+               
+               
               WHERE a.status = 1
                 AND SUBSTRING(a.trace_no,1,1) = 7
                 AND a.id_balance_head IN ($idBindings)
@@ -226,7 +226,66 @@ class TransferRepository implements TransferRepositoryInterface
             $idList
         ));
 
-        $result = $result->map(function ($item) {
+        $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
+            ->table('m_sloc')
+            ->select('id_sloc', 'description', 'id_tank')
+            ->get()
+            ->keyBy('id_sloc');
+
+        $result = $result->map(function ($item) use ($slocs) {
+            $item->raw_from_desc = '';
+            $item->from_tf_number = '';
+            if (isset($item->raw_id_sloc_from) && $item->raw_id_sloc_from !== null && $item->raw_id_sloc_from !== '') {
+                $decoded = json_decode((string)$item->raw_id_sloc_from, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $firstDesc = '';
+                    $tanks = [];
+                    foreach ($decoded as $id) {
+                        if (isset($slocs[$id])) {
+                            if (!$firstDesc) $firstDesc = $slocs[$id]->description;
+                            if ($slocs[$id]->id_tank) $tanks[] = $slocs[$id]->id_tank;
+                        }
+                    }
+                    if ($firstDesc) $item->raw_from_desc = $firstDesc;
+                    if (!empty($tanks)) {
+                        sort($tanks);
+                        $item->from_tf_number = implode(', ', array_unique($tanks));
+                    }
+                } else {
+                    if (isset($slocs[$item->raw_id_sloc_from])) {
+                        $item->raw_from_desc = $slocs[$item->raw_id_sloc_from]->description;
+                        $item->from_tf_number = $slocs[$item->raw_id_sloc_from]->id_tank;
+                    }
+                }
+            }
+
+            $item->raw_to_desc = '';
+            $item->to_tf_number = '';
+            if (isset($item->raw_id_sloc_to) && $item->raw_id_sloc_to !== null && $item->raw_id_sloc_to !== '') {
+                $decoded = json_decode((string)$item->raw_id_sloc_to, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $firstDesc = '';
+                    $tanks = [];
+                    foreach ($decoded as $id) {
+                        if (isset($slocs[$id])) {
+                            if (!$firstDesc) $firstDesc = $slocs[$id]->description;
+                            if ($slocs[$id]->id_tank) $tanks[] = $slocs[$id]->id_tank;
+                        }
+                    }
+                    if ($firstDesc) $item->raw_to_desc = $firstDesc;
+                    if (!empty($tanks)) {
+                        sort($tanks);
+                        $item->to_tf_number = implode(', ', array_unique($tanks));
+                    }
+                } else {
+                    if (isset($slocs[$item->raw_id_sloc_to])) {
+                        $item->raw_to_desc = $slocs[$item->raw_id_sloc_to]->description;
+                        $item->to_tf_number = $slocs[$item->raw_id_sloc_to]->id_tank;
+                    }
+                }
+            }
+
+
             $fromFormatted = $this->formatTankName($item->raw_from_desc);
             $toFormatted = $this->formatTankName($item->raw_to_desc);
 
@@ -299,15 +358,20 @@ class TransferRepository implements TransferRepositoryInterface
         $formattedName = $this->formatTankName($tank[0]->description);
         $plantId = $tank[0]->id_plant;
 
-        return collect(DB::connection($this->connection)->select(
-            'SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo
+        $results = DB::connection($this->connection)->select(
+            'SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo, description
                FROM m_sloc
               WHERE status = 1
                 AND description = ?
                 AND id_plant = ?
               ORDER BY id_sloc ASC',
             [$formattedName, $plantId]
-        ));
+        );
+
+        return collect($results)->map(function ($item) {
+            $item->tankName = $item->description . ' (' . $item->tankNo . ')';
+            return $item;
+        });
     }
 
     public function getLockStatus(string $entryDate): bool

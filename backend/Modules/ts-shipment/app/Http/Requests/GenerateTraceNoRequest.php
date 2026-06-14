@@ -13,8 +13,6 @@ class GenerateTraceNoRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
-            'id_plant' => ['required', 'integer'],
-        ];
+        return [];
     }
 }

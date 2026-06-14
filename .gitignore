@@ -1,0 +1,7 @@
+# Large templates & reference folders to exclude
+materio-vuetify-vuejs-laravel-admin-template-v3.4.0/
+reference-dont-change/
+ai-assisted laravel-vue onboarding/
+
+# Local configuration
+.claude/

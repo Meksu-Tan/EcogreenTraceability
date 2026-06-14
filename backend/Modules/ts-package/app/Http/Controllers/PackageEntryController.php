@@ -184,7 +184,7 @@ class PackageEntryController extends Controller
     public function newTraceNo(GenerateTraceNoRequest $request): JsonResponse
     {
         $warehouseId = (int) $request->validated('warehouse');
-        $plantId = (int) $request->validated('id_plant');
+        $plantId = (int) $request->get('plant_context')['plant_code'];
         try {
             $traceNo = $this->packageService->generateTraceNo($warehouseId, $plantId);
             return ApiResponse::success([['traceNo' => $traceNo]]);

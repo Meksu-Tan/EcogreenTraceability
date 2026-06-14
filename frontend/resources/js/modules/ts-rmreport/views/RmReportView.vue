@@ -392,19 +392,43 @@ watch(perPage, () => {
   loadData()
 })
 
-const openDetail = (row) => {
+const openDetail = async (row) => {
   showModal.value = true
   detailBatch.value = row.batch_sap || row.trace_no || '-'
   detailQty.value = row.qty || '0'
   detailTab.value = 'wip'
-  const baseRow = row.supplier
-    ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }]
-    : []
-  detailWip.value = baseRow
-  detailPrd.value = row.supplier
-    ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0', shipment: '-' }]
-    : []
-  detailAdj.value = baseRow
+  
+  detailWip.value = []
+  detailPrd.value = []
+  detailAdj.value = []
+
+  const batchSap = row.batch_sap || row.trace_no
+
+  if (batchSap) {
+    try {
+      const [tankData, prdData, adjData] = await Promise.all([
+        rmReportStore.fetchDetailOnTank({ batchSap }),
+        rmReportStore.fetchDetailOnWarehouse({ batchSap }),
+        rmReportStore.fetchDetailOnAdjOut({ batchSap })
+      ])
+      
+      detailWip.value = Array.isArray(tankData) ? tankData : []
+      detailPrd.value = Array.isArray(prdData) ? prdData : []
+      detailAdj.value = Array.isArray(adjData) ? adjData : []
+    } catch (err) {
+      console.error('Failed to fetch details:', err)
+    }
+  } else {
+    // Fallback if no trace no / batch sap
+    const baseRow = row.supplier
+      ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }]
+      : []
+    detailWip.value = baseRow
+    detailPrd.value = row.supplier
+      ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0', shipment: '-' }]
+      : []
+    detailAdj.value = baseRow
+  }
 }
 </script>
 

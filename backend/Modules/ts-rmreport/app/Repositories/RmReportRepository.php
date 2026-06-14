@@ -133,7 +133,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                LEFT JOIN m_material c
                  ON a.id_material = c.id_material
                LEFT JOIN m_sloc d
-                 ON (d.id_sloc = a.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))))) AND d.status = 1 AND (d.id_plant = ? OR ? = 0)
+                 ON (d.id_sloc = a.id_sloc OR (a.id_sloc LIKE CONCAT(\'%"\', d.id_sloc, \'"%\') OR a.id_sloc LIKE CONCAT(\'%[\', d.id_sloc, \',%\') OR a.id_sloc LIKE CONCAT(\'%,\', d.id_sloc, \']%\') OR a.id_sloc LIKE CONCAT(\'%[\', d.id_sloc, \']%\'))) AND d.status = 1 AND (d.id_plant = ? OR ? = 0)
                LEFT JOIN m_supplier e
                  ON e.id_supplier = b.id_supplier
                LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head
@@ -154,7 +154,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                            AND bb.status = 1
                                          GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                                        ) b
-                               ON (a.id_sloc = b.id_sloc OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(a.id_sloc AS CHAR))))))
+                               ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
                             WHERE a.status = 1 AND a.code_3 IN ("WIP", "PRD", "STORAGE")
                               AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
                             GROUP BY b.batch_sap
@@ -189,7 +189,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                            AND bb.status = 1
                                          GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                                        ) b
-                               ON (a.id_sloc = b.id_sloc OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(a.id_sloc AS CHAR))))))
+                               ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
                             WHERE a.status = 1 AND a.plant_name = "ADJUSTMENT OUT"
                               AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
                             GROUP BY b.batch_sap
@@ -229,7 +229,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(a.id_sloc AS CHAR))))))
+                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.code_3 IN ("WIP", "PRD", "STORAGE")
@@ -253,7 +253,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(a.id_sloc AS CHAR))))))
+                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.code_3 IN ("WIP", "PRD", "STORAGE")
@@ -285,7 +285,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(a.id_sloc AS CHAR))))))
+                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.plant_name = "ADJUSTMENT OUT"
@@ -309,7 +309,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(a.id_sloc AS CHAR))))))
+                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.plant_name = "ADJUSTMENT OUT"
