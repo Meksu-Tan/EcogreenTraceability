@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { rmEntryRepository, tankRepository, materialRepository, supplierRepository } from '@/repositories'
-import transactionRmEntryApi from '../services'
-import { useToastStore } from '@/stores/toast'
-import { registerCacheResetCallback } from '@/stores/plant'
+import transactionRmEntryApi from '../services/index.js'
+import { useToastStore } from '@/stores/toast.js'
+import { registerCacheResetCallback } from '@/stores/plant.js'
 
 export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const toastStore = useToastStore()

@@ -84,8 +84,8 @@ import { ref, onMounted } from 'vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import TankModal from './TankModal.vue'
 import { useSetupTankStore } from '@/modules/m-tank/stores'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 const store      = useSetupTankStore()
 const toast      = useToastStore()

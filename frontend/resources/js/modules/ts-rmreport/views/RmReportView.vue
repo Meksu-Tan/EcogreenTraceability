@@ -280,7 +280,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRmReportStore } from '../stores/rmReportStore'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 
 const rmReportStore = useRmReportStore()

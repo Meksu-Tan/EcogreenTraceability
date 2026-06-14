@@ -226,7 +226,7 @@
 import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useQuantifierStore } from '../stores/quantifierStore'
-import { useToastStore } from '@/stores/toast'
+import { useToastStore } from '@/stores/toast.js'
 
 const store = useQuantifierStore()
 const toast = useToastStore()

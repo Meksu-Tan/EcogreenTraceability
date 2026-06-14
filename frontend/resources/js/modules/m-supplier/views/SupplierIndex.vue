@@ -44,8 +44,8 @@ import { ref, onMounted } from 'vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import SupplierModal from './SupplierModal.vue'
 import { useSetupSupplierStore } from '@/modules/m-supplier/stores'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 const store      = useSetupSupplierStore()
 const toast      = useToastStore()

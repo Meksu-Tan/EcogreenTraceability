@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import * as plantApi from '@/modules/m-plant/services'
+import * as plantApi from '@/modules/m-plant/services/index.js'
 
 // Cache reset callback for dependent stores
 let cacheResetCallback = null

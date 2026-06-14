@@ -67,9 +67,9 @@
 import { ref, onMounted } from 'vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import PlantModal from './PlantModal.vue'
-import { useSetupPlantStore } from '@/stores/plant'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useSetupPlantStore } from '@/stores/plant.js'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 const store      = useSetupPlantStore()
 const toast      = useToastStore()

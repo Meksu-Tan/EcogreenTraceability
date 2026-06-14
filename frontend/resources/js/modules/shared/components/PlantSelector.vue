@@ -47,7 +47,7 @@
 
 <script setup>
 import { onMounted, computed } from 'vue'
-import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant.js'
 import { useAuthStore } from '@/modules/auth/stores/authStore'
 
 const emit = defineEmits(['change'])

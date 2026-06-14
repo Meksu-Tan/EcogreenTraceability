@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import packageService from '../services/packageService'
-import { useToastStore } from '@/stores/toast'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { useToastStore } from '@/stores/toast.js'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 
 export const usePackageEntryStore = defineStore('packageEntry', () => {
   const toastStore = useToastStore()

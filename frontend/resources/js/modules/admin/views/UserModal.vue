@@ -80,7 +80,7 @@
 import { reactive, computed, watch, onMounted } from 'vue'
 import BaseModal from '@/modules/shared/components/BaseModal.vue'
 import { useAdminUsersStore } from '@/modules/admin/stores'
-import { useSetupPlantStore } from '@/stores/plant'
+import { useSetupPlantStore } from '@/stores/plant.js'
 
 const props = defineProps({
   modelValue: Boolean,

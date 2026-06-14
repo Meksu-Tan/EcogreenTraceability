@@ -6,7 +6,7 @@ vi.mock('@/api/axios', () => ({
   }
 }))
 
-import { getDashboardStats } from '@/modules/dashboard/services'
+import { getDashboardStats } from '@/modules/dashboard/services/index.js'
 import api from '@/api/axios'
 
 describe('Dashboard API', () => {

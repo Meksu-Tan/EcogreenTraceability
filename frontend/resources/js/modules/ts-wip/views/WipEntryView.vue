@@ -241,9 +241,9 @@
 <script setup>
 import { computed, h, onMounted, reactive, ref, resolveComponent, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant.js'
 import { useTsWipEntryStore } from '@/modules/ts-wip/stores/wip'
-import { useToastStore } from '@/stores/toast'
+import { useToastStore } from '@/stores/toast.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import BaseModal from '@/modules/shared/components/BaseModal.vue'
 import WipMiniTable from './WipMiniTable.vue'

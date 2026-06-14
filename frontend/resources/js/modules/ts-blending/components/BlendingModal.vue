@@ -210,7 +210,7 @@
 
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
-import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant.js'
 import { useTsBlendingStore } from '../stores'
 import BlendingSourceMaterialModal from './BlendingSourceMaterialModal.vue'
 

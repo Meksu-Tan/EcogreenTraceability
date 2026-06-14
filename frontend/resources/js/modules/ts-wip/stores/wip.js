@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import wipApi from '../services/wip'
-import { useToastStore } from '@/stores/toast'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { useToastStore } from '@/stores/toast.js'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 
 // GAP #9: Renamed from useTsRawWipEntryStore to useTsWipEntryStore
 export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {

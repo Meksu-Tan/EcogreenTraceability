@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import * as tankApi from '../services'
+import * as tankApi from '../services/index.js'
 
 export const useSetupTankStore = defineStore('setupTank', () => {
   const tanks   = ref([])

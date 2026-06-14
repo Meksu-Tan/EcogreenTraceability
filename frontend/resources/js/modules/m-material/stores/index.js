@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import * as materialService from '../services'
+import * as materialService from '../services/index.js'
 
 export const useSetupMaterialStore = defineStore('setupMaterial', () => {
   const materials        = ref([])

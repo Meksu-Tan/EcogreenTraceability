@@ -8,7 +8,7 @@ vi.mock('@/modules/trace-forward/services', () => ({
   },
 }))
 
-import traceApi from '@/modules/trace-forward/services'
+import traceApi from '@/modules/trace-forward/services/index.js'
 import { useTraceForwardStore } from './traceForwardStore'
 
 describe('useTraceForwardStore', () => {

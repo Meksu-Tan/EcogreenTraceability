@@ -78,7 +78,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant.js'
 
 defineProps({
   isMandatory: { type: Boolean, default: true },

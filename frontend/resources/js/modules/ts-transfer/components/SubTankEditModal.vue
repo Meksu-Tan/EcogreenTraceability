@@ -77,7 +77,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useTsTransferStore } from '../stores'
-import transferApi from '../services'
+import transferApi from '../services/index.js'
 
 const props = defineProps({
   isOpen: Boolean,

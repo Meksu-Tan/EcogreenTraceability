@@ -8,7 +8,7 @@ vi.mock('@/modules/m-material/services', () => ({
   updateMaterial: vi.fn(),
 }))
 
-import * as MaterialApi from '@/modules/m-material/services'
+import * as MaterialApi from '@/modules/m-material/services/index.js'
 
 describe('materialStore', () => {
   beforeEach(() => {

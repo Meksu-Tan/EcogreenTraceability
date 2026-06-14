@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import traceApi from '@/modules/trace-forward/services'
+import traceApi from '@/modules/trace-forward/services/index.js'
 
 export const useTraceForwardStore = defineStore('traceForward', () => {
   const list = ref([])

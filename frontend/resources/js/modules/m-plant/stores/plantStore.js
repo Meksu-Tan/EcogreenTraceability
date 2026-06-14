@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import * as plantApi from '@/modules/m-plant/services'
+import * as plantApi from '@/modules/m-plant/services/index.js'
 
 export const useSetupPlantStore = defineStore('setupPlant', () => {
   const plants = ref([])

@@ -259,14 +259,14 @@
 </template>
 
 <script setup>
-import { useConfirmStore } from '@/stores/confirm'
+import { useConfirmStore } from '@/stores/confirm.js'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import RmEntryModal from '@/modules/ts-raw/components/RmEntryModal.vue'
 import TransferModal from '@/modules/ts-raw/components/TransferModal.vue'
-import { useToastStore } from '@/stores/toast'
+import { useToastStore } from '@/stores/toast.js'
 
 const store = useTsRawRmEntryStore()
 const confirmStore = useConfirmStore()

@@ -145,9 +145,6 @@ class TransferRepository implements TransferRepositoryInterface
         $result = collect(DB::connection($this->connection)->select(
             "SELECT a.entry_date, b.material_document,
                     th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_tank,
-                    t_from.description AS from_sloc_name,
-                    
-                    t_to.description AS to_sloc_name,
                     
                     CAST(a.trace_no AS CHAR) AS trace_no,
                     FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty,
@@ -168,15 +165,11 @@ class TransferRepository implements TransferRepositoryInterface
                         ' / Qty : ', ROUND(e.init_qty,3), ' MT / Qty : ', ROUND(e.qty,3), ' MT')
                         SEPARATOR ' | ') AS supplier,
                     IF(ABS(COALESCE(bs.init_qty,0) - a.init_qty) > 0.005, FORMAT(COALESCE(bs.init_qty,0),3), FORMAT(a.init_qty,3)) AS balance_supplier,
-                    CONCAT(
-                        COALESCE(GROUP_CONCAT(DISTINCT h_from.description ORDER BY h_from.description SEPARATOR ' & '), t_from.description, ''),
-                        ' >>> ',
-                        COALESCE(GROUP_CONCAT(DISTINCT h_to.description ORDER BY h_to.description SEPARATOR ' & '), t_to.description, '')
-                    ) AS raw_sloc,
+                    ' >>> ' AS raw_sloc,
                     a.id_sloc AS raw_id_sloc_to, th_from.id_sloc AS raw_id_sloc_from,
                     
-                    t_from.id_plant AS from_plant_id,
-                    t_to.id_plant AS to_plant_id
+                    a.id_plant AS from_plant_id,
+                    a.id_plant AS to_plant_id
                FROM t_balance_header a
                LEFT JOIN (SELECT b.id_balance_head, b.id_trace_head, b.from_trace_no,
                                  d.material_document,
@@ -306,11 +299,7 @@ class TransferRepository implements TransferRepositoryInterface
             } elseif (($item->from_plant_id ?? 0) == 1001) {
                 $item->sloc = "EOMB >>> " . trim($toPart);
             } else {
-                $item->sloc = str_replace(
-                    [$item->raw_from_desc ?? 'UNKNOWN_FROM', $item->raw_to_desc ?? 'UNKNOWN_TO'],
-                    [$fromFormatted ?? '', $toFormatted ?? ''],
-                    $item->raw_sloc
-                );
+                $item->sloc = trim($fromPart) . " >>> " . trim($toPart);
             }
 
             return $item;

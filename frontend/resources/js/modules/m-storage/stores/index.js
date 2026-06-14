@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import * as storageApi from '../services'
+import * as storageApi from '../services/index.js'
 
 export const useSetupStorageStore = defineStore('setupStorage', () => {
   const tanks      = ref([])

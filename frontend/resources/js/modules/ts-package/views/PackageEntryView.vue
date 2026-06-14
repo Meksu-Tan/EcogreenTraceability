@@ -157,9 +157,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import { usePackageEntryStore } from '../stores/usePackageEntryStore'
-import { useConfirmStore } from '@/stores/confirm'
+import { useConfirmStore } from '@/stores/confirm.js'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import PackageEntryModal from './PackageEntryModal.vue'

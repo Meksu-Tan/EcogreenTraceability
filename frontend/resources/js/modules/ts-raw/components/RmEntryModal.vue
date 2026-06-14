@@ -305,9 +305,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useTsRawRmEntryStore } from '@/modules/ts-raw/stores'
-import { usePlantSelectionStore } from '@/stores/plant'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { usePlantSelectionStore } from '@/stores/plant.js'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 const confirmStore = useConfirmStore()
 

@@ -210,7 +210,7 @@ trait WipEntryQueryTrait
     
     protected function mapSlocDescriptions(array $rows, string $slocField = 'sloc'): array
     {
-        if (empty($rows)) return $this->mapSlocDescriptions($rows);
+        if (empty($rows)) return $rows;
         
         $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
             ->table('m_sloc')
@@ -256,7 +256,7 @@ trait WipEntryQueryTrait
                 // it is already stored in tf_number
             }
         }
-        return $this->mapSlocDescriptions($rows);
+        return $rows;
     }
 
     protected function getFeedWithMaterialSign(string $feedId, string $feedPrefix, string $mode, $idPlant): array

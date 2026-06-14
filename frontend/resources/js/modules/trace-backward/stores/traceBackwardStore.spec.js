@@ -17,7 +17,7 @@ vi.mock('@/modules/ts-shipment/services/shipmentService', () => ({
   },
 }))
 
-import traceApi from '@/modules/trace-backward/services'
+import traceApi from '@/modules/trace-backward/services/index.js'
 import shipmentService from '@/modules/ts-shipment/services/shipmentService'
 import { useTraceBackwardStore } from './traceBackwardStore'
 

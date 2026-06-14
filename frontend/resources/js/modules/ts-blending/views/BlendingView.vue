@@ -218,9 +218,9 @@
 </template>
 
 <script setup>
-import { useConfirmStore } from '@/stores/confirm'
+import { useConfirmStore } from '@/stores/confirm.js'
 import { ref, watch, reactive, computed } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTsBlendingStore } from '@/modules/ts-blending/stores'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import BlendingModal from '@/modules/ts-blending/components/BlendingModal.vue'

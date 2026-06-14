@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import transferApi from '../services'
-import { useToastStore } from '@/stores/toast'
+import transferApi from '../services/index.js'
+import { useToastStore } from '@/stores/toast.js'
 
 export const useTsTransferStore = defineStore('transactionTransfer', () => {
   const toastStore = useToastStore()

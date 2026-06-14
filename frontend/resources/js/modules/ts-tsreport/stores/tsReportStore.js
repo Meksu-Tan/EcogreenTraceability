@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import tsReportApi from '@/modules/ts-tsreport/services'
+import tsReportApi from '@/modules/ts-tsreport/services/index.js'
 export const useTsReportStore = defineStore('tsReport', () => {
   const tsReportData = ref([]), rmSection = ref([]), pckSection = ref([]), shipmentSection = ref([]), transferSection = ref([]), wipSection = ref([]), loading = ref(false), error = ref(null)
   async function fetchTsReport(params = {}) { loading.value = true; error.value = null; try { const r = await tsReportApi.getTsReport(params); tsReportData.value = r.data?.data || r.data || [] } catch (e) { error.value = e.message; tsReportData.value = [] } finally { loading.value = false } }

@@ -62,8 +62,8 @@ import DataTable from '@/modules/shared/components/DataTable.vue'
 import MaterialModal from './MaterialModal.vue'
 import MaterialPackagingTab from './MaterialPackagingTab.vue'
 import { useSetupMaterialStore } from '@/modules/m-material/stores'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 const store           = useSetupMaterialStore()
 const toast           = useToastStore()

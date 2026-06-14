@@ -87,7 +87,7 @@ import LayoutThemeSwitcher from './components/ThemeSwitcher.vue'
 import LayoutUserProfile from './components/UserProfile.vue'
 import AppToast from '@/modules/shared/components/AppToast.vue'
 import ConfirmDialog from '@/modules/shared/components/ConfirmDialog.vue'
-import { useConfirmStore } from '@/stores/confirm'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 const confirmStore = useConfirmStore()
 const drawer = ref(true)

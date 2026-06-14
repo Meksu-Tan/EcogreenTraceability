@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import blendingApi from '../services'
-import { useToastStore } from '@/stores/toast'
+import blendingApi from '../services/index.js'
+import { useToastStore } from '@/stores/toast.js'
 
 export const useTsBlendingStore = defineStore('transactionBlending', () => {
   const toastStore = useToastStore()

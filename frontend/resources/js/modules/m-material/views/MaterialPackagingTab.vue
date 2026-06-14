@@ -27,8 +27,8 @@ import { ref, onMounted } from 'vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import MaterialPackagingModal from './MaterialPackagingModal.vue'
 import { useSetupMaterialStore } from '@/modules/m-material/stores'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 defineExpose({ openModal })
 

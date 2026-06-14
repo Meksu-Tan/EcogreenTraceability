@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { useAuthStore } from '@/stores/auth.js'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 
 const baseRoutes = [
   {

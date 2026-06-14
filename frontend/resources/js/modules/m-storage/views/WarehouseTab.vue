@@ -18,8 +18,8 @@ import { ref, onMounted } from 'vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import StorageWarehouseModal from './StorageWarehouseModal.vue'
 import { useSetupStorageStore } from '@/modules/m-storage/stores'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 defineExpose({ openModal })
 

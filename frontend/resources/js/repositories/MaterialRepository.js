@@ -2,7 +2,7 @@
  * @note Naming convention mismatch: this file lives in `repositories/` but should be in `services/`
  *       per project convention (View → Store → Service → Axios). Rename deferred due to risk.
  */
-import * as MaterialApi from '@/modules/m-material/services'
+import * as MaterialApi from '@/modules/m-material/services/index.js'
 
 class MaterialRepository {
   async all() {

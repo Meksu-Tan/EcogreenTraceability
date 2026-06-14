@@ -276,8 +276,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useStockStore } from '../stores/stockStore'
-import { useToastStore } from '@/stores/toast'
-import stockApi from '../services'
+import { useToastStore } from '@/stores/toast.js'
+import stockApi from '../services/index.js'
 
 const stockStore = useStockStore()
 const toastStore = useToastStore()

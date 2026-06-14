@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import traceApi from '@/modules/trace-backward/services'
+import traceApi from '@/modules/trace-backward/services/index.js'
 import shipmentService from '@/modules/ts-shipment/services/shipmentService'
 
 export const useTraceBackwardStore = defineStore('traceBackward', () => {

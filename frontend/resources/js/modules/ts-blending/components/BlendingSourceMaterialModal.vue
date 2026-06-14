@@ -69,7 +69,7 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
 import { useTsBlendingStore } from '../stores'
-import { useToastStore } from '@/stores/toast'
+import { useToastStore } from '@/stores/toast.js'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },

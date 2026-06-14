@@ -1,4 +1,4 @@
-import { useSetupPlantStore, usePlantSelectionStore } from '@/stores/plant'
+import { useSetupPlantStore, usePlantSelectionStore } from '@/stores/plant.js'
 
 export default {
   name: 'm-plant',

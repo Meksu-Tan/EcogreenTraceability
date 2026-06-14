@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import stockApi from '@/modules/ts-stock/services'
+import stockApi from '@/modules/ts-stock/services/index.js'
 
 export const useStockStore = defineStore('stock', () => {
   const stockData = ref([])

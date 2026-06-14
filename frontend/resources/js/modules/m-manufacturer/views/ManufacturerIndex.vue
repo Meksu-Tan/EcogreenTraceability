@@ -46,8 +46,8 @@ import { ref, onMounted } from 'vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import ManufacturerModal from './ManufacturerModal.vue'
 import { useSetupManufacturerStore } from '@/modules/m-manufacturer/stores'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 const store      = useSetupManufacturerStore()
 const toast      = useToastStore()

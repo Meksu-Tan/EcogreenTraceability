@@ -25,7 +25,7 @@
 
 <script setup>
 import { onMounted } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 
 const plantSelectionStore = usePlantSelectionStore()

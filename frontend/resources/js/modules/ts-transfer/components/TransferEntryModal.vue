@@ -242,9 +242,9 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTsTransferStore } from '../stores'
-import { useToastStore } from '@/stores/toast'
+import { useToastStore } from '@/stores/toast.js'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false }

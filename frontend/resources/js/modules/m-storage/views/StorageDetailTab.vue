@@ -39,8 +39,8 @@ import { useRouter } from 'vue-router'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import StorageTankModal   from './StorageTankModal.vue'
 import { useSetupStorageStore } from '@/modules/m-storage/stores'
-import { useToastStore } from '@/stores/toast'
-import { useConfirmStore } from '@/stores/confirm'
+import { useToastStore } from '@/stores/toast.js'
+import { useConfirmStore } from '@/stores/confirm.js'
 
 defineExpose({ openTankModal })
 

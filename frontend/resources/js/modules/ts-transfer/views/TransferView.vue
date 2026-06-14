@@ -194,9 +194,9 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTsTransferStore } from '@/modules/ts-transfer/stores'
-import { useToastStore } from '@/stores/toast'
+import { useToastStore } from '@/stores/toast.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import MaterialDocModal from '@/modules/ts-transfer/components/MaterialDocModal.vue'
 import TransferEntryModal from '@/modules/ts-transfer/components/TransferEntryModal.vue'
