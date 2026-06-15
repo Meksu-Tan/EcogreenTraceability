@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MaterialPackaging extends Model
 {
+    protected $connection = 'eudr_ts';
     protected $table      = 'm_material_pck';
     protected $primaryKey = 'id_materialpck';
 

@@ -21,7 +21,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array
     {
-        $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
+        $alias = $adjType === 'wh' ? 'a' : 'g';
+        $plantFilter = $this->buildTablePlantFilter($alias, $plantId, $userId);
 
         $whxColumns = $adjType === 'wh'
             ? ", wh.batch_no, wh.po_no, IFNULL(mwh.description, g.description) AS sloc_wh"
@@ -46,7 +47,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                    GROUP_CONCAT(DISTINCT CONCAT(e.description, ' / ', d.batch_sap, ' / Qty: ',
                       FORMAT(d.before_adjust,3), ' >>> ', FORMAT(d.after_adjust,3), ' MT') SEPARATOR ' | ') AS supplier,
                    a.created_by, a.created_at, a.status, a.after_adjust,
-                   CONCAT(g.description,
+                   CONCAT(
+                      IFNULL(MIN(g.description), ''),
                       IF(GROUP_CONCAT(DISTINCT h.description ORDER BY h.description ASC SEPARATOR ', ') IS NULL,
                           '',
                           CONCAT(' | ', GROUP_CONCAT(DISTINCT h.description ORDER BY h.description ASC SEPARATOR ', '))
@@ -73,8 +75,20 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     LEFT JOIN t_material_document ff ON f.id_trace_head = ff.id_trace_head AND ff.status = 1
                    WHERE f.status = 1
               ) f ON a.adjust_no = f.to_trace_no
-              LEFT JOIN m_sloc g ON g.id_sloc = a.id_sloc
-              LEFT JOIN m_sloc h ON c.id_sloc = h.id_sloc
+              LEFT JOIN m_sloc g ON (
+                  (a.id_sloc = CAST(g.id_sloc AS CHAR) COLLATE utf8mb4_general_ci)
+                  OR a.id_sloc LIKE CONCAT('%\"', g.id_sloc, '\"%') COLLATE utf8mb4_general_ci
+                  OR a.id_sloc LIKE CONCAT('%[', g.id_sloc, ',%') COLLATE utf8mb4_general_ci
+                  OR a.id_sloc LIKE CONCAT('%,', g.id_sloc, ']%') COLLATE utf8mb4_general_ci
+                  OR a.id_sloc LIKE CONCAT('%[', g.id_sloc, ']%') COLLATE utf8mb4_general_ci
+              ) AND g.status = 1
+              LEFT JOIN m_sloc h ON (
+                  (c.id_sloc = CAST(h.id_sloc AS CHAR) COLLATE utf8mb4_general_ci)
+                  OR c.id_sloc LIKE CONCAT('%\"', h.id_sloc, '\"%') COLLATE utf8mb4_general_ci
+                  OR c.id_sloc LIKE CONCAT('%[', h.id_sloc, ',%') COLLATE utf8mb4_general_ci
+                  OR c.id_sloc LIKE CONCAT('%,', h.id_sloc, ']%') COLLATE utf8mb4_general_ci
+                  OR c.id_sloc LIKE CONCAT('%[', h.id_sloc, ']%') COLLATE utf8mb4_general_ci
+              ) AND h.status = 1
               {$whxJoin}
              WHERE a.status IN (1, 2, 3, 4)
                AND SUBSTRING(a.adjust_no, 1, 1) = '9'
@@ -202,13 +216,14 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
     public function createAdjustmentHeader(string $user, array $data, mixed $plantId): array
     {
         $resolvedCode = PlantContextService::resolvePlantId($plantId);
+        $idSlocVal = !empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['id_tank'] ?? null];
+        $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
 
         $id = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
             'entry_date' => $data['entry_date'],
             'adjust_no' => $data['adjust_no'],
             'id_material' => $data['id_material'],
-            'id_tank' => $data['id_tank'],
-            'id_tank_tail' => $data['id_tank_tail'] ?? null,
+            'id_sloc' => $idSlocJson,
             'id_balance_head' => $data['id_balance_head'] ?? null,
             'adjustment_type' => $data['adjustment_type'] ?? 'physical',
             'before_adjust' => $data['before_adjust'] ?? 0,
@@ -584,13 +599,16 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $newPrevBalQty = $prevBalQty + $prevTraceOutQty - $newPrevTraceOutQty;
         if ($newPrevBalQty < 0) return [['response' => 9]];
 
+        $idSlocVal = !empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['id_tank'] ?? $idTank];
+        $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
+
         /* ── Insert adjustment header ── */
         $idAdjustHead = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
             'entry_date' => $entryDate,
             'adjust_no' => $batchNo,
             'id_balance_head' => $idHead,
             'id_material' => $idMaterial,
-            'id_tank' => $idTank,
+            'id_sloc' => $idSlocJson,
             'id_plant' => $idPlant,
             'in_qty' => $inQty,
             'out_qty' => 0,
@@ -1136,8 +1154,11 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $idMaterial = (int) ($data['id_material'] ?? 0);
         $materialDoc = $data['material_doc'] ?? null;
         $mode = $data['mode'] ?? 'ADD';
-        $idTankTail = [];
-        $idTankTailJson = '[]';
+        $idTankTail = $data['tankNo'] ?? [];
+        $idTankTailJson = is_array($idTankTail) ? json_encode($idTankTail) : (string) $idTankTail;
+        $idSlocVal = !empty($data['tankNo']) ? (is_array($data['tankNo']) ? $data['tankNo'] : [$data['tankNo']]) : [$data['tank'] ?? $idTank];
+        $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
+
         $suppliers = DB::connection($this->connection)->select(
             'SELECT id_supplier, qty AS qty_tail, batch_sap FROM t_balance_temporary WHERE entry_no = ?',
             [$entryNo]
@@ -1155,14 +1176,13 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $batchId = $matl->id_rundown ?? '00';
         $newEntryNo = $batchMoveType . $batchEntryDate . $batchId . $lastTwoDigitIdPlant . $batchSequence;
 
-        $idTankTailJson = json_encode($idTankTail);
-
         if ($mode === 'ADD') {
             /* ── Insert balance header ── */
             $idHead = DB::connection($this->connection)->table('t_balance_header')->insertGetId([
                 'trace_no' => $newEntryNo,
                 'id_material' => $idMaterial,
-                'id_sloc' => $idTank,
+                'id_sloc' => $idSlocJson,
+                'id_sloc_tail' => $idTankTailJson,
                 'entry_date' => $entryDate,
                 'qty' => $qty,
                 'in_qty' => $qty,
@@ -1177,7 +1197,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'id_balance_head' => $idHead,
                 'id_material' => $idMaterial,
                 'entry_date' => $entryDate,
-                'id_sloc' => $idTank,
+                'id_sloc' => $idSlocJson,
                 'id_tank_tail' => $idTankTailJson,
                 'in_qty' => $qty,
                 'id_plant' => $idPlant,
@@ -1190,7 +1210,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'adjust_no' => $newEntryNo,
                 'id_balance_head' => $idHead,
                 'id_material' => $idMaterial,
-                'id_sloc' => $idTank,
+                'id_sloc' => $idSlocJson,
                 'in_qty' => $qty,
                 'before_adjust' => 0,
                 'after_adjust' => $qty,
@@ -1344,13 +1364,16 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             if ($available < $adjustQty) return [['response' => 15]];
         }
 
+        $idSlocVal = !empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['id_tank'] ?? $idTank];
+        $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
+
         /* ── Insert adjustment header ── */
         $idAdjustHead = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
             'entry_date' => $entryDate,
             'adjust_no' => $entryNo,
             'id_balance_head' => $idHead,
             'id_material' => $idMaterial,
-            'id_tank' => $idTank,
+            'id_sloc' => $idSlocJson,
             'in_qty' => $adjustType === 'in' ? $adjustQty : 0,
             'out_qty' => $adjustType === 'out' ? $adjustQty : 0,
             'before_adjust' => 0,
@@ -1764,7 +1787,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         return DB::connection($this->connection)->select(
             'SELECT a.id_adjust_head, a.adjust_no, a.entry_date, a.status,
                     CONCAT(c.code, " :: ", c.description) AS material,
-                    g.description AS tank,
+                    MIN(g.description) AS tank,
                     a.before_adjust, a.after_adjust,
                     CASE a.status
                       WHEN 1 THEN "DRAFT"
@@ -1775,9 +1798,16 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     END AS status_label
                FROM t_adjustment_header a
                LEFT JOIN m_material c ON a.id_material = c.id_material
-               LEFT JOIN m_sloc g ON a.id_sloc = g.id_sloc
+               LEFT JOIN m_sloc g ON (
+                   (a.id_sloc = CAST(g.id_sloc AS CHAR) COLLATE utf8mb4_general_ci)
+                   OR a.id_sloc LIKE CONCAT("%\"", g.id_sloc, "\"%") COLLATE utf8mb4_general_ci
+                   OR a.id_sloc LIKE CONCAT("%[", g.id_sloc, ",%") COLLATE utf8mb4_general_ci
+                   OR a.id_sloc LIKE CONCAT("%,", g.id_sloc, "]%") COLLATE utf8mb4_general_ci
+                   OR a.id_sloc LIKE CONCAT("%[", g.id_sloc, "]%") COLLATE utf8mb4_general_ci
+               ) AND g.status = 1
               WHERE a.status IN (1, 2)
                 AND a.id_plant = ?
+               GROUP BY a.id_adjust_head
                ORDER BY a.id_adjust_head DESC
                LIMIT 10',
             [$idPlant]
@@ -1866,11 +1896,13 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         }
         $adjustNo = $batchMapping . str_pad((string) $nextSeq, 4, '0', STR_PAD_LEFT);
 
+        $idSlocJson = json_encode([(string) $idWarehouse]);
+
         $idHead = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
             'adjust_no' => $adjustNo,
             'entry_date' => $entryDate,
             'id_material' => $idMaterialPck,
-            'id_tank' => $idWarehouse,
+            'id_sloc' => $idSlocJson,
             'id_plant' => $idPlant,
             'before_adjust' => 0,
             'after_adjust' => $adjustQty,

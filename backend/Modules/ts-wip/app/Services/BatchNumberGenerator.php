@@ -14,17 +14,13 @@ namespace Modules\TsWip\Services;
  *  PP     = last 2 chars of plant code_3
  *  SS     = daily sequence (01–99)
  */
+use Modules\Shared\Services\TraceNumberGeneratorService;
+
 class BatchNumberGenerator
 {
     public static function parse(string $batchNo): array
     {
-        return [
-            'prefix'   => substr($batchNo, 0, 1),
-            'date'     => substr($batchNo, 1, 6),
-            'section'  => substr($batchNo, 7, 3),
-            'plant'    => substr($batchNo, 10, 2),
-            'sequence' => substr($batchNo, 12, 2),
-        ];
+        return TraceNumberGeneratorService::parse($batchNo);
     }
 
     public static function format(
@@ -34,7 +30,7 @@ class BatchNumberGenerator
         string $plant,
         int $sequence
     ): string {
-        return $prefix . $date . $section . $plant . str_pad((string) $sequence, 2, '0', STR_PAD_LEFT);
+        return TraceNumberGeneratorService::format($prefix, $date, $section, $plant, $sequence);
     }
 
     /**

@@ -5,8 +5,14 @@ use Modules\TsBlending\Http\Controllers\BlendingController;
 Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('transactions/blendings')->group(function () {
         Route::get('/', [BlendingController::class, 'index']);
-        Route::post('/', [BlendingController::class, 'store']);
         Route::delete('{id}', [BlendingController::class, 'destroy']);
+        
+        // REST Endpoints replacing monolithic store()
+        Route::post('material', [BlendingController::class, 'storeMaterial']);
+        Route::post('execute', [BlendingController::class, 'executeBlending']);
+        Route::post('matl-doc', [BlendingController::class, 'createMatlDoc']);
+        Route::post('update-sub-tank', [BlendingController::class, 'updateSubTank']);
+        Route::delete('material/{id}', [BlendingController::class, 'deleteMaterial']);
 
         Route::get('active-materials', [BlendingController::class, 'activeMaterials']);
         Route::get('new-entry-no', [BlendingController::class, 'newEntryNo']);

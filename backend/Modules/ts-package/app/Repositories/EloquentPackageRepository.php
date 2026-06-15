@@ -32,6 +32,30 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                    GROUP_CONCAT(DISTINCT CONCAT(d.description, " / ", d.batch_sap, " / Init: ", FORMAT(d.init_qty,3), " MT / Balance: ", FORMAT(d.qty,3), " MT") SEPARATOR " | ") AS supplier,
                    FORMAT(SUM(DISTINCT dd.init_qty),3) AS balance_supplier,
                    CASE
+                      WHEN LENGTH(CAST(a.trace_no AS CHAR)) >= 14 THEN
+                         CASE SUBSTRING(a.trace_no, 11, 2)
+                            WHEN "01" THEN "EOMB"
+                            WHEN "02" THEN "EOB1"
+                            WHEN "03" THEN "EOB2"
+                            WHEN "05" THEN "EOB5"
+                            WHEN "07" THEN "EOB3"
+                            ELSE CASE a.id_plant
+                                WHEN "1002" THEN "EOB1"
+                                WHEN "1003" THEN "EOB2"
+                                WHEN "1007" THEN "EOB3"
+                                WHEN "1001" THEN "EOMB"
+                                ELSE COALESCE(a.id_plant, "EOB1")
+                            END
+                         END
+                      ELSE CASE a.id_plant
+                          WHEN "1002" THEN "EOB1"
+                          WHEN "1003" THEN "EOB2"
+                          WHEN "1007" THEN "EOB3"
+                          WHEN "1001" THEN "EOMB"
+                          ELSE COALESCE(a.id_plant, "EOB1")
+                      END
+                   END AS plant_name,
+                   CASE
                       WHEN a.trace_no = (SELECT to_trace_no
                                            FROM t_trace_header
                                           WHERE SUBSTRING(to_trace_no, 8, 3) <> "000"

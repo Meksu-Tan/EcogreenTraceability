@@ -36,6 +36,7 @@ class PackageEntryResource extends JsonResource
             'balance_supplier' => $this->balance_supplier,
             'is_last_row' => $this->is_last_row,
             'next_process' => $this->next_process,
+            'plant_name' => $this->plant_name,
         ];
     }
 }

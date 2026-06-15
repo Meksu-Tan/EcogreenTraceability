@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import wipApi from '../services/wip'
 import { useToastStore } from '@/stores/toast.js'
 import { usePlantSelectionStore } from '@/stores/plant.js'
+import { useTransactionList } from '@/composables/useTransactionList.js'
 
 // GAP #9: Renamed from useTsRawWipEntryStore to useTsWipEntryStore
 export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
@@ -19,10 +20,20 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   const feedLogs = ref({})
   const rundownLatest = ref({})
   const rundownLogs = ref({})
-  const balanceData = ref([])
+
+  const {
+    list: balanceData,
+    loading: balanceLoading,
+    error: balanceError,
+    pagination: balanceMeta,
+    setPage: setBalancePage,
+    fetchList: doFetchBalance
+  } = useTransactionList(
+    (params) => wipApi.getBalance(params.rundownId, params),
+    { listKey: 'balanceData' }
+  )
 
   // Pagination meta from server
-  const balanceMeta = ref({ total: 0, page: 1, per_page: 5 })
   const feedLogMeta = ref({})
   const rundownLogMeta = ref({})
 
@@ -117,16 +128,8 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   }
 
   async function fetchBalance(rundownId, params = {}, page = 1) {
-    try {
-      const res = await wipApi.getBalance(rundownId, { id_plant: plantId.value || 0, page, ...params })
-      balanceData.value = res.data || []
-      balanceMeta.value = { total: res.total || 0, page: res.page || page, per_page: res.per_page || 5 }
-      return res
-    } catch (error) {
-      balanceData.value = []
-      balanceMeta.value = { total: 0, page: 1, per_page: 5 }
-      return { data: [], total: 0, page: 1, per_page: 5 }
-    }
+    setBalancePage(page)
+    return doFetchBalance({ rundownId, id_plant: plantId.value || 0, ...params })
   }
 
   async function fetchFeedNewBatchNumber(feedID) {
@@ -277,8 +280,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     }
     loading.value = true
     try {
-      const res = await wipApi.store({
-        flag: 'post_materialFeed',
+      const res = await wipApi.storeFeed({
         ...data,
         id_plant: plantId.value,
         feature: data.feature || 'FEED',
@@ -305,8 +307,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     }
     loading.value = true
     try {
-      const res = await wipApi.store({
-        flag: 'post_materialRundown',
+      const res = await wipApi.storeRundown({
         ...data,
         id_plant: plantId.value,
         feature: data.feature || 'RUNDOWN',
@@ -329,11 +330,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   async function cancelFeed(traceNo, feedId) {
     loading.value = true
     try {
-      const res = await wipApi.store({
-        flag: 'post_cancelFeed',
-        traceNo,
-        id_plant: plantId.value,
-      })
+      const res = await wipApi.cancelFeed(traceNo, plantId.value)
       if (res.status === 1) {
         toastStore.success(res.message || 'Feed cancelled')
         await fetchFeed(feedId, 'LOG')
@@ -352,11 +349,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   async function cancelRundown(traceNo, rundownId) {
     loading.value = true
     try {
-      const res = await wipApi.store({
-        flag: 'post_cancelRundown',
-        traceNo,
-        id_plant: plantId.value,
-      })
+      const res = await wipApi.cancelRundown(traceNo, plantId.value)
       if (res.status === 1) {
         toastStore.success(res.message || 'Rundown cancelled')
         await fetchRundown(rundownId, 'LOG')
@@ -374,12 +367,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
 
   async function saveMaterialDocument(mode, id, number) {
     try {
-      const res = await wipApi.store({
-        flag: 'post_matlDocNumber',
-        mode,
-        id,
-        number,
-      })
+      const res = await wipApi.postMaterialDocument(mode, id, number)
       if (res.status === 1) {
         toastStore.success(res.message || 'Material document saved')
       } else {
@@ -394,11 +382,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
 
   async function updateEntrySubTank(idHead, idTankTail) {
     try {
-      const res = await wipApi.store({
-        flag: 'post_updateEntrySubTank',
-        idHead,
-        idTankTail,
-      })
+      const res = await wipApi.updateSubTank(idHead, idTankTail)
       if (res.status === 1) {
         toastStore.success('Sub-tank updated')
       } else {
@@ -454,7 +438,10 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     rundownLatest,
     rundownLogs,
     balanceData,
+    balanceLoading,
+    balanceError,
     balanceMeta,
+    setBalancePage,
     feedLogMeta,
     rundownLogMeta,
     activeTanksFeed,

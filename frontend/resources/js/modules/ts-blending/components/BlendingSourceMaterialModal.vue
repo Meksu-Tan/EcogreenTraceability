@@ -119,7 +119,8 @@ function onMaterialChange() {
   if (form.idMaterialSource) {
     blendingStore.fetchTotalStockMaterial({
       idMaterial: form.idMaterialSource,
-      idTank: props.idTank
+      idTank: props.idTank,
+      id_plant: props.idPlant
     })
   } else {
     blendingStore.totalStock = 0

@@ -13,7 +13,7 @@ interface TransferRepositoryInterface
 
     public function getTransferList(int $plantId, int $page = 1, int $perPage = 5): array;
 
-    public function getActiveTanksRundown(?int $materialId, int $plantId): Collection;
+    public function getActiveTanksRundown(?int $materialId, int $plantId, bool $excludePlant = true): Collection;
 
     public function getActiveSpecificTanksRundown(int $sloc): Collection;
 

@@ -5,38 +5,15 @@ use Illuminate\Support\Facades\DB;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
 
+use Modules\Shared\Traits\TransactionLoggerTrait;
+
 trait WipEntryWriteTrait
 {
+    use TransactionLoggerTrait;
     public function postMaterialDocument(string $mode, int $idTraceHead, string $materialDoc, string $user): array
     {
-        if ($mode === 'ADD') {
-            $result = DB::connection('eudr_ts')->insert(
-                'INSERT INTO t_material_document (id_trace_head, material_document, created_by) VALUES (?, ?, ?)',
-                [$idTraceHead, $materialDoc, $user]
-            );
-
-            $id = DB::connection('eudr_ts')->select('SELECT id_matdoc FROM t_material_document ORDER BY id_matdoc DESC LIMIT 1');
-            $this->logTransaction('T_MATERIAL_DOCUMENT', 'ADD',
-                'ID: ' . $id[0]->id_matdoc . ' | IDTRACEHEAD: ' . $idTraceHead . ' / DOC_NO: ' . $materialDoc . ' | Status: 1', $user);
-
-            return [['response' => $result ? '1' : '0']];
-        }
-
-        $dat = DB::connection('eudr_ts')->select(
-            'SELECT id_matdoc, material_document FROM t_material_document WHERE id_trace_head = ?', [$idTraceHead]
-        );
-        if (empty($dat)) return [['response' => '0']];
-
-        $oldDoc = $dat[0]->material_document;
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_material_document SET material_document = ?, updated_by = ? WHERE id_trace_head = ?',
-            [$materialDoc, $user, $idTraceHead]
-        );
-
-        $this->logTransaction('T_MATERIAL_DOCUMENT', 'UPDATE',
-            'ID: ' . $dat[0]->id_matdoc . ' | IDTRACEHEAD: ' . $idTraceHead . ' / DOC_NO: ' . $oldDoc . ' >>> ' . $materialDoc . ' | Status: 1', $user);
-
-        return [['response' => '1']];
+        return app(\Modules\Shared\Services\TransactionCoreService::class)
+            ->createMaterialDocument($user, $idTraceHead, $materialDoc, $mode);
     }
 
     public function postMaterialFeed(array $data, string $user): array
@@ -569,44 +546,9 @@ trait WipEntryWriteTrait
 
     public function updateEntrySubTank(int $idHead, array $tails, string $user): array
     {
-        $jsonTails = json_encode(array_values(array_unique($tails)));
-
-        $row = DB::connection('eudr_ts')->selectOne(
-            'SELECT trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1', [$idHead]
-        );
-        if (!$row) return [['response' => '0', 'message' => 'HEAD NOT FOUND']];
-
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_balance_header SET id_sloc = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
-        );
-
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_trace_header SET id_sloc = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
-        );
-
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_balance_detail SET id_sloc = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$jsonTails, $user, $idHead]
-        );
-
-        DB::connection('eudr_ts')->update('
-            UPDATE t_trace_detail SET id_sloc = ?, updated_by = ?
-            WHERE id_trace_head IN (SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ?)
-        ', [$jsonTails, $user, $idHead]);
-
-        $this->logTransaction('T_BALANCE_HEAD', 'UPDATE_SUBTANK',
-            'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SUBTANKS: ' . implode(',', $tails), $user);
-
-        return [['response' => '1']];
+        return app(\Modules\Shared\Services\TransactionCoreService::class)
+            ->updateEntrySubTank($user, $idHead, $tails);
     }
 
-    public function logTransaction(string $module, string $type, string $description, string $user): void
-    {
-        DB::connection('eudr_ts')->insert(
-            'INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)',
-            [$module, $type, $description, $user]
-        );
-    }
+
 }

@@ -140,9 +140,12 @@ class TransferController extends Controller
         $materialId = $request->has('idMaterial')
             ? (int) $request->input('idMaterial')
             : null;
+        $excludePlant = $request->has('exclude_plant')
+            ? filter_var($request->input('exclude_plant'), FILTER_VALIDATE_BOOLEAN)
+            : true;
 
         try {
-            $data = $this->transferService->getActiveTanksRundown($materialId, $plantId);
+            $data = $this->transferService->getActiveTanksRundown($materialId, $plantId, $excludePlant);
             return ApiResponse::success($data);
         } catch (\Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);

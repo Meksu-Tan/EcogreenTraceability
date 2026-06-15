@@ -3,14 +3,32 @@ import { ref, computed } from 'vue'
 import shipmentService from '../services/shipmentService'
 import { useToastStore } from '@/stores/toast.js'
 import { usePlantSelectionStore } from '@/stores/plant.js'
+import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
   const toastStore = useToastStore()
   const plantStore = usePlantSelectionStore()
 
-  // State
-  const entries = ref([])
-  const loading = ref(false)
+  const {
+    list: entries,
+    loading,
+    error,
+    pagination,
+    setPage,
+    resetCache: resetListCache,
+    fetchList: doFetchList,
+    isFresh,
+    touch,
+    hasEntries,
+    entriesCount
+  } = useTransactionList(
+    (params) => shipmentService.getEntries(params),
+    { listKey: 'entries' }
+  )
+
+  async function fetchEntries(params = {}) {
+    return doFetchList({ plant: plantId.value, ...params })
+  }
   const activeFgProducts = ref([])
   const wipBalance = ref(0)
   const wipMaterialLabel = ref('')
@@ -28,19 +46,7 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
   const plantId = computed(() => plantStore.selectedPlantId)
 
   // Actions
-  async function fetchEntries() {
-    loading.value = true
-    try {
-      const res = await shipmentService.getEntries({ plant: plantId.value })
-      if (res.data?.status === 1 || res.data?.data) {
-        entries.value = res.data.data?.data || res.data.data || []
-      }
-    } catch (error) {
-      toastStore.error('Failed to load shipment entries')
-    } finally {
-      loading.value = false
-    }
-  }
+  // fetchEntries is replaced by the composable wrapper
 
   async function fetchActiveFgProducts() {
     try {
@@ -194,7 +200,11 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
   return {
     entries,
     loading,
-    activeFgProducts,
+    error,
+    pagination,
+    setPage,
+    hasEntries,
+    entriesCount,
     wipBalance,
     wipMaterialLabel,
     activeBatches,

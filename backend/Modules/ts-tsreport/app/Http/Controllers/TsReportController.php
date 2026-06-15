@@ -32,7 +32,8 @@ class TsReportController extends Controller
     public function getRmSection(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['entry_date', 'plant_id']);
+            $filters = $request->only(['entry_date', 'plant_id', 'id_plant']);
+            $filters['user_id'] = $request->user()?->id;
             $result = $this->tsReportService->getTsReportRm($filters);
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
@@ -46,7 +47,8 @@ class TsReportController extends Controller
     public function getPckSection(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['entry_date', 'plant_id']);
+            $filters = $request->only(['entry_date', 'plant_id', 'id_plant']);
+            $filters['user_id'] = $request->user()?->id;
             $result = $this->tsReportService->getTsReportPck($filters);
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
@@ -60,7 +62,8 @@ class TsReportController extends Controller
     public function getShipmentSection(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['entry_date', 'plant_id']);
+            $filters = $request->only(['entry_date', 'plant_id', 'id_plant']);
+            $filters['user_id'] = $request->user()?->id;
             $result = $this->tsReportService->getTsReportShipment($filters);
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
@@ -74,7 +77,8 @@ class TsReportController extends Controller
     public function getTransferSection(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['entry_date', 'plant_id']);
+            $filters = $request->only(['entry_date', 'plant_id', 'id_plant']);
+            $filters['user_id'] = $request->user()?->id;
             return ApiResponse::success($this->tsReportService->getTsReportTransfer($filters));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
@@ -84,7 +88,8 @@ class TsReportController extends Controller
     public function getWipSection(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['entry_date', 'plant_id']);
+            $filters = $request->only(['entry_date', 'plant_id', 'id_plant']);
+            $filters['user_id'] = $request->user()?->id;
             return ApiResponse::success($this->tsReportService->getTsReport($filters));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
@@ -94,7 +99,8 @@ class TsReportController extends Controller
     public function getAllSections(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['entry_date', 'plant_id']);
+            $filters = $request->only(['entry_date', 'plant_id', 'id_plant']);
+            $filters['user_id'] = $request->user()?->id;
 
             if (empty($filters['entry_date'])) {
                 $filters['entry_date'] = now()->toDateString();

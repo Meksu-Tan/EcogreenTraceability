@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Supplier extends Model
 {
+    protected $connection = 'eudr_ts';
     protected $table      = 'm_supplier';
     protected $primaryKey = 'id_supplier';
 

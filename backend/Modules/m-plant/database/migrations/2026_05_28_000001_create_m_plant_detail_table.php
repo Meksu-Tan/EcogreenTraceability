@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    protected $connection = 'eudr_ts';
+
     public function up(): void
     {
         Schema::create('m_plant_detail', function (Blueprint $table) {

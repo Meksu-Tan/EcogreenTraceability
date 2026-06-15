@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Warehouse extends Model
 {
+    protected $connection = 'eudr_ts';
     protected $table      = 'm_warehouse';
     protected $primaryKey = 'id_warehouse';
 

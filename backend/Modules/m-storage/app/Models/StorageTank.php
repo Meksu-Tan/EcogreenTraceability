@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class StorageTank extends Model
 {
+    protected $connection = 'eudr_ts';
     protected $table      = 'm_sloc';
     protected $primaryKey = 'id_sloc';
 

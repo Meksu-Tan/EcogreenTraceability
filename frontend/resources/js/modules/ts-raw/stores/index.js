@@ -4,6 +4,7 @@ import { rmEntryRepository, tankRepository, materialRepository, supplierReposito
 import transactionRmEntryApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
 import { registerCacheResetCallback } from '@/stores/plant.js'
+import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const toastStore = useToastStore()
@@ -14,9 +15,28 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const materialRepo = materialRepository
   const supplierRepo = supplierRepository
 
-  // State
-  const entries = ref([])
-  const loading = ref(false)
+  // Use the composable for the main list
+  const {
+    list: entries,
+    loading,
+    error,
+    pagination,
+    setPage,
+    resetCache: resetListCache,
+    fetchList: doFetchList,
+    isFresh,
+    touch,
+    hasEntries,
+    entriesCount
+  } = useTransactionList(
+    (params) => rmEntryRepo.getList(params),
+    { listKey: 'entries' }
+  )
+
+  async function fetchEntries(params = {}, force = false) {
+    return doFetchList(params, force)
+  }
+
   const feedLoading = ref(false)
   const tanks = ref([])
   const tankDetails = ref([])
@@ -33,50 +53,27 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   // Transfer state (moved from ts-transfer)
   const transferList = ref([])
   const destTanks = ref([])
-  const pagination = ref({ currentPage: 1, perPage: 5, total: 0, lastPage: 1 })
 
   const STALE_TIME = 30 * 1000
-  const _cache = { entries: 0, materials: 0, tanks: 0 }
+  const _cache = { materials: 0, tanks: 0 }
   function _isFresh(key) { return Date.now() - (_cache[key] || 0) < STALE_TIME }
   function _touch(key) { _cache[key] = Date.now() }
   function resetCache() { 
+    resetListCache()
     Object.keys(_cache).forEach(k => { _cache[k] = 0 })
     manufacturers.value = []
+    tanks.value = []
+    tankDetails.value = []
+    materials.value = []
+    suppliers.value = []
+    feedLogs.value = []
+    storageLogs.value = []
+    transferList.value = []
+    destTanks.value = []
   }
 
   // Register cache reset for plant change
   registerCacheResetCallback(resetCache)
-
-  // Getters
-  const entriesCount = computed(() => entries.value.length)
-  const hasEntries = computed(() => entries.value.length > 0)
-
-  // Actions
-  async function fetchEntries(params = {}, force = false) {
-    if (!force && _isFresh('entries') && entries.value.length > 0) return
-    loading.value = true
-    try {
-      const response = await rmEntryRepo.getList(params)
-      if (response && typeof response === 'object' && response.current_page !== undefined) {
-        entries.value = response.data || []
-        pagination.value = {
-          currentPage: response.current_page || 1,
-          perPage: response.per_page || 5,
-          total: response.total || 0,
-          lastPage: response.last_page || 1
-        }
-      } else {
-        entries.value = Array.isArray(response) ? response : []
-      }
-      _touch('entries')
-      return response
-    } catch (error) {
-      toastStore.error('Failed to fetch RM entries:')
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
 
   async function createEntry(data) {
     loading.value = true
@@ -350,19 +347,6 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     trfNumber.value = ''
     supplierList.value = []
     totalQty.value = '0.000'
-  }
-
-  function resetCache() {
-    // Reset all cached data for plant change scenarios
-    tanks.value = []
-    tankDetails.value = []
-    materials.value = []
-    suppliers.value = []
-    entries.value = []
-    feedLogs.value = []
-    storageLogs.value = []
-    transferList.value = []
-    destTanks.value = []
   }
 
   // Storage and Feed Log Actions (moved from ts-transfer)

@@ -31,12 +31,20 @@ class TransferService implements TransferServiceInterface
 
     public function generateEntryNo(int $materialId, int $plantId): ?string
     {
-        return $this->transferRepo->generateTransferEntryNo($materialId, $plantId);
+        $plantCode = 0;
+        if ($plantId > 0) {
+            $plantCode = (int) $this->resolvePlantCode($plantId);
+        }
+        return $this->transferRepo->generateTransferEntryNo($materialId, $plantCode);
     }
 
     public function getTotalStockMaterial(int $materialId, int $tankId, int $plantId): float
     {
-        return $this->transferRepo->getTotalStockMaterial($materialId, $tankId, $plantId);
+        $plantCode = 0;
+        if ($plantId > 0) {
+            $plantCode = (int) $this->resolvePlantCode($plantId);
+        }
+        return $this->transferRepo->getTotalStockMaterial($materialId, $tankId, $plantCode);
     }
 
     public function getTransferList(int $plantId, int $page = 1, int $perPage = 5): array
@@ -48,9 +56,13 @@ class TransferService implements TransferServiceInterface
         return $this->transferRepo->getTransferList($plantCode, $page, $perPage);
     }
 
-    public function getActiveTanksRundown(?int $materialId, int $plantId): array
+    public function getActiveTanksRundown(?int $materialId, int $plantId, bool $excludePlant = true): array
     {
-        return $this->transferRepo->getActiveTanksRundown($materialId, $plantId)->toArray();
+        $plantCode = 0;
+        if ($plantId > 0) {
+            $plantCode = (int) $this->resolvePlantCode($plantId);
+        }
+        return $this->transferRepo->getActiveTanksRundown($materialId, $plantCode, $excludePlant)->toArray();
     }
 
     public function getActiveSpecificTanksRundown(int $sloc): array
@@ -60,7 +72,11 @@ class TransferService implements TransferServiceInterface
 
     public function getUpdateSupplierMaterial(int $idMaterial, int $idTank, int $plantId): ?object
     {
-        return $this->transferRepo->getUpdateSupplierMaterial($idMaterial, $idTank, $plantId);
+        $plantCode = 0;
+        if ($plantId > 0) {
+            $plantCode = (int) $this->resolvePlantCode($plantId);
+        }
+        return $this->transferRepo->getUpdateSupplierMaterial($idMaterial, $idTank, $plantCode);
     }
 
     public function createMaterialDocument(string $user, int $idTraceHead, string $materialDoc, string $mode): array
@@ -156,11 +172,17 @@ class TransferService implements TransferServiceInterface
 
     private function runTransferTransaction(string $user, array $data, $params, $plants, $traceNos): array
     {
+        DB::connection('eudr_ts')->beginTransaction();
         try {
-            return DB::connection('eudr_ts')->transaction(
-                fn() => $this->processTransferTransaction($params, $plants, $traceNos, $user, $data)
-            );
+            $result = $this->processTransferTransaction($params, $plants, $traceNos, $user, $data);
+            if ($result['response'] == 1) {
+                DB::connection('eudr_ts')->commit();
+            } else {
+                DB::connection('eudr_ts')->rollBack();
+            }
+            return $result;
         } catch (Exception $e) {
+            DB::connection('eudr_ts')->rollBack();
             AuditService::logTransfer('CREATE', $data, $user, 0);
             return ['response' => 0, 'message' => $e->getMessage()];
         }
@@ -168,19 +190,26 @@ class TransferService implements TransferServiceInterface
 
     private function processTransferTransaction($params, $plants, $traceNos, $user, $data): array
     {
-        $feedResult = $this->executeTransferFeed($params, $plants, $traceNos, $user);
-        if ($feedResult['response'] != 1) return $feedResult;
-        $supplierRows = $this->extractSupplierRows($feedResult);
-        if ($supplierRows === null) {
-            DB::connection('eudr_ts')->rollBack();
-            return ['response' => 6];
-        }
-        $actualQty = round($feedResult['total_out'], 4);
-        $rundownResult = $this->executeTransferRundown(
-            $user, $params, $traceNos, $plants['destPlant'], $actualQty, $supplierRows
-        );
-        if ($rundownResult['response'] != 1) return $rundownResult;
-        $this->createDocumentIfProvided($user, $params->materialDoc, $rundownResult);
+        $feedParams = [
+            'qty' => $params->trfQty, 'id_material' => $params->idMaterial,
+            'id_sloc' => $params->trfSource, 'id_plant' => $plants['srcPlant'],
+            'to_trace_no' => $traceNos['feed'], 'entry_date' => $params->entryDate,
+            'user' => $user, 'trace_prefixes' => [1, 2, 7, 8, 9],
+        ];
+
+        $rundownParams = [
+            'user' => $user, 'entry_date' => $params->entryDate,
+            'trace_no' => $traceNos['rundown'], 'from_trace_no' => $traceNos['feed'],
+            'id_material' => $params->idMaterial, 'id_sloc' => $params->trfDestination,
+            'id_plant' => $plants['destPlant'], 'last_qtf' => 0,
+        ];
+
+        $orchestrator = app(\Modules\Shared\Services\FeedRundownOrchestrator::class);
+        $result = $orchestrator->executeFeedRundownSequence($feedParams, $rundownParams);
+
+        if ($result['response'] != 1) return $result;
+        
+        $this->createDocumentIfProvided($user, $params->materialDoc, $result);
         AuditService::logTransfer('CREATE', $data, $user, 1);
         return ['response' => 1];
     }
@@ -190,46 +219,6 @@ class TransferService implements TransferServiceInterface
         if (!empty($materialDoc) && isset($rundownResult['id_trace_head'])) {
             $this->transferRepo->createMaterialDocument($user, $rundownResult['id_trace_head'], $materialDoc, 'ADD');
         }
-    }
-
-    private function executeTransferFeed($params, $plants, $traceNos, $user): array
-    {
-        $feedResult = Feed::generalFeed([
-            'qty' => $params->trfQty, 'id_material' => $params->idMaterial,
-            'id_sloc' => $params->trfSource, 'id_plant' => $plants['srcPlant'],
-            'to_trace_no' => $traceNos['feed'], 'entry_date' => $params->entryDate,
-            'user' => $user, 'trace_prefixes' => [1, 2, 7, 8, 9],
-        ]);
-        if ($feedResult['response'] != 1) {
-            DB::connection('eudr_ts')->rollBack();
-            return ['response' => $feedResult['response']];
-        }
-        return $feedResult;
-    }
-
-    private function extractSupplierRows(array $feedResult): ?array
-    {
-        if (empty($feedResult['feed_in_details'])) return null;
-        return array_map(fn($d) => [
-            'id_supplier' => $d['id_supplier'], 'batch_sap' => $d['batch_sap'],
-            'rundownSupplier' => (float) $d['qty'],
-        ], $feedResult['feed_in_details']);
-    }
-
-    private function executeTransferRundown(string $user, $params, $traceNos, int $destPlant, float $actualQty, array $supplierRows): array
-    {
-        $result = Rundown::generalRundown([
-            'user' => $user, 'entry_date' => $params->entryDate,
-            'trace_no' => $traceNos['rundown'], 'from_trace_no' => $traceNos['feed'],
-            'id_material' => $params->idMaterial, 'id_sloc' => $params->trfDestination,
-            'id_plant' => $destPlant, 'in_qty' => $actualQty,
-            'last_qtf' => 0, 'curr_qtf' => $actualQty, 'supplier_rows' => $supplierRows,
-        ]);
-        if ($result['response'] != 1) {
-            DB::connection('eudr_ts')->rollBack();
-            return ['response' => 3];
-        }
-        return $result;
     }
 
     public function executeTransferWithAdjustment(string $user, array $data, int $plantId): array

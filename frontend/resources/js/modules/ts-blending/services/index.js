@@ -8,8 +8,28 @@ export default {
     return response.data
   },
 
-  async store(data) {
-    const response = await api.post(BASE_URL, data)
+  async storeMaterial(data) {
+    const response = await api.post(`${BASE_URL}/material`, data)
+    return response.data
+  },
+
+  async executeBlending(data) {
+    const response = await api.post(`${BASE_URL}/execute`, data)
+    return response.data
+  },
+
+  async createMatlDoc(data) {
+    const response = await api.post(`${BASE_URL}/matl-doc`, data)
+    return response.data
+  },
+
+  async updateSubTank(data) {
+    const response = await api.post(`${BASE_URL}/update-sub-tank`, data)
+    return response.data
+  },
+
+  async deleteMaterial(id) {
+    const response = await api.delete(`${BASE_URL}/material/${id}`)
     return response.data
   },
 

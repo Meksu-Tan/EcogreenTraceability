@@ -2,23 +2,40 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import transferApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
+import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const useTsTransferStore = defineStore('transactionTransfer', () => {
   const toastStore = useToastStore()
 
-  const transferList = ref([])
+  // Use the composable for the main list
+  const {
+    list: transferList,
+    loading,
+    error,
+    pagination,
+    setPage,
+    resetCache: resetListCache,
+    fetchList: doFetchList,
+    isFresh,
+    touch
+  } = useTransactionList(
+    (params) => transferApi.getTransferList(params.id_plant || 0, params.page || 1, params.per_page || 5),
+    { listKey: 'transferList' }
+  )
+
+  async function fetchTransferList(plantId = 0, page = 1, perPage = 5) {
+    return doFetchList({ id_plant: plantId, page, per_page: perPage })
+  }
+
   const activeMaterials = ref([])
   const activeTanks = ref([])
   const activeSpecificTanks = ref([])
   const currentEntryNo = ref('')
   const totalStock = ref(0)
   const supplierCode = ref(null)
-  const loading = ref(false)
-  const error = ref(null)
-  const pagination = ref({ currentPage: 1, perPage: 5, total: 0, lastPage: 1 })
 
   const STALE_TIME = 30 * 1000
-  const _cache = { transferList: 0, activeMaterials: 0 }
+  const _cache = { activeMaterials: 0 }
 
   function _isFresh(key) {
     return Date.now() - (_cache[key] || 0) < STALE_TIME
@@ -29,32 +46,8 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
   }
 
   function resetCache() {
+    resetListCache()
     Object.keys(_cache).forEach(k => { _cache[k] = 0 })
-  }
-
-  function setPage(p) {
-    pagination.value = { ...pagination.value, currentPage: p }
-  }
-
-  async function fetchTransferList(plantId = 0, page = 1, perPage = 5) {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await transferApi.getTransferList(plantId, page, perPage)
-      transferList.value = response?.data || []
-      pagination.value = {
-        currentPage: response?.current_page || 1,
-        perPage: response?.per_page || 5,
-        total: response?.total || 0,
-        lastPage: response?.last_page || 1
-      }
-      _touch('transferList')
-    } catch (err) {
-      error.value = err.response?.data?.message || err.message
-      transferList.value = []
-    } finally {
-      loading.value = false
-    }
   }
 
   async function fetchActiveMaterials() {

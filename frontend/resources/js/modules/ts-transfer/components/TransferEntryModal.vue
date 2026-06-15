@@ -285,14 +285,12 @@ const form = reactive({
 const plantId = computed(() => plantSelectionStore.selectedPlantId)
 
 const trfInLabel = computed(() => {
-  const map = { 1002: 'EOB1', 1003: 'EOB2', 1007: 'EOB3' }
-  const name = map[plantId.value] || 'EOMB'
+  const name = String(plantSelectionStore.selectedPlantName || 'EOMB').replace('-', ' ')
   return `- Trf IN to ${name} -`
 })
 
 const trfOutLabel = computed(() => {
-  const map = { 1002: 'EOB1', 1003: 'EOB2', 1007: 'EOB3' }
-  const name = map[plantId.value] || 'EOMB'
+  const name = String(plantSelectionStore.selectedPlantName || 'EOMB').replace('-', ' ')
   return `- Trf OUT from ${name} -`
 })
 
@@ -310,17 +308,41 @@ const materialOptions = computed(() => {
 })
 
 const sourceTankOptions = computed(() => {
-  return (sourceTanks.value || []).map(t => ({
-    value: String(t.id_sloc || t.id_tank),
-    label: String(t.tank || t.description || t.id_sloc || t.id_tank || 'Unknown')
-  }))
+  const seen = new Set()
+  return (sourceTanks.value || [])
+    .map(t => {
+      const label = t.tank || t.description || ''
+      return {
+        value: String(t.id_sloc || t.id_tank),
+        label: label
+      }
+    })
+    .filter(item => {
+      if (!item.value || !item.label || /^\d+$/.test(item.label) || seen.has(item.label)) {
+        return false
+      }
+      seen.add(item.label)
+      return true
+    })
 })
 
 const destTankOptions = computed(() => {
-  return (destTanks.value || []).map(t => ({
-    value: String(t.id_sloc || t.id_tank),
-    label: String(t.tank || t.description || t.id_sloc || t.id_tank || 'Unknown')
-  }))
+  const seen = new Set()
+  return (destTanks.value || [])
+    .map(t => {
+      const label = t.tank || t.description || ''
+      return {
+        value: String(t.id_sloc || t.id_tank),
+        label: label
+      }
+    })
+    .filter(item => {
+      if (!item.value || !item.label || /^\d+$/.test(item.label) || seen.has(item.label)) {
+        return false
+      }
+      seen.add(item.label)
+      return true
+    })
 })
 
 const showSloc = computed(() => {
@@ -380,8 +402,8 @@ function resetForm() {
   specificDestTanks.value = []
   selectedSourceTails.value = []
   selectedDestTails.value = []
-  sourceStockLabel.value = 'Stock : N/A'
-  destStockLabel.value = 'Stock : N/A'
+  sourceStockLabel.value = 'Stock (MT): N/A'
+  destStockLabel.value = 'Stock (MT): N/A'
 }
 
 async function onMaterialChange() {
@@ -423,59 +445,55 @@ async function populateTanks() {
   const idMat = form.id_material
   const currentPlant = plantId.value
 
-  sourceStockLabel.value = 'Stock : N/A'
-  destStockLabel.value = 'Stock : N/A'
+  sourceStockLabel.value = 'Stock (MT): N/A'
+  destStockLabel.value = 'Stock (MT): N/A'
 
   try {
     if (trfType === 'in') {
       const [sourceRes, destRes] = await Promise.all([
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant }),
-        store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: 1001 })
+        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: true }),
+        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false })
       ])
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
     } else if (trfType === 'out') {
       const [sourceRes, destRes] = await Promise.all([
-        store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: 1001 }),
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant })
+        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false }),
+        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: true })
       ])
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
     } else {
       const [sourceRes, destRes] = await Promise.all([
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant }),
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant })
+        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false }),
+        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false })
       ])
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
     }
 
-    const autoSelectSource = trfType === 'out' && sourceTanks.value.length > 0
-    const autoSelectDest = trfType === 'in' && destTanks.value.length > 0
-
-    if (autoSelectSource) {
-      form.source_sloc = sourceTanks.value[0].id_sloc || sourceTanks.value[0].id_tank
+    if (trfType === 'out') {
+      const wipTank = sourceTanks.value.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+      if (wipTank) {
+        form.source_sloc = String(wipTank.id_sloc || wipTank.id_tank)
+      } else if (sourceTanks.value.length > 0) {
+        form.source_sloc = String(sourceTanks.value[0].id_sloc || sourceTanks.value[0].id_tank)
+      }
       await onSourceChange()
     } else {
       form.source_sloc = ''
     }
 
-    if (autoSelectDest) {
-      form.trf_sloc = destTanks.value[0].id_sloc || destTanks.value[0].id_tank
+    if (trfType === 'in') {
+      const wipTank = destTanks.value.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+      if (wipTank) {
+        form.trf_sloc = String(wipTank.id_sloc || wipTank.id_tank)
+      } else if (destTanks.value.length > 0) {
+        form.trf_sloc = String(destTanks.value[0].id_sloc || destTanks.value[0].id_tank)
+      }
       await onDestinationChange()
     } else {
       form.trf_sloc = ''
-    }
-
-    if (trfType === 'all') {
-      if (sourceTanks.value.length > 0) {
-        form.source_sloc = sourceTanks.value[0].id_sloc || sourceTanks.value[0].id_tank
-        await onSourceChange()
-      }
-      if (destTanks.value.length > 0) {
-        form.trf_sloc = destTanks.value[0].id_sloc || destTanks.value[0].id_tank
-        await onDestinationChange()
-      }
     }
   } catch (err) {
     toastStore.error(err.message)
@@ -485,6 +503,7 @@ async function populateTanks() {
 async function onSourceChange() {
   if (!form.source_sloc) {
     specificSourceTanks.value = []
+    sourceStockLabel.value = 'Stock (MT): N/A'
     return
   }
   try {
@@ -501,6 +520,7 @@ async function onSourceChange() {
 async function onDestinationChange() {
   if (!form.trf_sloc) {
     specificDestTanks.value = []
+    destStockLabel.value = 'Stock (MT): N/A'
     return
   }
   try {
@@ -568,40 +588,53 @@ async function fetchTransferQty() {
 async function updateStock(type) {
   const idTank = type === 'source' ? form.source_sloc : form.trf_sloc
   if (!form.id_material || !idTank) return
-  try {
-    const response = await store.fetchTotalStockMaterial({
-      idMaterial: form.id_material,
-      idTank: idTank
-    })
-    const total = store.totalStock || 0
-    const label = `Stock (MT): ${total}`
 
-    if (type === 'source') {
-      if (form.trf_type === 'in') {
-        if (total <= 0 && !TANK_AUTO_IDS.includes(Number(idTank))) {
-          sourceStockLabel.value = 'AUTO IN/OUT'
-        } else {
-          sourceStockLabel.value = label
-        }
-      } else {
+  const isAutoInOut = (form.trf_type === 'in' && type === 'source') || 
+                      (form.trf_type === 'out' && type === 'dest')
+
+  if (isAutoInOut) {
+    try {
+      await store.fetchSupplierCode({
+        idMaterial: form.id_material,
+        idTank: idTank,
+        id_plant: plantId.value
+      })
+      const code = store.supplierCode?.supplierCode || 'N/A'
+      const label = `AUTO IN/OUT (${code})`
+      if (type === 'source') {
         sourceStockLabel.value = label
+      } else {
+        destStockLabel.value = label
       }
-    } else {
-      if (form.trf_type === 'in') {
-        if (total <= 0 && !TANK_AUTO_IDS.includes(Number(idTank))) {
-          destStockLabel.value = 'AUTO IN/OUT'
-        } else {
-          destStockLabel.value = label
-        }
+    } catch (err) {
+      const label = `AUTO IN/OUT (Error)`
+      if (type === 'source') {
+        sourceStockLabel.value = label
       } else {
         destStockLabel.value = label
       }
     }
-  } catch (err) {
-    if (type === 'source') {
-      sourceStockLabel.value = 'Stock (MT): N/A'
-    } else {
-      destStockLabel.value = 'Stock (MT): N/A'
+  } else {
+    try {
+      const response = await store.fetchTotalStockMaterial({
+        idMaterial: form.id_material,
+        idTank: idTank,
+        id_plant: plantId.value
+      })
+      const total = store.totalStock || 0
+      const label = `Stock (MT): ${total}`
+
+      if (type === 'source') {
+        sourceStockLabel.value = label
+      } else {
+        destStockLabel.value = label
+      }
+    } catch (err) {
+      if (type === 'source') {
+        sourceStockLabel.value = 'Stock (MT): N/A'
+      } else {
+        destStockLabel.value = 'Stock (MT): N/A'
+      }
     }
   }
 }

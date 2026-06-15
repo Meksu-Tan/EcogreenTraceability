@@ -264,10 +264,24 @@ const materialOptions = computed(() => {
 })
 
 const tankOptions = computed(() => {
-  return (blendingStore.allTanks || []).map(t => ({
-    value: t.id_sloc || t.id_tank,
-    label: String(t.tank || t.description || t.id_sloc || t.id_tank || '')
-  })).filter(item => item.value && item.label)
+  const seen = new Set()
+  const sourceList = blendingStore.allTanks;
+
+  return (sourceList || [])
+    .map(t => {
+      const label = t.tank || t.description || ''
+      return {
+        value: t.id_sloc || t.id_tank,
+        label: label
+      }
+    })
+    .filter(item => {
+      if (!item.value || !item.label || /^\d+$/.test(item.label) || seen.has(item.label)) {
+        return false
+      }
+      seen.add(item.label)
+      return true
+    })
 })
 
 const formattedTotalQty = computed(() => {

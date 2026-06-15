@@ -347,7 +347,7 @@ class RmEntryService implements RmEntryServiceInterface
                 $destPlant, $user, $materialDoc, $idPlant
             ) {
                 // Step 1: Feed - take material out of source (FIFO)
-                $feedResult = Feed::generalFeed([
+                $feedParams = [
                     'qty'          => $qty,
                     'id_material'  => $idMaterial,
                     'id_sloc'      => $trfSource,
@@ -355,48 +355,9 @@ class RmEntryService implements RmEntryServiceInterface
                     'to_trace_no'  => $feedEntryNo,
                     'entry_date'   => $entryDate,
                     'user'         => $user,
-                ]);
+                ];
 
-                if ($feedResult['response'] != 1) {
-                    throw new \RuntimeException('Feed failed: response ' . $feedResult['response']);
-                }
-
-                // Step 2: Aggregate supplier proportions
-                $supplierRows = DB::connection('eudr_ts')->select(
-                    'SELECT id_supplier, batch_sap, SUM(out_qty) AS rundownSupplier
-                       FROM t_trace_detail
-                      WHERE status = 1
-                        AND id_trace_head IN (
-                            SELECT id_trace_head
-                              FROM t_trace_header
-                             WHERE status = 1
-                               AND to_trace_no = ?
-                        )
-                      GROUP BY id_supplier, batch_sap',
-                    [$feedEntryNo]
-                );
-
-                if (empty($supplierRows)) {
-                    throw new \RuntimeException('No supplier rows found after feed');
-                }
-
-                $supplierRowsFormatted = array_map(fn($r) => [
-                    'id_supplier'     => $r->id_supplier,
-                    'batch_sap'       => $r->batch_sap,
-                    'rundownSupplier' => (float) $r->rundownSupplier,
-                ], $supplierRows);
-
-                // Actual qty deducted
-                $actualQty = round($feedResult['total_out'], 4);
-
-                if ($actualQty <= 0) {
-                    throw new \RuntimeException('Feed returned total_out=0');
-                }
-
-                Rundown::adjustRundownToTotal($supplierRowsFormatted, $actualQty);
-
-                // Step 3: Rundown - put material into destination
-                $rundownResult = Rundown::generalRundown([
+                $rundownParams = [
                     'user'          => $user,
                     'entry_date'    => $entryDate,
                     'trace_no'      => $entryNo,
@@ -404,14 +365,14 @@ class RmEntryService implements RmEntryServiceInterface
                     'id_material'   => $idMaterial,
                     'id_sloc'       => $trfDestination,
                     'id_plant'      => $destPlant,
-                    'in_qty'        => $actualQty,
                     'last_qtf'      => 0,
-                    'curr_qtf'      => $actualQty,
-                    'supplier_rows' => $supplierRowsFormatted,
-                ]);
+                ];
+
+                $orchestrator = app(\Modules\Shared\Services\FeedRundownOrchestrator::class);
+                $rundownResult = $orchestrator->executeFeedRundownSequence($feedParams, $rundownParams);
 
                 if (!isset($rundownResult['response']) || $rundownResult['response'] != 1) {
-                    throw new \RuntimeException('Rundown failed');
+                    throw new \RuntimeException('Feed/Rundown sequence failed: response ' . ($rundownResult['response'] ?? 'unknown'));
                 }
 
                 // Step 4: Create material document
@@ -638,28 +599,10 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function saveMatlDoc(string $mode, int $id, string $number, string $user): array
     {
-        if ($mode === 'ADD') {
-            $exists = DB::connection('eudr_ts')->table('t_material_document')
-                ->where('id_trace_head', $id)
-                ->exists();
-            if ($exists) {
-                DB::connection('eudr_ts')->table('t_material_document')
-                    ->where('id_trace_head', $id)
-                    ->update(['material_document' => $number, 'updated_by' => $user]);
-            } else {
-                DB::connection('eudr_ts')->table('t_material_document')->insert([
-                    'id_trace_head' => $id,
-                    'material_document' => $number,
-                    'created_by' => $user
-                ]);
-            }
-        } else {
-            DB::connection('eudr_ts')->table('t_material_document')
-                ->where('id_trace_head', $id)
-                ->update(['material_document' => $number, 'updated_by' => $user]);
-        }
-
-        return ['success' => true, 'status' => 1];
+        $res = app(\Modules\Shared\Services\TransactionCoreService::class)
+            ->createMaterialDocument($user, $id, $number, $mode);
+            
+        return ['success' => $res['response'] === 1, 'status' => $res['response']];
     }
 
     public function updateSubTankSlocTail(int $idHead, $idTankTail, string $user): array

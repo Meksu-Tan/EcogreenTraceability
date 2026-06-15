@@ -1,31 +1,31 @@
 <template>
   <div class="pa-6">
-    <!-- Header Toolbar -->
-    <VRow justify="space-between" align="center" class="mb-6">
-      <VCol cols="12" md="auto" class="d-flex align-center gap-4">
-        <div>
-          <h1 class="text-h5 font-weight-bold mb-1">Packaging Entry</h1>
-          <div class="d-flex align-center gap-2">
-            <span class="text-caption text-medium-emphasis">Location:</span>
-            <VChip
-              color="success"
-              variant="tonal"
-              size="small"
-              prepend-icon="ri-factory-line"
-              class="font-weight-bold"
-            >
-              {{ plantSelectionStore.selectedPlantName }}
-            </VChip>
-          </div>
-        </div>
-        <VDivider vertical class="mx-2" style="height: 40px" />
-        <PlantSelector @change="fetchData" />
+    <VRow justify="space-between" align="center" class="mb-4">
+      <VCol cols="auto">
+        <VRow align="center" no-gutters>
+          <VCol cols="auto">
+            <h1 class="text-h5 font-weight-bold">Packaging Entry</h1>
+            <div class="d-flex align-center gap-2 mt-1">
+              <span class="text-body-2 text-medium-emphasis">Location:</span>
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="ri-factory-line"
+              >
+                {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
+              </VChip>
+            </div>
+          </VCol>
+          <VCol cols="auto" class="ml-6 pl-6 border-s">
+            <PlantSelector @change="fetchData" />
+          </VCol>
+        </VRow>
       </VCol>
-      <VCol cols="12" md="auto">
+      <VCol cols="auto">
         <VBtn
           color="primary"
           prepend-icon="ri-add-line"
-          class="font-weight-bold"
           @click="openAddModal"
         >
           New Packaging Entry
@@ -33,118 +33,113 @@
       </VCol>
     </VRow>
 
-    <!-- Warnings / Info alert -->
     <VAlert
       type="error"
       variant="tonal"
-      icon="ri-alert-line"
-      class="mb-6 text-body-2 font-weight-semibold"
-      density="compact"
+      density="comfortable"
+      class="mb-4"
+      icon="ri-error-warning-line"
     >
       QTY MATERIAL MUST TALLY WITH QTY SUPPLIER. CHECK AGAIN YOUR ENTRY.
     </VAlert>
 
-    <!-- Main Data Table Card -->
-    <VCard rounded="lg" variant="outlined">
-      <DataTable
-        :columns="columns"
-        :data="store.entries"
-        :loading="store.loading"
-        row-key="id_whx_head"
-        :per-page="10"
-        :show-search="false"
-        :show-top-info="false"
-      >
-        <!-- Custom action cell -->
-        <template #actions="{ row }">
-          <div class="d-flex justify-center gap-1">
-            <!-- Edit PO -->
-            <VTooltip text="Edit PO" location="top">
-              <template #activator="{ props }">
-                <VBtn
-                  v-bind="props"
-                  size="x-small"
-                  icon="ri-article-line"
-                  color="primary"
-                  variant="tonal"
-                  @click="openPoModal(row)"
-                />
-              </template>
-            </VTooltip>
+    <VCard v-if="store.loading">
+      <VCardText class="pa-0">
+        <VSkeletonLoader type="table-thead, table-tbody@5" :loading="true" />
+      </VCardText>
+    </VCard>
 
-            <!-- Edit Batch & Warehouse -->
-            <VTooltip text="Edit Batch & Warehouse" location="top">
-              <template #activator="{ props }">
-                <VBtn
-                  v-bind="props"
-                  size="x-small"
-                  icon="ri-edit-box-line"
-                  color="warning"
-                  variant="tonal"
-                  @click="openBatchModal(row)"
-                />
-              </template>
-            </VTooltip>
+    <VAlert
+      v-else-if="store.error"
+      type="error"
+      variant="tonal"
+      class="mb-4"
+    >
+      <div class="d-flex flex-column">
+        <strong class="text-body-2 font-weight-medium">Error loading data</strong>
+        <span class="text-body-2 mt-1">{{ store.error }}</span>
+        <VBtn color="error" variant="tonal" size="small" class="mt-3 align-self-start" @click="fetchData">
+          Try again
+        </VBtn>
+      </div>
+    </VAlert>
 
-            <!-- Cancel / Delete -->
-            <VTooltip text="Cancel Entry" location="top">
-              <template #activator="{ props }">
-                <VBtn
-                  v-bind="props"
-                  size="x-small"
-                  icon="ri-delete-bin-7-line"
-                  color="error"
-                  variant="tonal"
-                  @click="onCancel(row)"
-                />
-              </template>
-            </VTooltip>
-          </div>
-        </template>
-
-        <!-- Custom column cell renderings -->
-        <template #cell-fromto_trace_no="{ value }">
-          <span class="text-caption text-medium-emphasis">{{ value }}</span>
-        </template>
-
-        <template #cell-po_no="{ value }">
-          <span class="font-weight-medium">{{ value || '-' }}</span>
-        </template>
-
-        <template #cell-batch_no="{ value }">
-          <VChip size="small" variant="flat" color="neutral-100" class="font-weight-semibold">
-            {{ value }}
-          </VChip>
-        </template>
-
-        <template #cell-sloc="{ row }">
-          <a
-            href="#"
-            class="text-decoration-none text-primary font-weight-semibold"
-            @click.prevent="openSubTankModal(row)"
-          >
-            {{ row.sloc || 'Sloc' }}
-          </a>
-        </template>
-
-        <template #cell-init_qty="{ row }">
-          <span :class="row.init_qty === row.balance_supplier ? 'text-success' : 'text-error'" class="font-weight-bold">
-            {{ row.init_qty }}
-          </span>
-        </template>
-
-        <template #cell-balance_supplier="{ row }">
-          <span :class="row.init_qty === row.balance_supplier ? 'text-success' : 'text-error'" class="font-weight-bold">
-            {{ row.balance_supplier }}
-          </span>
-        </template>
-
-        <template #cell-supplier="{ value }">
-          <span class="text-caption d-block text-truncate" style="max-width: 320px;" :title="value">
-            {{ value }}
-          </span>
-        </template>
-      </DataTable>
+    <VCard v-else>
+      <VCardText class="pa-0">
+        <div class="overflow-x-auto">
+          <VTable density="compact" class="text-body-2">
+            <thead>
+              <tr>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date')">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'fromto_trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('fromto_trace_no')">Trace No (From >>> To)<VIcon v-if="sortKey==='fromto_trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'plant_name' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('plant_name')">Plant<VIcon v-if="sortKey==='plant_name'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'po_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('po_no')">PO No<VIcon v-if="sortKey==='po_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'batch_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('batch_no')">PPH Batch No<VIcon v-if="sortKey==='batch_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'feed' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('feed')">WIP Product<VIcon v-if="sortKey==='feed'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'fg' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('fg')">FG Product<VIcon v-if="sortKey==='fg'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc')">Sloc<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'whx' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('whx')">FG Sloc<VIcon v-if="sortKey==='whx'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'init_qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('init_qty')">Init Material (MT)<VIcon v-if="sortKey==='init_qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier')">Init Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance')">Balance (MT)<VIcon v-if="sortKey==='balance'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:200px">Supplier / Batch SAP / Init / Balance</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
+              </tr>
+            </thead>
+            <tbody v-if="sortedList.length > 0">
+              <tr v-for="(row, index) in sortedList" :key="row.id_whx_head">
+                <td class="text-caption text-medium-emphasis text-center">{{ (page - 1) * perPage + index + 1 }}</td>
+                <td class="text-center">{{ row.entry_date }}</td>
+                <td class="text-center font-weight-medium font-mono text-caption">{{ row.fromto_trace_no }}</td>
+                <td class="text-center"><VChip size="x-small" color="primary" variant="tonal">{{ row.plant_name || '-' }}</VChip></td>
+                <td class="text-center">{{ row.po_no || '-' }}</td>
+                <td class="text-center"><VChip size="x-small" variant="flat" color="neutral-100">{{ row.batch_no || '-' }}</VChip></td>
+                <td class="font-weight-medium text-truncate" style="max-width:160px" :title="row.feed">{{ row.feed || '-' }}</td>
+                <td class="font-weight-medium text-truncate" style="max-width:160px" :title="row.fg">{{ row.fg || '-' }}</td>
+                <td class="text-center">
+                  <a href="#" @click.prevent="openSubTankModal(row)" class="text-medium-emphasis text-decoration-underline text-caption">
+                    {{ row.sloc || '-' }}
+                  </a>
+                </td>
+                <td class="text-center">{{ row.whx || '-' }}</td>
+                <td class="text-right font-monospace text-caption" :class="row.init_qty === row.balance_supplier ? 'text-success' : 'text-error'">{{ row.init_qty }}</td>
+                <td class="text-right font-monospace text-caption" :class="row.init_qty === row.balance_supplier ? 'text-success' : 'text-error'">{{ row.balance_supplier }}</td>
+                <td class="text-right font-monospace font-weight-bold text-caption">{{ row.balance }}</td>
+                <td class="text-caption" style="min-width:200px">
+                  <template v-if="row.supplier">
+                    <VChip
+                      v-for="(sup, si) in (typeof row.supplier === 'string' ? row.supplier.split('|') : [row.supplier])"
+                      :key="si"
+                      size="x-small"
+                      color="primary"
+                      variant="flat"
+                      class="mr-1 mb-1"
+                    >
+                      {{ sup.trim() }}
+                    </VChip>
+                  </template>
+                </td>
+                <td class="text-center">
+                  <div class="d-flex justify-center gap-1">
+                    <VBtn icon="ri-article-line" size="x-small" color="primary" variant="tonal" @click="openPoModal(row)" title="Edit PO" />
+                    <VBtn icon="ri-edit-box-line" size="x-small" color="warning" variant="tonal" @click="openBatchModal(row)" title="Edit Batch & Warehouse" />
+                    <VBtn icon="ri-delete-bin-7-line" size="x-small" color="error" variant="tonal" @click="onCancel(row)" title="Cancel Entry" />
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+            <tbody v-else>
+              <tr>
+                <td colspan="15" class="text-center pa-8">
+                  <VIcon icon="ri-inbox-2-line" size="40" class="text-disabled mb-2" />
+                  <p class="text-body-2 text-medium-emphasis">No packaging data yet</p>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </div>
+      </VCardText>
     </VCard>
 
     <!-- Modals -->
@@ -156,11 +151,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant.js'
 import { usePackageEntryStore } from '../stores/usePackageEntryStore'
 import { useConfirmStore } from '@/stores/confirm.js'
-import DataTable from '@/modules/shared/components/DataTable.vue'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import PackageEntryModal from './PackageEntryModal.vue'
 import PackageEntryPoModal from './PackageEntryPoModal.vue'
@@ -177,20 +171,53 @@ const showBatchModal = ref(false)
 const showSubTankModal = ref(false)
 const selectedRow = ref(null)
 
-const columns = [
-  { key: 'entry_date', label: 'Entry Date' },
-  { key: 'fromto_trace_no', label: 'Trace No (From >>> To)' },
-  { key: 'po_no', label: 'PO' },
-  { key: 'batch_no', label: 'PPH Batch No' },
-  { key: 'feed', label: 'WIP Product' },
-  { key: 'fg', label: 'FG Product' },
-  { key: 'sloc', label: 'Sloc' },
-  { key: 'whx', label: 'FG Sloc' },
-  { key: 'init_qty', label: 'Init Mat (MT)' },
-  { key: 'balance_supplier', label: 'Init Supp (MT)' },
-  { key: 'balance', label: 'Balance (MT)' },
-  { key: 'supplier', label: 'Supplier / Batch SAP / Init / Balance' }
-]
+const page = ref(1)
+const perPage = ref(10)
+const sortKey = ref(null)
+const sortDir = ref(null)
+
+function detectColumnType(key) {
+  const rows = store.entries
+  if (!rows || rows.length === 0) return 'text'
+  for (const row of rows) {
+    const val = row[key]
+    if (val !== null && val !== undefined && val !== '') {
+      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
+    }
+  }
+  return 'text'
+}
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    if (sortDir.value === 'asc') {
+      sortDir.value = 'desc'
+    } else if (sortDir.value === 'desc') {
+      sortKey.value = null
+      sortDir.value = null
+    }
+  } else {
+    sortKey.value = key
+    sortDir.value = detectColumnType(key) === 'text' ? 'asc' : 'desc'
+  }
+}
+
+const sortedList = computed(() => {
+  if (!sortKey.value || !sortDir.value) return store.entries
+  const key = sortKey.value
+  const dir = sortDir.value
+  const rows = [...store.entries]
+  const type = detectColumnType(key)
+  return rows.sort((a, b) => {
+    const va = a[key]
+    const vb = b[key]
+    if (va == null && vb == null) return 0
+    if (va == null) return 1
+    if (vb == null) return -1
+    if (type === 'number') return dir === 'asc' ? va - vb : vb - va
+    return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va))
+  })
+})
 
 async function fetchData() {
   await store.fetchEntries()
@@ -224,10 +251,16 @@ async function onCancel(row) {
     title: 'Are you sure?',
     message: `Cancel packaging entry with Batch No: ${row.batch_no}?`
   })
-  
+
   if (isConfirmed) {
     await store.cancelEntry(row.id_whx_head, row.trace_no)
     await fetchData()
   }
 }
 </script>
+
+<style scoped>
+.sort-icon { vertical-align: middle; transition: opacity 0.15s; opacity: 0.35; }
+.sortable-th:hover .sort-icon { opacity: 0.7; }
+.sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
+</style>

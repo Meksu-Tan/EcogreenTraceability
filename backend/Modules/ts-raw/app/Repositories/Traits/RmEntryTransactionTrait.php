@@ -543,47 +543,8 @@ trait RmEntryTransactionTrait
 
     public function updateEntrySubTank(string $user, int $idHead, array $tails): array
     {
-        if (!is_array($tails)) {
-            return ['response' => 0, 'message' => 'INVALID SUBTANK DATA'];
-        }
-
-        $jsonTails = json_encode(array_values(array_unique($tails)));
-
-        $row = DB::connection('eudr_ts')->selectOne(
-            'SELECT trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
-            [$idHead]
-        );
-
-        if (!$row) {
-            return ['response' => 0, 'message' => 'BALANCE HEAD NOT FOUND'];
-        }
-
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_balance_header SET updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_trace_header SET updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_balance_detail SET updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-
-        DB::connection('eudr_ts')->update(
-            'UPDATE t_trace_detail SET updated_by = ?
-              WHERE id_trace_head IN (SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ?)',
-            [$user, $idHead]
-        );
-
-        $this->logTransaction('T_BALANCE_HEAD', 'UPDATE_SUBTANK',
-            'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SUBTANKS: ' . implode(',', $tails),
-            $user);
-
-        return ['response' => 1];
+        return app(\Modules\Shared\Services\TransactionCoreService::class)
+            ->updateEntrySubTank($user, $idHead, $tails);
     }
 
     public function deactivateRmEntryTrf(int $id, string $user): array

@@ -32,6 +32,7 @@ class ShipmentEntryResource extends JsonResource
             'doc_url' => $this->doc_url,
             'is_last_row' => $this->is_last_row,
             'next_process' => $this->next_process,
+            'plant_name' => $this->plant_name,
         ];
     }
 }

@@ -24,45 +24,48 @@ class RmReportRepository implements RmReportRepositoryInterface
         $dateFrom = $filters['date_from'] ?? null;
         $dateTo = $filters['date_to'] ?? null;
 
-        $where = ["c.type = 'RM'", 'a.status = 1'];
-        $bindings = [];
+        $query = DB::connection($this->connection)->table('t_balance_header as a')
+            ->selectRaw("
+                a.id_balance_head, CAST(a.trace_no AS CHAR) AS trace_no,
+                FORMAT(SUM(DISTINCT a.qty),3) AS qty,
+                CONCAT(c.code,' :: ',c.description) AS material,
+                FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
+                a.entry_date, b.batch_sap,
+                GROUP_CONCAT(DISTINCT CONCAT(e.code,' :: ',e.description,
+                    ' / ',b.batch_sap,' / Qty:',FORMAT(b.init_qty,3),' MT',
+                    IF(b.out_qty=0,'',' / BATCH TRANSFERRED'))
+                    SEPARATOR ' | ') AS supplier,
+                f.material_document, f.po_so,
+                FORMAT(bs.supplier_qty,3) AS balance_supplier
+            ")
+            ->leftJoin('t_balance_detail as b', function($join) {
+                $join->on('a.id_balance_head', '=', 'b.id_balance_head')->where('b.status', 1);
+            })
+            ->leftJoin('m_material as c', 'a.id_material', '=', 'c.id_material')
+            ->leftJoin('m_sloc as d', function($join) {
+                $join->on('a.id_sloc', '=', 'd.id_sloc')->where('d.status', 1);
+            })
+            ->leftJoin('m_supplier as e', 'e.id_supplier', '=', 'b.id_supplier')
+            ->leftJoin(DB::raw("(SELECT f.id_balance_head,g.material_document,g.po_so,f.id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head=g.id_trace_head WHERE f.status=1 GROUP BY f.id_balance_head) as f"), 'f.id_balance_head', '=', 'a.id_balance_head')
+            ->leftJoin(DB::raw("(SELECT id_balance_head,SUM(init_qty) AS supplier_qty FROM t_balance_detail WHERE status=1 GROUP BY id_balance_head) as bs"), 'bs.id_balance_head', '=', 'a.id_balance_head')
+            ->where('c.type', 'RM')
+            ->where('a.status', 1)
+            ->where(function($q) {
+                $q->whereRaw("SUBSTRING(a.trace_no,1,1)='1'")->orWhereRaw("SUBSTRING(a.trace_no,1,1)='9'");
+            })
+            ->whereRaw("SUBSTRING(a.trace_no,8,3)='000'");
 
-        if ($plantId) { $where[] = '(a.id_plant = ? OR ? = 0)'; $bindings[] = $plantId; $bindings[] = $plantId; }
-        if ($materialId) { $where[] = 'a.id_material = ?'; $bindings[] = $materialId; }
-        if ($dateFrom) { $where[] = 'a.entry_date >= ?'; $bindings[] = $dateFrom; }
-        if ($dateTo) { $where[] = 'a.entry_date <= ?'; $bindings[] = $dateTo; }
+        if ($plantId) {
+            $query->where(function($q) use ($plantId) {
+                $q->where('a.id_plant', $plantId);
+            });
+        }
+        if ($materialId) $query->where('a.id_material', $materialId);
+        if ($dateFrom) $query->where('a.entry_date', '>=', $dateFrom);
+        if ($dateTo) $query->where('a.entry_date', '<=', $dateTo);
 
-        return DB::connection($this->connection)->select(
-            "SELECT a.id_balance_head, CAST(a.trace_no AS CHAR) AS trace_no,
-                    FORMAT(SUM(DISTINCT a.qty),3) AS qty,
-                    CONCAT(c.code,' :: ',c.description) AS material,
-                    FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
-                    a.entry_date, b.batch_sap,
-                    GROUP_CONCAT(DISTINCT CONCAT(e.code,' :: ',e.description,
-                        ' / ',b.batch_sap,' / Qty:',FORMAT(b.init_qty,3),' MT',
-                        IF(b.out_qty=0,'',' / BATCH TRANSFERRED'))
-                        SEPARATOR ' | ') AS supplier,
-                    f.material_document, f.po_so,
-                    FORMAT(bs.supplier_qty,3) AS balance_supplier
-               FROM t_balance_header a
-               LEFT JOIN t_balance_detail b ON a.id_balance_head=b.id_balance_head AND b.status=1
-               LEFT JOIN m_material c ON a.id_material=c.id_material
-               LEFT JOIN m_sloc d ON a.id_sloc = d.id_sloc AND d.status=1
-               LEFT JOIN m_supplier e ON e.id_supplier=b.id_supplier
-               LEFT JOIN (SELECT f.id_balance_head,g.material_document,g.po_so,f.id_trace_head
-                            FROM t_trace_header f
-                            LEFT JOIN t_material_document g ON f.id_trace_head=g.id_trace_head
-                           WHERE f.status=1 GROUP BY f.id_balance_head) f
-                 ON f.id_balance_head=a.id_balance_head
-               LEFT JOIN (SELECT id_balance_head,SUM(init_qty) AS supplier_qty
-                            FROM t_balance_detail WHERE status=1 GROUP BY id_balance_head) bs
-                 ON bs.id_balance_head=a.id_balance_head
-              WHERE " . implode(' AND ', $where) . "
-                AND (SUBSTRING(a.trace_no,1,1)='1' OR SUBSTRING(a.trace_no,1,1)='9')
-                AND SUBSTRING(a.trace_no,8,3)='000'
-              GROUP BY a.trace_no ORDER BY a.id_balance_head DESC",
-            $bindings
-        );
+        $result = $query->groupBy('a.trace_no')->orderByDesc('a.id_balance_head')->get();
+        return json_decode(json_encode($result), true);
     }
 
     public function getRmListTransfer(array $filters): array
@@ -72,45 +75,45 @@ class RmReportRepository implements RmReportRepositoryInterface
         $idTankFeed = DB::connection($this->connection)->table('m_sloc')
             ->where('status', 1)->where('code_3', 'FEED')->where('id_plant', 1002)->value('id_sloc');
 
-        $where = ["c.type = 'RM'", 'a.status = 1'];
-        $bindings = [];
+        $query = DB::connection($this->connection)->table('t_balance_header as a')
+            ->selectRaw("
+                a.id_balance_head, CAST(a.trace_no AS CHAR) AS trace_no,
+                aa.qty, aa.init_qty,
+                CONCAT(c.code,' :: ',c.description) AS material,
+                a.entry_date, b.batch_sap,
+                GROUP_CONCAT(DISTINCT CONCAT(e.code,' :: ',e.description,
+                    ' / ',b.batch_sap,' / Qty:',FORMAT(b.init_qty,3),' MT',
+                    IF(b.out_qty=0,'',' / BATCH USED IN WIP'))
+                    SEPARATOR ' | ') AS supplier,
+                f.material_document, f.po_so,
+                FORMAT(bs.supplier_qty,3) AS balance_supplier
+            ")
+            ->leftJoin(DB::raw("(SELECT trace_no,FORMAT(SUM(qty),3) AS qty,FORMAT(SUM(init_qty),3) AS init_qty FROM t_balance_header WHERE status=1 AND (SUBSTRING(trace_no,1,1)='1' OR SUBSTRING(trace_no,1,1)='2') GROUP BY trace_no) as aa"), 'a.trace_no', '=', 'aa.trace_no')
+            ->leftJoin('t_balance_detail as b', function($join) {
+                $join->on('a.id_balance_head', '=', 'b.id_balance_head')->where('b.status', 1);
+            })
+            ->leftJoin('m_material as c', 'a.id_material', '=', 'c.id_material')
+            ->leftJoin('m_sloc as d', function($join) {
+                $join->on('a.id_sloc', '=', 'd.id_sloc')->where('d.status', 1);
+            })
+            ->leftJoin('m_supplier as e', 'e.id_supplier', '=', 'b.id_supplier')
+            ->leftJoin(DB::raw("(SELECT f.id_balance_head,g.material_document,g.po_so,f.id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head=g.id_trace_head WHERE f.status=1 GROUP BY f.id_balance_head) as f"), 'f.id_balance_head', '=', 'a.id_balance_head')
+            ->leftJoin(DB::raw("(SELECT id_balance_head,SUM(init_qty) AS supplier_qty FROM t_balance_detail WHERE status=1 GROUP BY id_balance_head) as bs"), 'bs.id_balance_head', '=', 'a.id_balance_head')
+            ->where('c.type', 'RM')
+            ->where('a.status', 1)
+            ->where(function($q) {
+                $q->whereRaw("SUBSTRING(a.trace_no,1,1)='1'")->orWhereRaw("SUBSTRING(a.trace_no,1,1)='2'");
+            })
+            ->where('a.id_sloc', $idTankFeed);
 
-        if ($plantId) { $where[] = '(a.id_plant = ? OR ? = 0)'; $bindings[] = $plantId; $bindings[] = $plantId; }
+        if ($plantId) {
+            $query->where(function($q) use ($plantId) {
+                $q->where('a.id_plant', $plantId);
+            });
+        }
 
-        return DB::connection($this->connection)->select(
-            "SELECT a.id_balance_head, CAST(a.trace_no AS CHAR) AS trace_no,
-                    aa.qty, aa.init_qty,
-                    CONCAT(c.code,' :: ',c.description) AS material,
-                    a.entry_date, b.batch_sap,
-                    GROUP_CONCAT(DISTINCT CONCAT(e.code,' :: ',e.description,
-                        ' / ',b.batch_sap,' / Qty:',FORMAT(b.init_qty,3),' MT',
-                        IF(b.out_qty=0,'',' / BATCH USED IN WIP'))
-                        SEPARATOR ' | ') AS supplier,
-                    f.material_document, f.po_so,
-                    FORMAT(bs.supplier_qty,3) AS balance_supplier
-               FROM t_balance_header a
-               LEFT JOIN (SELECT trace_no,FORMAT(SUM(qty),3) AS qty,FORMAT(SUM(init_qty),3) AS init_qty
-                            FROM t_balance_header WHERE status=1
-                              AND (SUBSTRING(trace_no,1,1)='1' OR SUBSTRING(trace_no,1,1)='2')
-                            GROUP BY trace_no) aa ON a.trace_no=aa.trace_no
-               LEFT JOIN t_balance_detail b ON a.id_balance_head=b.id_balance_head AND b.status=1
-               LEFT JOIN m_material c ON a.id_material=c.id_material
-               LEFT JOIN m_sloc d ON a.id_sloc = d.id_sloc AND d.status=1
-               LEFT JOIN m_supplier e ON e.id_supplier=b.id_supplier
-               LEFT JOIN (SELECT f.id_balance_head,g.material_document,g.po_so,f.id_trace_head
-                            FROM t_trace_header f
-                            LEFT JOIN t_material_document g ON f.id_trace_head=g.id_trace_head
-                           WHERE f.status=1 GROUP BY f.id_balance_head) f
-                  ON f.id_balance_head=a.id_balance_head
-               LEFT JOIN (SELECT id_balance_head,SUM(init_qty) AS supplier_qty
-                            FROM t_balance_detail WHERE status=1 GROUP BY id_balance_head) bs
-                  ON bs.id_balance_head=a.id_balance_head
-              WHERE " . implode(' AND ', $where) . "
-                AND (SUBSTRING(a.trace_no,1,1)='1' OR SUBSTRING(a.trace_no,1,1)='2')
-                AND a.id_sloc=?
-              GROUP BY a.trace_no ORDER BY a.id_balance_head DESC",
-            array_merge($bindings, [$idTankFeed])
-        );
+        $result = $query->groupBy('a.trace_no')->orderByDesc('a.id_balance_head')->get();
+        return json_decode(json_encode($result), true);
     }
 
     public function getRmSummaryRmPrd(array $filters): array
@@ -118,94 +121,58 @@ class RmReportRepository implements RmReportRepositoryInterface
         $selectedYear = $filters['selectedYear'] ?? $filters['year'] ?? date('Y');
         $plantId = $filters['plant_id'] ?? $filters['id_plant'] ?? '0';
 
-        return DB::connection($this->connection)->select(
-            'SELECT a.id_balance_head, a.id_material, a.id_sloc, a.status,
-                    CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(SUM(DISTINCT a.qty),3) AS qty, a.created_by, a.created_at,
-                    CONCAT(c.code, " :: ", c.description) AS material, FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
-                    d.description AS tf_number, a.entry_date, b.batch_sap,
-                    GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
-                    GROUP_CONCAT(DISTINCT CONCAT(e.code, " :: ", e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty, 3), " MT") SEPARATOR " | ") AS supplier,
-                    IF(b.out_qty = 0, "N/A", "") AS traced, f.material_document, f.po_so, f.id_trace_head,
-                    g.qty_tank, h.qty_warehouse, i.qty_adjustment
-               FROM t_balance_header a
-               LEFT JOIN t_balance_detail b
-                 ON a.id_balance_head = b.id_balance_head AND b.status = 1
-               LEFT JOIN m_material c
-                 ON a.id_material = c.id_material
-               LEFT JOIN m_sloc d
-                 ON (d.id_sloc = a.id_sloc OR (a.id_sloc LIKE CONCAT(\'%"\', d.id_sloc, \'"%\') OR a.id_sloc LIKE CONCAT(\'%[\', d.id_sloc, \',%\') OR a.id_sloc LIKE CONCAT(\'%,\', d.id_sloc, \']%\') OR a.id_sloc LIKE CONCAT(\'%[\', d.id_sloc, \']%\'))) AND d.status = 1 AND (d.id_plant = ? OR ? = 0)
-               LEFT JOIN m_supplier e
-                 ON e.id_supplier = b.id_supplier
-               LEFT JOIN (SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head
-                            FROM t_trace_header f
-                            LEFT JOIN t_material_document g
-                              ON f.id_trace_head = g.id_trace_head
-                           WHERE f.status = 1
-                           GROUP BY f.id_balance_head) f
-                 ON f.id_balance_head = a.id_balance_head
-               LEFT JOIN ( SELECT b.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b.balance),3),3) AS qty_tank
-                             FROM m_sloc a
-                             LEFT JOIN (SELECT b.id_sloc, b.id_balance_head, bb.batch_sap, b.id_material,
-                                               SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance
-                                          FROM t_balance_header b
-                                          LEFT JOIN t_balance_detail bb
-                                            ON b.id_balance_head = bb.id_balance_head
-                                         WHERE b.status = 1
-                                           AND bb.status = 1
-                                         GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
-                                       ) b
-                               ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
-                            WHERE a.status = 1 AND a.code_3 IN ("WIP", "PRD", "STORAGE")
-                              AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
-                            GROUP BY b.batch_sap
-                    ) g
-                 ON g.batch_sap = b.batch_sap
-               LEFT JOIN ( SELECT b.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b.balance),3),3) AS qty_warehouse
-                             FROM m_warehouse a
-                             LEFT JOIN (SELECT b.id_section, b.id_whx_head, bb.batch_sap, b.id_material_fg, b.trace_no,
-                                               SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance,
-                                               b.batch_no
-                                          FROM t_warehouse_header b
-                                          LEFT JOIN t_warehouse_detail bb
-                                            ON b.id_whx_head = bb.id_whx_head
-                                         WHERE b.status = 1
-                                           AND bb.status = 1
-                                         GROUP BY b.id_section, bb.id_material_fg, bb.batch_sap
-                                       ) b
-                               ON a.id_warehouse = b.id_section
-                            WHERE a.status = 1
-                              AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
-                            GROUP BY b.batch_sap
-                    ) h
-                 ON h.batch_sap = b.batch_sap
-               LEFT JOIN ( SELECT b.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b.balance),3),3) AS qty_adjustment
-                             FROM m_sloc a
-                             LEFT JOIN (SELECT b.id_sloc, b.id_balance_head, bb.batch_sap, b.id_material,
-                                               SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance
-                                          FROM t_balance_header b
-                                          LEFT JOIN t_balance_detail bb
-                                            ON b.id_balance_head = bb.id_balance_head
-                                         WHERE b.status = 1
-                                           AND bb.status = 1
-                                         GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
-                                       ) b
-                               ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
-                            WHERE a.status = 1 AND a.plant_name = "ADJUSTMENT OUT"
-                              AND (b.in_qty > "0.001" OR b.out_qty > "0.001")
-                            GROUP BY b.batch_sap
-                    ) i
-                 ON i.batch_sap = b.batch_sap
-              WHERE c.type = "RM"
-                AND (SUBSTRING(a.trace_no,1,1) = "1" OR SUBSTRING(a.trace_no,1,1) = "9")
-                AND SUBSTRING(a.trace_no,8,2) = "00"
-                AND a.status = 1
-                AND d.code_3 = "STORAGE"
-                AND (a.id_plant = ? OR ? = 0)
-                AND YEAR(a.entry_date) = ?
-              GROUP BY a.trace_no
-              ORDER BY a.id_balance_head DESC',
-            [$plantId, $plantId, $plantId, $plantId, $selectedYear]
-        );
+        $storageSlocFilter = '';
+        $wipFeedSlocFilter = '';
+        $adjSlocFilter = '';
+
+        if ($plantId && $plantId !== '0') {
+            $storageSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms WHERE ms.status = 1 AND ms.code_3 = 'STORAGE' AND ms.id_plant = {$plantId} AND JSON_CONTAINS(a.id_sloc, CAST(ms.id_sloc AS JSON)))";
+            $wipFeedSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms2 WHERE ms2.status = 1 AND ms2.code_3 IN ('WIP','FEED','STORAGE') AND ms2.id_plant = {$plantId} AND JSON_CONTAINS(b.id_sloc, CAST(ms2.id_sloc AS JSON)))";
+            $adjSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms3 WHERE ms3.status = 1 AND ms3.code_3 = 'ADJUSTMENT OUT' AND ms3.id_plant = {$plantId} AND JSON_CONTAINS(b.id_sloc, CAST(ms3.id_sloc AS JSON)))";
+        } else {
+            $storageSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms WHERE ms.status = 1 AND ms.code_3 = 'STORAGE' AND JSON_CONTAINS(a.id_sloc, CAST(ms.id_sloc AS JSON)))";
+            $wipFeedSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms2 WHERE ms2.status = 1 AND ms2.code_3 IN ('WIP','FEED','STORAGE') AND JSON_CONTAINS(b.id_sloc, CAST(ms2.id_sloc AS JSON)))";
+            $adjSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms3 WHERE ms3.status = 1 AND ms3.code_3 = 'ADJUSTMENT OUT' AND JSON_CONTAINS(b.id_sloc, CAST(ms3.id_sloc AS JSON)))";
+        }
+
+        $query = DB::connection($this->connection)->table('t_balance_header as a')
+            ->selectRaw('
+                a.id_balance_head, a.id_material, a.id_sloc, a.status,
+                CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(SUM(DISTINCT a.qty),3) AS qty, a.created_by, a.created_at,
+                CONCAT(c.code, " :: ", c.description) AS material, FORMAT(SUM(DISTINCT a.init_qty),3) AS init_qty,
+                d.description AS tf_number, a.entry_date, b.batch_sap,
+                GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
+                GROUP_CONCAT(DISTINCT CONCAT(e.code, " :: ", e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty, 3), " MT") SEPARATOR " | ") AS supplier,
+                IF(b.out_qty = 0, "N/A", "") AS traced, f.material_document, f.po_so, f.id_trace_head,
+                g.qty_tank, h.qty_warehouse, i.qty_adjustment
+            ')
+            ->leftJoin('t_balance_detail as b', function($join) {
+                $join->on('a.id_balance_head', '=', 'b.id_balance_head')->where('b.status', 1);
+            })
+            ->leftJoin('m_material as c', 'a.id_material', '=', 'c.id_material')
+            ->leftJoin('m_sloc as d', function($join) use ($plantId) {
+                $join->on(function($q) {
+                    $q->whereRaw("JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS JSON))");
+                })->where('d.status', 1);
+                if ($plantId && $plantId !== '0') {
+                    $join->where('d.id_plant', $plantId);
+                }
+            })
+            ->leftJoin('m_supplier as e', 'e.id_supplier', '=', 'b.id_supplier')
+            ->leftJoin(DB::raw("(SELECT f.id_balance_head, g.material_document, g.po_so, f.id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 GROUP BY f.id_balance_head) as f"), 'f.id_balance_head', '=', 'a.id_balance_head')
+            ->leftJoin(DB::raw("(SELECT b2.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b2.balance),3),3) AS qty_tank FROM (SELECT b.id_sloc, b.id_balance_head, bb.batch_sap, b.id_material, SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance FROM t_balance_header b LEFT JOIN t_balance_detail bb ON b.id_balance_head = bb.id_balance_head WHERE b.status = 1 AND bb.status = 1 {$wipFeedSlocFilter} GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap) b2 GROUP BY b2.batch_sap) as g"), 'g.batch_sap', '=', 'b.batch_sap')
+            ->leftJoin(DB::raw("(SELECT b.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b.balance),3),3) AS qty_warehouse FROM m_warehouse a LEFT JOIN (SELECT b.id_section, b.id_whx_head, bb.batch_sap, b.id_material_fg, b.trace_no, SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance, b.batch_no FROM t_warehouse_header b LEFT JOIN t_warehouse_detail bb ON b.id_whx_head = bb.id_whx_head WHERE b.status = 1 AND bb.status = 1 GROUP BY b.id_section, bb.id_material_fg, bb.batch_sap) b ON a.id_warehouse = b.id_section WHERE a.status = 1 AND (b.in_qty > '0.001' OR b.out_qty > '0.001') GROUP BY b.batch_sap) as h"), 'h.batch_sap', '=', 'b.batch_sap')
+            ->leftJoin(DB::raw("(SELECT b3.batch_sap AS batch_sap, FORMAT(ROUND(SUM(b3.balance),3),3) AS qty_adjustment FROM (SELECT b.id_sloc, b.id_balance_head, bb.batch_sap, b.id_material, SUM(bb.in_qty) AS in_qty, SUM(bb.out_qty) AS out_qty, SUM(bb.qty) AS balance FROM t_balance_header b LEFT JOIN t_balance_detail bb ON b.id_balance_head = bb.id_balance_head WHERE b.status = 1 AND bb.status = 1 {$adjSlocFilter} GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap) b3 GROUP BY b3.batch_sap) as i"), 'i.batch_sap', '=', 'b.batch_sap')
+            ->where('c.type', 'RM')
+            ->where(function($q) {
+                $q->whereRaw("SUBSTRING(a.trace_no,1,1) = '1'")->orWhereRaw("SUBSTRING(a.trace_no,1,1) = '9'");
+            })
+            ->whereRaw("SUBSTRING(a.trace_no,8,2) = '00'")
+            ->whereRaw("YEAR(a.entry_date) = ?", [$selectedYear])
+            ->whereRaw("1=1 {$storageSlocFilter}");
+
+        $result = $query->groupBy('a.trace_no')->orderByDesc('a.id_balance_head')->get();
+        return json_decode(json_encode($result), true);
     }
 
     public function getRmDetailRmPrdOnTank(string $batchSap): array
@@ -229,7 +196,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
+                         ON JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS JSON))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.code_3 IN ("WIP", "PRD", "STORAGE")
@@ -253,7 +220,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
+                         ON JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS JSON))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.code_3 IN ("WIP", "PRD", "STORAGE")
@@ -285,7 +252,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
+                         ON JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS JSON))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.plant_name = "ADJUSTMENT OUT"
@@ -309,7 +276,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                                    AND bb.batch_sap = ?
                                    GROUP BY b.id_sloc, bb.id_balance_head, bb.id_material, bb.batch_sap
                             ) b
-                         ON (a.id_sloc = b.id_sloc OR (b.id_sloc LIKE CONCAT(\'%"\', a.id_sloc, \'"%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \',%\') OR b.id_sloc LIKE CONCAT(\'%,\', a.id_sloc, \']%\') OR b.id_sloc LIKE CONCAT(\'%[\', a.id_sloc, \']%\')))
+                         ON JSON_CONTAINS(b.id_sloc, CAST(a.id_sloc AS JSON))
                        LEFT JOIN m_material c
                          ON c.id_material = b.id_material
                       WHERE a.status = 1 AND a.plant_name = "ADJUSTMENT OUT"

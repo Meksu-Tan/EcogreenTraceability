@@ -39,65 +39,86 @@ class BlendingController extends Controller
         }
     }
 
-    /**
-     * Store a new blending entry or update existing.
-     *
-     * @todo Technical Debt: Flag-based routing with 5 branches (42 lines).
-     * Recommended: Split into separate methods: storeFeed(), storeRundown(), storeTransfer(), etc.
-     */
-    public function store(StoreBlendingRequest $request): JsonResponse
+    public function storeMaterial(StoreBlendingRequest $request): JsonResponse
     {
-        $flag = $request->input('flag');
         $mode = $request->input('mode', 'ADD');
         $user = $request->user()->name ?? 'system';
         $plantId = (int) $request->input('id_plant', 0);
 
         try {
-            if ($flag === 'post_blendingEntryMaterial') {
-                $result = $this->blendingService->addMaterialToBlending($user, [
-                    'entryNo' => $request->input('entryNo'),
-                    'idMaterialSource' => (int) $request->input('idMaterialSource'),
-                    'qty' => $request->input('qty'),
-                    'idTank' => (int) $request->input('idTank'),
-                    'mode' => $mode,
-                ], $plantId);
+            $result = $this->blendingService->addMaterialToBlending($user, [
+                'entryNo' => $request->input('entryNo'),
+                'idMaterialSource' => (int) $request->input('idMaterialSource'),
+                'qty' => $request->input('qty'),
+                'idTank' => (int) $request->input('idTank'),
+                'mode' => $mode,
+            ], $plantId);
+            return $this->buildResponse($result, 'post_blendingEntryMaterial', $mode, $request);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Blending operation failed: ' . $e->getMessage(), 500);
+        }
+    }
 
-            } elseif ($flag === 'post_blendingEntry') {
-                $result = $this->blendingService->executeBlending($user, [
-                    'entry_no' => $request->input('entry_no'),
-                    'entry_date' => $request->input('entry_date'),
-                    'id_material' => (int) $request->input('id_material'),
-                    'material_doc' => $request->input('material_doc'),
-                    'qty' => $request->input('qty'),
-                    'tankNo' => $request->input('tankNo', []),
-                ], $plantId);
+    public function executeBlending(StoreBlendingRequest $request): JsonResponse
+    {
+        $user = $request->user()->name ?? 'system';
+        $plantId = (int) $request->input('id_plant', 0);
 
-            } elseif ($flag === 'post_matlDocNumber') {
-                $result = $this->blendingService->createMaterialDocument(
-                    $user,
-                    (int) $request->input('id'),
-                    $request->input('number'),
-                    $mode
-                );
+        try {
+            $result = $this->blendingService->executeBlending($user, [
+                'entry_no' => $request->input('entry_no'),
+                'entry_date' => $request->input('entry_date'),
+                'id_material' => (int) $request->input('id_material'),
+                'material_doc' => $request->input('material_doc'),
+                'qty' => $request->input('qty'),
+                'tankNo' => $request->input('tankNo', []),
+            ], $plantId);
+            return $this->buildResponse($result, 'post_blendingEntry', 'ADD', $request);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Blending operation failed: ' . $e->getMessage(), 500);
+        }
+    }
 
-            } elseif ($flag === 'post_updateEntrySubTank') {
-                $result = $this->blendingService->updateEntrySubTank(
-                    $user,
-                    (int) $request->input('idHead'),
-                    $request->input('idTankTail', [])
-                );
+    public function createMatlDoc(Request $request): JsonResponse
+    {
+        $mode = $request->input('mode', 'ADD');
+        $user = $request->user()->name ?? 'system';
 
-            } elseif ($flag === 'delete_blendingMaterial') {
-                $id = (int) $request->input('id');
-                $success = $this->blendingService->deleteBlendingMaterial($id);
-                $result = ['response' => $success ? 1 : 0];
+        try {
+            $result = $this->blendingService->createMaterialDocument(
+                $user,
+                (int) $request->input('id'),
+                $request->input('number'),
+                $mode
+            );
+            return $this->buildResponse($result, 'post_matlDocNumber', $mode, $request);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Blending operation failed: ' . $e->getMessage(), 500);
+        }
+    }
 
-            } else {
-                return ApiResponse::error('Unknown flag: ' . $flag, 400);
-            }
+    public function updateSubTank(Request $request): JsonResponse
+    {
+        $user = $request->user()->name ?? 'system';
 
-            return $this->buildResponse($result, $flag, $mode, $request);
+        try {
+            $result = $this->blendingService->updateEntrySubTank(
+                $user,
+                (int) $request->input('idHead'),
+                $request->input('idTankTail', [])
+            );
+            return $this->buildResponse($result, 'post_updateEntrySubTank', 'UPDATE', $request);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Blending operation failed: ' . $e->getMessage(), 500);
+        }
+    }
 
+    public function deleteMaterial(Request $request, $id): JsonResponse
+    {
+        try {
+            $success = $this->blendingService->deleteBlendingMaterial((int) $id);
+            $result = ['response' => $success ? 1 : 0];
+            return $this->buildResponse($result, 'delete_blendingMaterial', 'DELETE', $request);
         } catch (\Exception $e) {
             return ApiResponse::error('Blending operation failed: ' . $e->getMessage(), 500);
         }

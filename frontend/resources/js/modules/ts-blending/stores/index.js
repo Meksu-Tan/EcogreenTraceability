@@ -2,11 +2,32 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import blendingApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
+import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const useTsBlendingStore = defineStore('transactionBlending', () => {
   const toastStore = useToastStore()
 
-  const blendingList = ref([])
+  // Use the composable for the main list
+  const {
+    list: blendingList,
+    loading,
+    error,
+    pagination,
+    setPage,
+    resetCache: resetListCache,
+    fetchList: doFetchList,
+    isFresh,
+    touch,
+    entriesCount: blendingCount
+  } = useTransactionList(
+    (params) => blendingApi.getList(params),
+    { listKey: 'blendingList' }
+  )
+
+  async function fetchBlendingList(params = {}) {
+    return doFetchList(params)
+  }
+
   const materialList = ref([])
   const activeMaterials = ref([])
   const activeTanks = ref([])
@@ -17,13 +38,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
   const currentEntryNo = ref('')
   const totalStock = ref(0)
   const totalQty = ref(0)
-  const loading = ref(false)
-  const error = ref(null)
-  const pagination = ref({ currentPage: 1, perPage: 5, total: 0, lastPage: 1 })
 
   const STALE_TIME = 30 * 1000
-  const _cache = { blendingList: 0, activeMaterials: 0, materialList: 0, allTanks: 0 }
-  const blendingCount = computed(() => blendingList.value.length)
+  const _cache = { activeMaterials: 0, materialList: 0, allTanks: 0 }
 
   function _isFresh(key) {
     return Date.now() - (_cache[key] || 0) < STALE_TIME
@@ -34,34 +51,8 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
   }
 
   function resetCache() {
+    resetListCache()
     Object.keys(_cache).forEach(k => { _cache[k] = 0 })
-  }
-
-  function setPage(p) {
-    pagination.value = { ...pagination.value, currentPage: p }
-  }
-
-  async function fetchBlendingList(params = {}) {
-    if (_isFresh('blendingList') && blendingList.value.length > 0) return
-    loading.value = true
-    error.value = null
-    try {
-      const response = await blendingApi.getList(params)
-      blendingList.value = response?.data || []
-      pagination.value = {
-        currentPage: response?.current_page || 1,
-        perPage: response?.per_page || 5,
-        total: response?.total || 0,
-        lastPage: response?.last_page || 1
-      }
-      _touch('blendingList')
-      return response
-    } catch (err) {
-      error.value = err.message
-      throw err
-    } finally {
-      loading.value = false
-    }
   }
 
   async function fetchActiveMaterials() {
@@ -193,10 +184,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await blendingApi.store({
-        ...data,
-        flag: 'post_blendingEntryMaterial'
-      })
+      const response = await blendingApi.storeMaterial(data)
       if (response?.status === 1) {
         toastStore.success('Material added to blending')
       } else {
@@ -215,10 +203,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await blendingApi.store({
-        ...data,
-        flag: 'post_blendingEntry'
-      })
+      const response = await blendingApi.executeBlending(data)
       if (response?.status === 1) {
         toastStore.success('Blending executed successfully')
         await fetchBlendingList()
@@ -238,10 +223,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await blendingApi.store({
-        ...data,
-        flag: 'delete_blendingMaterial'
-      })
+      const response = await blendingApi.deleteMaterial(data.id)
       return response
     } catch (err) {
       error.value = err.message
@@ -273,10 +255,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await blendingApi.store({
-        ...data,
-        flag: 'post_matlDocNumber'
-      })
+      const response = await blendingApi.createMatlDoc(data)
       if (response?.status === 1) {
         toastStore.success(response?.message || 'Material document updated')
       }
@@ -293,10 +272,7 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await blendingApi.store({
-        ...data,
-        flag: 'post_updateEntrySubTank'
-      })
+      const response = await blendingApi.updateSubTank(data)
       if (response?.status === 1) {
         toastStore.success('Sub-tank updated')
       }

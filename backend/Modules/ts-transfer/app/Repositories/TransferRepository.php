@@ -6,38 +6,14 @@ use Modules\Shared\Services\PeriodLockService;
 use Modules\Shared\Services\AuditService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Modules\Shared\Traits\TankNameFormatterTrait;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class TransferRepository implements TransferRepositoryInterface
 {
+    use TankNameFormatterTrait, TransactionLoggerTrait;
+
     protected string $connection = 'eudr_ts';
-
-    private function formatTankName(?string $name): ?string
-    {
-        if (!$name) return $name;
-        
-        if (stripos($name, 'ADJUSTMENT') !== false) {
-            return str_ireplace(
-                ['ADJUSTMENT IN', 'ADJUSTMENT OUT'],
-                ['Adjustment IN', 'Adjustment OUT'],
-                strtoupper($name)
-            );
-        }
-
-        if (preg_match('/^(EOB|EOMB)\s*(\d*)\s*(FEED|PRODUCT|WIP|STORAGE|MPR)\s*(TANK)?/i', $name, $matches)) {
-            $plantType = strtoupper($matches[1]);
-            $plantNum = $matches[2];
-            $type = strtoupper($matches[3]);
-            
-            if ($type !== 'WIP' && $type !== 'MPR') {
-                $type = ucfirst(strtolower($type));
-            }
-            
-            $plant = $plantType . ($plantNum ? ' ' . $plantNum : '');
-            return trim($type . ' ' . $plant);
-        }
-
-        return $name;
-    }
 
     public function getActiveMaterials(): Collection
     {
@@ -85,21 +61,25 @@ class TransferRepository implements TransferRepositoryInterface
     public function getTotalStockMaterial(int $materialId, int $tankId, int $plantId): float
     {
         $result = DB::connection($this->connection)->select(
-            'SELECT IFNULL(ROUND(SUM(c.in_qty) - SUM(c.out_qty), 3), 0) AS total
+            'SELECT IFNULL(ROUND(SUM(c.qty), 3), 0) AS total
                FROM m_material a
                LEFT JOIN (SELECT b.code, b.id_material
                             FROM m_material b
                            WHERE b.status = 1) b
                  ON a.code = b.code
-               LEFT JOIN (SELECT c.id_material, c.in_qty, c.out_qty
-                            FROM t_trace_header c
+               LEFT JOIN (SELECT c.id_material, c.qty
+                            FROM t_balance_header c
                            WHERE c.status = 1
-                             AND c.id_sloc = ?
+                             AND (c.id_sloc = ?
+                                  OR c.id_sloc LIKE CONCAT(\'%\"\', ?, \'\"%\')
+                                  OR c.id_sloc LIKE CONCAT(\'%[\', ?, \',%\')
+                                  OR c.id_sloc LIKE CONCAT(\'%, \', ?, \']%\')
+                                  OR c.id_sloc LIKE CONCAT(\'%[\', ?, \']%\'))
                           ) c
                  ON b.id_material = c.id_material
               WHERE a.status = 1
                 AND a.id_material = ?',
-            [$tankId, $materialId]
+            [$tankId, $tankId, $tankId, $tankId, $tankId, $materialId]
         );
 
         return (float) ($result[0]->total ?? 0);
@@ -121,19 +101,35 @@ class TransferRepository implements TransferRepositoryInterface
         );
         $total = $totalResult[0]->total ?? 0;
 
-        $idsResult = DB::connection($this->connection)->select(
-            'SELECT DISTINCT a.id_balance_head, a.trace_no
-               FROM t_balance_header a
-               LEFT JOIN t_trace_header b ON a.id_balance_head = b.id_balance_head AND b.status = 1 AND SUBSTRING(b.to_trace_no,1,1) = 7 AND SUBSTRING(b.from_trace_no,1,1) = 7
-               LEFT JOIN t_trace_header th_from ON th_from.to_trace_no = b.from_trace_no AND th_from.status = 1
-               LEFT JOIN m_sloc t_from ON t_from.id_sloc = th_from.id_sloc
-              WHERE a.status = 1
-                AND SUBSTRING(a.trace_no,1,1) = 7
-                AND (t_from.id_plant = ? OR a.id_plant = ? OR ? = 0)
-              ORDER BY a.trace_no DESC
-              LIMIT ? OFFSET ?',
-            [$plantId, $plantId, $plantId, $perPage, $offset]
-        );
+        $idsQuery = DB::connection($this->connection)->table('t_balance_header as a')
+            ->select('a.id_balance_head', 'a.trace_no')
+            ->distinct()
+            ->leftJoin('t_trace_header as b', function($join) {
+                $join->on('a.id_balance_head', '=', 'b.id_balance_head')
+                     ->where('b.status', 1)
+                     ->whereRaw('SUBSTRING(b.to_trace_no,1,1) = 7')
+                     ->whereRaw('SUBSTRING(b.from_trace_no,1,1) = 7');
+            })
+            ->leftJoin('t_trace_header as th_from', function($join) {
+                $join->on('th_from.to_trace_no', '=', 'b.from_trace_no')
+                     ->where('th_from.status', 1);
+            })
+            ->leftJoin('m_sloc as t_from', 't_from.id_sloc', '=', 'th_from.id_sloc')
+            ->where('a.status', 1)
+            ->whereRaw('SUBSTRING(a.trace_no,1,1) = 7');
+
+        if ($plantId != 0) {
+            $idsQuery->where(function($q) use ($plantId) {
+                $q->where('t_from.id_plant', $plantId)
+                  ->orWhere('a.id_plant', $plantId);
+            });
+        }
+
+        $idsResult = $idsQuery->orderByDesc('a.trace_no')
+            ->offset($offset)
+            ->limit($perPage)
+            ->get()
+            ->toArray();
 
         if (empty($idsResult)) {
             return ['data' => [], 'total' => $total];
@@ -142,82 +138,78 @@ class TransferRepository implements TransferRepositoryInterface
         $idList = array_map(function($row) { return $row->id_balance_head; }, $idsResult);
         $idBindings = implode(',', array_fill(0, count($idList), '?'));
 
-        $result = collect(DB::connection($this->connection)->select(
-            "SELECT a.entry_date, b.material_document,
-                    th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_tank,
-                    
-                    CAST(a.trace_no AS CHAR) AS trace_no,
-                    FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty,
-                    a.id_balance_head AS idHead,
-                    CONCAT(c.description, ' (', c.code, ')') AS material,
-                    CASE SUBSTRING(a.trace_no, 11, 2)
+        $result = DB::connection($this->connection)->table('t_balance_header as a')
+            ->selectRaw("
+                a.entry_date, b.material_document,
+                th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_tank,
+                CAST(a.trace_no AS CHAR) AS trace_no,
+                FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty,
+                a.id_balance_head AS idHead,
+                CONCAT(c.description, ' (', c.code, ')') AS material,
+                CASE SUBSTRING(a.trace_no, 11, 2)
+                    WHEN '01' THEN 'EOMB'
+                    WHEN '02' THEN 'EOB1'
+                    WHEN '03' THEN 'EOB2'
+                    WHEN '05' THEN 'EOB5'
+                    WHEN '07' THEN 'EOB3'
+                    ELSE p.code_2
+                END AS plant_name,
+                COALESCE(p_from.code_2, 
+                    CASE SUBSTRING(b.from_trace_no, 11, 2)
                         WHEN '01' THEN 'EOMB'
                         WHEN '02' THEN 'EOB1'
                         WHEN '03' THEN 'EOB2'
                         WHEN '05' THEN 'EOB5'
                         WHEN '07' THEN 'EOB3'
-                        ELSE p.code_2
-                    END AS plant_name,
-                    SUBSTRING(a.trace_no, 11, 2) AS plant_code_from_trace,
-                    b.id_trace_head AS idTraceHead, b.is_last_row, b.next_process,
-                    FORMAT(ROUND(a.in_qty,3),3) AS in_qty, FORMAT(ROUND(a.out_qty,3),3) AS out_qty,
-                    GROUP_CONCAT(DISTINCT CONCAT(f.description, ' / ', e.batch_sap,
-                        ' / Qty : ', ROUND(e.init_qty,3), ' MT / Qty : ', ROUND(e.qty,3), ' MT')
-                        SEPARATOR ' | ') AS supplier,
-                    IF(ABS(COALESCE(bs.init_qty,0) - a.init_qty) > 0.005, FORMAT(COALESCE(bs.init_qty,0),3), FORMAT(a.init_qty,3)) AS balance_supplier,
-                    ' >>> ' AS raw_sloc,
-                    a.id_sloc AS raw_id_sloc_to, th_from.id_sloc AS raw_id_sloc_from,
-                    
-                    a.id_plant AS from_plant_id,
-                    a.id_plant AS to_plant_id
-               FROM t_balance_header a
-               LEFT JOIN (SELECT b.id_balance_head, b.id_trace_head, b.from_trace_no,
+                        ELSE ''
+                    END
+                ) AS from_plant_name,
+                SUBSTRING(a.trace_no, 11, 2) AS plant_code_from_trace,
+                b.id_trace_head AS idTraceHead, b.is_last_row, b.next_process,
+                FORMAT(ROUND(a.in_qty,3),3) AS in_qty, FORMAT(ROUND(a.out_qty,3),3) AS out_qty,
+                GROUP_CONCAT(DISTINCT CONCAT(f.description, ' / ', e.batch_sap,
+                    ' / Qty : ', ROUND(e.init_qty,3), ' MT / Qty : ', ROUND(e.qty,3), ' MT')
+                    SEPARATOR ' | ') AS supplier,
+                IF(ABS(COALESCE(bs.init_qty,0) - a.init_qty) > 0.005, FORMAT(COALESCE(bs.init_qty,0),3), FORMAT(a.init_qty,3)) AS balance_supplier,
+                ' >>> ' AS raw_sloc,
+                a.id_sloc AS raw_id_sloc_to, th_from.id_sloc AS raw_id_sloc_from,
+                t_from.id_plant AS from_plant_id,
+                a.id_plant AS to_plant_id
+            ")
+            ->leftJoin(DB::raw("(SELECT b.id_balance_head, b.id_trace_head, b.from_trace_no,
                                  d.material_document,
-                                 CASE
-                                   WHEN b.to_trace_no = (SELECT c.to_trace_no
-                                                           FROM t_trace_header c
-                                                          WHERE SUBSTRING(c.to_trace_no,1,1) = 7
-                                                            AND SUBSTRING(c.to_trace_no,9,1) <> 0
-                                                            AND c.status = 1
-                                                          ORDER BY c.to_trace_no DESC LIMIT 1) THEN 1
-                                   ELSE NULL
-                                 END AS is_last_row,
-                                 CASE
-                                   WHEN b.to_trace_no = (SELECT c.from_trace_no
-                                                           FROM t_trace_header c
-                                                          WHERE c.from_trace_no = b.to_trace_no
-                                                            AND c.status = 1
-                                                          ORDER BY c.from_trace_no DESC LIMIT 1) THEN 1
-                                   ELSE NULL
-                                 END AS next_process
+                                 CASE WHEN b.to_trace_no = (SELECT c.to_trace_no FROM t_trace_header c WHERE SUBSTRING(c.to_trace_no,1,1) = 7 AND SUBSTRING(c.to_trace_no,9,1) <> 0 AND c.status = 1 ORDER BY c.to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
+                                 CASE WHEN b.to_trace_no = (SELECT c.from_trace_no FROM t_trace_header c WHERE c.from_trace_no = b.to_trace_no AND c.status = 1 ORDER BY c.from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process
                             FROM t_trace_header b
                             LEFT JOIN t_material_document d ON d.id_trace_head = b.id_trace_head
-                           WHERE b.status = 1
-                             AND SUBSTRING(b.to_trace_no,1,1) = 7
-                             AND SUBSTRING(b.from_trace_no,1,1) = 7
-                           GROUP BY b.id_balance_head) b
-                 ON a.id_balance_head = b.id_balance_head
-               LEFT JOIN m_material c ON c.id_material = a.id_material
-               LEFT JOIN t_trace_header th_from ON th_from.to_trace_no = b.from_trace_no AND th_from.status = 1
-               
-               
-               LEFT JOIN m_plant p ON (SUBSTRING(a.trace_no, 11, 2) = RIGHT(p.code_3, 2) COLLATE utf8mb4_unicode_ci) AND p.status = 1
-               LEFT JOIN t_balance_detail e ON a.id_balance_head = e.id_balance_head AND e.status = 1
-               LEFT JOIN m_supplier f ON e.id_supplier = f.id_supplier
-               LEFT JOIN (SELECT h.trace_no, ROUND(SUM(d.init_qty),3) AS init_qty, ROUND(SUM(d.qty),3) AS qty
+                           WHERE b.status = 1 AND SUBSTRING(b.to_trace_no,1,1) = 7 AND SUBSTRING(b.from_trace_no,1,1) = 7
+                           GROUP BY b.id_balance_head) b"), 'a.id_balance_head', '=', 'b.id_balance_head')
+            ->leftJoin('m_material as c', 'c.id_material', '=', 'a.id_material')
+            ->leftJoin('t_trace_header as th_from', function($join) {
+                $join->on('th_from.to_trace_no', '=', 'b.from_trace_no')->where('th_from.status', 1);
+            })
+            ->leftJoin('m_plant as p', function($join) {
+                $join->on(DB::raw('SUBSTRING(a.trace_no, 11, 2)'), '=', DB::raw('RIGHT(p.code_3, 2) COLLATE utf8mb4_unicode_ci'))->where('p.status', 1);
+            })
+            ->leftJoin('m_sloc as t_from', 't_from.id_sloc', '=', 'th_from.id_sloc')
+            ->leftJoin('m_plant as p_from', function($join) {
+                $join->on(DB::raw('t_from.id_plant'), '=', DB::raw('p_from.code_3 COLLATE utf8mb4_unicode_ci'))->where('p_from.status', 1);
+            })
+            ->leftJoin('t_balance_detail as e', function($join) {
+                $join->on('a.id_balance_head', '=', 'e.id_balance_head')->where('e.status', 1);
+            })
+            ->leftJoin('m_supplier as f', 'e.id_supplier', '=', 'f.id_supplier')
+            ->leftJoin(DB::raw("(SELECT h.trace_no, ROUND(SUM(d.init_qty),3) AS init_qty, ROUND(SUM(d.qty),3) AS qty
                             FROM t_balance_header h
                             JOIN t_balance_detail d ON d.id_balance_head = h.id_balance_head
                            WHERE d.status = 1 AND d.init_qty > 0.0001
-                           GROUP BY h.trace_no) bs ON bs.trace_no = a.trace_no
-               
-               
-              WHERE a.status = 1
-                AND SUBSTRING(a.trace_no,1,1) = 7
-                AND a.id_balance_head IN ($idBindings)
-              GROUP BY a.trace_no
-              ORDER BY a.trace_no DESC",
-            $idList
-        ));
+                           GROUP BY h.trace_no) bs"), 'bs.trace_no', '=', 'a.trace_no')
+            ->where('a.status', 1)
+            ->whereRaw('SUBSTRING(a.trace_no,1,1) = 7')
+            ->whereIn('a.id_balance_head', $idList)
+            ->groupBy('a.trace_no')
+            ->orderByDesc('a.trace_no')
+            ->get();
 
         $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
             ->table('m_sloc')
@@ -308,59 +300,16 @@ class TransferRepository implements TransferRepositoryInterface
         return ['data' => $result, 'total' => $total];
     }
 
-    public function getActiveTanksRundown(?int $materialId, int $plantId): Collection
+    public function getActiveTanksRundown(?int $materialId, int $plantId, bool $excludePlant = true): Collection
     {
-        if ($materialId === null) {
-            $result = collect(DB::connection($this->connection)->select(
-                'SELECT b.id_sloc AS id_tank, b.description AS tank, b.id_plant
-                   FROM m_sloc b
-                  WHERE b.status = 1
-                    AND b.id_plant <> ?
-                  GROUP BY b.id_sloc
-                  ORDER BY b.description ASC',
-                [$plantId]
-            ));
-        } else {
-            $result = collect(DB::connection($this->connection)->select(
-                'SELECT b.id_sloc AS id_tank, b.description AS tank, b.id_plant
-                   FROM m_material a
-                   LEFT JOIN m_sloc b ON a.type = b.code_2 COLLATE utf8mb4_unicode_ci AND b.status = 1 AND b.id_plant = ?
-                  WHERE a.status = 1
-                    AND a.id_material = ?
-                  GROUP BY b.id_sloc',
-                [$plantId, $materialId]
-            ));
-        }
-
-        return $result->map(function($item) {
-            $item->tank = $this->formatTankName($item->tank);
-            return $item;
-        });
+        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+            ->getActiveTanksRundown($materialId, $plantId, $excludePlant);
     }
 
     public function getActiveSpecificTanksRundown(int $sloc): Collection
     {
-        $tank = DB::connection($this->connection)->select('SELECT description, id_plant FROM m_sloc WHERE id_sloc = ?', [$sloc]);
-        if (empty($tank)) {
-            return collect([]);
-        }
-        $formattedName = $this->formatTankName($tank[0]->description);
-        $plantId = $tank[0]->id_plant;
-
-        $results = DB::connection($this->connection)->select(
-            'SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo, description
-               FROM m_sloc
-              WHERE status = 1
-                AND description = ?
-                AND id_plant = ?
-              ORDER BY id_sloc ASC',
-            [$formattedName, $plantId]
-        );
-
-        return collect($results)->map(function ($item) {
-            $item->tankName = $item->description . ' (' . $item->tankNo . ')';
-            return $item;
-        });
+        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+            ->getActiveSpecificTanksRundown($sloc);
     }
 
     public function getLockStatus(string $entryDate): bool
@@ -385,13 +334,13 @@ class TransferRepository implements TransferRepositoryInterface
 
         $plantCode = DB::connection($this->connection)->table('m_plant')
             ->where('id_plant', $plantId)
-            ->value('code_4');
+            ->value('code_3');
 
         $result = DB::connection($this->connection)->select(
             'SELECT CONCAT(DATE_FORMAT(NOW(), "%y%m%d"), ?, b.code_4, UCASE(a.code_matl_supplier)) AS supplierCode,
                     COALESCE(c.id_supplier, 0) AS idSupplier
                FROM (SELECT a.code_matl_supplier FROM m_material a WHERE a.status = 1 AND a.id_material = ?) a
-               JOIN (SELECT p.code_4 FROM m_sloc s JOIN m_plant p ON s.id_plant = p.code_3 WHERE s.status = 1 AND s.id_sloc = ?) b
+               JOIN (SELECT s.code_4 FROM m_sloc s JOIN m_plant p ON s.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci WHERE s.status = 1 AND s.id_sloc = ?) b
                LEFT JOIN (SELECT c.id_supplier FROM m_supplier c WHERE c.status = 1 AND c.type = ?) c ON 1=1
               LIMIT 1',
             [$seqNo, $idMaterial, $idTank, $idTank]
@@ -413,48 +362,8 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function createMaterialDocument(string $user, int $idTraceHead, string $materialDoc, string $mode): array
     {
-        if ($mode === 'ADD') {
-            DB::connection($this->connection)->insert(
-                'INSERT INTO t_material_document (id_trace_head, material_document, created_by)
-                 VALUES (?, ?, ?)',
-                [$idTraceHead, $materialDoc, $user]
-            );
-
-            $id = DB::connection($this->connection)->select(
-                'SELECT id_matdoc FROM t_material_document ORDER BY id_matdoc DESC LIMIT 1'
-            );
-
-            $this->logTransaction('T_MATERIAL_DOCUMENT', 'ADD',
-                'ID: ' . ($id[0]->id_matdoc ?? '') . ' | IDTRACEHEAD: ' . $idTraceHead . ' / DOC_NO: ' . $materialDoc,
-                $user
-            );
-
-            return ['response' => 1];
-        }
-
-        $dat = DB::connection($this->connection)->select(
-            'SELECT id_matdoc, material_document FROM t_material_document WHERE id_trace_head = ?',
-            [$idTraceHead]
-        );
-
-        if (empty($dat)) {
-            return ['response' => 0];
-        }
-
-        $idMatdoc = $dat[0]->id_matdoc;
-        $oldMaterialDoc = $dat[0]->material_document;
-
-        DB::connection($this->connection)->update(
-            'UPDATE t_material_document SET material_document = ?, updated_by = ? WHERE id_trace_head = ?',
-            [$materialDoc, $user, $idTraceHead]
-        );
-
-        $this->logTransaction('T_MATERIAL_DOCUMENT', 'UPDATE',
-            'ID: ' . $idMatdoc . ' | IDTRACEHEAD: ' . $idTraceHead . ' / DOC_NO: ' . $oldMaterialDoc . ' >>> ' . $materialDoc,
-            $user
-        );
-
-        return ['response' => 1];
+        return app(\Modules\Shared\Services\TransactionCoreService::class)
+            ->createMaterialDocument($user, $idTraceHead, $materialDoc, $mode);
     }
 
     public function deactivateTransfer(string $id, string $user): array
@@ -668,47 +577,8 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function updateEntrySubTank(string $user, int $idHead, array $tails): array
     {
-        if (!is_array($tails)) {
-            return ['response' => 0, 'message' => 'INVALID SUBTANK DATA'];
-        }
-
-        $jsonTails = json_encode(array_values(array_unique($tails)));
-
-        $row = DB::connection($this->connection)->selectOne(
-            'SELECT trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
-            [$idHead]
-        );
-
-        if (!$row) {
-            return ['response' => 0, 'message' => 'BALANCE HEAD NOT FOUND'];
-        }
-
-        DB::connection($this->connection)->update(
-            'UPDATE t_balance_header SET updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-
-        DB::connection($this->connection)->update(
-            'UPDATE t_trace_header SET updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-
-        DB::connection($this->connection)->update(
-            'UPDATE t_balance_detail SET updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-
-        DB::connection($this->connection)->update(
-            'UPDATE t_trace_detail SET updated_by = ?
-              WHERE id_trace_head IN (SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ?)',
-            [$user, $idHead]
-        );
-
-        $this->logTransaction('T_BALANCE_HEAD', 'UPDATE_SUBTANK',
-            'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SUBTANKS: ' . implode(',', $tails),
-            $user);
-
-        return ['response' => 1];
+        return app(\Modules\Shared\Services\TransactionCoreService::class)
+            ->updateEntrySubTank($user, $idHead, $tails);
     }
 
     public function checkTraceNoExists(string $traceNo): bool
@@ -791,12 +661,5 @@ class TransferRepository implements TransferRepositoryInterface
         return DB::connection($this->connection)->table('t_adjustment_detail')->insert($data);
     }
 
-    public function logTransaction(string $module, string $type, string $description, string $user): void
-    {
-        DB::connection($this->connection)->insert(
-            'INSERT INTO log_transactions (log_module, log_type, log_description, created_by)
-             VALUES (?, ?, ?, ?)',
-            [$module, $type, $description, $user]
-        );
-    }
+
 }

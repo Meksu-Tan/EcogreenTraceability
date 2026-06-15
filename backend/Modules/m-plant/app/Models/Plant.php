@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Plant extends Model
 {
+    protected $connection = 'eudr_ts';
     protected $table      = 'm_plant';
     protected $primaryKey = 'id_plant';
 

@@ -7,7 +7,7 @@ interface TransferServiceInterface
     public function generateEntryNo(int $materialId, int $plantId): ?string;
     public function getTotalStockMaterial(int $materialId, int $tankId, int $plantId): float;
     public function getTransferList(int $plantId, int $page = 1, int $perPage = 5): array;
-    public function getActiveTanksRundown(?int $materialId, int $plantId): array;
+    public function getActiveTanksRundown(?int $materialId, int $plantId, bool $excludePlant = true): array;
     public function getActiveSpecificTanksRundown(int $sloc): array;
     public function getUpdateSupplierMaterial(int $idMaterial, int $idTank, int $plantId): ?object;
     public function createMaterialDocument(string $user, int $idTraceHead, string $materialDoc, string $mode): array;

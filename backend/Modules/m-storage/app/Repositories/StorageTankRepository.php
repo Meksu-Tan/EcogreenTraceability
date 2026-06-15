@@ -41,13 +41,17 @@ class StorageTankRepository implements StorageTankRepositoryInterface
 
     private function getTankCountsByLocation(): array
     {
-        return StorageDetail::where('status', 1)
-            ->groupBy('id_sloc')
-            ->selectRaw('id_sloc, COUNT(id_sloc_tail) AS total_tank')
-            ->get()
-            ->keyBy('id_sloc')
-            ->map(fn(StorageDetail $r): int => (int) $r->total_tank)
-            ->toArray();
+        try {
+            return StorageDetail::where('status', 1)
+                ->groupBy('id_sloc')
+                ->selectRaw('id_sloc, COUNT(id_sloc_tail) AS total_tank')
+                ->get()
+                ->keyBy('id_sloc')
+                ->map(fn(StorageDetail $r): int => (int) $r->total_tank)
+                ->toArray();
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 
     public function findTankById(int $id): ?object
@@ -130,17 +134,21 @@ class StorageTankRepository implements StorageTankRepositoryInterface
 
     public function getDetailsByTank(int $tankId): array
     {
-        return StorageDetail::selectRaw('
-            a.id_sloc_tail, a.tf_number, a.status, a.created_at, a.updated_at,
-            b.description AS storage, b.id_plant, b.id_sloc
-        ')
-        ->from('m_sloc_detail AS a')
-        ->leftJoin('m_sloc AS b', 'a.id_sloc', '=', 'b.id_sloc')
-        ->where('b.id_sloc', $tankId)
-        ->where('a.status', 1)
-        ->orderBy('a.tf_number')
-        ->get()
-        ->toArray();
+        try {
+            return StorageDetail::selectRaw('
+                a.id_sloc_tail, a.tf_number, a.status, a.created_at, a.updated_at,
+                b.description AS storage, b.id_plant, b.id_sloc
+            ')
+            ->from('m_sloc_detail AS a')
+            ->leftJoin('m_sloc AS b', 'a.id_sloc', '=', 'b.id_sloc')
+            ->where('b.id_sloc', $tankId)
+            ->where('a.status', 1)
+            ->orderBy('a.tf_number')
+            ->get()
+            ->toArray();
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 
     public function findDetailById(int $id): ?object

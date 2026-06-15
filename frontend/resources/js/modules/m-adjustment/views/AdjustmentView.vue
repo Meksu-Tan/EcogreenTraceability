@@ -2,7 +2,25 @@
   <div class="pa-6">
     <VCard class="mb-4">
       <VCardTitle class="pa-5 pb-2">
-        <h1 class="text-h6 font-weight-bold">Adjustment - {{ adjMode === 'wip' ? 'WIP' : 'WAREHOUSE' }}</h1>
+        <VRow align="center" no-gutters>
+          <VCol cols="auto">
+            <h1 class="text-h6 font-weight-bold">Adjustment - {{ adjMode === 'wip' ? 'WIP' : 'WAREHOUSE' }}</h1>
+            <div class="d-flex align-center gap-2 mt-1">
+              <span class="text-body-2 text-medium-emphasis">Location:</span>
+              <VChip
+                size="small"
+                color="primary"
+                variant="tonal"
+                prepend-icon="ri-factory-line"
+              >
+                {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
+              </VChip>
+            </div>
+          </VCol>
+          <VCol cols="auto" class="ml-6 pl-6 border-s">
+            <PlantSelector />
+          </VCol>
+        </VRow>
       </VCardTitle>
       <VCardText>
         <div class="d-flex flex-wrap ga-2">
@@ -112,7 +130,6 @@
               />
             </div>
             <VPagination
-              v-slot:prev="{ onClick, disabled }"
               v-if="listMeta.lastPage > 1"
               v-model="listMeta.page"
               :length="listMeta.lastPage"
@@ -717,7 +734,11 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAdjustmentStore } from '../stores/adjustmentStore'
 import { useToastStore } from '@/stores/toast.js'
+import { usePlantSelectionStore } from '@/stores/plant.js'
+import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import adjustmentApi from '@/modules/m-adjustment/services/index.js'
+
+const plantSelectionStore = usePlantSelectionStore()
 
 const store = useAdjustmentStore()
 const toast = useToastStore()
@@ -862,6 +883,12 @@ watch(adjMode, () => {
   loadFormOptions()
 })
 
+watch(() => plantSelectionStore.selectedPlantId, () => {
+  listMeta.value.page = 1
+  loadData()
+  loadFormOptions()
+})
+
 watch(perPage, (val) => {
   listMeta.value.perPage = val
   listMeta.value.page = 1
@@ -917,10 +944,12 @@ const switchMode = (mode) => {
 }
 
 const loadData = async () => {
+  const plantId = plantSelectionStore.selectedPlantId || 0
   await store.fetchList({
     adj_type: adjMode.value === 'wip' ? 'wip' : 'wh',
     page: listMeta.value.page,
-    per_page: listMeta.value.perPage
+    per_page: listMeta.value.perPage,
+    id_plant: plantId
   })
 }
 
@@ -931,9 +960,15 @@ const changePage = async (p) => {
 }
 
 const loadFormOptions = async () => {
+  const plantId = plantSelectionStore.selectedPlantId || 0
   await store.fetchSuppliers({ supplier: '' })
   store.fetchActiveMaterials()
-  store.fetchActiveTanks()
+  store.fetchActiveTanks({ id_plant: plantId })
+}
+
+const onPlantChange = () => {
+  loadData()
+  loadFormOptions()
 }
 
 function toggleTankNo(id, checked) {
@@ -1059,7 +1094,8 @@ const submitLastRecord = async () => {
       id_material: lastRecordForm.idMaterial,
       id_tank: lastRecordForm.idTank,
       id_sloc: lastRecordForm.idSloc,
-      qty: lastRecordForm.qty
+      qty: lastRecordForm.qty,
+      id_plant: plantSelectionStore.selectedPlantId || 0
     }
     const result = adjMode.value === 'wip'
       ? await store.storeAdjustment(payload)
@@ -1079,7 +1115,8 @@ const submitLastRecord = async () => {
 }
 
 const onInitDateChange = async () => {
-  await store.fetchEntryNo({ entry_date: initForm.entry_date })
+  const plantId = plantSelectionStore.selectedPlantId || 0
+  await store.fetchEntryNo({ entry_date: initForm.entry_date, id_plant: plantId })
   if (store.entryNo) initForm.entry_no = store.entryNo
 }
 
@@ -1104,7 +1141,8 @@ const addSupplierToInit = async () => {
       id_supplier: initSupplierForm.idSupplier,
       batch_sap: initSupplierForm.batchSap,
       qty: initSupplierForm.qty,
-      entry_date: initForm.entry_date
+      entry_date: initForm.entry_date,
+      id_plant: plantSelectionStore.selectedPlantId || 0
     })
     if (res?.response === 1) {
       const supplierName = searchSuppliersList.value.find(s => s.id_supplier == initSupplierForm.idSupplier)?.supplier || initSupplierForm.idSupplier
@@ -1167,7 +1205,8 @@ const submitInit = async () => {
       tank: initForm.tank,
       tankNo: initForm.tankNo,
       qty: initForm.qty,
-      id_material: initForm.id_material
+      id_material: initForm.id_material,
+      id_plant: plantSelectionStore.selectedPlantId || 0
     }
     const result = adjMode.value === 'wip'
       ? await store.adjustmentInit(payload)
@@ -1342,7 +1381,8 @@ const submitSupplierAdj = async () => {
       id_supplier: supplierAdjForm.idSupplier,
       batch_sap: supplierAdjForm.batchSap,
       qty: supplierAdjForm.qty,
-      adjust_type: supplierAdjForm.adjustType
+      adjust_type: supplierAdjForm.adjustType,
+      id_plant: plantSelectionStore.selectedPlantId || 0
     })
     if (result?.response === 1) {
       toast.success('Supplier Adjustment Saved')

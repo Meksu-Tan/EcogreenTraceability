@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class StorageDetail extends Model
 {
+    protected $connection = 'eudr_ts';
     protected $table      = 'm_sloc_detail';
     protected $primaryKey = 'id_sloc_tail';
 

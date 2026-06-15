@@ -16,7 +16,9 @@ trait WipEntryQueryTrait
         $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'd.id_plant = ?';
         $bindings = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? [$dbRundownId] : [$idPlant, $dbRundownId];
 
-        $rows = DB::connection('eudr_ts')->select('
+        $offset = ($page - 1) * $perPage;
+
+        $baseSql = '
             SELECT aa.id_balance_head, aa.id_material, aa.id_sloc, aa.status,
                    aa.trace_no, aa.qty, aa.created_by, aa.created_at,
                    aa.material, aa.init_qty, aa.tf_number AS sloc, aa.entry_date,
@@ -85,10 +87,20 @@ trait WipEntryQueryTrait
                     WHERE c.status = 1
                       AND c.' . $column . ' = ?
                     ) aa
-              ORDER BY entry_date DESC
-        ', $bindings);
+        ';
 
-        return $this->mapSlocDescriptions($rows);
+        $total = (int) (DB::connection('eudr_ts')->selectOne(
+            'SELECT COUNT(*) AS total FROM (' . $baseSql . ') AS counted',
+            $bindings
+        )->total ?? 0);
+
+        $rows = DB::connection('eudr_ts')->select(
+            $baseSql . ' ORDER BY entry_date DESC LIMIT ? OFFSET ?',
+            array_merge($bindings, [$perPage, $offset])
+        );
+
+        $result = $this->mapSlocDescriptions($rows);
+        return ['data' => $result, 'total' => $total, 'page' => $page, 'per_page' => $perPage];
     }
 
     public function getFeed(string $feedId, string $mode, $plantId, int $page = 1, int $perPage = 5): array
@@ -204,10 +216,14 @@ trait WipEntryQueryTrait
             ', $bindings);
         }
 
-        return $this->mapSlocDescriptions($rows);
+        $result = $this->mapSlocDescriptions($rows);
+        if ($mode === 'LOG') {
+            return ['data' => $result, 'total' => count($result), 'page' => $page, 'per_page' => $perPage];
+        }
+        return $result;
     }
 
-    
+
     protected function mapSlocDescriptions(array $rows, string $slocField = 'sloc'): array
     {
         if (empty($rows)) return $rows;
@@ -456,11 +472,11 @@ trait WipEntryQueryTrait
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
                                                    WHERE (SUBSTRING(to_trace_no, 1, 1) = ? OR SUBSTRING(to_trace_no, 1, 1) = ?)
                                                      AND SUBSTRING(to_trace_no, 8, 3) = ?
-                                                     AND status = 1 AND $plantFilter
+                                                     AND status = 1 AND ' . $plantFilter . '
                                                    ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                        CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                    WHERE from_trace_no = a.to_trace_no
-                                                     AND status = 1 AND $plantFilter
+                                                     AND status = 1 AND ' . $plantFilter . '
                                                    ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
                        a.id_plant, p.description AS plant_name
                   FROM t_trace_header a
@@ -470,19 +486,23 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.in_qty) AS in_qty
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  
+
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.in_qty > 0 AND b.in_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                   AND a.status = 1 AND a.id_plant = ?
+                   AND a.status = 1 AND ' . $plantFilter . '
                  GROUP BY a.to_trace_no
                  ORDER BY a.to_trace_no DESC
                   LIMIT ' . $limit . ' OFFSET ' . $offset . '
-            ', [$this->movType1, $this->movType2, $rundownId, $idPlant, $idPlant, $rundownId, $this->movType1, $idPlant], $idPlant);
+            ', $bindings);
         }
 
-        return $this->mapSlocDescriptions($rows);
+        $result = $this->mapSlocDescriptions($rows);
+        if ($mode === 'LOG') {
+            return ['data' => $result, 'total' => count($result), 'page' => $page, 'per_page' => $perPage];
+        }
+        return $result;
     }
 
     public function getActiveTanksForFeed(string $feedId, $plantId): array
@@ -500,50 +520,18 @@ trait WipEntryQueryTrait
 
     protected function getActiveTanksBySlocType(string $type, ?string $idPlant, mixed $rawPlantId = null): array
     {
-        $params = [$type, $type, $type];
-        $plantWhere = '';
-
-        if ($idPlant !== null && $idPlant !== '0' && $idPlant !== '') {
-            $plantWhere = ' AND id_plant = ?';
-            $params[] = $idPlant;
-        }
-
-        $rows = DB::connection('eudr_ts')->select("
-            SELECT id_sloc, id_sloc AS id_tank, description AS tank, id_plant,
-                   0 AS details_count
-              FROM m_sloc
-             WHERE status = 1
-               AND (
-                    UPPER(COALESCE(code_3, '')) = ?
-                 OR UPPER(COALESCE(code_2, '')) = ?
-                 OR UPPER(COALESCE(description, '')) LIKE CONCAT('%', ?, '%')
-               )
-               {$plantWhere}
-             ORDER BY description ASC, id_sloc ASC
-        ", $params);
-
-        \Log::info('WIP SLOC debug', [
-            'type' => $type,
-            'raw_plant_id' => $rawPlantId,
-            'resolved_plant_id' => $idPlant,
-            'params' => $params,
-            'count' => count($rows),
-            'sample' => $rows[0] ?? null,
-        ]);
+        $rows = app(\Modules\Shared\Repositories\TankQueryRepository::class)
+            ->getActiveTanksByKeywords([$type], $idPlant)
+            ->toArray();
 
         return $this->mapSlocDescriptions($rows);
     }
 
     public function getActiveSpecificTanks(int $slocId): array
     {
-        return DB::connection('eudr_ts')->select('
-            SELECT id_sloc AS id_sloc_tail, id_sloc AS id_tank_tail, id_tank AS tankNo
-              FROM m_sloc
-             WHERE status = 1
-               AND description = (SELECT description FROM m_sloc WHERE id_sloc = ?)
-               AND id_plant = (SELECT id_plant FROM m_sloc WHERE id_sloc = ?)
-             ORDER BY id_sloc ASC
-        ', [$slocId, $slocId]);
+        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+            ->getActiveSpecificTanksRundown($slocId)
+            ->toArray();
     }
 
     public function getQuantifierData(string $date, string $tagNumber): array

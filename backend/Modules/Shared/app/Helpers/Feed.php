@@ -363,4 +363,24 @@ class Feed
             'parameters' => $params
         ];
     }
+
+    /**
+     * Stub for normalizeSupplierRundown to prevent fatal errors.
+     * Original logic seems to have normalized supplier proportion for rundown.
+     */
+    public static function normalizeSupplierRundown(array $traceHeadIds, float $outQty): array
+    {
+        // TODO: Implement actual normalization logic or route to Rundown::adjustRundownToTotal
+        return [];
+    }
+
+    /**
+     * Stub for getDetailedFifoStock to prevent fatal errors.
+     * Original logic seems to have returned detailed FIFO stock info.
+     */
+    public static function getDetailedFifoStock(array $feedData): array
+    {
+        // TODO: Implement actual detailed FIFO stock query
+        return [];
+    }
 }

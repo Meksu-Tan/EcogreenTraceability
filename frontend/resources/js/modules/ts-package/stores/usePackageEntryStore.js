@@ -3,14 +3,32 @@ import { ref, computed } from 'vue'
 import packageService from '../services/packageService'
 import { useToastStore } from '@/stores/toast.js'
 import { usePlantSelectionStore } from '@/stores/plant.js'
+import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const usePackageEntryStore = defineStore('packageEntry', () => {
   const toastStore = useToastStore()
   const plantStore = usePlantSelectionStore()
 
-  // State
-  const entries = ref([])
-  const loading = ref(false)
+  const {
+    list: entries,
+    loading,
+    error,
+    pagination,
+    setPage,
+    resetCache: resetListCache,
+    fetchList: doFetchList,
+    isFresh,
+    touch,
+    hasEntries,
+    entriesCount
+  } = useTransactionList(
+    (params) => packageService.getEntries(params),
+    { listKey: 'entries' }
+  )
+
+  async function fetchEntries(params = {}) {
+    return doFetchList({ plant: plantId.value, ...params })
+  }
   const activeFgProducts = ref([])
   const wipMaterials = ref([])
   const wipBalance = ref(0)
@@ -26,19 +44,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
   const plantId = computed(() => plantStore.selectedPlantId)
 
   // Actions
-  async function fetchEntries() {
-    loading.value = true
-    try {
-      const res = await packageService.getEntries({ plant: plantId.value })
-      if (res.data?.status === 1 || res.data?.data) {
-        entries.value = res.data.data?.data || res.data.data || []
-      }
-    } catch (error) {
-      toastStore.error('Failed to load packaging entries')
-    } finally {
-      loading.value = false
-    }
-  }
+  // fetchEntries is replaced by the composable wrapper
 
   async function fetchActiveFgProducts() {
     try {
@@ -209,6 +215,11 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
   return {
     entries,
     loading,
+    error,
+    pagination,
+    setPage,
+    hasEntries,
+    entriesCount,
     activeFgProducts,
     wipMaterials,
     wipBalance,

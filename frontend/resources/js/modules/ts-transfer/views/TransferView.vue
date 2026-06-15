@@ -22,7 +22,7 @@
           </VCol>
         </VRow>
       </VCol>
-      <VCol cols="auto">
+      <VCol cols="auto" v-if="plantSelectionStore.selectedPlantId !== null">
         <VBtn
           color="primary"
           prepend-icon="ri-add-line"
@@ -90,7 +90,7 @@
               <tr v-for="(trf, index) in sortedList" :key="trf.id_balance_head">
                 <td class="text-caption text-medium-emphasis">{{ (page - 1) * perPage + index + 1 }}</td>
                 <td class="text-center">{{ formatDate(trf.entry_date) }}</td>
-                <td class="text-center font-weight-medium text-caption">{{ trf.plant_name || '-' }}</td>
+                <td class="text-center font-weight-medium text-caption" style="white-space:nowrap">{{ trf.from_plant_name ? trf.from_plant_name + ' ➔ ' + (trf.plant_name || '-') : (trf.plant_name || '-') }}</td>
                 <td class="text-center">
                   <span v-if="trf.material_document" class="text-caption">{{ trf.material_document }}</span>
                   <VBtn
