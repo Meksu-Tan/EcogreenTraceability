@@ -38,7 +38,7 @@ class PackageEntryController extends Controller
             $user = $request->user()->username ?? 'System';
             $data = $request->validated();
             // In case plant needs resolving
-            $data['id_plant'] = $request->get('plant_context')['plant_code'];
+            $data['id_plant'] = $request->get('plant_context')['plant_code'] ?? (int) $request->input('id_plant', 0);
             
             $res = $this->packageService->store($user, $data);
             if ($res['response'] == ResponseCode::PERIOD_LOCKED) {
@@ -184,7 +184,7 @@ class PackageEntryController extends Controller
     public function newTraceNo(GenerateTraceNoRequest $request): JsonResponse
     {
         $warehouseId = (int) $request->validated('warehouse');
-        $plantId = (int) $request->get('plant_context')['plant_code'];
+        $plantId = (int) ($request->get('plant_context')['plant_code'] ?? $request->input('id_plant', 0));
         try {
             $traceNo = $this->packageService->generateTraceNo($warehouseId, $plantId);
             return ApiResponse::success([['traceNo' => $traceNo]]);

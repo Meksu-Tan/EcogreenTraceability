@@ -18,7 +18,7 @@ class StoreTransferRequest extends FormRequest
                 'id_material' => 'required|integer',
                 'material_doc' => 'nullable|string',
                 'trf_qty' => 'required|numeric|min:0.001',
-                'source_sloc' => 'required|integer',
+                'source_sloc' => 'required|integer|different:trf_sloc',
                 'trf_sloc' => 'required|integer',
                 'source_sloc_no' => 'nullable|array',
                 'trf_sloc_no' => 'nullable|array',

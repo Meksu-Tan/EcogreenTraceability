@@ -66,6 +66,12 @@ class TransferServiceTest extends TestCase
     {
         $expectedEntryNo = '726060310001';
 
+        // plantId=1001 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(1001)
+            ->andReturn('1001');
+
         $this->repoMock->shouldReceive('generateTransferEntryNo')
             ->once()
             ->with(1, 1001)
@@ -78,6 +84,12 @@ class TransferServiceTest extends TestCase
 
     public function test_it_returns_null_when_entry_no_cannot_be_generated(): void
     {
+        // plantId=9999 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(9999)
+            ->andReturn('9999');
+
         $this->repoMock->shouldReceive('generateTransferEntryNo')
             ->once()
             ->with(99, 9999)
@@ -92,6 +104,12 @@ class TransferServiceTest extends TestCase
 
     public function test_it_delegates_get_total_stock_material_to_repository(): void
     {
+        // plantId=1001 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(1001)
+            ->andReturn('1001');
+
         $this->repoMock->shouldReceive('getTotalStockMaterial')
             ->once()
             ->with(1, 5, 1001)
@@ -104,6 +122,12 @@ class TransferServiceTest extends TestCase
 
     public function test_it_returns_zero_when_no_stock_available(): void
     {
+        // plantId=1001 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(1001)
+            ->andReturn('1001');
+
         $this->repoMock->shouldReceive('getTotalStockMaterial')
             ->once()
             ->with(1, 5, 1001)
@@ -168,9 +192,16 @@ class TransferServiceTest extends TestCase
             (object) ['id_tank' => 1, 'tank' => 'Storage EOB1'],
         ];
 
+        // plantId=1001 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(1001)
+            ->andReturn('1001');
+
+        // getActiveTanksRundown signature: ($materialId, $plantCode, $excludePlant = true)
         $this->repoMock->shouldReceive('getActiveTanksRundown')
             ->once()
-            ->with(1, 1001)
+            ->with(1, 1001, true)
             ->andReturn(collect($expected));
 
         $result = $this->service->getActiveTanksRundown(1, 1001);
@@ -180,9 +211,15 @@ class TransferServiceTest extends TestCase
 
     public function test_it_delegates_get_active_tanks_rundown_with_null_material(): void
     {
+        // plantId=1001 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(1001)
+            ->andReturn('1001');
+
         $this->repoMock->shouldReceive('getActiveTanksRundown')
             ->once()
-            ->with(null, 1001)
+            ->with(null, 1001, true)
             ->andReturn(collect([]));
 
         $result = $this->service->getActiveTanksRundown(null, 1001);
@@ -214,6 +251,12 @@ class TransferServiceTest extends TestCase
     {
         $expected = (object) ['supplierCode' => '26060101PO', 'idSupplier' => 3];
 
+        // plantId=1001 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(1001)
+            ->andReturn('1001');
+
         $this->repoMock->shouldReceive('getUpdateSupplierMaterial')
             ->once()
             ->with(1, 5, 1001)
@@ -226,6 +269,12 @@ class TransferServiceTest extends TestCase
 
     public function test_it_returns_null_when_supplier_material_not_found(): void
     {
+        // plantId=99 > 0 → resolvePlantCode is called → findPlantCode is called
+        $this->repoMock->shouldReceive('findPlantCode')
+            ->once()
+            ->with(99)
+            ->andReturn('99');
+
         $this->repoMock->shouldReceive('getUpdateSupplierMaterial')
             ->once()
             ->with(99, 99, 99)

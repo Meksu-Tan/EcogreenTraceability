@@ -39,6 +39,23 @@ class BlendingController extends Controller
         }
     }
 
+    /**
+     * Unified POST dispatcher — routes to the correct handler based on `flag`.
+     * Supports: post_blendingEntryMaterial, post_blendingEntry, post_matlDocNumber, post_updateEntrySubTank
+     */
+    public function store(StoreBlendingRequest $request): JsonResponse
+    {
+        $flag = $request->input('flag');
+
+        return match ($flag) {
+            'post_blendingEntryMaterial' => $this->storeMaterial($request),
+            'post_blendingEntry'         => $this->executeBlending($request),
+            'post_matlDocNumber'         => $this->createMatlDoc($request),
+            'post_updateEntrySubTank'    => $this->updateSubTank($request),
+            default                      => ApiResponse::error('Invalid flag: ' . $flag, 422),
+        };
+    }
+
     public function storeMaterial(StoreBlendingRequest $request): JsonResponse
     {
         $mode = $request->input('mode', 'ADD');
