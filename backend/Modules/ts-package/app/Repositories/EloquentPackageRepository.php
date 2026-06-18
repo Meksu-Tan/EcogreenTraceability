@@ -4,6 +4,7 @@ namespace Modules\TsPackage\Repositories;
 
 use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
 use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Helpers\Feed;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,50 +18,141 @@ use Exception;
  */
 class EloquentPackageRepository implements PackageRepositoryInterface
 {
+    use DbCompatTrait;
+
     protected string $connection = 'eudr_ts';
     protected static string $movType1 = "4";
 
-    public function getDtPckEntry(): Collection
+    public function getDtPckEntry(int $plantId = 0, int $page = 1, int $perPage = 50): Collection
     {
-        $results = DB::connection($this->connection)->select('
-            SELECT a.id_whx_head, a.entry_date,
-                   CONCAT(CAST(g.from_trace_no AS CHAR) , " >>> ", CAST(a.trace_no AS CHAR) ) AS fromto_trace_no,
-                   a.id_material_feed, a.id_material_fg, a.batch_no, f.id_trace_head, f.id_balance_head,
-                   GROUP_CONCAT(DISTINCT CONCAT(ms.description, IFNULL(CONCAT(" | ", ms.id_sloc), "")) ORDER BY ms.id_sloc ASC SEPARATOR ", ") AS sloc,
-                   FORMAT(g.init_qty,3) AS init_qty, FORMAT(g.qty,3) AS balance, a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
-                   UPPER(b.description) AS feed, UPPER(c.description) AS fg, a.trace_no, a.po_no, g.code AS whx, a.id_section,
-                   GROUP_CONCAT(DISTINCT CONCAT(d.description, " / ", d.batch_sap, " / Init: ", FORMAT(d.init_qty,3), " MT / Balance: ", FORMAT(d.qty,3), " MT") SEPARATOR " | ") AS supplier,
-                   FORMAT(SUM(DISTINCT dd.init_qty),3) AS balance_supplier,
-                   CASE
-                      WHEN LENGTH(CAST(a.trace_no AS CHAR)) >= 14 THEN
+        $gcSloc     = "''";
+        $gcSupplier = $this->dbGroupConcat(
+            "CONCAT(d.description, ' / ', d.batch_sap, ' / Init: ', {$this->dbNumberFormat('d.init_qty', 3)}, ' MT / Balance: ', {$this->dbNumberFormat('d.qty', 3)}, ' MT')",
+            ' | ',
+            true
+        );
+        $gcFromTrace = $this->dbGroupConcat('DISTINCT g.from_trace_no', ' ');
+        $fmtInitQty  = $this->isPgsql()
+            ? $this->dbNumberFormat('MIN(wh_sub.init_qty)', 3)
+            : $this->dbNumberFormat('wh_sub.init_qty', 3);
+        $fmtQty      = $this->isPgsql()
+            ? $this->dbNumberFormat('MIN(wh_sub.qty)', 3)
+            : $this->dbNumberFormat('wh_sub.qty', 3);
+        $fmtBalSup   = $this->dbNumberFormat('SUM(DISTINCT dd.init_qty)', 3);
+
+        $groupKw = $this->isPgsql() ? 'GROUP BY a.trace_no' : 'GROUP BY a.trace_no';
+
+        $wherePlant = '';
+        $bindings = [];
+        if ($plantId > 0) {
+            $wherePlant = ' AND a.id_plant = ?';
+            $bindings[] = $plantId;
+        }
+        $bindings[] = $perPage;
+        $bindings[] = ($page - 1) * $perPage;
+
+        $results = DB::connection($this->connection)->select("
+            SELECT" . ($this->isPgsql() ? "
+                   MIN(a.id_whx_head) AS id_whx_head,
+                   MIN(a.entry_date) AS entry_date,
+                   MIN(CONCAT(wh_sub.from_trace_no, ' >>> ', a.trace_no)) AS fromto_trace_no,
+                   MIN(a.id_material_feed) AS id_material_feed,
+                   MIN(a.id_material_fg) AS id_material_fg,
+                   MIN(a.batch_no) AS batch_no,
+                   MIN(f.id_trace_head) AS id_trace_head,
+                   MIN(f.id_balance_head) AS id_balance_head,
+                   {$gcSloc} AS sloc,
+                   {$fmtInitQty} AS init_qty, {$fmtQty} AS balance,
+                   MIN(a.status) AS status,
+                   MIN(a.created_by) AS created_by,
+                   MIN(a.created_at) AS created_at,
+                   MIN(a.updated_by) AS updated_by,
+                   MIN(a.updated_at) AS updated_at,
+                   MIN(UPPER(b.description)) AS feed,
+                   MIN(UPPER(c.description)) AS fg,
+                   a.trace_no,
+                   MIN(a.po_no) AS po_no,
+                   MIN(wh.code) AS whx,
+                   MIN(a.id_section) AS id_section,
+                   {$gcSupplier} AS supplier,
+                   {$fmtBalSup} AS balance_supplier,
+                   MIN(CASE
+                      WHEN LENGTH(a.trace_no) >= 14 THEN
                          CASE SUBSTRING(a.trace_no, 11, 2)
-                            WHEN "01" THEN "EOMB"
-                            WHEN "02" THEN "EOB1"
-                            WHEN "03" THEN "EOB2"
-                            WHEN "05" THEN "EOB5"
-                            WHEN "07" THEN "EOB3"
+                            WHEN '01' THEN 'EOMB'
+                            WHEN '02' THEN 'EOB1'
+                            WHEN '03' THEN 'EOB2'
+                            WHEN '05' THEN 'EOB5'
+                            WHEN '07' THEN 'EOB3'
                             ELSE CASE a.id_plant
-                                WHEN "1002" THEN "EOB1"
-                                WHEN "1003" THEN "EOB2"
-                                WHEN "1007" THEN "EOB3"
-                                WHEN "1001" THEN "EOMB"
-                                ELSE COALESCE(a.id_plant, "EOB1")
+                                WHEN '1002' THEN 'EOB1'
+                                WHEN '1003' THEN 'EOB2'
+                                WHEN '1007' THEN 'EOB3'
+                                WHEN '1001' THEN 'EOMB'
+                                ELSE COALESCE(a.id_plant, 'EOB1')
                             END
                          END
                       ELSE CASE a.id_plant
-                          WHEN "1002" THEN "EOB1"
-                          WHEN "1003" THEN "EOB2"
-                          WHEN "1007" THEN "EOB3"
-                          WHEN "1001" THEN "EOMB"
-                          ELSE COALESCE(a.id_plant, "EOB1")
+                          WHEN '1002' THEN 'EOB1'
+                          WHEN '1003' THEN 'EOB2'
+                          WHEN '1007' THEN 'EOB3'
+                          WHEN '1001' THEN 'EOMB'
+                          ELSE COALESCE(a.id_plant, 'EOB1')
+                      END
+                   END) AS plant_name,
+                    MAX(CASE
+                       WHEN a.trace_no = (SELECT tth.to_trace_no
+                                            FROM t_trace_header tth
+                                           WHERE SUBSTRING(tth.to_trace_no, 8, 3) <> '000'
+                                             AND SUBSTRING(tth.to_trace_no, 1, 1) = '4'
+                                             AND tth.status = 1
+                                           ORDER BY tth.id_trace_head DESC LIMIT 1) THEN 1
+                       ELSE NULL
+                    END) AS is_last_row,
+                    MAX(CASE
+                       WHEN EXISTS (SELECT 1 FROM t_trace_header tth2
+                                    WHERE tth2.from_trace_no = a.trace_no
+                                      AND tth2.status = 1) THEN 1
+                       ELSE NULL
+                    END) AS next_process" : "
+                   a.id_whx_head, a.entry_date,
+                   CONCAT(wh_sub.from_trace_no, ' >>> ', a.trace_no) AS fromto_trace_no,
+                   a.id_material_feed, a.id_material_fg, a.batch_no, f.id_trace_head, f.id_balance_head,
+                   {$gcSloc} AS sloc,
+                   {$fmtInitQty} AS init_qty, {$fmtQty} AS balance, a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
+                   UPPER(b.description) AS feed, UPPER(c.description) AS fg, a.trace_no, a.po_no, wh.code AS whx, a.id_section,
+                   {$gcSupplier} AS supplier,
+                   {$fmtBalSup} AS balance_supplier,
+                   CASE
+                      WHEN LENGTH(a.trace_no) >= 14 THEN
+                         CASE SUBSTRING(a.trace_no, 11, 2)
+                            WHEN '01' THEN 'EOMB'
+                            WHEN '02' THEN 'EOB1'
+                            WHEN '03' THEN 'EOB2'
+                            WHEN '05' THEN 'EOB5'
+                            WHEN '07' THEN 'EOB3'
+                            ELSE CASE a.id_plant
+                                WHEN '1002' THEN 'EOB1'
+                                WHEN '1003' THEN 'EOB2'
+                                WHEN '1007' THEN 'EOB3'
+                                WHEN '1001' THEN 'EOMB'
+                                ELSE COALESCE(a.id_plant, 'EOB1')
+                            END
+                         END
+                      ELSE CASE a.id_plant
+                          WHEN '1002' THEN 'EOB1'
+                          WHEN '1003' THEN 'EOB2'
+                          WHEN '1007' THEN 'EOB3'
+                          WHEN '1001' THEN 'EOMB'
+                          ELSE COALESCE(a.id_plant, 'EOB1')
                       END
                    END AS plant_name,
                    CASE
                       WHEN a.trace_no = (SELECT to_trace_no
                                            FROM t_trace_header
-                                          WHERE SUBSTRING(to_trace_no, 8, 3) <> "000"
-                                            AND SUBSTRING(to_trace_no, 1, 1) = 4
-                                            AND `status` = 1
+                                          WHERE SUBSTRING(to_trace_no, 8, 3) <> '000'
+                                            AND SUBSTRING(to_trace_no, 1, 1) = '4'
+                                            AND status = 1
                                           ORDER BY id_trace_head DESC LIMIT 1) THEN 1
                       ELSE NULL
                    END AS is_last_row,
@@ -68,52 +160,57 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                       WHEN a.trace_no = (SELECT from_trace_no
                                            FROM t_trace_header
                                           WHERE from_trace_no = a.trace_no
-                                            AND `status` = 1
+                                            AND status = 1
                                           LIMIT 1) THEN 1
                       ELSE NULL
-                   END AS next_process
-              FROM t_warehouse_header a
-              LEFT JOIN m_material b ON a.id_material_feed = b.id_material
-              LEFT JOIN m_material_pck c ON a.id_material_fg = c.id_materialpck
-              LEFT JOIN (SELECT dd.trace_no, e.description, d.batch_sap, SUM(d.init_qty) AS init_qty, SUM(d.qty) AS qty
-                           FROM t_warehouse_header dd
-                           LEFT JOIN t_warehouse_detail d ON dd.id_whx_head = d.id_whx_head
-                           LEFT JOIN m_supplier e ON e.id_supplier = d.id_supplier
-                          WHERE d.status = 1 AND dd.status = 1
-                          GROUP BY dd.trace_no, d.batch_sap
-                        ) d ON a.trace_no = d.trace_no
-              LEFT JOIN (SELECT dd.trace_no, SUM(d.init_qty) AS init_qty, SUM(d.qty) AS qty
-                           FROM t_warehouse_header dd
-                           LEFT JOIN t_warehouse_detail d ON dd.id_whx_head = d.id_whx_head
-                          WHERE d.status = 1 AND dd.status = 1
-                          GROUP BY dd.trace_no
-                        ) dd ON a.trace_no = dd.trace_no
-              LEFT JOIN t_trace_header f ON f.to_trace_no = a.trace_no AND f.status = 1
-              LEFT JOIN (SELECT g.id_whx_head, SUM(g.init_qty) AS init_qty, SUM(g.qty) AS qty,
-                                GROUP_CONCAT(DISTINCT g.from_trace_no SEPARATOR " ") AS from_trace_no
-                           FROM t_warehouse_header g
-                          WHERE g.status = 1
-                          GROUP BY g.trace_no) g ON a.id_whx_head = g.id_whx_head
-              LEFT JOIN m_warehouse g ON g.id_warehouse = a.id_section
-              LEFT JOIN m_sloc ms ON JSON_CONTAINS(a.id_sloc, CAST(ms.id_sloc AS JSON))
-             WHERE a.`status` = 1
-               AND g.from_trace_no IS NOT NULL
-             GROUP BY a.trace_no
-             ORDER BY a.entry_date DESC, a.id_whx_head DESC
-        ');
+                   END AS next_process")
+              . "
+       FROM t_warehouse_header a
+       LEFT JOIN m_material b ON a.id_material_feed = b.id_material
+       LEFT JOIN m_material_pck c ON a.id_material_fg = c.id_materialpck
+       LEFT JOIN (SELECT dd.trace_no, e.description, d.batch_sap, SUM(d.init_qty) AS init_qty, SUM(d.qty) AS qty
+                    FROM t_warehouse_header dd
+                    LEFT JOIN t_warehouse_detail d ON dd.id_whx_head = d.id_whx_head
+                    LEFT JOIN m_supplier e ON e.id_supplier = d.id_supplier
+                   WHERE d.status = 1 AND dd.status = 1
+                   GROUP BY dd.trace_no, d.batch_sap, e.description
+                 ) d ON a.trace_no = d.trace_no
+       LEFT JOIN (SELECT dd.trace_no, SUM(d.init_qty) AS init_qty, SUM(d.qty) AS qty
+                    FROM t_warehouse_header dd
+                    LEFT JOIN t_warehouse_detail d ON dd.id_whx_head = d.id_whx_head
+                   WHERE d.status = 1 AND dd.status = 1
+                   GROUP BY dd.trace_no
+                 ) dd ON a.trace_no = dd.trace_no
+       LEFT JOIN t_trace_header f ON f.to_trace_no = a.trace_no AND f.status = 1
+       LEFT JOIN (SELECT g.trace_no,
+                         {$gcFromTrace} AS from_trace_no,
+                         SUM(g.init_qty) AS init_qty,
+                         SUM(g.qty) AS qty
+                    FROM t_warehouse_header g
+                   WHERE g.status = 1
+                   GROUP BY g.trace_no
+                 ) wh_sub ON a.trace_no = wh_sub.trace_no
+       LEFT JOIN m_warehouse wh ON wh.id_warehouse = a.id_section
+      WHERE a.status = 1
+        AND wh_sub.from_trace_no IS NOT NULL
+        {$wherePlant}
+      {$groupKw}
+      ORDER BY " . ($this->isPgsql() ? 'MIN(a.entry_date) DESC, MIN(a.id_whx_head) DESC' : 'a.entry_date DESC, a.id_whx_head DESC') . "
+      LIMIT ? OFFSET ?
+        ", $bindings);
 
         return collect($results);
     }
 
     public function getActiveFgProduct(): Collection
     {
-        $results = DB::connection($this->connection)->select('
-            SELECT a.id_materialpck, UPPER(CONCAT(a.description, " (", a.code, ")")) AS material,
+        $results = DB::connection($this->connection)->select("
+            SELECT a.id_materialpck, UPPER(CONCAT(a.description, ' (', a.code, ')')) AS material,
                    a.batch_prefix
               FROM m_material_pck a
              WHERE a.status = 1
              ORDER BY a.description ASC
-        ');
+        ");
         return collect($results);
     }
 
@@ -144,34 +241,34 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 ->value('id_plant');
         }
 
-        // m_material / m_material_pck are in mysql; run on mysql and qualify eudr_ts tables
-        $results = DB::connection('mysql')->select('
-            SELECT IFNULL(CONCAT(a.description, " (", a.code, ") || Balance : ", IFNULL(a.balance,0), " MT" ), CONCAT(a.description, " (", a.code, ") || Balance : 0.0 MT" )) AS wip_material,
-                   IFNULL(a.balance,0) AS balance, a.id_rundown
+        $balanceFmt = $this->dbNumberFormat('SUM(c.balance)', 3);
+        $results = DB::connection($this->connection)->select("
+            SELECT COALESCE(CONCAT(a.description, ' (', a.code, ') || Balance : ', COALESCE(a.balance, '0'), ' MT'), CONCAT(a.description, ' (', a.code, ') || Balance : 0.0 MT')) AS wip_material,
+                   COALESCE(a.balance, '0') AS balance, a.id_rundown
               FROM (
-                  SELECT b.description, b.code, IFNULL(FORMAT(SUM(c.balance),3),3) AS balance, b.id_rundown
+                  SELECT b.description, b.code, COALESCE({$balanceFmt},'3') AS balance, b.id_rundown
                     FROM (
                           SELECT c.id_material, c.code, c.description, c.id_rundown
                             FROM m_material_pck a
                             LEFT JOIN (SELECT b.id_material, b.code, b.description, b.id_rundown
                                          FROM m_material b
-                                        WHERE b.`status` = 1
+                                        WHERE b.status = 1
                                       ) b ON a.id_material = b.id_material
                             LEFT JOIN (SELECT b.code, b.id_material, b.description, b.id_rundown
                                          FROM m_material b
-                                         LEFT JOIN eudr_ts.m_sloc c ON b.type COLLATE utf8mb4_unicode_ci = c.code_2 AND c.status = 1
-                                        WHERE b.`status` = 1) c ON b.code = c.code
+                                         LEFT JOIN m_sloc c ON b.type = c.code_2 AND c.status = 1
+                                        WHERE b.status = 1) c ON b.code = c.code
                            WHERE a.id_materialpck = ?
                           ) b
                     LEFT JOIN (
                           SELECT c.id_material, SUM(c.qty) AS balance
-                            FROM eudr_ts.t_balance_header c
-                           WHERE c.`status` = 1 and c.id_plant = ?
+                            FROM t_balance_header c
+                           WHERE c.status = 1 AND c.id_plant = ?
                            GROUP BY c.id_material
                           ) c ON b.id_material = c.id_material
-                   GROUP BY b.code
+                   GROUP BY b.code, b.description, b.id_rundown
               ) a
-        ', [$idMaterialPck, $idPlant]);
+        ", [$idMaterialPck, $idPlant]);
 
         return collect($results);
     }
@@ -181,7 +278,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         $rundownID = $data['rundownID'] ?? null;
         if (!$rundownID) return collect([]);
 
-        $materialType = DB::connection('mysql')
+        $materialType = DB::connection($this->connection)
             ->table('m_material')
             ->where('status', 1)
             ->where('id_rundown', $rundownID)
@@ -193,7 +290,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             'SELECT MIN(id_sloc) AS id_sloc, MIN(description) AS tank
                FROM m_sloc
               WHERE status = 1
-                AND description IS NOT NULL AND description != ""
+                AND description IS NOT NULL AND description != \'\'
                 AND code_2 = ?
                 AND id_plant IN (\'1002\', \'1007\')
               GROUP BY description
@@ -228,15 +325,15 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         $sloc = $data['sloc'] ?? null;
         if (!$sloc) return collect([]);
 
-        $results = DB::connection($this->connection)->select('
-            SELECT a.id_sloc, a.id_sloc AS id_tank_tail, a.id_tank AS tankNo, a.id_tank AS tank
-              FROM eudr_ts.m_sloc a
+        $results = DB::connection($this->connection)->select("
+            SELECT a.id_sloc, a.id_sloc AS id_tank_tail, a.id_sloc AS tankNo, a.id_sloc AS tank
+              FROM m_sloc a
              WHERE a.status = 1
-               AND COALESCE(NULLIF(a.description,""), a.id_sloc) = (
-                   SELECT COALESCE(NULLIF(description,""), id_sloc) FROM eudr_ts.m_sloc WHERE id_sloc = ? LIMIT 1
+               AND COALESCE(NULLIF(a.description,''), a.id_sloc) = (
+                   SELECT COALESCE(NULLIF(description,''), id_sloc) FROM m_sloc WHERE id_sloc = ? LIMIT 1
                )
              ORDER BY a.id_sloc ASC
-        ', [$sloc]);
+        ", [$sloc]);
 
         return collect($results);
     }
@@ -267,18 +364,19 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             $whID = str_pad((string)$idWarehouse, 3, "0", STR_PAD_LEFT);
 
             // Generate batch/trace number
-            $datPckBatch = DB::connection($this->connection)->select('
+            $fmtDate = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
+            $datPckBatch = DB::connection($this->connection)->select("
                 SELECT a.pck_batch
-                  FROM (SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, LPAD(SUBSTRING(a.to_trace_no,13,2) + 1,2,0)) AS pck_batch
+                  FROM (SELECT CONCAT(?, {$fmtDate}, ?, LPAD(SUBSTRING(a.to_trace_no,13,2) + 1, 2, '0')) AS pck_batch
                           FROM t_trace_header a
-                         WHERE SUBSTRING(a.to_trace_no,1,7) = CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"))
+                         WHERE SUBSTRING(a.to_trace_no,1,7) = CONCAT(?, {$fmtDate})
                            AND a.status = 1
                          ORDER BY a.id_trace_head DESC
                          LIMIT 1 ) a
                 UNION ALL
-                SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS pck_batch
+                SELECT CONCAT(?, {$fmtDate}, ? , LPAD(RIGHT(?, 2), 2, '0'), '01') AS pck_batch
                  LIMIT 1
-            ', [self::$movType1, $whID, self::$movType1, self::$movType1, $whID, $idPlant]);
+            ", [self::$movType1, $whID, self::$movType1, self::$movType1, $whID, $idPlant]);
 
             $traceNoWhx = $datPckBatch[0]->pck_batch;
             $traceNoTrf = substr_replace($traceNoWhx, '000', 7, 3);
@@ -298,17 +396,32 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             $codeMaterial = $datMaterial[0]->code;
 
             // Check balance stock
-            $datBalQty = DB::connection($this->connection)->select('
-                SELECT SUM(b.qty) AS total
-                  FROM m_material a
-                  LEFT JOIN t_balance_header b ON b.id_material = a.id_material
-                 WHERE a.code = ?
-                   AND a.status = 1
-                   AND b.status = 1
-                   AND b.qty > 0.0001
-                   AND JSON_CONTAINS(b.id_sloc, JSON_ARRAY(?))
-                   AND b.id_plant = ?
-            ', [$codeMaterial, $idTank, $idPlant]);
+            if ($this->isPgsql()) {
+                $jcSloc = $this->dbJsonContains('b.id_sloc', "CAST(? AS TEXT)");
+                $datBalQty = DB::connection($this->connection)->select("
+                    SELECT SUM(b.qty) AS total
+                      FROM m_material a
+                      LEFT JOIN t_balance_header b ON b.id_material = a.id_material
+                     WHERE a.code = ?
+                       AND a.status = 1
+                       AND b.status = 1
+                       AND b.qty > '0.0001'
+                       AND {$jcSloc}
+                       AND b.id_plant = ?
+                ", [$codeMaterial, (string)$idTank, $idPlant]);
+            } else {
+                $datBalQty = DB::connection($this->connection)->select(
+                    "SELECT SUM(b.qty) AS total
+                      FROM m_material a
+                      LEFT JOIN t_balance_header b ON b.id_material = a.id_material
+                     WHERE a.code = ?
+                       AND a.status = 1
+                       AND b.status = 1
+                       AND b.qty > '0.0001'
+                       AND JSON_CONTAINS(b.id_sloc, JSON_ARRAY(CAST(? AS CHAR)))
+                       AND b.id_plant = ?
+                ", [$codeMaterial, $idTank, $idPlant]);
+            }
 
             $totalStock = (float)($datBalQty[0]->total ?? 0);
             if (($totalStock - $qtyPck) < -0.000001) {
@@ -425,7 +538,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 SELECT entry_date
                   FROM t_trace_header
                  WHERE to_trace_no = ?
-                   AND `status` = 1
+                   AND status = 1
             ', [$traceNo]);
 
             if (empty($entryDate)) {
@@ -475,7 +588,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                         SELECT init_qty
                           FROM t_warehouse_header
                          WHERE id_whx_head = ?
-                           AND `status` = 1
+                           AND status = 1
                     ', [$idWhxHead]);
 
                     $whxQty = (float)$datWhxHead[0]->init_qty;
@@ -484,7 +597,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                         SELECT qty, out_qty
                           FROM t_balance_header
                          WHERE id_balance_head = ?
-                           AND `status` = 1
+                           AND status = 1
                     ', [$idBalHead]);
 
                     if (!empty($datBalHead)) {
@@ -500,7 +613,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                                    out_qty = ?,
                                    updated_by = ?
                              WHERE id_balance_head = ?
-                               AND `status` = 1
+                               AND status = 1
                         ', [$newBalQty, $newBalOutQty, $user, $idBalHead]);
 
                         // Log
@@ -514,11 +627,11 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     $datWhxTail = DB::connection($this->connection)->select('
                         SELECT a.id_whx_tail, a.init_qty, b.from_trace_no, d.id_balance_tail, d.qty, d.out_qty
                           FROM t_warehouse_detail a
-                          LEFT JOIN t_warehouse_header b ON a.id_whx_head = b.id_whx_head AND b.`status` = 1
-                          LEFT JOIN t_balance_header c ON c.trace_no = b.from_trace_no AND c.`status` = 1
-                          LEFT JOIN t_balance_detail d ON c.id_balance_head = d.id_balance_head AND d.`status` = 1 AND a.batch_sap = d.batch_sap
+                          LEFT JOIN t_warehouse_header b ON a.id_whx_head = b.id_whx_head AND b.status = 1
+                          LEFT JOIN t_balance_header c ON c.trace_no = b.from_trace_no AND c.status = 1
+                          LEFT JOIN t_balance_detail d ON c.id_balance_head = d.id_balance_head AND d.status = 1 AND a.batch_sap = d.batch_sap
                          WHERE a.id_whx_head = ?
-                           AND a.`status` = 1
+                           AND a.status = 1
                     ', [$idWhxHead]);
 
                     foreach ($datWhxTail as $tailRow) {
@@ -538,7 +651,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                                    out_qty = ?,
                                    updated_by = ?
                              WHERE id_balance_tail = ?
-                               AND `status` = 1
+                               AND status = 1
                         ', [$newBalQtyTail, $newBalOutQtyTail, $user, $idBalTail]);
 
                         // Log
@@ -549,12 +662,12 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     }
 
                     // Set header and detail status to 0
-                    DB::connection($this->connection)->update('UPDATE t_warehouse_header SET `status` = 0, updated_by = ? WHERE id_whx_head = ?', [$user, $idWhxHead]);
-                    DB::connection($this->connection)->update('UPDATE t_warehouse_detail SET `status` = 0, updated_by = ? WHERE id_whx_head = ?', [$user, $idWhxHead]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_header SET `status` = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET `status` = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_header SET `status` = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET `status` = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
+                    DB::connection($this->connection)->update('UPDATE t_warehouse_header SET status = 0, updated_by = ? WHERE id_whx_head = ?', [$user, $idWhxHead]);
+                    DB::connection($this->connection)->update('UPDATE t_warehouse_detail SET status = 0, updated_by = ? WHERE id_whx_head = ?', [$user, $idWhxHead]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
                 }
 
                 return ['response' => 1, 'message' => 'Packaging entry cancelled successfully.'];
@@ -677,19 +790,21 @@ class EloquentPackageRepository implements PackageRepositoryInterface
     {
         $whID = str_pad((string)$warehouseId, 3, "0", STR_PAD_LEFT);
         $plantStr = str_pad(substr((string)$plantId, -2), 2, "0", STR_PAD_LEFT);
-        
-        $datPckBatch = DB::connection($this->connection)->select('
+
+        $fmtDate = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
+
+        $datPckBatch = DB::connection($this->connection)->select("
             SELECT a.pck_batch
-              FROM (SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, ?, LPAD(SUBSTRING(a.to_trace_no,13,2) + 1,2,0)) AS pck_batch
+              FROM (SELECT CONCAT(CAST(? AS TEXT), {$fmtDate}, CAST(? AS TEXT), CAST(? AS TEXT), LPAD(CAST(CAST(SUBSTRING(a.to_trace_no,13,2) AS INTEGER) + 1 AS TEXT), 2, '0')) AS pck_batch
                       FROM t_trace_header a
-                     WHERE SUBSTRING(a.to_trace_no,1,12) = CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, ?)
+                     WHERE SUBSTRING(a.to_trace_no,1,12) = CONCAT(CAST(? AS TEXT), {$fmtDate}, CAST(? AS TEXT), CAST(? AS TEXT))
                        AND a.status = 1
                      ORDER BY a.id_trace_head DESC
                      LIMIT 1 ) a
              UNION ALL
-             SELECT CONCAT(?, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, ?, "01") AS pck_batch
+             SELECT CONCAT(CAST(? AS TEXT), {$fmtDate}, CAST(? AS TEXT), CAST(? AS TEXT), '01') AS pck_batch
               LIMIT 1
-        ', [self::$movType1, $whID, $plantStr, self::$movType1, $whID, $plantStr, self::$movType1, $whID, $plantStr]);
+        ", [self::$movType1, $whID, $plantStr, self::$movType1, $whID, $plantStr, self::$movType1, $whID, $plantStr]);
 
         return $datPckBatch[0]->pck_batch ?? '';
     }

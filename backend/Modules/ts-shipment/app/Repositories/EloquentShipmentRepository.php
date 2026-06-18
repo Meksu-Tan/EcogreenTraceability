@@ -4,11 +4,11 @@ namespace Modules\TsShipment\Repositories;
 
 use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
 use Modules\Shared\Helpers\QuantityDistributionHelper;
+use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Services\PeriodLockService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Exception;
 
 /**
  * @todo Technical Debt: This class is 834 lines (limit: 200). Requires refactoring into smaller, focused classes.
@@ -18,98 +18,124 @@ use Exception;
  */
 class EloquentShipmentRepository implements ShipmentRepositoryInterface
 {
+    use DbCompatTrait;
+
     protected string $connection = 'eudr_ts';
 
-    public function getDtShipEntry(): Collection
+    public function getDtShipEntry(int $plantId = 0, int $page = 1, int $perPage = 50): Collection
     {
-        $results = DB::connection($this->connection)->select('
-            SELECT a.id_ship_head, a.entry_date, CONCAT(CAST(dd.from_trace_no AS CHAR), " >>> ", CAST(dd.trace_no AS CHAR) ) AS fromto_trace_no,
-                   a.so_no, a.id_material_fg, FORMAT(ROUND(f.qty,3), 3) AS qty , a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
-                   IF(SUBSTRING(a.from_trace_no,1,1) < 3, g.`description`, c.`description`) AS material,
+        $castToText = $this->isPgsql() ? 'TEXT' : 'CHAR';
+        $orderBy  = 'ORDER BY a.entry_date DESC, a.id_ship_head DESC';
+
+        $rndD = $this->isPgsql() ? 'SUM(ROUND(CAST(d.qty AS numeric),4))' : 'SUM(ROUND(d.qty,4))';
+        $rndEe = $this->isPgsql() ? 'SUM(ROUND(CAST(ee.qty AS numeric),4))' : 'SUM(ROUND(ee.qty,4))';
+        $rndF = $this->isPgsql() ? 'SUM(ROUND(CAST(f.out_qty AS numeric),4))' : 'SUM(ROUND(f.out_qty,4))';
+        $wherePlant = '';
+        $bindings = [];
+        if ($plantId > 0) {
+            $wherePlant = ' AND a.id_plant = ?';
+            $bindings[] = $plantId;
+        }
+        $bindings[] = $perPage;
+        $bindings[] = ($page - 1) * $perPage;
+
+        $results = DB::connection($this->connection)->select("
+            SELECT
+            a.id_ship_head, a.entry_date,
+            CONCAT(CAST(dd.from_trace_no AS {$castToText}), ' >>> ', CAST(dd.trace_no AS {$castToText})) AS fromto_trace_no,
+            a.so_no, a.id_material_fg,
+            {$this->dbNumberFormat('ROUND(CAST(f.qty AS numeric),3)', 3)} AS qty,
+            a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
+                   CASE SUBSTRING(a.from_trace_no,1,1) WHEN '4' THEN g.description WHEN '5' THEN g.description ELSE c.description END AS material,
                    f.id_trace_head, f.id_balance_head, a.trace_no, a.from_trace_no, f.batch_no,
-                   GROUP_CONCAT(DISTINCT CONCAT(d.description, " / ", d.batch_sap, " / Qty: ", FORMAT(d.qty,3), " MT") SEPARATOR " | ") AS supplier,
-                   FORMAT(ROUND(dd.qty,3),3) AS balance_supplier, a.doc_url,
+                   {$this->dbGroupConcat("CONCAT(d.description, ' / ', d.batch_sap, ' / Qty: ', {$this->dbNumberFormat('d.qty', 3)}, ' MT')", ' | ', true)} AS supplier,
+                   {$this->dbNumberFormat('ROUND(CAST(dd.qty AS numeric),3)', 3)} AS balance_supplier, a.doc_url,
                    CASE
-                      WHEN LENGTH(CAST(a.trace_no AS CHAR)) >= 14 THEN
+                      WHEN LENGTH(CAST(a.trace_no AS {$castToText})) >= 14 THEN
                          CASE SUBSTRING(a.trace_no, 11, 2)
-                            WHEN "01" THEN "EOMB"
-                            WHEN "02" THEN "EOB1"
-                            WHEN "03" THEN "EOB2"
-                            WHEN "05" THEN "EOB5"
-                            WHEN "07" THEN "EOB3"
+                            WHEN '01' THEN 'EOMB'
+                            WHEN '02' THEN 'EOB1'
+                            WHEN '03' THEN 'EOB2'
+                            WHEN '05' THEN 'EOB5'
+                            WHEN '07' THEN 'EOB3'
                             ELSE CASE a.id_plant
-                                WHEN "1002" THEN "EOB1"
-                                WHEN "1003" THEN "EOB2"
-                                WHEN "1007" THEN "EOB3"
-                                WHEN "1001" THEN "EOMB"
-                                ELSE COALESCE(a.id_plant, "EOB1")
+                                WHEN '1002' THEN 'EOB1'
+                                WHEN '1003' THEN 'EOB2'
+                                WHEN '1007' THEN 'EOB3'
+                                WHEN '1001' THEN 'EOMB'
+                                ELSE COALESCE(a.id_plant, 'EOB1')
                             END
                          END
                       ELSE CASE a.id_plant
-                          WHEN "1002" THEN "EOB1"
-                          WHEN "1003" THEN "EOB2"
-                          WHEN "1007" THEN "EOB3"
-                          WHEN "1001" THEN "EOMB"
-                          ELSE COALESCE(a.id_plant, "EOB1")
+                          WHEN '1002' THEN 'EOB1'
+                          WHEN '1003' THEN 'EOB2'
+                          WHEN '1007' THEN 'EOB3'
+                          WHEN '1001' THEN 'EOMB'
+                          ELSE COALESCE(a.id_plant, 'EOB1')
                       END
                    END AS plant_name,
                    CASE
-                      WHEN a.trace_no = (SELECT to_trace_no
-                                           FROM t_trace_header
-                                          WHERE SUBSTRING(to_trace_no, 1, 1) = 5
-                                            AND `status` = 1
-                                          ORDER BY id_trace_head DESC LIMIT 1) THEN 1
+                       WHEN a.trace_no = (SELECT to_trace_no
+                                            FROM t_trace_header
+                                           WHERE SUBSTRING(to_trace_no, 1, 1) = '5'
+                                             AND status = 1
+                                           ORDER BY id_trace_head DESC LIMIT 1) THEN 1
                       ELSE NULL
                    END AS is_last_row,
                    CASE
-                      WHEN a.trace_no = (SELECT from_trace_no
-                                           FROM t_trace_header
-                                          WHERE SUBSTRING(from_trace_no, 8, 3) = "001"
-                                            AND SUBSTRING(from_trace_no, 1, 1) = 4
-                                            AND `status` = 1
-                                          ORDER BY from_trace_no DESC LIMIT 1) THEN 1
+                       WHEN a.trace_no = (SELECT from_trace_no
+                                            FROM t_trace_header
+                                           WHERE SUBSTRING(from_trace_no, 8, 3) = '001'
+                                             AND SUBSTRING(from_trace_no, 1, 1) = '4'
+                                             AND status = 1
+                                           ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                       ELSE NULL
                    END AS next_process
               FROM t_shipment_header a
               LEFT JOIN m_material_pck c ON a.id_material_fg = c.id_materialpck
-              LEFT JOIN (SELECT dd.trace_no, e.description, d.batch_sap, SUM(ROUND(d.qty,4)) AS qty
+               LEFT JOIN (SELECT dd.trace_no, e.description, d.batch_sap, {$rndD} AS qty
                            FROM t_shipment_header dd
                            LEFT JOIN t_shipment_detail d ON dd.id_ship_head = d.id_ship_head
                            LEFT JOIN m_supplier e ON e.id_supplier = d.id_supplier
                           WHERE d.status = 1 AND dd.status = 1
-                          GROUP BY dd.trace_no, d.batch_sap
+                          GROUP BY dd.trace_no, e.description, d.batch_sap
                         ) d ON a.trace_no = d.trace_no
-              LEFT JOIN (SELECT dd.trace_no, SUM(ROUND(ee.qty,4)) AS qty, GROUP_CONCAT(DISTINCT CAST(dd.from_trace_no AS CHAR) SEPARATOR " + ") AS from_trace_no
+               LEFT JOIN (SELECT dd.trace_no, {$rndEe} AS qty,
+                                {$this->dbGroupConcat('CAST(dd.from_trace_no AS ' . $castToText . ')', ' + ', true)} AS from_trace_no
                            FROM t_shipment_header dd
                            LEFT JOIN t_shipment_detail ee ON dd.id_ship_head = ee.id_ship_head
                           WHERE dd.status = 1
                           GROUP BY dd.trace_no
                         ) dd ON a.trace_no = dd.trace_no
-              LEFT JOIN (SELECT f.to_trace_no, f.id_trace_head, f.id_balance_head, ff.batch_no,
-                                SUM(ROUND(f.out_qty,4)) AS qty
+               LEFT JOIN (SELECT f.to_trace_no, f.id_trace_head, f.id_balance_head, ff.batch_no,
+                                 {$rndF} AS qty
                            FROM t_trace_header f
                            LEFT JOIN t_warehouse_header ff ON f.id_balance_head = ff.id_whx_head AND ff.status = 1
                           WHERE f.status = 1
-                          GROUP BY f.to_trace_no
-                          ) f ON f.to_trace_no = a.trace_no
+                          GROUP BY f.to_trace_no, f.id_trace_head, f.id_balance_head, ff.batch_no
+                        ) f ON f.to_trace_no = a.trace_no
               LEFT JOIN m_material g ON g.id_material = a.id_material_fg
              WHERE a.status = 1
-             GROUP BY a.trace_no
-             ORDER BY a.entry_date DESC, id_ship_head DESC
-        ');
+               {$wherePlant}
+             GROUP BY a.trace_no, a.id_ship_head, a.entry_date, a.so_no, a.id_material_fg, a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
+                      a.from_trace_no, a.doc_url, a.id_plant, c.description, dd.from_trace_no, dd.qty, d.description, d.batch_sap,
+                      f.id_trace_head, f.id_balance_head, f.batch_no, f.qty, g.description
+             {$orderBy}
+             LIMIT ? OFFSET ?
+        ", $bindings);
 
         return collect($results);
     }
 
     public function getActiveFgProduct(): Collection
     {
-        $results = DB::connection($this->connection)->select('
-            SELECT CONCAT(UPPER(a.description), " (", a.code, ")") AS material,
-                   CONCAT("PCK|", a.id_materialpck) AS id_material
+        $results = DB::connection($this->connection)->select("
+            SELECT CONCAT(UPPER(a.description), ' (', a.code, ')') AS material,
+                   CONCAT('PCK|', a.id_materialpck) AS id_material
               FROM m_material_pck a
              WHERE a.status = 1
              ORDER BY material ASC
-        ');
+        ");
         return collect($results);
     }
 
@@ -123,24 +149,26 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
         if ($type == 'WIP') {
             // Start from m_material so description always returns even with zero balance
-            $results = DB::connection($this->connection)->select('
-                SELECT FORMAT(IFNULL(SUM(a.qty),0), 3) AS balance,
-                       CONCAT(b.description, " (", b.code, ") || Balance : ", FORMAT(IFNULL(SUM(a.qty),0),3), " MT") AS wip_material
+            $results = DB::connection($this->connection)->select("
+                SELECT {$this->dbNumberFormat('COALESCE(SUM(a.qty),0)', 3)} AS balance,
+                       CONCAT(b.description, ' (', b.code, ') || Balance : ', {$this->dbNumberFormat('COALESCE(SUM(a.qty),0)', 3)}, ' MT') AS wip_material
                   FROM m_material b
                   LEFT JOIN t_balance_header a ON a.id_material = b.id_material AND a.status = 1 AND a.id_plant = ?
                  WHERE b.id_material = ?
                    AND b.status = 1
-            ', [$idPlant, $idMaterial]);
+                 GROUP BY b.description, b.code
+            ", [$idPlant, $idMaterial]);
         } else {
             // Start from m_material_pck so description always returns even with zero balance
-            $results = DB::connection($this->connection)->select('
-                SELECT FORMAT(IFNULL(SUM(a.qty),0), 3) AS balance,
-                       CONCAT(b.description, " (", b.code, ") || Balance : ", FORMAT(IFNULL(SUM(a.qty),0),3), " MT") AS wip_material
+            $results = DB::connection($this->connection)->select("
+                SELECT {$this->dbNumberFormat('COALESCE(SUM(a.qty),0)', 3)} AS balance,
+                       CONCAT(b.description, ' (', b.code, ') || Balance : ', {$this->dbNumberFormat('COALESCE(SUM(a.qty),0)', 3)}, ' MT') AS wip_material
                   FROM m_material_pck b
                   LEFT JOIN t_warehouse_header a ON a.id_material_fg = b.id_materialpck AND a.status = 1 AND a.id_plant = ?
                  WHERE b.id_materialpck = ?
                    AND b.status = 1
-            ', [$idPlant, $idMaterial]);
+                 GROUP BY b.description, b.code
+            ", [$idPlant, $idMaterial]);
         }
 
         return collect($results);
@@ -153,19 +181,19 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
         $idMaterial = $parts[1] ?? 0;
         $idPlant = $data['id_plant'] ?? null;
 
-        $results = DB::connection($this->connection)->select('
-            SELECT a.batch_no, CONCAT(a.batch_no, " | Qty : ", FORMAT(b.qty,3)) AS `description`
+        $results = DB::connection($this->connection)->select("
+            SELECT " . ($this->isPgsql() ? 'DISTINCT' : '') . " a.batch_no, CONCAT(a.batch_no, ' | Qty : ', {$this->dbNumberFormat('b.qty', 3)}) AS description
               FROM t_warehouse_header a
               LEFT JOIN (SELECT b.id_material_fg, b.batch_no, SUM(b.qty) AS qty
                            FROM t_warehouse_header b
                           WHERE b.status = 1
                           GROUP BY b.id_material_fg, b.batch_no) b ON a.batch_no = b.batch_no AND a.id_material_fg = b.id_material_fg
              WHERE a.id_material_fg = ?
-               AND a.`status` = 1
-               AND a.qty > "0.000001"
+               AND a.status = 1
+               AND a.qty > '0.000001'
                AND a.id_plant = ?
-             GROUP BY a.batch_no
-        ', [$idMaterial, $idPlant]);
+             " . ($this->isPgsql() ? '' : 'GROUP BY a.batch_no') . "
+        ", [$idMaterial, $idPlant]);
 
         return collect($results);
     }
@@ -178,20 +206,23 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             return collect([]);
         }
 
+        // OEE queries — use dedicated oee connection (fails silently until OEE server is configured)
+        $conn = 'oee';
+
         try {
-            $results = DB::connection($this->connection)->select('
+            $results = DB::connection($conn)->select('
                 SELECT a.entry_date, a.tf_number, a.batch_no, a.spec, a.production_order,
                        a.lot_qty, a.qty, a.product, b.id_process, c.id_packing, d.id_pallet,
-                       CONCAT(b.id_process, " , ", b.code, " , ", b.description) AS process,
-                       CONCAT(c.code, " , ", c.description) AS packing,
-                       CONCAT(d.code, " , ", d.description) AS pallet,
+                       CONCAT(b.id_process, \' , \', b.code, \' , \', b.description) AS process,
+                       CONCAT(c.code, \' , \', c.description) AS packing,
+                       CONCAT(d.code, \' , \', d.description) AS pallet,
                        e.url_link AS label_link, f.url_link AS splabel_link,
                        g.url_link AS csmark_link, a.id_special_label, a.id_customer_mark,
-                       CONCAT(a.id_sloc, ",", a.tf_number) AS id_tank, a.csmark_isCheck, a.splabel_isCheck,
-                       CONCAT(a.id_product, ",", a.product) AS id_product, a.long_text,
+                       CONCAT(a.id_sloc, \',\', a.tf_number) AS id_tank, a.csmark_isCheck, a.splabel_isCheck,
+                       CONCAT(a.id_product, \',\', a.product) AS id_product, a.long_text,
                        a.approved_by, a.approved_at,
                        a.created_by, a.id_prdexecution, a.created_at,
-                       a.status, e.id_label, h.id_customer, CONCAT(h.code, " , ", h.description) AS customer,
+                       a.status, e.id_label, h.id_customer, CONCAT(h.code, \' , \', h.description) AS customer,
                        CONCAT(e.description) AS label, CONCAT(f.description) AS splabel,
                        CONCAT(g.description) AS csmark, a.updated_by, UPPER(a.uom) AS uom,
                        a.updated_at AS updated_at, a.finished_by, a.finished_at,
@@ -219,8 +250,11 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
     {
         $batchNo = $data['batchNo'] ?? '';
 
+        // OEE queries — use dedicated oee connection (fails silently until OEE server is configured)
+        $conn = 'oee';
+
         try {
-            $results = DB::connection($this->connection)->select('
+            $results = DB::connection($conn)->select('
                 SELECT a.id_prepentry, a.id_prdexecution, a.batch_no, a.type,
                        a.description, a.created_by, a.created_at, a.updated_at, a.status
                   FROM oee_756.t_prep_entry a
@@ -237,11 +271,12 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
     public function getLabel(array $data): Collection
     {
         $label = $data['label'] ?? '';
+        $conn = 'oee';
 
-        $results = DB::connection($this->connection)->select('
+        $results = DB::connection($conn)->select('
             SELECT a.url_link
               FROM oee_756.m_label a
-             WHERE a.status = "1"
+             WHERE a.status = 1
                AND a.id_label = ?
         ', [$label]);
 
@@ -251,11 +286,12 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
     public function getSpecialLabel(array $data): Collection
     {
         $label = $data['label'] ?? '';
+        $conn = 'oee';
 
-        $results = DB::connection($this->connection)->select('
+        $results = DB::connection($conn)->select('
             SELECT a.url_link
               FROM oee_756.m_special_label a
-             WHERE a.status = "1"
+             WHERE a.status = 1
                AND a.id_label = ?
         ', [$label]);
 
@@ -265,11 +301,12 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
     public function getCustomerMark(array $data): Collection
     {
         $label = $data['label'] ?? '';
+        $conn = 'oee';
 
-        $results = DB::connection($this->connection)->select('
+        $results = DB::connection($conn)->select('
             SELECT a.url_link
               FROM oee_756.m_customer_mark a
-             WHERE a.status = "1"
+             WHERE a.status = 1
                AND a.id_label = ?
         ', [$label]);
 
@@ -303,13 +340,13 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
         }
 
         try {
-            $response = Http::timeout(30)->get($eobUrl);
+            $response = Http::timeout(10)->get($eobUrl);
             if ($response->failed()) {
                 return [];
             }
 
             return $response->json() ?? [];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -330,13 +367,13 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
         $eobUrl = $sapReqUrl . $sapClient . $sapFm . $input1;
 
         try {
-            $response = Http::timeout(30)->get($eobUrl);
+            $response = Http::timeout(10)->get($eobUrl);
             if ($response->failed()) {
                 return [];
             }
 
             return $response->json() ?? [];
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -365,19 +402,26 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             }
 
             $shID = '001';
+            $traceNoIncrement = $this->isPgsql()
+                ? 'CAST(a.to_trace_no AS BIGINT) + 1'
+                : 'a.to_trace_no + 1';
+            $lpadArg = $this->isPgsql()
+                ? "LPAD(RIGHT(CAST(? AS TEXT), 2), 2, '0')"
+                : 'LPAD(RIGHT(?, 2), 2, \'0\')';
+
             // Create shipment batch trace no
-            $datPckBatch = DB::connection($this->connection)->select('
+            $datPckBatch = DB::connection($this->connection)->select("
                 SELECT a.pck_batch
-                  FROM (SELECT a.to_trace_no + 1 AS pck_batch
+                  FROM (SELECT {$traceNoIncrement} AS pck_batch
                           FROM t_trace_header a
-                         WHERE SUBSTRING(a.to_trace_no,1,10) = CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ?)
+                         WHERE SUBSTRING(a.to_trace_no,1,10) = CONCAT(5, {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, ?)
                            AND a.status = 1
                          ORDER BY a.id_trace_head DESC
                          LIMIT 1 ) a
                 UNION ALL
-                SELECT CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS pck_batch
+                SELECT CONCAT(5, {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, ? , {$lpadArg}, '01') AS pck_batch
                  LIMIT 1
-            ', [$shID, $shID, $idPlant]);
+            ", [$shID, $shID, $idPlant]);
 
             $traceNo = $datPckBatch[0]->pck_batch;
 
@@ -593,7 +637,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 return ['response' => 1, 'message' => 'Shipment stored successfully.'];
             });
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return ['response' => 0, 'message' => 'Store failed: ' . $e->getMessage()];
         }
     }
@@ -611,7 +655,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 SELECT entry_date
                   FROM t_trace_header
                  WHERE to_trace_no = ?
-                   AND `status` = 1
+                   AND status = 1
             ', [$traceNo]);
 
             if (empty($entryDate)) {
@@ -626,7 +670,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 SELECT from_trace_no, id_balance_head, out_qty, id_trace_head
                   FROM t_trace_header
                  WHERE to_trace_no = ?
-                   AND `status` = 1
+                   AND status = 1
             ', [$traceNo]);
 
             if (count($datTraceHead) === 0) {
@@ -648,13 +692,13 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                         SELECT id_balance_tail, out_qty
                           FROM t_trace_detail
                          WHERE id_trace_head = ?
-                           AND `status` = 1
+                           AND status = 1
                     ', [$idTraceHead]);
 
                     if ($origin == 4) {
                         // Retrieve current qty in warehouse
                         $datWhxHead = DB::connection($this->connection)->select('
-                            SELECT qty, out_qty FROM t_warehouse_header WHERE id_whx_head = ? AND `status` = 1
+                            SELECT qty, out_qty FROM t_warehouse_header WHERE id_whx_head = ? AND status = 1
                         ', [$idHead]);
 
                         if (!empty($datWhxHead)) {
@@ -662,7 +706,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                             $whxOutQty = (float)$datWhxHead[0]->out_qty;
 
                             DB::connection($this->connection)->update('
-                                UPDATE t_warehouse_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_whx_head = ? AND `status` = 1
+                                UPDATE t_warehouse_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_whx_head = ? AND status = 1
                             ', [$whxBalQty + $outQtyShip, $whxOutQty - $outQtyShip, $user, $idHead]);
 
                             // Log
@@ -673,10 +717,10 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                         }
 
                         // Update shipment status
-                        DB::connection($this->connection)->update('UPDATE t_trace_header SET `status` = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
+                        DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
                         
                         DB::connection($this->connection)->update('
-                            UPDATE t_shipment_header SET `status` = 0, updated_by = ?
+                            UPDATE t_shipment_header SET status = 0, updated_by = ?
                              WHERE from_trace_no = ? AND trace_no = ? AND qty = ?
                         ', [$user, $fromTraceNo, $traceNo, $outQtyShip]);
 
@@ -687,7 +731,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
                         if (!empty($idShipHead)) {
                             DB::connection($this->connection)->update('
-                                UPDATE t_shipment_detail SET `status` = 0, updated_by = ? WHERE id_ship_head = ?
+                                UPDATE t_shipment_detail SET status = 0, updated_by = ? WHERE id_ship_head = ?
                             ', [$user, $idShipHead[0]->id_ship_head]);
                         }
 
@@ -708,7 +752,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                                     UPDATE t_warehouse_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_whx_tail = ?
                                 ', [$whxBalQtyTail + $outQtyShipTail, $whxOutQtyTail - $outQtyShipTail, $user, $idTail]);
 
-                                DB::connection($this->connection)->update('UPDATE t_trace_detail SET `status` = 0, updated_by = ? WHERE id_trace_tail = ?', [$user, $idTail]);
+                                DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ?', [$user, $idTail]);
 
                                 // Log
                                 DB::connection($this->connection)->insert('
@@ -721,7 +765,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                     } elseif ($origin == 1) {
                         // Retrieve current qty in WIP
                         $datWipHead = DB::connection($this->connection)->select('
-                            SELECT qty, out_qty FROM t_balance_header WHERE id_balance_head = ? AND `status` = 1
+                            SELECT qty, out_qty FROM t_balance_header WHERE id_balance_head = ? AND status = 1
                         ', [$idHead]);
 
                         if (!empty($datWipHead)) {
@@ -729,7 +773,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                             $wipOutQty = (float)$datWipHead[0]->out_qty;
 
                             DB::connection($this->connection)->update('
-                                UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ? AND `status` = 1
+                                UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ? AND status = 1
                             ', [$wipBalQty + $outQtyShip, $wipOutQty - $outQtyShip, $user, $idHead]);
 
                             // Log
@@ -740,10 +784,10 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                         }
 
                         // Update status
-                        DB::connection($this->connection)->update('UPDATE t_trace_header SET `status` = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
+                        DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
                         
                         DB::connection($this->connection)->update('
-                            UPDATE t_shipment_header SET `status` = 0, updated_by = ?
+                            UPDATE t_shipment_header SET status = 0, updated_by = ?
                              WHERE from_trace_no = ? AND trace_no = ? AND qty = ?
                         ', [$user, $fromTraceNo, $traceNo, $outQtyShip]);
 
@@ -754,7 +798,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
                         if (!empty($idShipHead)) {
                             DB::connection($this->connection)->update('
-                                UPDATE t_shipment_detail SET `status` = 0, updated_by = ? WHERE id_ship_head = ?
+                                UPDATE t_shipment_detail SET status = 0, updated_by = ? WHERE id_ship_head = ?
                             ', [$user, $idShipHead[0]->id_ship_head]);
                         }
 
@@ -775,7 +819,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                                     UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?
                                 ', [$whxBalQtyTail + $outQtyShipTail, $whxOutQtyTail - $outQtyShipTail, $user, $idTail]);
 
-                                DB::connection($this->connection)->update('UPDATE t_trace_detail SET `status` = 0, updated_by = ? WHERE id_trace_tail = ?', [$user, $idTail]);
+                                DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ?', [$user, $idTail]);
 
                                 // Log
                                 DB::connection($this->connection)->insert('
@@ -790,7 +834,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 return ['response' => 1, 'message' => 'Shipment cancelled successfully.'];
             });
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return ['response' => 0, 'message' => 'Cancellation failed: ' . $e->getMessage()];
         }
     }
@@ -809,7 +853,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             ', [$soNo, $user, $id]);
 
             return ['response' => 1, 'message' => 'SO updated successfully.'];
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return ['response' => 0, 'message' => 'Failed to update SO: ' . $e->getMessage()];
         }
     }
@@ -825,19 +869,23 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
     {
         $shID = '001';
         $plantStr = str_pad((string)$plantId, 2, "0", STR_PAD_LEFT);
-        
-        $datPckBatch = DB::connection($this->connection)->select('
+
+        $lpadExpr = $this->isPgsql()
+            ? "LPAD(CAST(CAST(SUBSTRING(a.to_trace_no,13,2) AS INTEGER) + 1 AS TEXT), 2, '0')"
+            : "LPAD(SUBSTRING(a.to_trace_no,13,2) + 1, 2, 0)";
+
+        $datPckBatch = DB::connection($this->connection)->select("
             SELECT a.pck_batch
-              FROM (SELECT CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, ?, LPAD(SUBSTRING(a.to_trace_no,13,2) + 1,2,0)) AS pck_batch
+              FROM (SELECT CONCAT(CAST(5 AS TEXT), {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, CAST(? AS TEXT), CAST(? AS TEXT), {$lpadExpr}) AS pck_batch
                       FROM t_trace_header a
-                     WHERE SUBSTRING(a.to_trace_no,1,12) = CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, ?)
+                     WHERE SUBSTRING(a.to_trace_no,1,12) = CONCAT(CAST(5 AS TEXT), {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, CAST(? AS TEXT), CAST(? AS TEXT))
                        AND a.status = 1
                      ORDER BY a.id_trace_head DESC
                      LIMIT 1 ) a
              UNION ALL
-             SELECT CONCAT(5, DATE_FORMAT(CURDATE(), "%y%m%d"), ?, ?, "01") AS pck_batch
+             SELECT CONCAT(CAST(5 AS TEXT), {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, CAST(? AS TEXT), CAST(? AS TEXT), '01') AS pck_batch
               LIMIT 1
-        ', [$shID, $plantStr, $shID, $plantStr, $shID, $plantStr]);
+        ", [$shID, $plantStr, $shID, $plantStr, $shID, $plantStr]);
 
         return $datPckBatch[0]->pck_batch ?? '';
     }
