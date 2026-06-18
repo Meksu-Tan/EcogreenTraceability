@@ -2,6 +2,7 @@
 namespace Modules\Auth\Repositories;
 
 use App\Models\User;
+use App\Support\DbConnectionRetry;
 use Modules\Auth\Repositories\Contracts\AuthRepositoryInterface;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
@@ -10,7 +11,9 @@ class AuthRepository implements AuthRepositoryInterface
 {
     public function findByEmail(string $email): ?object
     {
-        return User::where('email', $email)->first();
+        return DbConnectionRetry::execute(
+            fn() => User::where('email', $email)->first()
+        );
     }
 
     public function createToken(object $user, string $name = 'auth-token'): string
@@ -25,10 +28,10 @@ class AuthRepository implements AuthRepositoryInterface
 
     public function getUserWithPermissions(object $user): object
     {
-        $user->load('roles');
-        $user->roles;
-        $user->permissions;
-        return $user;
+        return DbConnectionRetry::execute(function () use ($user) {
+            $user->load('roles', 'permissions');
+            return $user;
+        });
     }
 
     public function getAllRoles(): array
