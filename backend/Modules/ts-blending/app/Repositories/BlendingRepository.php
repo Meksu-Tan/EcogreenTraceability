@@ -4,6 +4,7 @@ namespace Modules\TsBlending\Repositories;
 
 use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
 use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Traits\DbCompatTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Shared\Traits\TankNameFormatterTrait;
@@ -11,14 +12,14 @@ use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class BlendingRepository implements BlendingRepositoryInterface
 {
-    use TankNameFormatterTrait, TransactionLoggerTrait;
+    use TankNameFormatterTrait, TransactionLoggerTrait, DbCompatTrait;
 
     protected $connection = 'eudr_ts';
 
     public function getActiveMaterials(): Collection
     {
         return DB::connection($this->connection)->table('m_material')
-            ->select('id_material', DB::raw('CONCAT(UPPER(description), " (", code, ")") AS material'))
+            ->select('id_material', DB::raw("CONCAT(UPPER(description), ' (', code, ')') AS material"))
             ->where('status', 1)
             ->where('id_rundown', '<>', '-')
             ->groupBy('code', 'id_material', 'description')
@@ -28,24 +29,35 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function generateBlendingEntryNo(int $materialId, int $plantId): ?string
     {
+        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
+
+        $lpadRight = $this->isPgsql()
+            ? "LPAD(CAST(RIGHT(CAST(? AS TEXT), 2) AS TEXT), 2, '0')"
+            : "LPAD(RIGHT(?, 2), 2, '0')";
+        $traceNoInc = $this->isPgsql()
+            ? 'CAST(b.trace_no AS BIGINT) + 1'
+            : 'b.trace_no + 1';
+
         $result = DB::connection($this->connection)->select(
-            'SELECT a.entryNo
-               FROM (SELECT b.trace_no + 1 AS entryNo
+            "SELECT a.entryNo
+               FROM (SELECT {$traceNoInc} AS entryNo
                        FROM m_material a
                        LEFT JOIN t_balance_header b
-                         ON a.id_rundown = SUBSTRING(b.trace_no, 8,3) AND b.status = 1
+                         ON a.id_rundown = SUBSTRING(b.trace_no FROM 8 FOR 3) AND b.status = 1
                       WHERE a.id_material = ?
-                        AND SUBSTRING(b.trace_no, 1, 7) = CONCAT(8, DATE_FORMAT(CURDATE(), "%y%m%d"))
-                        AND SUBSTRING(b.trace_no, 11, 2) = LPAD(RIGHT(?, 2), 2, "0")
+                        AND SUBSTRING(b.trace_no FROM 1 FOR 7) = CONCAT(8, {$dateFmt})
+                        AND SUBSTRING(b.trace_no FROM 11 FOR 2) = {$lpadRight}
                         AND a.status = 1
                       ORDER BY b.id_balance_head DESC
                       LIMIT 1) a
               UNION ALL
-              SELECT CONCAT("8", DATE_FORMAT(CURDATE(), "%y%m%d"), IF(a.id_rundown <> "-", a.id_rundown, "000"), LPAD(RIGHT(?, 2), 2, "0"), "01") AS entryNo
+              SELECT CONCAT('8', {$dateFmt},
+                     CASE WHEN a.id_rundown <> '-' THEN a.id_rundown ELSE '000' END,
+                     {$lpadRight}, '01') AS entryNo
                 FROM m_material a
                WHERE a.status = 1
                  AND a.id_material = ?
-               LIMIT 1',
+               LIMIT 1",
             [$materialId, $plantId, $plantId, $materialId]
         );
 
@@ -58,8 +70,16 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->where('id_plant', $plantId)
             ->value('code_3') ?: $plantId;
 
+        $slocMatch = $this->isPgsql()
+            ? 'CAST(c.id_sloc AS TEXT) = CAST(cc.id_sloc AS TEXT)'
+            : "c.id_sloc = cc.id_sloc
+                 OR c.id_sloc LIKE CONCAT('%\"', cc.id_sloc, '\"%')
+                 OR c.id_sloc LIKE CONCAT('%[', cc.id_sloc, ',%')
+                 OR c.id_sloc LIKE CONCAT('%, ', cc.id_sloc, ']%')
+                 OR c.id_sloc LIKE CONCAT('%[', cc.id_sloc, ']%')";
+
         $result = DB::connection($this->connection)->select(
-            'SELECT IFNULL(SUM(c.qty),0) AS total
+            "SELECT COALESCE(SUM(c.qty),0) AS total
                FROM m_material a
                LEFT JOIN (SELECT b.code, b.id_material
                             FROM m_material b WHERE b.status = 1) b
@@ -67,26 +87,22 @@ class BlendingRepository implements BlendingRepositoryInterface
                LEFT JOIN (SELECT c.id_material, c.qty
                             FROM m_sloc cc
                             LEFT JOIN t_balance_header c
-                              ON c.id_sloc = cc.id_sloc
-                                 OR c.id_sloc LIKE CONCAT(\'%\"\', cc.id_sloc, \'\"%\')
-                                 OR c.id_sloc LIKE CONCAT(\'%[\', cc.id_sloc, \',%\')
-                                 OR c.id_sloc LIKE CONCAT(\'%, \', cc.id_sloc, \']%\')
-                                 OR c.id_sloc LIKE CONCAT(\'%[\', cc.id_sloc, \']%\')
+                              ON {$slocMatch}
                            WHERE c.status = 1
                              AND cc.status = 1
-                             AND (SUBSTRING(c.trace_no,1,1) IN (1,2,7,8,9))
+                             AND (SUBSTRING(c.trace_no FROM 1 FOR 1) IN ('1','2','7','8','9'))
                              AND cc.id_plant = ?
                          ) c
                  ON b.id_material = c.id_material
               WHERE a.status = 1
-                AND a.id_material = ?',
+                AND a.id_material = ?",
             [$resolvedPlant, $materialId]
         );
 
         return (float) ($result[0]->total ?? 0);
     }
 
-    public function getTotalQtyMaterial(string $mode, string $entryNo, ?int $idHead, int $plantId): float
+    public function getTotalQtyMaterial(?string $mode, string $entryNo, ?int $idHead, int $plantId): float
     {
         if ($mode === 'ADD') {
             $total = DB::connection($this->connection)->table('t_balance_temporary as a')
@@ -105,18 +121,18 @@ class BlendingRepository implements BlendingRepositoryInterface
         return (float) $total;
     }
 
-    public function getMaterialList(string $mode, string $entryNo, ?int $idHead, int $plantId): Collection
+    public function getMaterialList(?string $mode, string $entryNo, ?int $idHead, int $plantId): Collection
     {
         if ($mode === 'ADD') {
             return DB::connection($this->connection)->table('t_balance_temporary as a')
                 ->leftJoin('m_material as c', 'a.id_material', '=', 'c.id_material')
                 ->select(
-                    DB::raw('FORMAT(a.qty,3) AS qty'),
+                    DB::raw($this->dbNumberFormat('a.qty', 3) . ' AS qty'),
                     'a.id_material',
-                    DB::raw('CONCAT(c.code, " :: ", c.description) AS material'),
+                    DB::raw("CONCAT(c.code, ' :: ', c.description) AS material"),
                     'a.id_balance_temp AS idTail',
                     'a.entry_no',
-                    DB::raw('"' . $mode . '" AS mode')
+                    DB::raw("'" . $mode . "' AS mode")
                 )
                 ->where('a.entry_no', $entryNo)
                 ->where('a.status', 1)
@@ -128,12 +144,12 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->leftJoin('t_balance_header as c', 'a.id_balance_head', '=', 'c.id_balance_head')
             ->leftJoin('m_material as d', 'a.id_material', '=', 'd.id_material')
             ->select(
-                DB::raw('FORMAT(a.qty,3) AS qty'),
+                DB::raw($this->dbNumberFormat('a.qty', 3) . ' AS qty'),
                 'a.id_material',
-                DB::raw('CONCAT(d.code, " :: ", d.description) AS material'),
+                DB::raw("CONCAT(d.code, ' :: ', d.description) AS material"),
                 'a.id_balance_tail AS idTail',
                 'c.trace_no AS entry_no',
-                DB::raw('"' . $mode . '" AS mode')
+                DB::raw("'" . $mode . "' AS mode")
             )
             ->where('a.id_balance_head', $idHead)
             ->where('a.status', 1)
@@ -157,7 +173,7 @@ class BlendingRepository implements BlendingRepositoryInterface
         $result = $query->orderBy('description', 'asc')
             ->orderBy('id_sloc', 'asc')
             ->get();
-        
+
         return $result->map(function($item) {
             $item->tank = $this->formatTankName($item->tank);
             return $item;
@@ -181,64 +197,99 @@ class BlendingRepository implements BlendingRepositoryInterface
     public function getBlendingList(int $plantId, int $page = 1, int $perPage = 5): array
     {
         $offset = ($page - 1) * $perPage;
+
+        $supplierConcat = $this->dbGroupConcat(
+            "CONCAT(f.description, ' / ', e.batch_sap, ' / Qty : ', " . $this->dbNumberFormat('e.init_qty', 3) . ", ' MT / Qty : ', " . $this->dbNumberFormat('e.qty', 3) . ", ' MT')",
+            ' | ',
+            true
+        );
+
+        $slocExpr = $this->buildSlocExpression();
+
+        $castTrace = $this->isPgsql() ? 'CAST(a.trace_no AS TEXT)' : 'CAST(a.trace_no AS CHAR)';
+        $castFromTrace = $this->isPgsql() ? 'CAST(b.from_trace_no AS TEXT)' : 'CAST(b.from_trace_no AS CHAR)';
+
+        $selectFields = "a.entry_date, b.material_document, a.id_sloc,
+            {$castTrace} AS trace_no, {$this->dbNumberFormat('a.qty', 3)} AS qty,
+            {$this->dbNumberFormat('a.init_qty', 3)} AS init_qty, a.id_balance_head AS idHead,
+            CONCAT(c.description, ' (', c.code, ')') AS material,
+            p.code_2 AS plant_name,
+            {$supplierConcat} AS supplier,
+            {$castFromTrace} AS from_trace_no, b.id_trace_head AS idTraceHead,
+            b.is_last_row, b.next_process,
+            {$slocExpr} AS sloc,
+            {$this->dbNumberFormat('ROUND(ee.init_qty,4)', 3)} as balance_supplier";
+
+        $subFromTraceConcat = $this->dbGroupConcat(
+            "CONCAT(c.from_trace_no, ' :: ', cc.description, ' (', cc.code, ') - Qty ', " . $this->dbNumberFormat('c.out_qty', 3) . ", ' MT')",
+            '|'
+        );
+
+        $traceSubquery = "(SELECT b.id_balance_head, b.id_trace_head, c.from_trace_no, d.material_document,
+                  CASE WHEN b.to_trace_no = (SELECT to_trace_no FROM t_trace_header WHERE SUBSTRING(to_trace_no FROM 1 FOR 1) = '8' AND SUBSTRING(to_trace_no FROM 9 FOR 1) <> '0' AND status = 1 ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
+                  CASE WHEN b.to_trace_no = (SELECT from_trace_no FROM t_trace_header WHERE from_trace_no = b.to_trace_no AND status = 1 ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process
+             FROM t_trace_header b
+             LEFT JOIN (SELECT c.to_trace_no, c.id_balance_head, {$subFromTraceConcat} AS from_trace_no
+                        FROM t_trace_header c LEFT JOIN m_material cc ON c.id_material = cc.id_material
+                       WHERE c.status = 1 AND SUBSTRING(c.to_trace_no FROM 1 FOR 1) = '8' AND SUBSTRING(c.to_trace_no FROM 9 FOR 1) = '0' GROUP BY c.to_trace_no, c.id_balance_head
+             ) c ON b.from_trace_no = c.to_trace_no
+             LEFT JOIN t_material_document d ON d.id_trace_head = b.id_trace_head
+            WHERE b.status = 1 AND SUBSTRING(b.to_trace_no FROM 1 FOR 1) = '8' AND SUBSTRING(b.from_trace_no FROM 1 FOR 1) = '8') b";
+
         $query = DB::connection($this->connection)->table('t_balance_header as a')
-            ->selectRaw('
-                    a.entry_date, b.material_document, a.id_sloc,
-                    CAST(a.trace_no AS CHAR) AS trace_no, FORMAT(a.qty,3) AS qty,
-                    FORMAT(a.init_qty,3) AS init_qty, a.id_balance_head AS idHead,
-                    CONCAT(c.description, " (", c.code, ")") AS material,
-                    p.code_2 AS plant_name,
-                    GROUP_CONCAT(DISTINCT CONCAT(f.description, " / ", e.batch_sap,
-                        " / Qty : ", FORMAT(e.init_qty,3), " MT / Qty : ", FORMAT(e.qty,3), " MT")
-                        SEPARATOR " | ") AS supplier,
-                    CAST(b.from_trace_no AS CHAR) AS from_trace_no, b.id_trace_head AS idTraceHead,
-                    b.is_last_row, b.next_process,
-                    CONCAT(
-                        COALESCE(d.description, ""),
-                        IF(
-                            GROUP_CONCAT(DISTINCT COALESCE(h_sloc.description, h.description) ORDER BY COALESCE(h_sloc.description, h.description) ASC SEPARATOR " & ") IS NULL,
-                            "",
-                            CONCAT(" | ", GROUP_CONCAT(DISTINCT COALESCE(h_sloc.description, h.description) ORDER BY COALESCE(h_sloc.description, h.description) ASC SEPARATOR " & "))
-                        )
-                    ) AS sloc,
-                    FORMAT(ROUND(ee.init_qty,4),3) as balance_supplier
-            ')
-            ->leftJoin(DB::raw('(SELECT b.id_balance_head, b.id_trace_head, c.from_trace_no, d.material_document,
-                          CASE WHEN b.to_trace_no = (SELECT to_trace_no FROM t_trace_header WHERE SUBSTRING(to_trace_no, 1, 1) = 8 AND SUBSTRING(to_trace_no, 9, 1) <> 0 AND status = 1 ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
-                          CASE WHEN b.to_trace_no = (SELECT from_trace_no FROM t_trace_header WHERE from_trace_no = b.to_trace_no AND status = 1 ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process
-                     FROM t_trace_header b
-                     LEFT JOIN (SELECT c.to_trace_no, c.id_balance_head, GROUP_CONCAT(CONCAT(c.from_trace_no, " :: ", cc.description, " (", cc.code, ") - Qty ", FORMAT(c.out_qty,3), " MT") SEPARATOR "|") AS from_trace_no
-                                FROM t_trace_header c LEFT JOIN m_material cc ON c.id_material = cc.id_material
-                               WHERE c.status = 1 AND SUBSTRING(c.to_trace_no,1,1) = 8 AND SUBSTRING(c.to_trace_no,9,1) = 0 GROUP BY c.to_trace_no
-                     ) c ON b.from_trace_no = c.to_trace_no
-                     LEFT JOIN t_material_document d ON d.id_trace_head = b.id_trace_head
-                    WHERE b.status = 1 AND SUBSTRING(b.to_trace_no,1,1) = 8 AND SUBSTRING(b.from_trace_no,1,1) = 8) b'), 'a.id_balance_head', '=', 'b.id_balance_head')
+            ->select(DB::raw($selectFields))
+            ->leftJoin(DB::raw($traceSubquery), 'a.id_balance_head', '=', 'b.id_balance_head')
             ->leftJoin('m_material as c', 'c.id_material', '=', 'a.id_material')
-            ->leftJoin(DB::raw('m_sloc d'), function($join) {
-                $join->on('d.id_sloc', '=', 'a.id_sloc')
-                     ->on(DB::raw('d.id_plant'), '=', DB::raw('a.id_plant COLLATE utf8mb4_unicode_ci'));
+            ->leftJoin('m_sloc as d', function($join) {
+                if ($this->isPgsql()) {
+                    $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(d.id_sloc AS TEXT)'))
+                         ->on('d.id_plant', '=', 'a.id_plant');
+                } else {
+                    $join->on('d.id_sloc', '=', 'a.id_sloc')
+                         ->on('d.id_plant', '=', 'a.id_plant');
+                }
             })
-            ->leftJoin(DB::raw('m_plant p'), function($join) {
-                $join->on(DB::raw('a.id_plant'), '=', DB::raw('p.code_3 COLLATE utf8mb4_unicode_ci'))
+            ->leftJoin('m_plant as p', function($join) {
+                $join->on('a.id_plant', '=', 'p.code_3')
                      ->where('p.status', 1);
             })
             ->leftJoin('t_balance_detail as e', 'a.id_balance_head', '=', 'e.id_balance_head')
             ->leftJoin(DB::raw('(SELECT ee1.trace_no, SUM(ee2.init_qty) AS init_qty FROM t_balance_header ee1 LEFT JOIN t_balance_detail ee2 ON ee1.id_balance_head = ee2.id_balance_head WHERE ee1.status = 1 GROUP BY ee1.trace_no) ee'), 'a.trace_no', '=', 'ee.trace_no')
             ->leftJoin('m_supplier as f', 'e.id_supplier', '=', 'f.id_supplier')
-            ->leftJoin('m_sloc as h', 'h.id_sloc', '=', 'a.id_sloc')
-            ->leftJoin('m_sloc as h_sloc', 'h_sloc.id_sloc', '=', 'a.id_sloc')
+            ->leftJoin('m_sloc as h', function($join) {
+                if ($this->isPgsql()) {
+                    $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(h.id_sloc AS TEXT)'));
+                } else {
+                    $join->on('h.id_sloc', '=', 'a.id_sloc');
+                }
+            })
+            ->leftJoin('m_sloc as h_sloc', function($join) {
+                if ($this->isPgsql()) {
+                    $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(h_sloc.id_sloc AS TEXT)'));
+                } else {
+                    $join->on('h_sloc.id_sloc', '=', 'a.id_sloc');
+                }
+            })
             ->where('a.status', 1)
-            ->whereRaw('SUBSTRING(a.trace_no,1,1) = 8');
+            ->whereRaw("SUBSTRING(a.trace_no FROM 1 FOR 1) = '8'");
 
         if ($plantId != 0) {
             $query->where('a.id_plant', $plantId);
         }
 
-        $query->groupBy('a.trace_no')->orderByDesc('a.trace_no');
-        
+        $groupByCols = ['a.trace_no'];
+        if ($this->isPgsql()) {
+            $groupByCols = array_merge($groupByCols, [
+                'a.entry_date', 'a.id_sloc',
+                'a.qty', 'a.init_qty', 'a.id_balance_head',
+                'c.description', 'c.code', 'p.code_2',
+            ]);
+        }
+        $query->groupBy($groupByCols)->orderByDesc('a.trace_no');
+
         $total = DB::connection($this->connection)->table('t_balance_header as a')
             ->where('a.status', 1)
-            ->whereRaw('SUBSTRING(a.trace_no,1,1) = 8')
+            ->whereRaw("SUBSTRING(a.trace_no FROM 1 FOR 1) = '8'")
             ->when($plantId != 0, function($q) use ($plantId) { return $q->where('a.id_plant', $plantId); })
             ->distinct('a.trace_no')->count('a.trace_no');
 
@@ -270,7 +321,7 @@ class BlendingRepository implements BlendingRepositoryInterface
         $query .= ' ORDER BY a.description ASC';
 
         $result = collect(DB::connection($this->connection)->select($query, $params));
-        
+
         return $result->map(function($item) {
             $item->tank = $this->formatTankName($item->tank);
             return $item;
@@ -316,108 +367,8 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function deactivateBlending(string $id, string $user): array
     {
-        $idTmp = explode("|", $id);
-        $idHead = trim($idTmp[0]);
-        $idTraceHead = trim($idTmp[1]);
-
-        // Get entry date for lock check
-        $entryDate = DB::connection($this->connection)->select(
-            'SELECT entry_date FROM t_trace_header WHERE id_trace_head = ? AND status = 1',
-            [$idTraceHead]
-        );
-
-        if (empty($entryDate)) {
-            return ['response' => 98];
-        }
-
-        $curr_entryDate = $entryDate[0]->entry_date;
-
-        // Use shared PeriodLockService for consistent date lock mechanism
-        if (PeriodLockService::isLocked($curr_entryDate)) {
-            return ['response' => 99];
-        }
-
-        $this->logTransaction('BLENDING_ENTRY', 'DE-ACTIVATE', 'IdBalHead: ' . $idHead . ' | Status: 1 >> 0', $user);
-
-        DB::connection($this->connection)->update(
-            'UPDATE t_balance_detail SET status = "0", updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-        DB::connection($this->connection)->update(
-            'UPDATE t_balance_header SET status = "0", updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-
-        // Get and restore source blending
-        $datTraceHead = DB::connection($this->connection)->select(
-            'SELECT b.id_balance_head, b.out_qty, b.id_trace_head
-               FROM t_trace_header a
-               LEFT JOIN t_trace_header b ON a.from_trace_no = b.to_trace_no AND b.status = 1
-              WHERE a.id_balance_head = ? AND a.status = 1',
-            [$idHead]
-        );
-
-        foreach ($datTraceHead as $row) {
-            $datBalHeadSource = DB::connection($this->connection)->select(
-                'SELECT a.qty, a.out_qty FROM t_balance_header a WHERE a.status = 1 AND a.id_balance_head = ?',
-                [$row->id_balance_head]
-            );
-
-            if (!empty($datBalHeadSource)) {
-                $outQtyBalHeadSource = $datBalHeadSource[0]->out_qty - $row->out_qty;
-                $onhandQtyBalHeadSource = $datBalHeadSource[0]->qty + $row->out_qty;
-
-                DB::connection($this->connection)->update(
-                    'UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ?',
-                    [$onhandQtyBalHeadSource, $outQtyBalHeadSource, $user, $row->id_balance_head]
-                );
-
-                // Restore trace details
-                $datTraceTail = DB::connection($this->connection)->select(
-                    'SELECT a.id_balance_tail, a.out_qty, a.id_trace_tail
-                       FROM t_trace_detail a WHERE a.id_trace_head = ? AND a.status = 1',
-                    [$row->id_trace_head]
-                );
-
-                foreach ($datTraceTail as $tail) {
-                    $datBalTailSource = DB::connection($this->connection)->select(
-                        'SELECT a.qty, a.out_qty FROM t_balance_detail a WHERE a.status = 1 AND a.id_balance_tail = ?',
-                        [$tail->id_balance_tail]
-                    );
-
-                    if (!empty($datBalTailSource)) {
-                        $outQtyBalTailSource = $datBalTailSource[0]->out_qty - $tail->out_qty;
-                        $onhandQtyBalTailSource = $datBalTailSource[0]->qty + $tail->out_qty;
-
-                        DB::connection($this->connection)->update(
-                            'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
-                            [$onhandQtyBalTailSource, $outQtyBalTailSource, $user, $tail->id_balance_tail]
-                        );
-                    }
-
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_trace_detail SET status = "0", updated_by = ? WHERE id_trace_tail = ?',
-                        [$user, $tail->id_trace_tail]
-                    );
-                }
-
-                DB::connection($this->connection)->update(
-                    'UPDATE t_trace_header SET status = "0", updated_by = ? WHERE id_trace_head = ?',
-                    [$user, $row->id_trace_head]
-                );
-            }
-        }
-
-        DB::connection($this->connection)->update(
-            'UPDATE t_trace_header SET status = "0", updated_by = ? WHERE id_balance_head = ?',
-            [$user, $idHead]
-        );
-        DB::connection($this->connection)->update(
-            'UPDATE t_trace_detail SET status = "0", updated_by = ? WHERE id_trace_head = ?',
-            [$user, $idTraceHead]
-        );
-
-        return ['response' => 1];
+        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+            ->deactivateBlending($id, $user);
     }
 
     public function updateEntrySubTank(string $user, int $idHead, array $tails): array
@@ -465,5 +416,12 @@ class BlendingRepository implements BlendingRepositoryInterface
         ));
     }
 
-
+    private function buildSlocExpression(): string
+    {
+        if ($this->isPgsql()) {
+            return "CONCAT(COALESCE(d.description, ''), COALESCE(' | ' || STRING_AGG(DISTINCT COALESCE(h_sloc.description, h.description), ' & ' ORDER BY COALESCE(h_sloc.description, h.description)), ''))";
+        }
+        $gc = $this->dbGroupConcat("COALESCE(h_sloc.description, h.description)", ' & ', true, 'COALESCE(h_sloc.description, h.description) ASC');
+        return "CONCAT(COALESCE(d.description, ''), COALESCE(CONCAT(' | ', {$gc}), ''))";
+    }
 }

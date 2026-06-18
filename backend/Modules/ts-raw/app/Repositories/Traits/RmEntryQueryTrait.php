@@ -7,11 +7,12 @@ use Modules\Material\Models\Material;
 use Modules\Plant\Models\Plant;
 use Exception;
 use Modules\Shared\Traits\TransactionLoggerTrait;
+use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Services\TraceNumberGeneratorService;
 
 trait RmEntryQueryTrait
 {
-    use TransactionLoggerTrait;
+    use TransactionLoggerTrait, DbCompatTrait;
 
     public function getRmList($plantId, int $page = 1, int $perPage = 5): array
     {
@@ -21,17 +22,19 @@ trait RmEntryQueryTrait
         $idTankStorageIds = $this->getStorageSlocIds($resolvedPlant, $allPlants);
         $bhQuery = $this->buildBhSubquery($resolvedPlant, $allPlants, $idTankStorageIds);
         
+        $groupConcatSloc = $this->dbGroupConcat('DISTINCT sl.id_tank', ' & ', false, 'sl.id_tank ASC');
+        $balanceFmt = $this->dbNumberFormat('bs.supplier_qty', 3);
         $query = DB::connection('eudr_ts')->table($bhQuery, 'bh')
             ->selectRaw("
                 bh.id_balance_head, bh.id_material, bh.id_sloc AS id_tank,
                 NULL AS id_tank_tail_raw, bh.status,
-                CAST(bh.trace_no AS CHAR) AS trace_no,
+                CAST(bh.trace_no AS TEXT) AS trace_no,
                 bh.qty, bh.created_by, bh.created_at,
                 CONCAT(m.code, ' :: ', m.description) AS material,
                 bh.init_qty, MIN(sl.description) AS sloc_description,
-                GROUP_CONCAT(DISTINCT sl.id_tank ORDER BY sl.id_tank ASC SEPARATOR ' & ') AS sloc_tank_number,
+                {$groupConcatSloc} AS sloc_tank_number,
                 bh.entry_date, f.material_document, f.po_so, f.id_trace_head,
-                FORMAT(bs.supplier_qty,3) AS balance_supplier,
+                {$balanceFmt} AS balance_supplier,
                 bh.id_plant, p.code AS plant_code, p.description AS plant_description
             ")
             ->join('m_material as m', function($join) {
@@ -39,14 +42,17 @@ trait RmEntryQueryTrait
                      ->where('m.type', '=', clone DB::raw("'{$this->typeMaterial}'"));
             })
             ->leftJoin('m_sloc as sl', function($join) {
-                $join->on(function($q) {
-                    $q->whereRaw("JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS JSON))");
+                $jsonCond = $this->isPgsql('eudr_ts')
+                    ? "CAST(bh.id_sloc AS TEXT) = CAST(sl.id_sloc AS TEXT)"
+                    : "JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS JSON))";
+                $join->on(function($q) use ($jsonCond) {
+                    $q->whereRaw($jsonCond);
                 })->where('sl.status', 1);
             })
             ->leftJoin(DB::raw("(SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so, MAX(f.id_trace_head) AS id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 GROUP BY f.id_balance_head) as f"), 'f.id_balance_head', '=', 'bh.id_balance_head')
             ->leftJoin(DB::raw("(SELECT id_balance_head, SUM(init_qty) AS supplier_qty FROM t_balance_detail WHERE status = 1 GROUP BY id_balance_head) as bs"), 'bs.id_balance_head', '=', 'bh.id_balance_head')
-            ->leftJoin('m_plant as p', DB::raw('bh.id_plant'), '=', DB::raw('p.code_3 COLLATE utf8mb4_unicode_ci'))
-            ->groupBy('bh.id_balance_head')
+            ->leftJoin('m_plant as p', DB::raw('bh.id_plant'), '=', DB::raw('p.code_3'))
+            ->groupBy('bh.id_balance_head', 'bh.id_material', 'bh.id_sloc', 'bh.status', 'bh.trace_no', 'bh.qty', 'bh.created_by', 'bh.created_at', 'bh.init_qty', 'bh.entry_date', 'bh.id_plant', 'm.code', 'm.description', 'f.material_document', 'f.po_so', 'f.id_trace_head', 'bs.supplier_qty', 'p.code', 'p.description')
             ->orderByDesc('bh.id_balance_head')
             ->limit(100);
 
@@ -95,11 +101,19 @@ trait RmEntryQueryTrait
                 if (!$allPlants) $q->where('id_plant', $resolvedPlant);
             })
             ->where(function($q) use ($idTankStorageIds) {
-                $q->where(function($q2) use ($idTankStorageIds) {
-                    foreach ($idTankStorageIds as $slocId) {
-                        $q2->orWhereRaw("JSON_CONTAINS(id_sloc, ?)", [json_encode($slocId)]);
-                    }
-                });
+                if ($this->isPgsql('eudr_ts')) {
+                    $q->where(function($q2) use ($idTankStorageIds) {
+                        foreach ($idTankStorageIds as $slocId) {
+                            $q2->orWhere('id_sloc', '=', $slocId);
+                        }
+                    });
+                } else {
+                    $q->where(function($q2) use ($idTankStorageIds) {
+                        foreach ($idTankStorageIds as $slocId) {
+                            $q2->orWhereRaw('JSON_CONTAINS(id_sloc, ?)', [json_encode($slocId)]);
+                        }
+                    });
+                }
             })
             ->orderByDesc('id_balance_head');
     }
@@ -115,7 +129,7 @@ trait RmEntryQueryTrait
 
         $map = [];
         foreach ($details as $sd) {
-            $map[$sd->trace_no]['supplier'][] = sprintf('%s / %s / Qty: %s MT / %s', $sd->code ?? 'N/A', $sd->description ?? 'Unknown', number_format($sd->init_qty, 3), $sd->out_qty == 0 ? '-' : 'BATCH TRANSFERRED');
+            $map[$sd->trace_no]['supplier'][] = sprintf('%s / %s / Qty: %s MT / %s', $sd->code ?? 'N/A', $sd->description ?? 'Unknown', number_format((float) $sd->init_qty, 3), $sd->out_qty == 0 ? '-' : 'BATCH TRANSFERRED');
             $map[$sd->trace_no]['id_balance_detail'][] = $sd->id_balance_tail;
         }
         return $map;
@@ -128,7 +142,7 @@ trait RmEntryQueryTrait
             ->join('t_balance_header as bh', 'th.id_balance_head', '=', 'bh.id_balance_head')
             ->where('td.status', 1)->whereIn('bh.trace_no', $traceNos)
             ->groupBy('bh.trace_no')
-            ->selectRaw("bh.trace_no, IF(SUM(td.out_qty) > 0, 'USED', 'N/A') AS traced")
+            ->selectRaw("bh.trace_no, CASE WHEN COALESCE(SUM(td.out_qty), 0) > 0 THEN 'USED' ELSE 'N/A' END AS traced")
             ->pluck('traced', 'trace_no')->toArray();
     }
 
@@ -149,18 +163,22 @@ trait RmEntryQueryTrait
 
     public function getRmEntryById($id): ?object
     {
+        $slocJoin = $this->isPgsql('eudr_ts')
+            ? 'LEFT JOIN m_sloc sl ON CAST(bh.id_sloc AS TEXT) = CAST(sl.id_sloc AS TEXT) AND sl.status = 1'
+            : 'LEFT JOIN m_sloc sl ON JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS JSON)) AND sl.status = 1';
+
         $result = DB::connection('eudr_ts')->select(
             "SELECT bh.id_balance_head, bh.id_material, bh.id_sloc AS id_tank,
                     NULL AS id_tank_tail_raw, bh.status,
-                    CAST(bh.trace_no AS CHAR) AS trace_no,
+                    CAST(bh.trace_no AS TEXT) AS trace_no,
                     bh.qty, bh.created_by, bh.created_at,
                     CONCAT(m.code, ' :: ', m.description) AS material,
                     bh.init_qty, sl.description AS sloc_description,
                     bh.entry_date, bh.id_plant, p.code AS plant_code, p.description AS plant_description
                FROM t_balance_header bh
                INNER JOIN m_material m ON bh.id_material = m.id_material
-               LEFT JOIN m_sloc sl ON JSON_CONTAINS(bh.id_sloc, CAST(sl.id_sloc AS JSON)) AND sl.status = 1
-               LEFT JOIN m_plant p ON bh.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+               {$slocJoin}
+               LEFT JOIN m_plant p ON bh.id_plant = p.code_3
               WHERE bh.id_balance_head = ? AND bh.status = 1",
             [$id]
         );
@@ -175,14 +193,18 @@ trait RmEntryQueryTrait
         $section = '1';
         $tracePlantCode = '00';
 
+        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
+        $castRight = $this->isPgsql()
+            ? "CAST(RIGHT(trace_no, 2) AS INTEGER)"
+            : "CAST(RIGHT(trace_no, 2) AS UNSIGNED)";
         $result = DB::connection('eudr_ts')->select(
-            'SELECT MAX(CAST(RIGHT(trace_no, 2) AS UNSIGNED)) as max_seq
+            "SELECT MAX({$castRight}) as max_seq
                FROM t_balance_header
               WHERE SUBSTRING(trace_no,1,1) = ?
-                AND SUBSTRING(trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
+                AND SUBSTRING(trace_no,2,6) = {$dateFmt}
                 AND SUBSTRING(trace_no,8,3) = ?
                 AND SUBSTRING(trace_no,11,2) = ?
-                AND status = 1',
+                AND status = 1",
             [$section, $warehouse, $tracePlantCode]
         );
 
@@ -244,13 +266,7 @@ trait RmEntryQueryTrait
 
     public function resolvePlantCode($plantId)
     {
-        if ($plantId) {
-            $plant = Plant::find($plantId);
-            if ($plant && $plant->code_3) {
-                return $plant->code_3;
-            }
-        }
-        return $plantId;
+        return \Modules\Shared\Services\PlantContextService::resolvePlantId($plantId) ?: (string) $plantId;
     }
 
     public function buildTraceNo(string $section, string $entryDate, string $warehouse, string $plantCode, int $sequence): string
