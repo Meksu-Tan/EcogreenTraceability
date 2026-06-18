@@ -8,9 +8,11 @@ use Modules\Material\Models\Material;
 use Modules\Shared\Helpers\Rundown;
 use Modules\Shared\Helpers\Feed;
 use Exception;
+use Modules\Shared\Traits\DbCompatTrait;
 
 trait RmEntryTransactionTrait
 {
+    use DbCompatTrait;
     public function checkStockSynchronization(string $entryNo, int $materialId = null): array
     {
         $tempQuery = 'SELECT COUNT(*) as temp_count, SUM(qty) as temp_qty FROM t_balance_temporary WHERE entry_no = ? AND status = 1';
@@ -53,15 +55,19 @@ trait RmEntryTransactionTrait
     {
         $since = now()->subHours($hoursBack);
 
+        $jsonCond = $this->isPgsql('eudr_ts')
+            ? 'id_sloc = CAST(? AS TEXT)'
+            : 'JSON_CONTAINS(id_sloc, JSON_ARRAY(?))';
+
         $entries = DB::connection('eudr_ts')->select(
-            'SELECT id_balance_head, trace_no, qty, init_qty, entry_date, created_at
+            "SELECT id_balance_head, trace_no, qty, init_qty, entry_date, created_at
                FROM t_balance_header
               WHERE id_material = ?
-                AND JSON_CONTAINS(id_sloc, JSON_ARRAY(?))
+                AND {$jsonCond}
                 AND id_plant = ?
                 AND status = 1
                 AND created_at >= ?
-              ORDER BY id_balance_head ASC',
+              ORDER BY id_balance_head ASC",
             [$materialId, $tankId, $plantId, $since]
         );
 
@@ -431,114 +437,14 @@ trait RmEntryTransactionTrait
 
     public function deactivateRmEntry(int $id, string $user): array
     {
-        DB::connection('eudr_ts')->beginTransaction();
-
-        try {
-            $used = TraceHeader::where('id_balance_head', $id)
-                ->where('out_qty', '!=', 0)
-                ->where('status', 1)
-                ->count();
-
-            if ($used > 0) {
-                throw new Exception('RM Entry has been used and cannot be deactivated');
-            }
-
-            DB::connection('eudr_ts')->table('t_balance_header')
-                ->where('id_balance_head', $id)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            DB::connection('eudr_ts')->table('t_balance_detail')
-                ->where('id_balance_head', $id)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            $traceHead = TraceHeader::where('id_balance_head', $id)
-                ->where('status', 1)
-                ->first();
-
-            if ($traceHead) {
-                DB::connection('eudr_ts')->table('t_trace_header')
-                    ->where('id_trace_head', $traceHead->id_trace_head)
-                    ->update(['status' => 0, 'updated_by' => $user]);
-
-                DB::connection('eudr_ts')->table('t_trace_detail')
-                    ->where('id_trace_head', $traceHead->id_trace_head)
-                    ->update(['status' => 0, 'updated_by' => $user]);
-            }
-
-            $this->logTransaction('RM_ENTRY', 'DEACTIVATE', 'ID: ' . $id, $user);
-            DB::connection('eudr_ts')->commit();
-            return ['success' => true];
-
-        } catch (Exception $e) {
-            DB::connection('eudr_ts')->rollBack();
-            throw $e;
-        }
+        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+            ->deactivateRmEntry($id, $user);
     }
 
     public function deactivateFeedLogEntry(int $id, string $user): array
     {
-        DB::connection('eudr_ts')->beginTransaction();
-
-        try {
-            $traceHead = DB::connection('eudr_ts')->table('t_trace_header')
-                ->where('id_trace_head', $id)
-                ->where('status', 1)
-                ->first();
-
-            if (!$traceHead) {
-                throw new Exception('Feed log entry not found');
-            }
-
-            $toTraceNo = (string) ($traceHead->to_trace_no ?? '');
-            if (substr($toTraceNo, 0, 1) === '7') {
-                throw new Exception('Use transfer deactivation for transfer entries');
-            }
-
-            // Check if this balance has been used by downstream operations
-            $usedCount = DB::connection('eudr_ts')->table('t_trace_header')
-                ->where('id_balance_head', $traceHead->id_balance_head)
-                ->where('out_qty', '!=', 0)
-                ->where('status', 1)
-                ->count();
-
-            if ($usedCount > 0) {
-                throw new Exception('Feed log entry has been used and cannot be deactivated');
-            }
-
-            // Deactivate balance header
-            DB::connection('eudr_ts')->table('t_balance_header')
-                ->where('id_balance_head', $traceHead->id_balance_head)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            // Deactivate balance detail
-            DB::connection('eudr_ts')->table('t_balance_detail')
-                ->where('id_balance_head', $traceHead->id_balance_head)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            // Deactivate trace header
-            DB::connection('eudr_ts')->table('t_trace_header')
-                ->where('id_trace_head', $id)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            // Deactivate trace detail
-            DB::connection('eudr_ts')->table('t_trace_detail')
-                ->where('id_trace_head', $id)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            $this->logTransaction(
-                'FEED_LOG',
-                'DEACTIVATE',
-                'ID: ' . $id . ' | Trace: ' . $toTraceNo,
-                $user
-            );
-
-            DB::connection('eudr_ts')->commit();
-            return ['success' => true];
-
-        } catch (Exception $e) {
-            DB::connection('eudr_ts')->rollBack();
-            throw $e;
-        }
+        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+            ->deactivateFeedLogEntry($id, $user);
     }
 
     public function updateEntrySubTank(string $user, int $idHead, array $tails): array
@@ -549,78 +455,7 @@ trait RmEntryTransactionTrait
 
     public function deactivateRmEntryTrf(int $id, string $user): array
     {
-        DB::connection('eudr_ts')->beginTransaction();
-
-        try {
-            $head = DB::connection('eudr_ts')->selectOne(
-                'SELECT trace_no FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
-                [$id]
-            );
-            if (!$head) {
-                throw new Exception('RM Entry not found');
-            }
-
-            $traceNo = $head->trace_no;
-
-            $traceHead = DB::connection('eudr_ts')->selectOne(
-                'SELECT id_trace_head, from_trace_no, out_qty FROM t_trace_header
-                 WHERE from_trace_no = ? AND status = 1 LIMIT 1',
-                [$traceNo]
-            );
-
-            if ($traceHead) {
-                $sourceTraceNo = $traceHead->from_trace_no;
-                $sourceTraceHead = DB::connection('eudr_ts')->selectOne(
-                    'SELECT id_trace_head, id_balance_head FROM t_trace_header WHERE to_trace_no = ? AND status = 1 LIMIT 1',
-                    [$sourceTraceNo]
-                );
-
-                if ($sourceTraceHead) {
-                    $balanceHead = DB::connection('eudr_ts')->selectOne(
-                        'SELECT id_balance_head, qty, out_qty FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
-                        [$sourceTraceHead->id_balance_head]
-                    );
-
-                    if ($balanceHead) {
-                        DB::connection('eudr_ts')->update(
-                            'UPDATE t_balance_header SET qty = qty + ?, out_qty = out_qty - ?, updated_by = ? WHERE id_balance_head = ? AND status = 1',
-                            [$traceHead->out_qty, $traceHead->out_qty, $user, $sourceTraceHead->id_balance_head]
-                        );
-                    }
-                }
-            }
-
-            DB::connection('eudr_ts')->table('t_balance_header')
-                ->where('id_balance_head', $id)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            DB::connection('eudr_ts')->table('t_balance_detail')
-                ->where('id_balance_head', $id)
-                ->update(['status' => 0, 'updated_by' => $user]);
-
-            $traceHead = DB::connection('eudr_ts')->selectOne(
-                'SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ? AND status = 1 LIMIT 1',
-                [$id]
-            );
-
-            if ($traceHead) {
-                DB::connection('eudr_ts')->table('t_trace_header')
-                    ->where('id_trace_head', $traceHead->id_trace_head)
-                    ->update(['status' => 0, 'updated_by' => $user]);
-
-                DB::connection('eudr_ts')->table('t_trace_detail')
-                    ->where('id_trace_head', $traceHead->id_trace_head)
-                    ->update(['status' => 0, 'updated_by' => $user]);
-            }
-
-            $this->logTransaction('RMTRF_ENTRY', 'DEACTIVATE', 'ID: ' . $id . ' | Trace: ' . $traceNo, $user);
-
-            DB::connection('eudr_ts')->commit();
-            return ['success' => true];
-
-        } catch (Exception $e) {
-            DB::connection('eudr_ts')->rollBack();
-            throw $e;
-        }
+        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+            ->deactivateRmEntryTrf($id, $user);
     }
 }

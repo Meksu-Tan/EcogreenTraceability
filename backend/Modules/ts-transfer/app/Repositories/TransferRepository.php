@@ -142,7 +142,7 @@ class TransferRepository implements TransferRepositoryInterface
     {
         $offset = ($page - 1) * $perPage;
         $slocJoin = $this->isPgsql()
-            ? 'LEFT JOIN m_sloc t_from ON th_from.id_sloc @> to_jsonb(CAST(t_from.id_sloc AS TEXT))'
+            ? 'LEFT JOIN m_sloc t_from ON CAST(th_from.id_sloc AS TEXT) = CAST(t_from.id_sloc AS TEXT)'
             : 'LEFT JOIN m_sloc t_from ON t_from.id_sloc = th_from.id_sloc';
 
         $totalResult = DB::connection($this->connection)->select(

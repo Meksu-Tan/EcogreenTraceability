@@ -17,6 +17,16 @@ class RmEntryService implements RmEntryServiceInterface
         protected RmEntryRepositoryInterface $rmEntryRepo
     ) {}
 
+    private function isPgsql(): bool
+    {
+        return DB::connection('eudr_ts')->getDriverName() === 'pgsql';
+    }
+
+    private function jsonArrayContains(string $col, string $param): string
+    {
+        return "{$col} = CAST({$param} AS INTEGER)";
+    }
+
     public function getRmList($plantId, int $page = 1, int $perPage = 5): array
     {
         return $this->rmEntryRepo->getRmList($plantId, $page, $perPage);
@@ -290,8 +300,9 @@ class RmEntryService implements RmEntryServiceInterface
         $destPlant = $destTank->id_plant ?? $plantCode;
 
         // Pre-flight: validate source has supplier detail
+        $jcSloc = $this->jsonArrayContains('bh.id_sloc', '?');
         $orphanHeads = DB::connection('eudr_ts')->select(
-            'SELECT bh.id_balance_head, bh.trace_no, bh.qty
+            "SELECT bh.id_balance_head, bh.trace_no, bh.qty
                FROM t_balance_header bh
                LEFT JOIN t_balance_detail bd
                  ON bh.id_balance_head = bd.id_balance_head
@@ -300,9 +311,9 @@ class RmEntryService implements RmEntryServiceInterface
               WHERE bh.status = 1
                 AND bh.qty > 0.0001
                 AND bh.id_material = ?
-                AND JSON_CONTAINS(bh.id_sloc, JSON_ARRAY(?))
+                AND {$jcSloc}
                 AND bh.id_plant = ?
-                AND bd.id_balance_tail IS NULL',
+                AND bd.id_balance_tail IS NULL",
             [$idMaterial, $trfSource, $srcPlant]
         );
 
@@ -311,20 +322,21 @@ class RmEntryService implements RmEntryServiceInterface
         }
 
         // Check total stock
+        $jcSloc2 = $this->jsonArrayContains('c.id_sloc', '?');
         $totalStock = DB::connection('eudr_ts')->select(
-            'SELECT IFNULL(SUM(c.qty),0) AS qty
+            "SELECT COALESCE(SUM(c.qty),0) AS qty
                FROM m_material a
                LEFT JOIN (SELECT b.code, b.id_material
                             FROM m_material b) b
                  ON a.code = b.code
                LEFT JOIN t_balance_header c
-                 ON b.id_material = c.id_material AND c.status = 1 AND JSON_CONTAINS(c.id_sloc, JSON_ARRAY(?))
+                 ON b.id_material = c.id_material AND c.status = 1 AND {$jcSloc2}
               WHERE a.id_material = ?
                 AND a.status = 1
                 AND c.qty > 0.0001
-                AND (SUBSTRING(c.trace_no,1,1) = 1 OR SUBSTRING(c.trace_no,1,1) = 2 OR
-                     SUBSTRING(c.trace_no,1,1) = 7 OR SUBSTRING(c.trace_no,1,1) = 8 OR
-                     SUBSTRING(c.trace_no,1,1) = 9)',
+                AND (CAST(SUBSTRING(c.trace_no,1,1) AS INTEGER) = 1 OR CAST(SUBSTRING(c.trace_no,1,1) AS INTEGER) = 2 OR
+                     CAST(SUBSTRING(c.trace_no,1,1) AS INTEGER) = 7 OR CAST(SUBSTRING(c.trace_no,1,1) AS INTEGER) = 8 OR
+                     CAST(SUBSTRING(c.trace_no,1,1) AS INTEGER) = 9)",
             [$trfSource, $idMaterial]
         );
         $totalReserve = (float) ($totalStock[0]->qty ?? 0);
