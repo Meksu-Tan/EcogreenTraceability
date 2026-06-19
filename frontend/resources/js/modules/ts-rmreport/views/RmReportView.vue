@@ -115,7 +115,7 @@
                   <td class="font-monospace text-caption">{{ row.material_document || '-' }}</td>
                   <td class="font-monospace text-caption">{{ row.po_so || '-' }}</td>
                   <td class="font-weight-medium text-truncate text-caption" style="max-width:200px" :title="row.material">{{ row.material }}</td>
-                  <td class="text-caption">{{ row.tank || '-' }}</td>
+                  <td class="text-caption">{{ row.tf_number || '-' }}</td>
                   <td class="text-right font-monospace text-caption">{{ row.init_qty || row.qty }}</td>
                   <td class="text-right font-monospace font-weight-bold text-caption">{{ row.qty }}</td>
                   <td class="text-right font-monospace text-caption">{{ row.qty_tank || '-' }}</td>
@@ -421,11 +421,11 @@ const openDetail = async (row) => {
   } else {
     // Fallback if no trace no / batch sap
     const baseRow = row.supplier
-      ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }]
+      ? [{ sloc: row.tf_number || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }]
       : []
     detailWip.value = baseRow
     detailPrd.value = row.supplier
-      ? [{ sloc: row.tank || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0', shipment: '-' }]
+      ? [{ sloc: row.tf_number || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0', shipment: '-' }]
       : []
     detailAdj.value = baseRow
   }
