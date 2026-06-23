@@ -1,11 +1,15 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsWip\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Plant\Models\Plant;
+use Modules\Shared\Traits\DbCompatTrait;
 
 trait WipEntryQueryTrait
 {
+    use DbCompatTrait;
+
     public function getBalance(string $rundownId, $plantId, ?string $subgroup = null, int $page = 1, int $perPage = 5): array
     {
         $idPlant = $this->resolvePlantId($plantId);
@@ -13,12 +17,24 @@ trait WipEntryQueryTrait
         $column = (strpos($dbRundownId, '00') === 0) ? 'id_feed' : 'id_rundown';
 
         // Handle "all plants" case
-        $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'd.id_plant = ?';
-        $bindings = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? [$dbRundownId] : [$idPlant, $dbRundownId];
+        $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'd.id_plant = ?';
+        $bindings = ($idPlant === '0' || $idPlant === null) ? [$dbRundownId] : [$idPlant, $dbRundownId];
 
         $offset = ($page - 1) * $perPage;
 
-        $baseSql = '
+        $materialConcat = $this->dbGroupConcat("CONCAT(c.code, ' :: ', c.description)", ' | ', true);
+        $detailConcat = $this->dbGroupConcat('CAST(b.id_balance_tail AS TEXT)', ',', true);
+        $supplierConcat = $this->dbGroupConcat(
+            "CONCAT(e.description, ' / ', b.batch_sap, ' / Qty : ', {$this->dbNumberFormat('b.init_qty', 3)}, ' MT / Qty : ', {$this->dbNumberFormat('b.qty', 3)}, ' MT')",
+            ' | ',
+            true
+        );
+        $sumFormat = $this->dbNumberFormat('SUM(b.init_qty)', 3);
+        $qtyFormat1 = $this->dbNumberFormat('SUM(qty)', 3);
+        $qtyFormat2 = $this->dbNumberFormat('SUM(init_qty)', 3);
+        $slocJoinClause = $this->dbSlocJsonClause('a.id_sloc', 'd.id_sloc');
+
+        $baseSql = <<<SQL
             SELECT aa.id_balance_head, aa.id_material, aa.id_sloc, aa.status,
                    aa.trace_no, aa.qty, aa.created_by, aa.created_at,
                    aa.material, aa.init_qty, aa.tf_number AS sloc, aa.entry_date,
@@ -34,12 +50,12 @@ trait WipEntryQueryTrait
                          ON c.code = d.code
                        LEFT JOIN (SELECT a.id_balance_head, a.id_material, a.id_sloc, a.status,
                                          a.trace_no, aa.qty, a.created_by, a.created_at, aa.init_qty,
-                                         GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
+                                         {$materialConcat} AS material,
                                          a.id_sloc AS tf_number, a.entry_date,
-                                         GROUP_CONCAT(DISTINCT b.id_balance_tail SEPARATOR ",") AS id_balance_detail,
-                                         GROUP_CONCAT(DISTINCT CONCAT(e.description, " / ", b.batch_sap, " / Qty : ", FORMAT(b.init_qty,3), " MT / Qty : ", FORMAT(b.qty,3), " MT") SEPARATOR " | ") AS supplier,
-                                         FORMAT(SUM(b.init_qty),3) AS balance_supplier,
-                                         IFNULL(f.to_trace_no, "N/A") AS traced, f.material_document,
+                                         {$detailConcat} AS id_balance_detail,
+                                         {$supplierConcat} AS supplier,
+                                         {$sumFormat} AS balance_supplier,
+                                         COALESCE(f.to_trace_no, 'N/A') AS traced, f.material_document,
                                          a.id_plant
                                     FROM m_sloc d
                                     LEFT JOIN (
@@ -47,22 +63,22 @@ trait WipEntryQueryTrait
                                                 a.created_by, a.created_at, a.entry_date, a.id_plant
                                            FROM t_balance_header a
                                           WHERE a.status = 1 AND a.id_sloc IS NOT NULL
-                                            AND (SUBSTRING(a.trace_no,1,1) = 1 OR SUBSTRING(a.trace_no,1,1) = 2 OR SUBSTRING(a.trace_no,1,1) = 7 OR
-                                                 SUBSTRING(a.trace_no,1,1) = 8 OR SUBSTRING(a.trace_no,1,1) = 9)
+                                            AND (SUBSTRING(a.trace_no::text,1,1) = '1' OR SUBSTRING(a.trace_no::text,1,1) = '2' OR SUBSTRING(a.trace_no::text,1,1) = '7' OR
+                                                 SUBSTRING(a.trace_no::text,1,1) = '8' OR SUBSTRING(a.trace_no::text,1,1) = '9')
                                          UNION ALL
                                          SELECT a.id_sloc, a.id_balance_head, a.id_material, a.status, a.trace_no,
                                                 a.created_by, a.created_at, a.entry_date, a.id_plant
                                            FROM t_balance_header a
                                           WHERE a.status = 1 AND a.id_sloc IS NULL
-                                            AND (SUBSTRING(a.trace_no,1,1) = 1 OR SUBSTRING(a.trace_no,1,1) = 2 OR SUBSTRING(a.trace_no,1,1) = 7 OR
-                                                 SUBSTRING(a.trace_no,1,1) = 8 OR SUBSTRING(a.trace_no,1,1) = 9)
-                                    ) a ON a.id_sloc = d.id_sloc OR (JSON_VALID(a.id_sloc) AND (JSON_CONTAINS(a.id_sloc, CAST(d.id_sloc AS CHAR)) OR JSON_CONTAINS(a.id_sloc, JSON_QUOTE(CAST(d.id_sloc AS CHAR)))))
-                                    LEFT JOIN (SELECT id_balance_head, FORMAT(SUM(qty),3) AS qty, FORMAT(SUM(init_qty),3) AS init_qty
+                                            AND (SUBSTRING(a.trace_no::text,1,1) = '1' OR SUBSTRING(a.trace_no::text,1,1) = '2' OR SUBSTRING(a.trace_no::text,1,1) = '7' OR
+                                                 SUBSTRING(a.trace_no::text,1,1) = '8' OR SUBSTRING(a.trace_no::text,1,1) = '9')
+                                    ) a ON {$slocJoinClause}
+                                    LEFT JOIN (SELECT id_balance_head, {$qtyFormat1} AS qty, {$qtyFormat2} AS init_qty
                                                  FROM t_balance_header
                                                 WHERE status = 1
-                                                  AND (SUBSTRING(trace_no,1,1) = 1 OR SUBSTRING(trace_no,1,1) = 2 OR SUBSTRING(trace_no,1,1) = 7 OR
-                                                       SUBSTRING(trace_no,1,1) = 8 OR SUBSTRING(trace_no,1,1) = 9)
-                                                GROUP BY trace_no) aa
+                                                  AND (SUBSTRING(trace_no::text,1,1) = '1' OR SUBSTRING(trace_no::text,1,1) = '2' OR SUBSTRING(trace_no::text,1,1) = '7' OR
+                                                       SUBSTRING(trace_no::text,1,1) = '8' OR SUBSTRING(trace_no::text,1,1) = '9')
+                                                GROUP BY trace_no, id_balance_head) aa
                                       ON a.id_balance_head = aa.id_balance_head
                                     LEFT JOIN t_balance_detail b
                                       ON a.id_balance_head = b.id_balance_head AND b.init_qty > 0.0001
@@ -70,24 +86,26 @@ trait WipEntryQueryTrait
                                       ON a.id_material = c.id_material
                                     LEFT JOIN m_supplier e
                                       ON e.id_supplier = b.id_supplier
-                                    LEFT JOIN (SELECT f.id_balance_head, g.material_document, f.to_trace_no
+                                    LEFT JOIN (SELECT f.id_balance_head,
+                                                      MAX(g.material_document) AS material_document,
+                                                      MAX(f.to_trace_no) AS to_trace_no
                                                  FROM t_trace_header f
                                                  LEFT JOIN t_material_document g
                                                    ON f.id_trace_head = g.id_trace_head
                                                 WHERE f.status = 1
-                                                  AND (SUBSTRING(f.to_trace_no,1,1) = 1 OR SUBSTRING(f.to_trace_no,1,1) = 2 OR SUBSTRING(f.to_trace_no,1,1) = 7 OR
-                                                       SUBSTRING(f.to_trace_no,1,1) = 8 OR SUBSTRING(f.to_trace_no,1,1) = 9)
+                                                  AND (SUBSTRING(f.to_trace_no::text,1,1) = '1' OR SUBSTRING(f.to_trace_no::text,1,1) = '2' OR SUBSTRING(f.to_trace_no::text,1,1) = '7' OR
+                                                       SUBSTRING(f.to_trace_no::text,1,1) = '8' OR SUBSTRING(f.to_trace_no::text,1,1) = '9')
                                                 GROUP BY f.id_balance_head) f
                                       ON f.id_balance_head = a.id_balance_head
-                                   WHERE ' . $plantFilter . '
+                                    WHERE {$plantFilter}
                                      AND 1=1
-                                   GROUP BY a.trace_no) e
+                                    GROUP BY a.trace_no, a.id_balance_head, a.id_material, a.id_sloc, a.status, aa.qty, a.created_by, a.created_at, aa.init_qty, a.entry_date, f.to_trace_no, f.material_document, a.id_plant) e
                        ON d.id_material = e.id_material
-                       LEFT JOIN m_plant p ON e.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+                       LEFT JOIN m_plant p ON e.id_plant = p.code_3
                     WHERE c.status = 1
-                      AND c.' . $column . ' = ?
+                      AND c.{$column} = ?
                     ) aa
-        ';
+SQL;
 
         $total = (int) (DB::connection('eudr_ts')->selectOne(
             'SELECT COUNT(*) AS total FROM (' . $baseSql . ') AS counted',
@@ -110,30 +128,84 @@ trait WipEntryQueryTrait
         $idPlant = $this->resolvePlantId($plantId);
 
         if (strlen($feedId) >= 6) {
-            return $this->getFeedWithMaterialSign($feedId, $feedPrefix, $mode, $idPlant);
+            $result = $this->getFeedWithMaterialSign($feedId, $feedPrefix, $mode, $idPlant);
+            if ($mode === 'LOG') {
+                return ['data' => $result, 'total' => count($result), 'page' => $page, 'per_page' => $perPage];
+            }
+            return $result;
         }
+
+        $materialRows = DB::connection('eudr_ts')->select(
+            "SELECT id_material FROM m_material WHERE id_feed = ? AND status = 1 LIMIT 1",
+            [$feedPrefix]
+        );
+        $idMaterial = $materialRows[0]->id_material ?? null;
 
         $limit = ($mode === 'LOG') ? 50 : 1;
         $offset = 0;
 
         if ($mode === 'LATEST') {
-            // Handle "all plants" case
-            $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-            $subqueryPlantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-            $bindings = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) 
-                ? [$feedPrefix, $this->movType2] 
-                : [$idPlant, $feedPrefix, $this->movType2, $idPlant];
+            $hasPlant = !($idPlant === '0' || $idPlant === null);
+            $plantFilter = $hasPlant ? 'a.id_plant = ?' : '1=1';
+            $subqueryPlantFilter = $hasPlant ? 'a.id_plant = ?' : '1=1';
+            $matFilter = $idMaterial ? 'AND a.id_material = ?' : '';
+            $subPlantFilter = $hasPlant ? 'id_plant = ?' : '1=1';
+            $subMatFilter = $idMaterial ? 'AND id_material = ?' : '';
 
-            $rows = DB::connection('eudr_ts')->select('
-                 SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no,
-                        a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_sloc AS id_sloc_tail,
-                        FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
-                        GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
-                        b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
-                        GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
-                        IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
-                        a.id_sloc AS sloc,
-                        a.id_plant, p.description AS plant_name
+            // Build bindings matching SQL `?` order:
+            // is_last_row: feedPrefix, movType2 [, idPlant] [, idMaterial]
+            // next_process: movType2, movType2 [, idPlant] [, idMaterial]
+            // h subquery: [, idPlant]
+            // Main WHERE: feedPrefix, movType2 [, idPlant] [, idMaterial]
+            $bindings = [$feedPrefix, $this->movType2];
+            if ($hasPlant) $bindings[] = $idPlant;
+            if ($idMaterial) $bindings[] = $idMaterial;
+
+            $bindings[] = $this->movType2;
+            $bindings[] = $this->movType2;
+            if ($hasPlant) $bindings[] = $idPlant;
+            if ($idMaterial) $bindings[] = $idMaterial;
+
+            if ($hasPlant) $bindings[] = $idPlant;
+
+            $bindings[] = $feedPrefix;
+            $bindings[] = $this->movType2;
+            if ($hasPlant) $bindings[] = $idPlant;
+            if ($idMaterial) $bindings[] = $idMaterial;
+
+            $matConcat = $this->dbGroupConcat("CONCAT(c.code, ' :: ', c.description)", ' | ', true);
+            $qtyFmt = $this->dbNumberFormat('ROUND(MAX(h.out_qty),3)', 3);
+            $lastFmt = $this->dbNumberFormat('MAX(a.last_qtf)', 3);
+            $currFmt = $this->dbNumberFormat('MAX(a.curr_qtf)', 3);
+            $suppConcat = $this->dbGroupConcat(
+                "CONCAT(a.from_trace_no, ' / ', e.description, ' / ', b.batch_sap, ' / Qty: ', {$this->dbNumberFormat('ROUND(b.out_qty,3)', 3)}, ' MT')",
+                ' | ',
+                true
+            );
+            $bsFmtSum = $this->dbNumberFormat('ROUND(SUM(b.out_qty),3)', 3);
+            $bsFmt2 = $this->dbNumberFormat('ROUND(MAX(h.out_qty),3)', 3);
+
+            $rows = DB::connection('eudr_ts')->select("
+                 SELECT MIN(a.id_trace_head) AS id_trace_head, MAX(a.entry_date) AS entry_date, CAST(a.to_trace_no AS TEXT) AS to_trace_no,
+                        MIN(a.id_balance_head) AS id_balance_head, MIN(a.id_material) AS id_material,
+                        {$qtyFmt} AS out_qty, MIN(a.created_by) AS created_by, MIN(a.updated_by) AS updated_by, MAX(a.created_at) AS created_at, MAX(a.updated_at) AS updated_at,
+                        {$matConcat} AS material,
+                        {$lastFmt} AS last_qtf, {$currFmt} AS curr_qtf,
+                        MAX(g.material_document) AS material_document,
+                        {$suppConcat} AS supplier,
+                        CASE WHEN ABS(ROUND(CAST(SUM(b.out_qty) AS numeric),3) - ROUND(CAST(MAX(h.out_qty) AS numeric),3)) > 0.005 THEN {$bsFmtSum} ELSE {$bsFmt2} END AS balance_supplier,
+                        MIN(CAST(a.id_sloc AS TEXT)) AS sloc,
+                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
+                                                    WHERE SUBSTRING(to_trace_no, 8, 3) = ?
+                                                      AND SUBSTRING(to_trace_no, 1, 1) = ?
+                                                      AND status = 1 AND {$subPlantFilter} {$subMatFilter}
+                                                    ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
+                        CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
+                                                    WHERE SUBSTRING(from_trace_no, 1, 1) = ?
+                                                      AND SUBSTRING(from_trace_no, 10, 1) = ?
+                                                      AND status = 1 AND {$subPlantFilter} {$subMatFilter}
+                                                    ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
+                        MIN(a.id_plant) AS id_plant, MAX(p.description) AS plant_name
                    FROM t_trace_header a
                    LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
                    LEFT JOIN m_material c ON a.id_material = c.id_material
@@ -141,58 +213,73 @@ trait WipEntryQueryTrait
                    LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                    LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                 FROM t_trace_header a
-                               WHERE a.status = 1 AND ' . $subqueryPlantFilter . '
+                               WHERE a.status = 1 AND {$subqueryPlantFilter}
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                   
-                   LEFT JOIN (SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
-                                FROM t_trace_header h
-                                JOIN t_trace_detail d ON h.id_trace_head = d.id_trace_head
-                               WHERE d.out_qty > 0 AND h.status = 1
-                               GROUP BY h.to_trace_no) bs ON bs.to_trace_no = a.to_trace_no
-                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+
+                   LEFT JOIN m_plant p ON a.id_plant = p.code_3
                   WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                     AND a.out_qty > 0 AND b.out_qty > 0
                     AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                    AND a.status = 1 AND ' . $plantFilter . '
+                    AND a.status = 1 AND {$plantFilter} {$matFilter}
                   GROUP BY a.to_trace_no
-                  ORDER BY a.to_trace_no DESC
-                  LIMIT 5
-            ', $bindings);
+                  ORDER BY MAX(a.id_trace_head) DESC
+                    LIMIT {$limit} OFFSET {$offset}
+            ", $bindings);
         } else {
-            // Handle "all plants" case
-            $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-            $subqueryPlantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-            
-            // Build bindings based on plant filter
-            if ($idPlant === '0' || $idPlant === 0 || $idPlant === null) {
-                $bindings = [$feedPrefix, $this->movType2, 
-                    $this->movType2, substr($feedPrefix, 1, 1),
-                    $feedPrefix, $this->movType2];
-            } else {
-                $bindings = [$feedPrefix, $this->movType2, $idPlant,
-                    $this->movType2, substr($feedPrefix, 1, 1), $idPlant,
-                    $idPlant, $feedPrefix, $this->movType2, $idPlant];
-            }
+            $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+            $subqueryPlantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+            $matFilter = $idMaterial ? 'AND a.id_material = ?' : '';
 
-            $rows = DB::connection('eudr_ts')->select('
-                 SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no,
+            $hasPlant = !($idPlant === '0' || $idPlant === null);
+            $bindings = [];
+            $bindings[] = $feedPrefix;
+            $bindings[] = $this->movType2;
+            if ($hasPlant) $bindings[] = $idPlant;
+            if ($idMaterial) $bindings[] = $idMaterial;
+            
+            $bindings[] = $this->movType2;
+            $bindings[] = substr($feedPrefix, 1, 1);
+            if ($hasPlant) $bindings[] = $idPlant;
+            if ($idMaterial) $bindings[] = $idMaterial;
+
+            if ($hasPlant) $bindings[] = $idPlant;
+
+            $bindings[] = $feedPrefix;
+            $bindings[] = $this->movType2;
+            if ($hasPlant) $bindings[] = $idPlant;
+            if ($idMaterial) $bindings[] = $idMaterial;
+
+            $matConcat = $this->dbGroupConcat("CONCAT(c.code, ' :: ', c.description)", ' | ', true);
+            $qtyFmt = $this->dbNumberFormat('ROUND(MAX(h.out_qty),3)', 3);
+            $lastFmt = $this->dbNumberFormat('MAX(a.last_qtf)', 3);
+            $currFmt = $this->dbNumberFormat('MAX(a.curr_qtf)', 3);
+            $suppConcat = $this->dbGroupConcat(
+                "CONCAT(a.from_trace_no, ' / ', e.description, ' / ', b.batch_sap, ' / Qty: ', {$this->dbNumberFormat('ROUND(b.out_qty,3)', 3)}, ' MT')",
+                ' | ',
+                true
+            );
+            $bsFmtSum = $this->dbNumberFormat('ROUND(SUM(b.out_qty),3)', 3);
+            $bsFmt2 = $this->dbNumberFormat('ROUND(MAX(h.out_qty),3)', 3);
+
+            $rows = DB::connection('eudr_ts')->select("
+                 SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS TEXT) AS to_trace_no,
                         a.id_balance_head, a.id_material,
-                        FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
-                        GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
-                        FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
-                        g.material_document, b.batch_sap,
-                        GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
-                        IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
+                        {$qtyFmt} AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
+                        {$matConcat} AS material,
+                        {$lastFmt} AS last_qtf, {$currFmt} AS curr_qtf,
+                        g.material_document,
+                        {$suppConcat} AS supplier,
+                        CASE WHEN ABS(ROUND(CAST(SUM(b.out_qty) AS numeric),3) - ROUND(CAST(MAX(h.out_qty) AS numeric),3)) > 0.005 THEN {$bsFmtSum} ELSE {$bsFmt2} END AS balance_supplier,
                         a.id_sloc AS sloc,
                         CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
                                                     WHERE SUBSTRING(to_trace_no, 8, 3) = ?
                                                       AND SUBSTRING(to_trace_no, 1, 1) = ?
-                                                      AND status = 1 AND ' . $plantFilter . '
+                                                      AND status = 1 AND {$plantFilter} {$matFilter}
                                                     ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                         CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                     WHERE SUBSTRING(from_trace_no, 1, 1) = ?
                                                       AND SUBSTRING(from_trace_no, 10, 1) = ?
-                                                      AND status = 1 AND ' . $plantFilter . '
+                                                      AND status = 1 AND {$plantFilter} {$matFilter}
                                                     ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
                         a.id_plant, p.description AS plant_name
                    FROM t_trace_header a
@@ -202,18 +289,18 @@ trait WipEntryQueryTrait
                    LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                    LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                 FROM t_trace_header a
-                               WHERE a.status = 1 AND ' . $subqueryPlantFilter . '
+                               WHERE a.status = 1 AND {$subqueryPlantFilter}
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                   
-                   LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+
+                   LEFT JOIN m_plant p ON a.id_plant = p.code_3
                   WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                     AND a.out_qty > 0 AND b.out_qty > 0
                     AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                    AND a.status = 1 AND ' . $plantFilter . '
-                  GROUP BY a.to_trace_no
+                    AND a.status = 1 AND {$plantFilter} {$matFilter}
+                  GROUP BY a.to_trace_no, a.id_trace_head, a.id_balance_head, a.id_material, g.material_document, a.created_by, a.updated_by, a.created_at, a.updated_at, a.last_qtf, a.curr_qtf, a.id_sloc, a.id_plant, p.description, h.out_qty, a.entry_date
                   ORDER BY a.id_trace_head DESC
-                    LIMIT ' . $limit . ' OFFSET ' . $offset . '
-            ', $bindings);
+                    LIMIT {$limit} OFFSET {$offset}
+            ", $bindings);
         }
 
         $result = $this->mapSlocDescriptions($rows);
@@ -227,30 +314,37 @@ trait WipEntryQueryTrait
     protected function mapSlocDescriptions(array $rows, string $slocField = 'sloc'): array
     {
         if (empty($rows)) return $rows;
-        
+
         $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
             ->table('m_sloc')
-            ->select('id_sloc', 'description', 'id_tank')
+            ->select('id_sloc', 'description', 'tf_number', 'code_3', 'id_plant')
             ->get()
             ->keyBy('id_sloc');
 
+        $plants = \Illuminate\Support\Facades\DB::connection('mysql')
+            ->table('m_plant')
+            ->select('code_3', 'code_2')
+            ->get()
+            ->keyBy('code_3');
+
         foreach ($rows as $row) {
             $row->{$slocField} = '';
-            
-            // For getBalance where we use tf_number
+
             $sourceField = isset($row->tf_number) ? 'tf_number' : 'id_sloc';
             $slocVal = $row->{$sourceField} ?? null;
-            
+
             if ($slocVal !== null && $slocVal !== '') {
                 $decoded = json_decode((string)$slocVal, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $firstDesc = '';
                     $tanks = [];
                     foreach ($decoded as $id) {
-                        if (isset($slocs[$id])) {
-                            if (!$firstDesc) $firstDesc = $slocs[$id]->description;
-                            if ($slocs[$id]->id_tank) $tanks[] = $slocs[$id]->id_tank;
+                        if (!isset($slocs[$id])) continue;
+                        $s = $slocs[$id];
+                        if (!$firstDesc) {
+                            $firstDesc = $this->buildSlocLabel($s, $plants);
                         }
+                        if ($s->tf_number) $tanks[] = $s->tf_number;
                     }
                     if (!empty($tanks)) {
                         sort($tanks);
@@ -262,17 +356,24 @@ trait WipEntryQueryTrait
                 } else {
                     if (isset($slocs[$slocVal])) {
                         $s = $slocs[$slocVal];
-                        $row->{$slocField} = $s->id_tank ? ($s->description . ' | ' . $s->id_tank) : $s->description;
+                        $label = $this->buildSlocLabel($s, $plants);
+                        $row->{$slocField} = $s->tf_number ? ($label . ' | ' . $s->tf_number) : $label;
                     }
                 }
             }
-            
-            // Cleanup tf_number if we hijacked it
-            if ($slocField === 'tf_number') {
-                // it is already stored in tf_number
-            }
         }
         return $rows;
+    }
+
+    private function buildSlocLabel(object $sloc, \Illuminate\Support\Collection $plants): string
+    {
+        $desc = $sloc->description ?? '';
+        if (!empty($desc)) return $desc;
+
+        $code3    = strtoupper($sloc->code_3 ?? '');
+        $label    = ($code3 === 'PRD') ? 'PRODUCT' : $code3;
+        $plantAbbr = $plants[$sloc->id_plant ?? '']->code_2 ?? '';
+        return trim($label . ($plantAbbr ? ' ' . $plantAbbr : ''));
     }
 
     protected function getFeedWithMaterialSign(string $feedId, string $feedPrefix, string $mode, $idPlant): array
@@ -306,17 +407,32 @@ trait WipEntryQueryTrait
             : 'a.id_material = ?';
         $matlParams = $isDual ? [$idMaterial1, $idMaterial2] : [$idMaterial];
 
+        $matConcat = $this->dbGroupConcat("CONCAT(c.code, ' :: ', c.description)", ' | ', true);
+        $qtyFmt = $this->dbNumberFormat('ROUND(MAX(h.out_qty),3)', 3);
+        $lastFmt = $this->dbNumberFormat('MAX(a.last_qtf)', 3);
+        $currFmt = $this->dbNumberFormat('MAX(a.curr_qtf)', 3);
+        $suppConcat = $this->dbGroupConcat(
+            "CONCAT(a.from_trace_no, ' / ', e.description, ' / ', b.batch_sap, ' / Qty: ', {$this->dbNumberFormat('ROUND(b.out_qty,3)', 3)}, ' MT')",
+            ' | ',
+            true
+        );
+        $bsFmt1 = $this->dbNumberFormat('ROUND(MAX(bs.supplier_qty),3)', 3);
+        $bsFmt2 = $this->dbNumberFormat('ROUND(MAX(h.out_qty),3)', 3);
+
         if ($mode === 'LATEST') {
-            $sql = '
-                SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no,
-                       a.id_balance_head, a.id_material, g.material_document, a.id_sloc, a.id_sloc AS id_sloc_tail,
-                       FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
-                       GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
-                       b.batch_sap, FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
-                       GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
-                       IF(ABS(ROUND(bs.supplier_qty,3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(bs.supplier_qty,3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
-                       a.id_sloc AS sloc,
-                       a.id_plant, p.description AS plant_name
+            $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+            $subPlantFilter = str_replace('a.', '', $plantFilter);
+            $subMatlWhere = str_replace('a.', '', $matlWhere);
+            $sql = "
+                SELECT MIN(a.id_trace_head) AS id_trace_head, MAX(a.entry_date) AS entry_date, CAST(a.to_trace_no AS TEXT) AS to_trace_no,
+                       MIN(a.id_balance_head) AS id_balance_head, MIN(a.id_material) AS id_material, MAX(g.material_document) AS material_document, MIN(CAST(a.id_sloc AS TEXT)) AS id_sloc, MIN(CAST(a.id_sloc AS TEXT)) AS id_sloc_tail,
+                       {$qtyFmt} AS out_qty, MIN(a.created_by) AS created_by, MIN(a.updated_by) AS updated_by, MAX(a.created_at) AS created_at, MAX(a.updated_at) AS updated_at,
+                       {$matConcat} AS material,
+                       {$lastFmt} AS last_qtf, {$currFmt} AS curr_qtf,
+                       {$suppConcat} AS supplier,
+                       CASE WHEN ABS(ROUND(CAST(MAX(bs.supplier_qty) AS numeric),3) - ROUND(CAST(MAX(h.out_qty) AS numeric),3)) > 0.005 THEN {$bsFmt1} ELSE {$bsFmt2} END AS balance_supplier,
+                       MIN(CAST(a.id_sloc AS TEXT)) AS sloc,
+                       MIN(a.id_plant) AS id_plant, MAX(p.description) AS plant_name
                   FROM t_trace_header a
                   LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
                   LEFT JOIN m_material c ON a.id_material = c.id_material
@@ -324,42 +440,45 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                FROM t_trace_header a WHERE a.status = 1 AND a.id_plant = ? GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  
+
                   LEFT JOIN (SELECT h.to_trace_no, SUM(d.out_qty) AS supplier_qty
                                FROM t_trace_header h JOIN t_trace_detail d ON h.id_trace_head = d.id_trace_head
                               WHERE d.out_qty > 0 AND h.status = 1 GROUP BY h.to_trace_no) bs ON bs.to_trace_no = a.to_trace_no
-                  LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+                  LEFT JOIN m_plant p ON a.id_plant = p.code_3
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.out_qty > 0 AND b.out_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                   AND ' . $matlWhere . '
+                   AND {$matlWhere}
                    AND a.status = 1 AND a.id_plant = ?
                  GROUP BY a.to_trace_no
                  ORDER BY a.to_trace_no DESC
                  LIMIT 1
-            ';
+            ";
             $params = array_merge([$idPlant, $feedId, $this->movType2], $matlParams, [$idPlant]);
         } else {
-            $sql = '
-                SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no,
+            $bsFmtSum = $this->dbNumberFormat('ROUND(SUM(b.out_qty),3)', 3);
+
+            $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+            $sql = "
+                SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS TEXT) AS to_trace_no,
                        a.id_balance_head, a.id_material,
-                       FORMAT(ROUND(h.out_qty,3),3) AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
-                       GROUP_CONCAT(DISTINCT CONCAT(c.code, " :: ", c.description) SEPARATOR " | ") AS material,
-                       FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf,
-                       g.material_document, b.batch_sap,
-                       GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(ROUND(b.out_qty,3),3), " MT") SEPARATOR " | ") AS supplier,
-                       IF(ABS(ROUND(SUM(b.out_qty),3) - ROUND(h.out_qty,3)) > 0.005, FORMAT(ROUND(SUM(b.out_qty),3),3), FORMAT(ROUND(h.out_qty,3),3)) AS balance_supplier,
+                       {$qtyFmt} AS out_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
+                       {$matConcat} AS material,
+                       {$lastFmt} AS last_qtf, {$currFmt} AS curr_qtf,
+                       g.material_document,
+                       {$suppConcat} AS supplier,
+                       CASE WHEN ABS(ROUND(CAST(SUM(b.out_qty) AS numeric),3) - ROUND(CAST(MAX(h.out_qty) AS numeric),3)) > 0.005 THEN {$bsFmtSum} ELSE {$bsFmt2} END AS balance_supplier,
                        a.id_sloc AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
                                                    WHERE SUBSTRING(to_trace_no, 8, 3) = ?
                                                      AND SUBSTRING(to_trace_no, 1, 1) = ?
-                                                     AND ' . $matlWhere . '
-                                                     AND status = 1 AND $plantFilter
+                                                     AND {$subMatlWhere}
+                                                     AND status = 1 AND {$subPlantFilter}
                                                    ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                        CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                    WHERE from_trace_no = a.to_trace_no
-                                                     AND ' . $matlWhere . '
-                                                     AND status = 1 AND $plantFilter
+                                                     AND {$subMatlWhere}
+                                                     AND status = 1 AND {$subPlantFilter}
                                                    ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
                        a.id_plant, p.description AS plant_name
                   FROM t_trace_header a
@@ -369,16 +488,16 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.out_qty) AS out_qty
                                FROM t_trace_header a WHERE a.status = 1 AND a.id_plant = ? GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  
-                  LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+
+                  LEFT JOIN m_plant p ON a.id_plant = p.code_3
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.out_qty > 0 AND b.out_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                   AND ' . $matlWhere . '
+                   AND {$matlWhere}
                    AND a.status = 1 AND a.id_plant = ?
-                 GROUP BY a.to_trace_no
+                 GROUP BY a.to_trace_no, a.id_trace_head, a.id_balance_head, a.id_material, g.material_document, a.created_by, a.updated_by, a.created_at, a.updated_at, a.last_qtf, a.curr_qtf, a.id_sloc, a.id_plant, p.description, h.out_qty, a.entry_date
                  ORDER BY a.id_trace_head DESC
-            ';
+            ";
             $params = array_merge(
                 [$feedId, $this->movType2], $matlParams, [$idPlant],
                 $matlParams, [$idPlant],
@@ -387,16 +506,16 @@ trait WipEntryQueryTrait
         }
 
         // Handle "all plants" case
-        $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-        $subqueryPlantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-        
+        $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+        $subqueryPlantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+
         // Replace plant filters in SQL
         $sql = str_replace('AND a.id_plant = ?', 'AND ' . $plantFilter, $sql);
         $sql = str_replace('WHERE a.status = 1 AND a.id_plant = ?', 'WHERE a.status = 1 AND ' . $subqueryPlantFilter, $sql);
         $sql = str_replace('AND status = 1 AND $plantFilter', 'AND status = 1 AND ' . $plantFilter, $sql);
-        
+
         // Filter bindings to remove plantId when showing all plants
-        if ($idPlant === '0' || $idPlant === 0 || $idPlant === null) {
+        if ($idPlant === '0' || $idPlant === null) {
             $filteredParams = [];
             foreach ($params as $param) {
                 if ($param !== $idPlant && $param !== '0' && $param !== 0) {
@@ -405,7 +524,7 @@ trait WipEntryQueryTrait
             }
             $params = $filteredParams;
         }
-        
+
         return $this->mapSlocDescriptions(DB::connection('eudr_ts')->select($sql, $params));
     }
 
@@ -419,21 +538,32 @@ trait WipEntryQueryTrait
 
         if ($mode === 'LATEST') {
             // Handle "all plants" case
-            $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-            $bindings = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) 
-                ? [$rundownId, $this->movType1] 
+            $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+            $subPlantFilter = str_replace('a.', '', $plantFilter);
+            $bindings = ($idPlant === '0' || $idPlant === null)
+                ? [$rundownId, $this->movType1]
                 : [$rundownId, $this->movType1, $idPlant];
 
-            $rows = DB::connection('eudr_ts')->select('
-                SELECT a.id_trace_head, a.entry_date, a.to_trace_no AS rundown_trace_no,
-                       a.id_balance_head, a.id_material, a.id_sloc, a.id_sloc AS id_sloc_tail,
-                       FORMAT(ROUND(h.in_qty,3),3) AS in_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
-                       CONCAT(c.code, " :: ", c.description) AS material, g.material_document,
-                       FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf, b.batch_sap,
-                       GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(b.in_qty,3), " MT") SEPARATOR " | ") AS supplier,
-                       FORMAT(ROUND(bs.supplier_qty,3),3) AS balance_supplier,
-                       a.id_sloc AS sloc,
-                       a.id_plant, p.description AS plant_name
+            $qtyFmt = $this->dbNumberFormat('ROUND(MAX(h.in_qty),3)', 3);
+            $lastFmt = $this->dbNumberFormat('MAX(a.last_qtf)', 3);
+            $currFmt = $this->dbNumberFormat('MAX(a.curr_qtf)', 3);
+            $suppConcat = $this->dbGroupConcat(
+                "CONCAT(a.from_trace_no, ' / ', e.description, ' / ', b.batch_sap, ' / Qty: ', {$this->dbNumberFormat('b.in_qty', 3)}, ' MT')",
+                ' | ',
+                true
+            );
+            $balFmt = $this->dbNumberFormat('ROUND(MAX(bs.supplier_qty),3)', 3);
+
+            $rows = DB::connection('eudr_ts')->select("
+                SELECT MIN(a.id_trace_head) AS id_trace_head, MAX(a.entry_date) AS entry_date, a.to_trace_no AS rundown_trace_no,
+                       MIN(a.id_balance_head) AS id_balance_head, MIN(a.id_material) AS id_material, MIN(CAST(a.id_sloc AS TEXT)) AS id_sloc, MIN(CAST(a.id_sloc AS TEXT)) AS id_sloc_tail,
+                       {$qtyFmt} AS in_qty, MIN(a.created_by) AS created_by, MIN(a.updated_by) AS updated_by, MAX(a.created_at) AS created_at, MAX(a.updated_at) AS updated_at,
+                       MAX(CONCAT(c.code, ' :: ', c.description)) AS material, MAX(g.material_document) AS material_document,
+                       {$lastFmt} AS last_qtf, {$currFmt} AS curr_qtf,
+                       {$suppConcat} AS supplier,
+                       {$balFmt} AS balance_supplier,
+                       MIN(CAST(a.id_sloc AS TEXT)) AS sloc,
+                       MIN(a.id_plant) AS id_plant, MAX(p.description) AS plant_name
                   FROM t_trace_header a
                   LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
                   LEFT JOIN m_material c ON a.id_material = c.id_material
@@ -441,44 +571,55 @@ trait WipEntryQueryTrait
                   LEFT JOIN t_material_document g ON a.id_trace_head = g.id_trace_head
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.in_qty) AS in_qty
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
-                  
+
                   LEFT JOIN (SELECT id_trace_head, SUM(in_qty) AS supplier_qty
                                FROM t_trace_detail WHERE in_qty > 0 GROUP BY id_trace_head) bs ON bs.id_trace_head = a.id_trace_head
-                  LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+                  LEFT JOIN m_plant p ON a.id_plant = p.code_3
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.in_qty > 0 AND b.in_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                   AND a.status = 1 AND ' . $plantFilter . '
+                   AND a.status = 1 AND {$subPlantFilter}
                  GROUP BY a.to_trace_no
                  ORDER BY a.to_trace_no DESC
                  LIMIT 1
-            ', $bindings);
+            ", $bindings);
         } else {
             // Handle "all plants" case
-            $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-            $bindings = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) 
+            $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
+            $subPlantFilter = str_replace('a.', '', $plantFilter);
+            $bindings = ($idPlant === '0' || $idPlant === null)
                 ? [$this->movType1, $this->movType2, $rundownId, $rundownId, $this->movType1]
                 : [$this->movType1, $this->movType2, $rundownId, $idPlant, $idPlant, $rundownId, $this->movType1, $idPlant];
 
-            $rows = DB::connection('eudr_ts')->select('
-                SELECT a.id_trace_head, a.entry_date, CAST(a.to_trace_no AS CHAR) AS to_trace_no,
-                       a.id_balance_head, a.id_material,
-                       FORMAT(ROUND(h.in_qty,3),3) AS in_qty, a.created_by, a.updated_by, a.created_at, a.updated_at,
-                       CONCAT(c.code, " :: ", c.description) AS material, g.material_document,
-                       FORMAT(a.last_qtf,3) AS last_qtf, FORMAT(a.curr_qtf,3) AS curr_qtf, b.batch_sap,
-                       GROUP_CONCAT(DISTINCT CONCAT(a.from_trace_no, " / ", e.description, " / ", b.batch_sap, " / Qty: ", FORMAT(b.in_qty,3), " MT") SEPARATOR " | ") AS supplier,
-                       FORMAT(ROUND(SUM(b.in_qty),3),3) AS balance_supplier,
-                       a.id_sloc AS sloc,
+            $qtyFmt = $this->dbNumberFormat('ROUND(h.in_qty,3)', 3);
+            $lastFmt = $this->dbNumberFormat('MAX(a.last_qtf)', 3);
+            $currFmt = $this->dbNumberFormat('MAX(a.curr_qtf)', 3);
+            $suppConcat = $this->dbGroupConcat(
+                "CONCAT(a.from_trace_no, ' / ', e.description, ' / ', b.batch_sap, ' / Qty: ', {$this->dbNumberFormat('b.in_qty', 3)}, ' MT')",
+                ' | ',
+                true
+            );
+            $balFmt = $this->dbNumberFormat('ROUND(SUM(b.in_qty),3)', 3);
+
+            $rows = DB::connection('eudr_ts')->select("
+                SELECT MIN(a.id_trace_head) AS id_trace_head, MAX(a.entry_date) AS entry_date, CAST(a.to_trace_no AS TEXT) AS to_trace_no,
+                       MIN(a.id_balance_head) AS id_balance_head, MIN(a.id_material) AS id_material,
+                       {$qtyFmt} AS in_qty, MIN(a.created_by) AS created_by, MIN(a.updated_by) AS updated_by, MAX(a.created_at) AS created_at, MAX(a.updated_at) AS updated_at,
+                       MAX(CONCAT(c.code, ' :: ', c.description)) AS material, MAX(g.material_document) AS material_document,
+                       {$lastFmt} AS last_qtf, {$currFmt} AS curr_qtf,
+                       {$suppConcat} AS supplier,
+                       {$balFmt} AS balance_supplier,
+                       MIN(CAST(a.id_sloc AS TEXT)) AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
                                                    WHERE (SUBSTRING(to_trace_no, 1, 1) = ? OR SUBSTRING(to_trace_no, 1, 1) = ?)
                                                      AND SUBSTRING(to_trace_no, 8, 3) = ?
-                                                     AND status = 1 AND ' . $plantFilter . '
+                                                     AND status = 1 AND {$subPlantFilter}
                                                    ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                        CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                    WHERE from_trace_no = a.to_trace_no
-                                                     AND status = 1 AND ' . $plantFilter . '
+                                                     AND status = 1 AND {$subPlantFilter}
                                                    ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
-                       a.id_plant, p.description AS plant_name
+                       MIN(a.id_plant) AS id_plant, MAX(p.description) AS plant_name
                   FROM t_trace_header a
                   LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
                   LEFT JOIN m_material c ON a.id_material = c.id_material
@@ -487,15 +628,15 @@ trait WipEntryQueryTrait
                   LEFT JOIN (SELECT a.to_trace_no, SUM(a.in_qty) AS in_qty
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
 
-                  LEFT JOIN m_plant p ON a.id_plant = p.code_3 COLLATE utf8mb4_unicode_ci
+                  LEFT JOIN m_plant p ON a.id_plant = p.code_3
                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
                    AND a.in_qty > 0 AND b.in_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                   AND a.status = 1 AND ' . $plantFilter . '
+                   AND a.status = 1 AND {$plantFilter}
                  GROUP BY a.to_trace_no
                  ORDER BY a.to_trace_no DESC
-                  LIMIT ' . $limit . ' OFFSET ' . $offset . '
-            ', $bindings);
+                  LIMIT {$limit} OFFSET {$offset}
+            ", $bindings);
         }
 
         $result = $this->mapSlocDescriptions($rows);
@@ -539,13 +680,14 @@ trait WipEntryQueryTrait
         $nextDate = date('Y-m-d', strtotime($date . ' +1 day'));
 
         try {
+            $tsCol = $this->dbDateFormat('timestamp', '%Y-%m-%d');
             return DB::connection('dwsql')->select("
-                SELECT FORMAT(`value`,3) AS `value`,
-                       CONCAT(?, ' 07:00') AS `timestamp`
-                  FROM `{$tagNumber}`
-                 WHERE DATE_FORMAT(`timestamp`, '%Y-%m-%d') = ?
+                SELECT FORMAT(value,3) AS value,
+                       CONCAT(?, ' 07:00') AS timestamp
+                  FROM {$tagNumber}
+                 WHERE {$tsCol} = ?
                  UNION ALL
-                SELECT 0 AS `value`, CONCAT(?, ' 07:00') AS `timestamp`
+                SELECT 0 AS value, CONCAT(?, ' 07:00') AS timestamp
                  LIMIT 1
             ", [$nextDate, $nextDate, $nextDate]);
         } catch (\Exception $e) {
@@ -559,9 +701,9 @@ trait WipEntryQueryTrait
         $idPlant = $this->resolvePlantId($plantId);
 
         // Handle "all plants" case
-        $plantFilter = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) ? '1=1' : 'id_plant = ?';
-        $bindings = ($idPlant === '0' || $idPlant === 0 || $idPlant === null) 
-            ? [] 
+        $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'id_plant = ?';
+        $bindings = ($idPlant === '0' || $idPlant === null)
+            ? []
             : [$idPlant, $idPlant, $idPlant, $idPlant, $idPlant, $idPlant, $idPlant];
 
         $sections = DB::connection('eudr_ts')->select("
@@ -572,32 +714,32 @@ trait WipEntryQueryTrait
                 (SELECT to_trace_no FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '3'
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND $plantFilter
+                   AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_trace,
                 (SELECT entry_date FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '3'
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND $plantFilter
+                   AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_date,
                 (SELECT curr_qtf FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '3'
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND $plantFilter
+                   AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_qty,
                 (SELECT to_trace_no FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '2'
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND $plantFilter
+                   AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_trace,
                 (SELECT entry_date FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '2'
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND $plantFilter
+                   AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_date,
                 (SELECT curr_qtf FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '2'
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND $plantFilter
+                   AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_qty
             FROM m_material m
             WHERE m.status = 1
@@ -655,13 +797,17 @@ trait WipEntryQueryTrait
         return $sectionMap[$key] ?? null;
     }
 
-    protected function mapFrontendSectionToDbFeedId(string $sectionId): string
+    protected function mapFrontendSectionToDbFeedId(string $sectionId, ?string $subgroup = null): string
     {
+        // Section 105 (Hidrogenasi) has two chains: short (ME28â†’CFA28) and long (ME80â†’CFA80).
+        // Caller passes subgroup 'short' or 'long' to disambiguate.
+        if ($sectionId === '105') {
+            return $subgroup === 'short' ? '006-01' : '006-02';
+        }
         $map = [
             '101' => '001',
             '103' => '002',
             '104' => '003',
-            '105' => '006-02',
             '110' => '004',
             '111' => '007',
             '112' => '009-01',
@@ -688,6 +834,7 @@ trait WipEntryQueryTrait
                 'me80' => '063',
             ],
             '105' => [
+                'cfa28' => '016',
                 'cfa80' => '026',
             ],
             '106' => [

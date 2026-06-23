@@ -22,7 +22,7 @@
           </VCol>
         </VRow>
       </VCol>
-      <VCol cols="auto">
+      <VCol cols="auto" v-if="plantSelectionStore.selectedPlantId && String(plantSelectionStore.selectedPlantId) !== '0'">
         <VBtn
           color="primary"
           prepend-icon="ri-add-line"
@@ -88,7 +88,7 @@
                 <td class="text-caption text-medium-emphasis text-center">{{ (page - 1) * perPage + index + 1 }}</td>
                 <td class="text-center">{{ row.entry_date }}</td>
                 <td class="text-center font-weight-medium font-mono text-caption">{{ row.fromto_trace_no }}</td>
-                <td class="text-center"><VChip size="x-small" color="primary" variant="tonal">{{ row.plant_name || '-' }}</VChip></td>
+                <td class="text-center font-weight-medium text-caption">{{ row.plant_name || '-' }}</td>
                 <td class="text-center font-weight-medium">{{ row.so_no || '-' }}</td>
                 <td class="text-center">
                   <a href="#" @click.prevent="openBatchDetailModal(row.batch_no)" class="text-medium-emphasis text-decoration-underline text-caption">
@@ -131,6 +131,32 @@
             </tbody>
           </VTable>
         </div>
+
+        <div v-if="store.pagination.total > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+          <div class="d-flex align-center gap-3">
+            <span class="text-caption text-medium-emphasis">
+              Showing {{ (page - 1) * perPage + 1 }} - {{ Math.min(page * perPage, store.pagination.total) }} of {{ store.pagination.total }} records
+            </span>
+            <VSelect
+              v-model="perPage"
+              :items="[5, 10, 15, 20]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 80px; max-width: 100px;"
+            />
+          </div>
+          <VPagination
+            v-if="lastPage > 1"
+            v-model="page"
+            :length="lastPage"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="changePage"
+          />
+        </div>
       </VCardText>
     </VCard>
 
@@ -143,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useShipmentEntryStore } from '../stores/useShipmentEntryStore'
 import { useConfirmStore } from '@/stores/confirm.js'
@@ -212,13 +238,18 @@ const sortedList = computed(() => {
   })
 })
 
+const lastPage = computed(() => store.pagination.lastPage)
+
 async function fetchData() {
-  await store.fetchEntries()
+  await store.fetchEntries({ page: page.value, per_page: perPage.value })
 }
 
-onMounted(() => {
-  fetchData()
-})
+async function changePage(p) {
+  if (p < 1 || p > lastPage.value) return
+  page.value = p
+  store.setPage(p)
+  await fetchData()
+}
 
 function openAddModal() {
   showAddModal.value = true
@@ -250,6 +281,16 @@ async function onCancel(row) {
     await fetchData()
   }
 }
+
+watch(() => plantSelectionStore.selectedPlantId, () => {
+  page.value = 1
+  fetchData()
+}, { immediate: true })
+
+watch(perPage, () => {
+  page.value = 1
+  fetchData()
+})
 </script>
 
 <style scoped>

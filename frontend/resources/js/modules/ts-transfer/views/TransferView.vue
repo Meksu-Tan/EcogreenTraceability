@@ -193,7 +193,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTsTransferStore } from '@/modules/ts-transfer/stores'
 import { useToastStore } from '@/stores/toast.js'
@@ -229,7 +229,7 @@ function formatDate(dateString) {
 }
 
 const page = ref(1)
-const perPage = ref(5)
+const perPage = ref(10)
 
 const sortKey = ref(null)
 const sortDir = ref(null)
@@ -286,6 +286,7 @@ async function fetchData() {
 
 async function changePage(p) {
   if (p < 1 || p > lastPage.value) return
+  page.value = p
   transferStore.setPage(p)
   await fetchData()
 }
@@ -334,6 +335,10 @@ watch(() => plantSelectionStore.selectedPlantId, () => {
 
 watch(perPage, () => {
   page.value = 1
+  fetchData()
+})
+
+onMounted(() => {
   fetchData()
 })
 </script>
