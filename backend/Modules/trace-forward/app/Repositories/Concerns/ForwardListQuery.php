@@ -51,8 +51,6 @@ final class ForwardListQuery
             "DISTINCT CONCAT(s.code, ' :: ', s.description, ' / ', bd.batch_sap, ' / Qty: ', {$bdInitQtyFmt}, ' MT')",
             ' | '
         );
-        $tfNumberConcat = $this->dbGroupConcat('DISTINCT h.tf_number', ', ', true, 'h.tf_number ASC');
-
         $mdSubquery = 'SELECT DISTINCT ON (f.id_balance_head) f.id_balance_head, g.material_document, g.po_so FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 ORDER BY f.id_balance_head, f.id_trace_head DESC';
 
         $sql = "
@@ -64,7 +62,6 @@ final class ForwardListQuery
                    {$qtyFmt} AS qty,
                    {$supplierConcat} AS supplier,
                    MAX(bd.batch_sap) AS batch_sap,
-                   {$tfNumberConcat} AS tf_number,
                    CASE WHEN SUM(bd.out_qty) = 0 THEN 'N/A' ELSE 'TRACED' END AS traced,
                    md.material_document,
                    md.po_so,
@@ -75,7 +72,6 @@ final class ForwardListQuery
               LEFT JOIN m_sloc t ON {$this->dbSlocColumnClause('bh.id_sloc', 't.id_sloc')}
               LEFT JOIN t_balance_detail bd ON bh.id_balance_head = bd.id_balance_head AND bd.status = 1
               LEFT JOIN m_supplier s ON bd.id_supplier = s.id_supplier
-              LEFT JOIN m_sloc h ON bh.id_sloc_tail @> jsonb_build_array(h.id_sloc)
               LEFT JOIN ({$mdSubquery}) md
                 ON md.id_balance_head = bh.id_balance_head
              WHERE " . implode(' AND ', $where) . "
