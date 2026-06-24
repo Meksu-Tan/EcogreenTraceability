@@ -23,25 +23,38 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array
     {
-        $alias = $adjType === 'wh' ? 'a' : 'g';
-        $plantFilter = $this->buildTablePlantFilter($alias, $plantId, $userId);
+        $isWh        = ($adjType === 'wh');
+        $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
+        $substrFilter = $isWh ? '6' : '9';
 
-        $whxColumns = $adjType === 'wh'
-            ? ", wh.batch_no, wh.po_no, COALESCE(mwh.description, g.description) AS sloc_wh"
-            : ", NULL AS batch_no, NULL AS po_no";
+        $materialJoin = $isWh
+            ? "LEFT JOIN m_material_pck b ON a.id_material = b.id_materialpck"
+            : "LEFT JOIN m_material b ON a.id_material = b.id_material";
 
-        $whxJoin = $adjType === 'wh'
-            ? "LEFT JOIN t_warehouse_header wh ON CAST(wh.trace_no AS TEXT) = CAST(a.adjust_no AS TEXT) AND wh.status = 1
-               LEFT JOIN m_warehouse mwh ON mwh.id_warehouse = wh.id_section"
-            : "";
+        $balanceJoin = $isWh
+            ? "LEFT JOIN t_warehouse_header c ON a.id_balance_head = c.id_whx_head AND c.status = 1"
+            : "LEFT JOIN t_balance_header c ON a.id_balance_head = c.id_balance_head AND c.status = 1";
 
-        $whxGroupBy = $adjType === 'wh'
-            ? ", wh.batch_no, wh.po_no, mwh.description, mwh.id_warehouse"
-            : "";
+        $slocJoinG = $isWh
+            ? "LEFT JOIN m_warehouse g ON g.id_warehouse = a.id_sloc"
+            : "LEFT JOIN m_sloc g ON ({$this->dbSlocColumnClause('a.id_sloc', 'g.id_sloc')}) AND g.status = 1";
 
-        $typeFilter = $adjType === 'wh'
-            ? "AND a.id_balance_head IS NULL"
-            : "AND a.id_balance_head IS NOT NULL";
+        $slocJoinH = $isWh
+            ? ""
+            : "LEFT JOIN m_sloc h ON ({$this->dbSlocColumnClause('c.id_sloc', 'h.id_sloc')}) AND h.status = 1";
+
+        $slocColumn = $isWh
+            ? "COALESCE(g.description, '') AS sloc"
+            : "CONCAT(
+                  COALESCE(MIN(g.description), ''),
+                  CASE WHEN {$this->dbGroupConcat('DISTINCT h.description', ', ', true, 'h.description ASC')} IS NULL
+                      THEN ''
+                      ELSE CONCAT(' | ', {$this->dbGroupConcat('DISTINCT h.description', ', ', true, 'h.description ASC')})
+                  END
+               ) AS sloc";
+
+        $whxColumns  = $isWh ? ", c.batch_no, c.po_no" : ", NULL AS batch_no, NULL AS po_no";
+        $whxGroupBy  = $isWh ? ", c.batch_no, c.po_no, g.id_warehouse" : ", c.id_sloc, g.id_sloc";
 
         $sql = "
             SELECT a.entry_date, CAST(a.adjust_no AS TEXT) AS adjust_no,
@@ -52,13 +65,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                    a.id_adjust_head,
                    {$this->dbGroupConcat("DISTINCT CONCAT(e.description, ' / ', d.batch_sap, ' / Qty: ', " . $this->dbNumberFormat('d.before_adjust', 3) . ", ' >>> ', " . $this->dbNumberFormat('d.after_adjust', 3) . ", ' MT')", ' | ', true)} AS supplier,
                    a.created_by, a.created_at, a.status, a.after_adjust,
-                   CONCAT(
-                      COALESCE(MIN(g.description), ''),
-                      CASE WHEN {$this->dbGroupConcat('DISTINCT h.description', ', ', true, 'h.description ASC')} IS NULL
-                          THEN ''
-                          ELSE CONCAT(' | ', {$this->dbGroupConcat('DISTINCT h.description', ', ', true, 'h.description ASC')})
-                      END
-                   ) AS sloc,
+                   {$slocColumn},
                    CASE WHEN c.qty IS NOT NULL AND a.after_adjust <> c.qty THEN 0 ELSE 1 END AS adjust_flag,
                    f.id_matdoc, f.material_document, f.id_trace_head,
                    CASE a.status
@@ -70,8 +77,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                    END AS status_label
                    {$whxColumns}
               FROM t_adjustment_header a
-              LEFT JOIN m_material b ON a.id_material = b.id_material
-              LEFT JOIN t_balance_header c ON a.id_balance_head = c.id_balance_head AND c.status = 1
+              {$materialJoin}
+              {$balanceJoin}
               LEFT JOIN t_adjustment_detail d ON a.id_adjust_head = d.id_adjust_head
               LEFT JOIN m_supplier e ON e.id_supplier = d.id_supplier
               LEFT JOIN (
@@ -80,21 +87,15 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     LEFT JOIN t_material_document ff ON f.id_trace_head = ff.id_trace_head AND ff.status = 1
                    WHERE f.status = 1
               ) f ON CAST(a.adjust_no AS TEXT) = f.to_trace_no
-              LEFT JOIN m_sloc g ON (
-                  {$this->dbSlocColumnClause('a.id_sloc', 'g.id_sloc')}
-              ) AND g.status = 1
-              LEFT JOIN m_sloc h ON (
-                  {$this->dbSlocColumnClause('c.id_sloc', 'h.id_sloc')}
-              ) AND h.status = 1
-              {$whxJoin}
+              {$slocJoinG}
+              {$slocJoinH}
              WHERE a.status IN (1, 2, 3, 4)
-               AND SUBSTRING(CAST(a.adjust_no AS TEXT), 1, 1) = '9'
-               {$typeFilter}
+               AND SUBSTRING(CAST(a.adjust_no AS TEXT), 1, 1) = '{$substrFilter}'
                AND ({$plantFilter['sql']})
             GROUP BY a.id_adjust_head, a.entry_date, a.adjust_no, a.id_material, a.id_sloc,
                      a.before_adjust, a.after_adjust, a.created_by, a.created_at, a.status,
-                     a.id_balance_head, a.after_adjust, b.code, b.description,
-                     c.trace_no, c.id_sloc, c.qty, g.description, g.id_sloc,
+                     a.id_balance_head, b.code, b.description,
+                     c.trace_no, c.qty, g.description,
                      f.id_matdoc, f.material_document, f.id_trace_head
                      {$whxGroupBy}
             ORDER BY a.entry_date DESC, a.id_adjust_head DESC
