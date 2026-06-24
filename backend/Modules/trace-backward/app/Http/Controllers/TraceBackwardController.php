@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TraceBackward\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -9,7 +9,6 @@ use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
 use Modules\TraceBackward\Http\Requests\TraceBackwardDetailRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardListRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardSearchRequest;
-use Modules\TraceBackward\Http\Requests\TraceBackwardShowRequest;
 use Illuminate\Http\JsonResponse;
 
 class TraceBackwardController extends Controller
@@ -28,19 +27,6 @@ class TraceBackwardController extends Controller
         } catch (\Exception $e) {
             Log::error('TraceBackward index failed', ['exception' => $e]);
             return ApiResponse::error('Failed to retrieve backward list', 500);
-        }
-    }
-
-    public function backward(TraceBackwardShowRequest $request, string $traceNo): JsonResponse
-    {
-        try {
-            $data = $request->validated();
-            $idMaterial = isset($data['id_material']) ? (int) $data['id_material'] : null;
-            $result = $this->traceBackwardService->backwardTrace($traceNo, $idMaterial);
-            return ApiResponse::success($result, 'Backward trace retrieved', 200);
-        } catch (\Exception $e) {
-            Log::error('TraceBackward backward failed', ['trace_no' => $traceNo, 'exception' => $e]);
-            return ApiResponse::error('Failed to retrieve backward trace', 500);
         }
     }
 
@@ -67,11 +53,20 @@ class TraceBackwardController extends Controller
             $traceNo = $data['trace_no'];
             $idMaterial = isset($data['id_material']) ? (int) $data['id_material'] : null;
 
-            $result = $this->traceBackwardService->getBackwardTraceDetail($traceNo, $idMaterial, $plantId, $userId);
+            $rows   = $this->traceBackwardService->getBackwardTraceDetail($traceNo, $idMaterial, $plantId, $userId);
+            $result = [
+                'initial' => array_values(array_filter((array) $rows, fn($r) => ($r->level ?? 0) === 1)),
+                'chain'   => array_values(array_filter((array) $rows, fn($r) => ($r->level ?? 0) > 1)),
+            ];
             return ApiResponse::success($result, 'Backward trace detail retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceBackward traceDetail failed', ['exception' => $e]);
             return ApiResponse::error('Failed to retrieve backward trace detail', 500);
         }
+    }
+
+    public function show(string $traceNo): JsonResponse
+    {
+        return ApiResponse::success(['trace_no' => $traceNo], 'Trace found', 200);
     }
 }

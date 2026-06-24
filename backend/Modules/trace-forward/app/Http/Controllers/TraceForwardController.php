@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TraceForward\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -9,7 +9,6 @@ use Modules\TraceForward\Services\Contracts\TraceForwardServiceInterface;
 use Modules\TraceForward\Http\Requests\TraceForwardDetailRequest;
 use Modules\TraceForward\Http\Requests\TraceForwardListRequest;
 use Modules\TraceForward\Http\Requests\TraceForwardSearchRequest;
-use Modules\TraceForward\Http\Requests\TraceForwardShowRequest;
 use Illuminate\Http\JsonResponse;
 
 class TraceForwardController extends Controller
@@ -28,19 +27,6 @@ class TraceForwardController extends Controller
         } catch (\Exception $e) {
             Log::error('TraceForward index failed', ['exception' => $e]);
             return ApiResponse::error('Failed to retrieve forward list', 500);
-        }
-    }
-
-    public function forward(TraceForwardShowRequest $request, string $traceNo): JsonResponse
-    {
-        try {
-            $data = $request->validated();
-            $idMaterial = isset($data['id_material']) ? (int) $data['id_material'] : null;
-            $result = $this->traceForwardService->forwardTrace($traceNo, $idMaterial);
-            return ApiResponse::success($result, 'Forward trace retrieved', 200);
-        } catch (\Exception $e) {
-            Log::error('TraceForward forward failed', ['trace_no' => $traceNo, 'exception' => $e]);
-            return ApiResponse::error('Failed to retrieve forward trace', 500);
         }
     }
 
@@ -68,11 +54,20 @@ class TraceForwardController extends Controller
             $traceNo = $data['trace_no'] ?? '';
             $idMaterial = (int) ($data['id_material'] ?? 0);
 
-            $result = $this->traceForwardService->getForwardTraceDetail($idHeader, $traceNo, $idMaterial, $plantId, $userId);
+            $rows   = $this->traceForwardService->getForwardTraceDetail($idHeader, $traceNo, $idMaterial, $plantId, $userId);
+            $result = [
+                'initial' => array_values(array_filter((array) $rows, fn($r) => ($r->level ?? 0) === 1)),
+                'chain'   => array_values(array_filter((array) $rows, fn($r) => ($r->level ?? 0) > 1)),
+            ];
             return ApiResponse::success($result, 'Trace detail retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceForward traceDetail failed', ['exception' => $e]);
             return ApiResponse::error('Failed to retrieve trace detail', 500);
         }
+    }
+
+    public function show(string $traceNo): JsonResponse
+    {
+        return ApiResponse::success(['trace_no' => $traceNo], 'Trace found', 200);
     }
 }

@@ -6,7 +6,7 @@ import shipmentService from '@/modules/ts-shipment/services/shipmentService'
 export const useTraceBackwardStore = defineStore('traceBackward', () => {
   const list = ref([])
   const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
-  const detail = ref([])
+  const detail = ref({ initial: [], chain: [] })
   const shipmentData = ref(null)
   const batchData = ref(null)
   const preparationRecords = ref([])
@@ -43,11 +43,14 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     error.value = null
     try {
       const res = await traceApi.getTraceDetail(payload)
-      const data = res.data?.data || (Array.isArray(res.data) ? res.data : [])
-      detail.value = Array.isArray(data) ? data : (data.data || [])
+      const data = res.data?.data || {}
+      detail.value = {
+        initial: data.initial || [],
+        chain: data.chain || [],
+      }
     } catch (err) {
       error.value = err.message || 'Failed to load trace detail'
-      detail.value = []
+      detail.value = { initial: [], chain: [] }
     } finally {
       loadingDetail.value = false
     }
@@ -100,7 +103,7 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
 
   function clear() {
     list.value = []
-    detail.value = []
+    detail.value = { initial: [], chain: [] }
     shipmentData.value = null
     batchData.value = null
     preparationRecords.value = []
