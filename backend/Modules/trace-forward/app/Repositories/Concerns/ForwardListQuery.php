@@ -29,13 +29,8 @@ final class ForwardListQuery
 
         $plantFilter = $this->buildTablePlantFilter('bh', $plantId, $userId);
 
-        $idTankStorage = $this->connection->table('m_sloc')
-            ->where('status', 1)
-            ->where('code_3', 'STORAGE')
-            ->value('id_sloc');
-
-        $where    = ['bh.status = 1', 'bh.id_sloc = ?', $plantFilter['sql']];
-        $bindings = array_merge([$idTankStorage], $plantFilter['bindings']);
+        $where    = ['bh.status = 1', "bh.id_sloc IN (SELECT id_sloc FROM m_sloc WHERE code_3 = 'STORAGE' AND status = 1)", $plantFilter['sql']];
+        $bindings = $plantFilter['bindings'];
         $where[]  = "(SUBSTRING(bh.trace_no,1,1)='1' OR SUBSTRING(bh.trace_no,1,1)='9')";
 
         if ($search !== null && $search !== '') {
