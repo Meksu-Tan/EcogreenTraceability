@@ -19,6 +19,18 @@
               hide-details
             />
           </VCol>
+          <VCol cols="12" md="4">
+            <VTextField
+              v-model="filters.search"
+              label="Search trace no / SO no / material / batch"
+              density="compact"
+              variant="outlined"
+              hide-details
+              clearable
+              @keyup.enter="loadData"
+              @click:clear="onClearSearch"
+            />
+          </VCol>
           <VCol cols="12" md="auto" class="d-flex gap-2">
             <VBtn
               color="primary"
@@ -70,19 +82,18 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('trace_no')">Trace No<VIcon v-if="sortKey==='trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'so_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('so_no')">SO No<VIcon v-if="sortKey==='so_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'batch_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('batch_no')">Batch No<VIcon v-if="sortKey==='batch_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc')">Sloc<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="white-space:nowrap">Sloc</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material')">Product Desc<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty')">Qty (MT)<VIcon v-if="sortKey==='qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" style="white-space:nowrap">Qty (MT)</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap;max-width:240px" @click="toggleSort('supplier')">Supplier / Batch SAP / Qty (MT)<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'source_trace' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('source_trace')">Source Trace<VIcon v-if="sortKey==='source_trace'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'source' }" style="cursor:pointer;user-select:none;white-space:nowrap;max-width:240px" @click="toggleSort('source')">Source (PO/SO & RM Trace)<VIcon v-if="sortKey==='source'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'created_at' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_at')">Created At<VIcon v-if="sortKey==='created_at'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'created_by' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_by')">Created By<VIcon v-if="sortKey==='created_by'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="white-space:nowrap;max-width:240px">Source Trace No / PO</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="white-space:nowrap">Created At</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="white-space:nowrap">Created By</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, i) in sortedList" :key="row.id_shipment_head">
+              <tr v-for="(row, i) in list" :key="row.id_shipment_head">
                 <td class="text-center text-caption text-medium-emphasis">{{ (meta.page - 1) * meta.perPage + i + 1 }}</td>
                 <td class="text-caption text-medium-emphasis">{{ row.entry_date }}</td>
                 <td class="font-weight-medium font-mono text-caption">{{ row.trace_no }}</td>
@@ -93,12 +104,29 @@
                   <div class="text-truncate">{{ row.material }}</div>
                 </td>
                 <td class="text-right font-weight-bold font-mono text-caption">{{ row.qty }}</td>
-                <td style="max-width:240px" class="text-caption" :title="row.supplier">
-                  <div class="text-truncate">{{ row.supplier || '-' }}</div>
+                <td style="max-width:320px; white-space: normal;" class="text-caption">
+                  <div v-if="row.supplier">
+                    <div v-for="(item, idx) in formatSupplier(row.supplier)" :key="idx" class="mb-1 pa-1.5 rounded border bg-grey-lighten-4">
+                      <div class="font-weight-bold text-primary" style="font-size: 11px;">{{ item.supplier }}</div>
+                      <div class="d-flex justify-space-between align-center mt-1" style="font-size: 11px;">
+                        <span>Batch SAP: <span class="font-weight-bold font-mono">{{ item.batch || '-' }}</span></span>
+                        <span>Qty: <span class="font-weight-bold text-success">{{ item.qty || '-' }}</span></span>
+                      </div>
+                    </div>
+                  </div>
+                  <span v-else>-</span>
                 </td>
-                <td class="text-caption text-medium-emphasis">{{ row.source_trace || '-' }}</td>
-                <td style="max-width:240px" class="text-caption text-medium-emphasis" :title="row.source">
-                  <div class="text-truncate">{{ row.source || row.po_so || '-' }}</div>
+                <td style="max-width:320px; white-space: normal;" class="text-caption text-medium-emphasis">
+                  <div v-if="row.source || row.po_so">
+                    <div v-for="(item, idx) in formatSource(row.source || row.po_so)" :key="idx" class="mb-1 pa-1.5 rounded border bg-grey-lighten-4">
+                      <div v-if="item.poso" class="font-weight-bold text-info" style="font-size: 11px;">PO/SO: {{ item.poso }}</div>
+                      <div class="d-flex flex-column gap-0.5 mt-1" style="font-size: 11px;">
+                        <span v-if="item.batch">Batch SAP: <span class="font-weight-bold font-mono">{{ item.batch }}</span></span>
+                        <span v-if="item.trace">Trace No: <span class="font-weight-bold font-mono">{{ item.trace }}</span></span>
+                      </div>
+                    </div>
+                  </div>
+                  <span v-else>-</span>
                 </td>
                 <td class="text-caption text-medium-emphasis">{{ row.created_at || '-' }}</td>
                 <td class="text-caption text-medium-emphasis">{{ row.created_by || '-' }}</td>
@@ -190,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTraceBackwardStore } from '../stores/traceBackwardStore'
 import { parseSoNo } from '../utils/parseSoNo'
@@ -201,72 +229,81 @@ import BatchPackagingModal from '../components/BatchPackagingModal.vue'
 const store = useTraceBackwardStore()
 const { listMeta: meta, list, detail, shipmentData, batchData, preparationRecords, sapAllocations, loading, loadingDetail, loadingShipment, loadingBatch, error } = storeToRefs(store)
 
-const filters = reactive({ id_plant: '' })
+const filters = reactive({ id_plant: '', search: '' })
 const showModal = ref(false)
 const modalTraceNo = ref('')
 const showShipmentModal = ref(false)
 const showBatchModal = ref(false)
 const selectedRow = ref(null)
 
-const sortKey = ref(null)
-const sortDir = ref(null)
+const sortKey = ref('entry_date')
+const sortDir = ref('desc')
 const perPage = ref(meta.value.perPage)
+
+// ponytail: server-sort only — columns not in backend whitelist are non-sortable
+const SORTABLE = new Set(['entry_date', 'trace_no', 'so_no', 'material', 'batch_no', 'supplier'])
 
 onMounted(() => loadData())
 
-function detectColumnType(colKey) {
-  const rows = list.value
-  if (!rows || rows.length === 0) return 'text'
-  for (const row of rows) {
-    const val = row[colKey]
-    if (val !== null && val !== undefined && val !== '') {
-      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
+function formatSupplier(val) {
+  if (!val) return []
+  return val.split(' | ').map(item => {
+    const parts = item.split(' / ')
+    return {
+      supplier: parts[0] || '',
+      batch: parts[1] || '',
+      qty: (parts[2] || '').replace('Qty : ', '').replace('Qty: ', ''),
     }
-  }
-  return 'text'
+  })
+}
+
+function formatSource(val) {
+  if (!val) return []
+  return val.split(' | ').map(item => {
+    const parts = item.split(' / ')
+    const subParts = (parts[0] || '').split(' :: ')
+    return {
+      batch: subParts[0] || '',
+      trace: subParts[1] || '',
+      poso: parts[1] || '',
+    }
+  })
 }
 
 function toggleSort(key) {
+  if (!SORTABLE.has(key)) return
   if (sortKey.value === key) {
-    if (sortDir.value === 'asc') {
-      sortDir.value = 'desc'
-    } else if (sortDir.value === 'desc') {
-      sortKey.value = null
-      sortDir.value = null
-    }
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
     sortKey.value = key
-    sortDir.value = detectColumnType(key) === 'text' ? 'asc' : 'desc'
+    sortDir.value = 'asc'
   }
+  meta.value.page = 1
+  loadData()
 }
 
-const sortedList = computed(() => {
-  if (!sortKey.value || !sortDir.value) return list.value
-  const key = sortKey.value
-  const dir = sortDir.value
-  const rows = [...list.value]
-  const type = detectColumnType(key)
-  return rows.sort((a, b) => {
-    const va = a[key]
-    const vb = b[key]
-    if (va == null && vb == null) return 0
-    if (va == null) return 1
-    if (vb == null) return -1
-    if (type === 'number') return dir === 'asc' ? va - vb : vb - va
-    return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va))
-  })
-})
-
-watch(perPage, (newVal) => {
+watch(perPage, newVal => {
   meta.value.perPage = newVal
   meta.value.page = 1
   loadData()
 })
 
 async function loadData() {
-  const params = { page: meta.value.page, per_page: meta.value.perPage }
+  const params = {
+    page: meta.value.page,
+    per_page: meta.value.perPage,
+    sort_by: sortKey.value,
+    sort_dir: sortDir.value,
+  }
   if (filters.id_plant) params.id_plant = filters.id_plant
+  if (filters.search) params.search = filters.search
   await store.fetchList(params)
+}
+
+function onClearSearch() {
+  filters.search = ''
+  meta.value.page = 1
+  loadData()
 }
 
 async function changePage(p) {
@@ -277,6 +314,9 @@ async function changePage(p) {
 
 function resetFilters() {
   filters.id_plant = ''
+  filters.search = ''
+  sortKey.value = 'entry_date'
+  sortDir.value = 'desc'
   meta.value.page = 1
   loadData()
 }
@@ -306,4 +346,3 @@ async function openBatchPackagingModal(row) {
 .sortable-th:hover .sort-icon { opacity: 0.7; }
 .sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
 </style>
-
