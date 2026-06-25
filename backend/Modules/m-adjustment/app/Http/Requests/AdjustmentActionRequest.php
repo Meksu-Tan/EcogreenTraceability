@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -20,7 +20,7 @@ class AdjustmentActionRequest extends FormRequest
             'entry_no' => 'nullable|string',
             'adjust_no' => 'nullable|string',
             'id_material' => 'nullable|integer',
-            'id_tank' => 'nullable|integer',
+            'tf_number' => 'nullable|integer',
             'id_supplier' => 'nullable|integer',
             'qty' => 'nullable|numeric',
             'batch_sap' => 'nullable|string',

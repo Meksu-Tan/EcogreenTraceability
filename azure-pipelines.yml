@@ -1,0 +1,74 @@
+trigger:
+  branches:
+    include:
+      - dev
+      - main
+
+pr:
+  branches:
+    include:
+      - dev
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  phpVersion: 8.3
+  nodeVersion: 20.x
+
+stages:
+  - stage: Build
+    displayName: Build & Test
+    jobs:
+      - job: backend
+        displayName: Backend (Laravel)
+        steps:
+          - checkout: self
+          - task: PHPInstaller@0
+            inputs:
+              phpVersion: $(phpVersion)
+            displayName: Install PHP $(phpVersion)
+          - script: |
+              sudo apt-get update
+              sudo apt-get install -y php$(phpVersion)-mbstring php$(phpVersion)-xml php$(phpVersion)-zip php$(phpVersion)-bcmath php$(phpVersion)-intl php$(phpVersion)-sqlite3
+            displayName: Install PHP extensions
+          - script: |
+              php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
+              php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+              php -r "unlink('composer-setup.php');"
+            displayName: Install Composer
+          - script: |
+              cd backend
+              composer install --no-interaction --prefer-dist
+            displayName: Composer install
+          - script: |
+              cd backend
+              cp .env.example .env
+              php artisan key:generate
+            displayName: Setup .env
+          - script: |
+              cd backend
+              php artisan test --profile
+            displayName: Run tests
+
+      - job: frontend
+        displayName: Frontend (Vue 3)
+        steps:
+          - checkout: self
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(nodeVersion)
+            displayName: Install Node $(nodeVersion)
+          - script: |
+              cd frontend
+              npm ci
+            displayName: npm ci
+          - script: |
+              cd frontend
+              npm run lint
+            displayName: Lint
+          - script: |
+              cd frontend
+              npm run test:unit
+            displayName: Unit tests

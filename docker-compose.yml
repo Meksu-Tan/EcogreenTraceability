@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+
+
+  # ──────────────────────────────────────────
+  # Laravel Backend API
+  # ──────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: eods-backend
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    environment:
+      APP_NAME: "EODS API"
+      APP_ENV: local
+      APP_KEY: "${APP_KEY:-base64:2yTgU/Pj3aVjEjzShx9GD8VQvvJwinRLff+JH5ixLLk=}"
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      APP_TIMEZONE: Asia/Jakarta
+      DB_CONNECTION: eudr_ts
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: cookie
+      SANCTUM_STATEFUL_DOMAINS: "localhost:5173,127.0.0.1:5173,localhost,127.0.0.1"
+      FRONTEND_URL: http://localhost:5173
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-false}"
+    volumes:
+      - ./backend/storage:/var/www/html/storage
+      - ./backend/bootstrap/cache:/var/www/html/bootstrap/cache
+
+    networks:
+      - eods-network
+
+  # ──────────────────────────────────────────
+  # Vue 3 Frontend (Vite Dev Server)
+  # ──────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: eods-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+      VITE_APP_ENV: local
+    volumes:
+      - ./frontend/resources:/app/resources
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+    depends_on:
+      - backend
+    networks:
+      - eods-network
+
+
+
+networks:
+  eods-network:
+    driver: bridge

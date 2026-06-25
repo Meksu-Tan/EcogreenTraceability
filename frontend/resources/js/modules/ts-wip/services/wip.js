@@ -35,8 +35,8 @@ export default {
     return res.data
   },
 
-  async updateSubTank(idHead, idTankTail) {
-    const res = await api.post(`${BASE_URL}/update-sub-tank`, { idHead, idTankTail })
+  async updateSubTank(idHead, idSlocTail) {
+    const res = await api.post(`${BASE_URL}/update-sub-tank`, { idHead, idSlocTail })
     return res.data
   },
 
@@ -54,7 +54,7 @@ export default {
       case 'post_cancelFeed': return this.cancelFeed(data.traceNo, data.id_plant);
       case 'post_cancelRundown': return this.cancelRundown(data.traceNo, data.id_plant);
       case 'post_matlDocNumber': return this.postMaterialDocument(data.mode, data.id, data.number);
-      case 'post_updateEntrySubTank': return this.updateSubTank(data.idHead, data.idTankTail);
+      case 'post_updateEntrySubTank': return this.updateSubTank(data.idHead, data.idSlocTail);
       default: return api.post(BASE_URL, data).then(r => r.data);
     }
   },

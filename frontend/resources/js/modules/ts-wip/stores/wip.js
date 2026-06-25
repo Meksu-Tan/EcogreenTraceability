@@ -380,9 +380,9 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     }
   }
 
-  async function updateEntrySubTank(idHead, idTankTail) {
+  async function updateEntrySubTank(idHead, idSlocTail) {
     try {
-      const res = await wipApi.updateSubTank(idHead, idTankTail)
+      const res = await wipApi.updateSubTank(idHead, idSlocTail)
       if (res.status === 1) {
         toastStore.success('Sub-tank updated')
       } else {

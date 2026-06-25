@@ -24,6 +24,8 @@ export function parseSoNo(soNoRaw = '', batchNo = '') {
     soItem = !soItem.endsWith('0')
       ? soItem.padStart(5, '0') + '0'
       : soItem.padStart(5, '0')
+  } else {
+    soItem = 'No Doc'
   }
 
   return { soNo, soItem, batchNo }

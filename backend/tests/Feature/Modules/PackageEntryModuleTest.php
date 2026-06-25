@@ -52,7 +52,7 @@ class PackageEntryModuleTest extends TestCase
         $this->app->instance(PackageServiceInterface::class, $mockService);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/transactions/package-entries/new-trace-no?warehouse=1&id_plant=1');
+            ->getJson('/api/v1/transactions/package-entries/new-trace-no?warehouse=1&id_plant=1&id_material=1');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.0.traceNo', '4' . date('ymd') . '0010101');
@@ -67,4 +67,31 @@ class PackageEntryModuleTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function test_get_wip_materials_success(): void
+    {
+        $user = User::factory()->make();
+
+        $mockService = Mockery::mock(PackageServiceInterface::class);
+        $mockService->shouldReceive('getWipMaterialByFgProduct')
+            ->once()
+            ->with([
+                'idMaterialPck' => '1',
+                'tank' => null,
+                'id_plant' => null,
+            ])
+            ->andReturn(collect([
+                ['wip_material' => 'CPO (CPO) || Balance : 100.000 MT', 'balance' => '100.000', 'id_rundown' => '001']
+            ]));
+        $this->app->instance(PackageServiceInterface::class, $mockService);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson('/api/v1/transactions/package-entries/wip-materials?idMaterialPck=1');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('status', 1);
+    }
 }
+
+
+

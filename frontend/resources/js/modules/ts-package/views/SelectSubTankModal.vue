@@ -24,11 +24,11 @@
             <!-- Specific Sub Tanks -->
             <VCol cols="12">
               <VSelect
-                v-model="form.idTankTail"
+                v-model="form.idSlocTail"
                 label="Specific Tank No"
                 :items="store.specificTanks"
                 item-title="tankNo"
-                item-value="id_tank_tail"
+                item-value="id_sloc_tail"
                 multiple
                 chips
                 variant="outlined"
@@ -68,7 +68,7 @@ const mainSlocLabel = ref('')
 
 const form = reactive({
   id: null,
-  idTankTail: []
+  idSlocTail: []
 })
 
 watch(() => props.modelValue, async (newVal) => {
@@ -76,9 +76,9 @@ watch(() => props.modelValue, async (newVal) => {
     form.id = props.row.id_whx_head
     mainSlocLabel.value = props.row.sloc || ''
 
-    // Parse current subtanks - read from id_sloc (new column) or id_tank (legacy fallback)
+    // Parse current subtanks - read from id_sloc (new column) or tf_number (legacy fallback)
     let currentTails = []
-    const rawTails = props.row.id_sloc || props.row.id_tank || '[]'
+    const rawTails = props.row.id_sloc || props.row.tf_number || '[]'
     if (rawTails) {
       try {
         currentTails = typeof rawTails === 'string'
@@ -88,10 +88,10 @@ watch(() => props.modelValue, async (newVal) => {
         currentTails = []
       }
     }
-    form.idTankTail = currentTails.map(String)
+    form.idSlocTail = currentTails.map(String)
 
     // Load specific tanks for the parent sloc
-    const parentSloc = props.row.id_sloc || props.row.id_tank
+    const parentSloc = props.row.id_sloc || props.row.tf_number
     if (parentSloc) {
       await store.fetchSpecificTanks(parentSloc)
     }
@@ -106,7 +106,7 @@ async function save() {
   if (!isValid.value) return
   submitting.value = true
   try {
-    const res = await store.updateSubTank(form.id, form.idTankTail)
+    const res = await store.updateSubTank(form.id, form.idSlocTail)
     if (res.response == 1) {
       emit('saved')
       close()

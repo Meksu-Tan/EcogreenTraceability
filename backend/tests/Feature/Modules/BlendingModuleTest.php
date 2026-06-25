@@ -150,7 +150,7 @@ class BlendingModuleTest extends TestCase
         $user = User::factory()->make();
 
         $tanks = collect([
-            (object)['id_tank' => 1, 'description' => 'T-01', 'sloc' => 'SL01'],
+            (object)['id_sloc' => 1, 'description' => 'T-01', 'sloc' => 'SL01'],
         ]);
 
         $serviceMock = Mockery::mock(BlendingServiceInterface::class);
@@ -208,7 +208,7 @@ class BlendingModuleTest extends TestCase
                 'entryNo'          => '82605240010101',
                 'idMaterialSource' => 3,
                 'qty'              => '100',
-                'idTank'           => 5,
+                'idSloc'           => 5,
                 'id_plant'         => 0,
             ]);
 

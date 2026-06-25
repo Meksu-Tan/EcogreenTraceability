@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsWip\Repositories;
 
 use Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface;
@@ -10,7 +11,7 @@ use Modules\TsWip\Repositories\Traits\WipEntryWriteTrait;
  * @todo Technical Debt: This class is 21 lines in this file but delegates to 3 traits (WipEntryQueryTrait, WipEntryBatchTrait, WipEntryWriteTrait).
  * The effective class size across all traits likely exceeds 200 lines. Requires audit of trait line counts.
  * - Split into: WipEntryQueryRepository, WipEntryBatchProcessor, WipEntryWriteRepository
- * Current trait-based decomposition is a step in the right direction — verify each trait stays under 200 lines.
+ * Current trait-based decomposition is a step in the right direction â€” verify each trait stays under 200 lines.
  */
 class WipEntryRepository implements WipEntryRepositoryInterface
 {

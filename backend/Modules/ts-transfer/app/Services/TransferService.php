@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsTransfer\Services;
 
 use Modules\TsTransfer\Repositories\Contracts\TransferRepositoryInterface;
@@ -70,13 +71,13 @@ class TransferService implements TransferServiceInterface
         return $this->transferRepo->getActiveSpecificTanksRundown($sloc)->toArray();
     }
 
-    public function getUpdateSupplierMaterial(int $idMaterial, int $idTank, int $plantId): ?object
+    public function getUpdateSupplierMaterial(int $idMaterial, int $idSloc, int $plantId): ?object
     {
         $plantCode = 0;
         if ($plantId > 0) {
             $plantCode = (int) $this->resolvePlantCode($plantId);
         }
-        return $this->transferRepo->getUpdateSupplierMaterial($idMaterial, $idTank, $plantCode);
+        return $this->transferRepo->getUpdateSupplierMaterial($idMaterial, $idSloc, $plantCode);
     }
 
     public function createMaterialDocument(string $user, int $idTraceHead, string $materialDoc, string $mode): array
@@ -95,7 +96,7 @@ class TransferService implements TransferServiceInterface
         $idTmp = explode("|", $id);
         $idHead = trim($idTmp[0]);
 
-        if (!$this->approvalService->canDelete($idHead)) {
+        if (!$this->approvalService->canDelete((int)$idHead)) {
             return ['response' => 5, 'message' => 'Transfer cannot be deleted in current approval status'];
         }
 
@@ -107,7 +108,7 @@ class TransferService implements TransferServiceInterface
     /**
      * Submit transfer for approval.
      */
-    public function submitForApproval(string $idBalanceHead, string $user): array
+    public function submitForApproval(int $idBalanceHead, string $user): array
     {
         return $this->approvalService->submit($idBalanceHead, $user);
     }
@@ -115,7 +116,7 @@ class TransferService implements TransferServiceInterface
     /**
      * Approve a transfer.
      */
-    public function approveTransfer(string $idBalanceHead, string $user, ?string $notes = null): array
+    public function approveTransfer(int $idBalanceHead, string $user, ?string $notes = null): array
     {
         return $this->approvalService->approve($idBalanceHead, $user, $notes);
     }
@@ -123,7 +124,7 @@ class TransferService implements TransferServiceInterface
     /**
      * Reject a transfer.
      */
-    public function rejectTransfer(string $idBalanceHead, string $user, string $reason): array
+    public function rejectTransfer(int $idBalanceHead, string $user, string $reason): array
     {
         return $this->approvalService->reject($idBalanceHead, $user, $reason);
     }
@@ -131,7 +132,7 @@ class TransferService implements TransferServiceInterface
     /**
      * Cancel a transfer.
      */
-    public function cancelTransfer(string $idBalanceHead, string $user): array
+    public function cancelTransfer(int $idBalanceHead, string $user): array
     {
         return $this->approvalService->cancel($idBalanceHead, $user);
     }
@@ -147,7 +148,7 @@ class TransferService implements TransferServiceInterface
     /**
      * Get approval history.
      */
-    public function getApprovalHistory(string $idBalanceHead): array
+    public function getApprovalHistory(int $idBalanceHead): array
     {
         return $this->approvalService->getApprovalHistory($idBalanceHead);
     }
@@ -174,6 +175,10 @@ class TransferService implements TransferServiceInterface
     {
         DB::connection('eudr_ts')->beginTransaction();
         try {
+            if ($this->transferRepo->getLockStatus($params->entryDate)) {
+                DB::connection('eudr_ts')->rollBack();
+                return ['response' => 99];
+            }
             $result = $this->processTransferTransaction($params, $plants, $traceNos, $user, $data);
             if ($result['response'] == 1) {
                 DB::connection('eudr_ts')->commit();
@@ -293,7 +298,8 @@ class TransferService implements TransferServiceInterface
         }
 
         $totalReserve = $this->transferRepo->getTotalStockMaterial($idMaterial, $trfSource, $plantId);
-        if (round($totalReserve - $trfQty, 4) < 0) {
+        $trfQtyFloat = (float) $trfQty;
+        if (round($totalReserve - $trfQtyFloat, 4) < 0) {
             return ['response' => 4];
         }
 
@@ -302,13 +308,22 @@ class TransferService implements TransferServiceInterface
 
     private function generateTransferTraceNumbers(string $entryNo, int $srcPlant, int $destPlant): array
     {
-        $feedEntryNo = substr($entryNo, 7, 3) == '000'
-            ? substr_replace($entryNo, '1', 9, 1)
-            : substr_replace($entryNo, '0', 8, 1);
+        $ymd = substr($entryNo, 1, 6);
+        $rundownRaw = substr($entryNo, 7, 3);
         $feedPlantCode = str_pad(substr((string)$srcPlant, -2), 2, '0', STR_PAD_LEFT);
         $destPlantCode = str_pad(substr((string)$destPlant, -2), 2, '0', STR_PAD_LEFT);
-        $feedEntryNo = substr_replace($feedEntryNo, $destPlantCode, 10, 2);
-        $entryNo = substr_replace($entryNo, $feedPlantCode, 10, 2);
+
+        // GAP 3: For raw material (RRR=000), feedEntryNo = entryNo (no modification)
+        $isRaw = ($rundownRaw == '000');
+        $feedRundown = $isRaw ? $rundownRaw : substr_replace($rundownRaw, '0', 1, 1);
+
+        // GAP 1&2: Generate sequence based on destination plant for entryNo
+        // and source plant for feedEntryNo, instead of context plant
+        $destSeq = $this->transferRepo->getNextSequence($ymd, $rundownRaw, $destPlantCode);
+        $feedSeq = $this->transferRepo->getNextSequence($ymd, $feedRundown, $feedPlantCode);
+
+        $entryNo = "7{$ymd}{$rundownRaw}{$destPlantCode}{$destSeq}";
+        $feedEntryNo = "7{$ymd}{$feedRundown}{$feedPlantCode}{$feedSeq}";
 
         $resolve = fn(string $no): string => $this->resolveTraceCollision($no);
 
@@ -330,7 +345,10 @@ class TransferService implements TransferServiceInterface
     ): array {
         $plantRecord = $this->transferRepo->findPlantById($plantId);
         $plantCode = $plantRecord ? substr($plantRecord->code_3, -2) : '01';
-        $adjEntryNo = '9' . date('ymd') . '001' . $plantCode . '01';
+        $ymd = date('ymd', strtotime($entryDate));
+        $rundown = $this->transferRepo->findMaterialRundown($idMaterial);
+        $prefix12 = '9' . $ymd . $rundown . $plantCode;
+        $adjEntryNo = $prefix12 . $this->transferRepo->generateAdjSequence($prefix12);
         $slocJson = json_encode([$trfSource]);
 
         try {

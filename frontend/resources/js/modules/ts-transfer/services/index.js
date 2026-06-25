@@ -55,8 +55,8 @@ export default {
     return response.data
   },
 
-  async postUpdateEntrySubTank(idHead, idTankTail) {
-    const response = await api.post(`${BASE_URL}/update-sub-tank`, { idHead, idTankTail })
+  async postUpdateEntrySubTank(idHead, idSlocTail) {
+    const response = await api.post(`${BASE_URL}/update-sub-tank`, { idHead, idSlocTail })
     return response.data
   },
 

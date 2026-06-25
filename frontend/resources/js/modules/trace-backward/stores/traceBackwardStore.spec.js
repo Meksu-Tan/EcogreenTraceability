@@ -86,7 +86,7 @@ describe('useTraceBackwardStore', () => {
   describe('fetchShipmentDetail', () => {
     it('populates shipmentData from nested response', async () => {
       shipmentService.getDatShipment.mockResolvedValue({
-        data: { data: { data: { SO_NO: 'SO-001', BATCH: 'B-001' } } },
+        data: { data: { SO_NO: 'SO-001', BATCH: 'B-001' } },
       })
 
       const store = useTraceBackwardStore()
@@ -116,7 +116,7 @@ describe('useTraceBackwardStore', () => {
         data: { data: [{ prep_no: 'P-001' }, { prep_no: 'P-002' }] },
       })
       shipmentService.getDatSoAllocation.mockResolvedValue({
-        data: { data: { data: { IT_EXPORT: [{ so_item: '00010' }, { so_item: '00020' }] } } },
+        data: { data: { IT_EXPORT: [{ so_item: '00010' }, { so_item: '00020' }] } },
       })
 
       const store = useTraceBackwardStore()
@@ -132,7 +132,7 @@ describe('useTraceBackwardStore', () => {
       shipmentService.getShipmentBatchPackaging.mockResolvedValue({ data: { data: [] } })
       shipmentService.getPreparationRecord.mockResolvedValue({ data: { data: [] } })
       shipmentService.getDatSoAllocation.mockResolvedValue({
-        data: { data: { data: { IT_EXPORT: [] } } },
+        data: { data: { IT_EXPORT: [] } },
       })
 
       const store = useTraceBackwardStore()

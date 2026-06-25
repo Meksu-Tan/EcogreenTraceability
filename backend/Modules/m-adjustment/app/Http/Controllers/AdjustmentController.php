@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -265,7 +265,7 @@ class AdjustmentController extends Controller
         try {
             $data = $this->adjustmentService->getSupplierByFilter(
                 (int) $request->input('id_material'),
-                (int) $request->input('id_tank')
+                (int) $request->input('tf_number')
             );
             return ApiResponse::success($data, 'Suppliers retrieved', 200);
         } catch (\Exception $e) {
@@ -278,7 +278,7 @@ class AdjustmentController extends Controller
         try {
             $data = $this->adjustmentService->getBatchBySupplier(
                 (int) $request->input('id_material'),
-                (int) $request->input('id_tank'),
+                (int) $request->input('tf_number'),
                 (int) $request->input('id_supplier')
             );
             return ApiResponse::success($data, 'Batches retrieved', 200);
@@ -441,10 +441,14 @@ class AdjustmentController extends Controller
 
     // ========== Period Adjustment Endpoints ==========
 
-    public function getPeriodHeaders(): JsonResponse
+    public function getPeriodHeaders(Request $request): JsonResponse
     {
         try {
-            $data = $this->adjustmentService->getPeriodHeaders();
+            $filters = [
+                'page' => (int) $request->input('page', 1),
+                'per_page' => (int) $request->input('per_page', 10),
+            ];
+            $data = $this->adjustmentService->getPeriodHeaders($filters);
             return ApiResponse::success($data, 'Period headers retrieved', 200);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed: ' . $e->getMessage(), 500);

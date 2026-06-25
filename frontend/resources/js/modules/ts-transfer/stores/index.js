@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import transferApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
+import { registerCacheResetCallback } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const useTsTransferStore = defineStore('transactionTransfer', () => {
@@ -49,6 +50,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
     resetListCache()
     Object.keys(_cache).forEach(k => { _cache[k] = 0 })
   }
+  registerCacheResetCallback(resetCache)
 
   async function fetchActiveMaterials() {
     if (_isFresh('activeMaterials') && activeMaterials.value.length > 0) return
@@ -97,7 +99,7 @@ async function fetchTotalStockMaterial(params = {}) {
   async function fetchActiveTanksRundown(params = {}) {
     try {
       const response = await transferApi.getTanksRundown(params)
-      activeTanks.value = response?.data || []
+      activeTanks.value = response?.data?.data || []
       return response
     } catch (err) {
       toastStore.error('Failed to fetch tanks:')
@@ -144,9 +146,10 @@ async function fetchTotalStockMaterial(params = {}) {
       }
       return response
     } catch (err) {
-      error.value = err.message
-      toastStore.error(err.message || 'Transfer failed')
-      throw err
+      const apiMsg = err.response?.data?.message || err.message || 'Transfer failed'
+      error.value = apiMsg
+      toastStore.error(apiMsg)
+      return { status: 0, message: apiMsg }
     } finally {
       loading.value = false
     }
@@ -165,9 +168,9 @@ async function fetchTotalStockMaterial(params = {}) {
     }
   }
 
-  async function submitUpdateEntrySubTank(idHead, idTankTail) {
+  async function submitUpdateEntrySubTank(idHead, idSlocTail) {
     try {
-      const response = await transferApi.postUpdateEntrySubTank(idHead, idTankTail)
+      const response = await transferApi.postUpdateEntrySubTank(idHead, idSlocTail)
       if (response?.status === 1) {
         toastStore.success('Sub-tank updated')
       }

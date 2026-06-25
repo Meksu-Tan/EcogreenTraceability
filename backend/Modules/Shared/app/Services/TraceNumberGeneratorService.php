@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Shared\Services;
 
 class TraceNumberGeneratorService
@@ -10,12 +10,24 @@ class TraceNumberGeneratorService
      */
     public static function parse(string $traceNo): array
     {
+        $len = strlen($traceNo);
+        if ($len >= 14) {
+            return [
+                'prefix'   => substr($traceNo, 0, 1),
+                'date'     => substr($traceNo, 1, 6),
+                'section'  => substr($traceNo, 7, 3),
+                'plant'    => substr($traceNo, 10, 2),
+                'sequence' => substr($traceNo, 12, 2),
+            ];
+        }
+
+        // 11-digit legacy
         return [
             'prefix'   => substr($traceNo, 0, 1),
             'date'     => substr($traceNo, 1, 6),
-            'section'  => substr($traceNo, 7, 3),
-            'plant'    => substr($traceNo, 10, 2),
-            'sequence' => substr($traceNo, 12, 2),
+            'section'  => '000',
+            'plant'    => substr($traceNo, 7, 2),
+            'sequence' => substr($traceNo, 9, 2),
         ];
     }
 

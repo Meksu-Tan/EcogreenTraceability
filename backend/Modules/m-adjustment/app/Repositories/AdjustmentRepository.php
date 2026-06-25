@@ -36,7 +36,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             : "LEFT JOIN t_balance_header c ON a.id_balance_head = c.id_balance_head AND c.status = 1";
 
         $slocJoinG = $isWh
-            ? "LEFT JOIN m_warehouse g ON g.id_warehouse = a.id_sloc"
+            ? "LEFT JOIN m_warehouse g ON g.id_warehouse = CAST(a.id_sloc AS bigint)"
             : "LEFT JOIN m_sloc g ON ({$this->dbSlocColumnClause('a.id_sloc', 'g.id_sloc')}) AND g.status = 1";
 
         $slocJoinH = $isWh
@@ -199,7 +199,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 "SELECT a.adj_number
                    FROM (SELECT CAST(CAST(a.adjust_no AS BIGINT) + 1 AS TEXT) AS adj_number
                            FROM t_adjustment_header a
-                          WHERE SUBSTRING(a.adjust_no,1,7) = CONCAT('9', {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')})
+                          WHERE SUBSTRING(CAST(a.adjust_no AS TEXT),1,7) = CONCAT('9', {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')})
                             AND a.status IN (1,2,3,4)
                           ORDER BY a.id_adjust_head DESC
                           LIMIT 1) a
@@ -209,19 +209,20 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 [$pp]
             );
         } else {
-            $date = Carbon::parse($entryDate);
+            $dateStr = Carbon::parse($entryDate)->format('Y-m-d');
+            $formatted = Carbon::parse($entryDate)->format('ymd');
             $result = DB::connection($this->connection)->select(
                 "SELECT a.adj_number
                    FROM (SELECT CAST(CAST(a.adjust_no AS BIGINT) + 1 AS TEXT) AS adj_number
                            FROM t_adjustment_header a
-                          WHERE SUBSTRING(a.adjust_no, 1, 7) = CONCAT('9', {$this->dbDateFormat('?', '%y%m%d')})
+                          WHERE SUBSTRING(CAST(a.adjust_no AS TEXT), 1, 7) = CONCAT('9', '{$formatted}')
                             AND a.status IN (1,2,3,4)
                           ORDER BY a.id_adjust_head DESC
                           LIMIT 1) a
                   UNION ALL
-                   SELECT CONCAT('9', {$this->dbDateFormat('?', '%y%m%d')}, '000', ?, '01') AS adj_number
+                   SELECT CONCAT('9', '{$formatted}', '000', CAST(? AS TEXT), '01') AS adj_number
                   LIMIT 1",
-                [$date, $date, $pp]
+                [$pp]
             );
         }
 
@@ -544,7 +545,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT a.adjust_no, COUNT(a.adjust_no) AS flag
                FROM (SELECT a.adjust_no
                        FROM t_adjustment_header a
-                      WHERE SUBSTRING(a.adjust_no,1,12) = ?
+                       WHERE SUBSTRING(CAST(a.adjust_no AS TEXT),1,12) = ?
                       ORDER BY a.adjust_no DESC
                       LIMIT 1) a',
             [$batchMapping]
@@ -2020,7 +2021,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
         $existing = DB::connection($this->connection)->selectOne(
             'SELECT adjust_no FROM t_adjustment_header
-              WHERE SUBSTRING(adjust_no, 1, 12) = ?
+              WHERE SUBSTRING(CAST(adjust_no AS TEXT), 1, 12) = ?
               ORDER BY id_adjust_head DESC LIMIT 1',
             [$batchMapping]
         );

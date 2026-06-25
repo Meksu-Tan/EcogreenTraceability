@@ -1,0 +1,37 @@
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+*.md
+
+# Node
+node_modules
+dist
+.vite
+
+# Backend vendor (rebuilt in container)
+backend/vendor
+backend/node_modules
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+
+# Reference app (not needed in Docker)
+reference-dont-change
+
+# Docker
+docker-compose.yml
+Dockerfile.backend
+Dockerfile.frontend
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db
+graphify-out
+
+# Template (not needed)
+materio-vuetify-vuejs-laravel-admin-template-v3.4.0
+ai-assisted laravel-vue onboarding

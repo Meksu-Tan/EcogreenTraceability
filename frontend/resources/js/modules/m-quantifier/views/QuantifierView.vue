@@ -148,61 +148,75 @@
       </VCardText>
     </VCard>
 
-    <VDialog v-model="showModal" max-width="500" persistent>
+    <VDialog v-model="showModal" max-width="960" scrollable>
       <VCard>
         <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
-          <span class="text-h6 font-weight-bold">{{ editMode==='ADD' ? 'New Quantifier' : 'Edit Quantifier' }}</span>
-          <VBtn icon="ri-close-line" size="small" variant="text" color="medium-emphasis" @click="showModal = false" />
+          <span class="text-h6 font-weight-bold">{{ editMode === 'ADD' ? 'New Quantifier' : 'Edit Quantifier' }}</span>
+          <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showModal = false" />
         </VCardTitle>
         <VDivider />
-        <VCardText class="pa-5">
-          <VRow dense>
-            <VCol cols="12" md="6">
-              <VTextField
-                v-model="form.reset_date"
-                label="Reset Date *"
-                type="date"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VSelect
-                v-model="form.flowmeter"
-                :items="flowmeterOptions"
-                label="Flowmeter"
-                density="compact"
-                variant="outlined"
-              />
-              <p v-if="editMode==='ADD'" class="text-caption text-medium-emphasis mt-1">Leave empty for ALL flowmeters (bulk).</p>
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField
-                v-model.number="form.value"
-                label="Value *"
-                type="number"
-                step="0.001"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol cols="12">
-              <VTextarea
-                v-model="form.remark"
-                label="Remark"
-                rows="2"
-                density="compact"
-                variant="outlined"
-                placeholder="Monthly reset"
-              />
-            </VCol>
-          </VRow>
+        <VCardText class="pa-5 bg-neutral-50">
+          <form @submit.prevent="saveQuantifier" class="d-flex flex-column ga-4">
+            <VCard variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">Reset Details</span>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField
+                      v-model="form.reset_date"
+                      label="Reset Date *"
+                      type="date"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="form.flowmeter"
+                      :items="flowmeterOptions"
+                      label="Flowmeter"
+                      density="compact"
+                      variant="outlined"
+                    />
+                    <p v-if="editMode === 'ADD'" class="text-caption text-medium-emphasis mt-1">Leave empty for ALL flowmeters (bulk).</p>
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField
+                      v-model.number="form.value"
+                      label="Value *"
+                      type="number"
+                      step="0.001"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                </VRow>
+                <VRow dense class="mt-2">
+                  <VCol cols="12">
+                    <VTextarea
+                      v-model="form.remark"
+                      label="Remark"
+                      rows="2"
+                      density="compact"
+                      variant="outlined"
+                      placeholder="Monthly reset"
+                    />
+                  </VCol>
+                </VRow>
+              </VCardText>
+            </VCard>
+            <VCard variant="outlined">
+              <VCardText class="d-flex flex-wrap align-center justify-end gap-3">
+                <div class="d-flex ga-2">
+                  <VBtn variant="outlined" color="medium-emphasis" @click="showModal = false">Cancel</VBtn>
+                  <VBtn type="submit" color="primary" prepend-icon="ri-save-line" :loading="saving">Save</VBtn>
+                </div>
+              </VCardText>
+            </VCard>
+          </form>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-5 pt-3 justify-end gap-2">
-          <VBtn variant="outlined" color="medium-emphasis" @click="showModal = false">Cancel</VBtn>
-          <VBtn color="primary" :loading="saving" prepend-icon="ri-save-line" @click="saveQuantifier">Save</VBtn>
-        </VCardActions>
       </VCard>
     </VDialog>
 

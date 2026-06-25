@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    protected $connection = 'eudr_ts';
+
     public function up(): void
     {
         Schema::create('t_balance_header', function (Blueprint $table) {
@@ -16,8 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('id_material');
             $table->longText('id_sloc')->nullable();
             $table->longText('id_sloc_tail')->nullable();
-            $table->unsignedBigInteger('id_tank')->nullable()->index();
-            $table->longText('id_tank_tail')->nullable();
+            $table->unsignedBigInteger('tf_number')->nullable()->index();
             $table->string('id_plant', 10)->nullable()->index();
             $table->double('qty')->default('0');
             $table->double('in_qty')->default('0');
@@ -30,7 +31,7 @@ return new class extends Migration
             if (DB::getDriverName() === 'sqlite') {
                 $table->timestamp('updated_at')->nullable();
             } else {
-                $table->timestamp('updated_at')->default(DB::raw('null on update CURRENT_TIMESTAMP'))->nullable();
+                $table->timestamp('updated_at')->nullable();
             }
             
             $table->charset = 'utf8mb4';
@@ -38,8 +39,6 @@ return new class extends Migration
 
             // Composite indexes
             $table->index(['status', 'id_plant', 'trace_no'], 'idx_balance_header_filter');
-            $table->index(['status', 'id_material', 'id_sloc', 'qty', 'id_balance_head'], 'idx_bh_fifo_core');
-            $table->index(['status', 'id_plant', 'id_material', 'id_sloc'], 'idx_bh_plant_material_tank');
         });
     }
 

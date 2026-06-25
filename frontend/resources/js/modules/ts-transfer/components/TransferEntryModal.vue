@@ -20,14 +20,7 @@
       <VDivider />
 
       <VCardText class="pa-5 bg-neutral-50">
-        <div v-if="loading" class="d-flex flex-column align-center justify-center pa-8">
-          <VProgressCircular indeterminate color="primary" size="48" />
-          <span class="mt-3 text-body-2 text-medium-emphasis">Processing...</span>
-        </div>
-
-
-
-        <form @submit.prevent="handleSubmit" :class="{ 'opacity-50': loading }" class="d-flex flex-column gap-4">
+        <form @submit.prevent="handleSubmit" class="d-flex flex-column gap-4">
           <VCard variant="outlined">
             <VCardText>
               <VRow dense>
@@ -47,6 +40,7 @@
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Trace No</label>
                   <VTextField
                     :model-value="form.entry_no"
+                    :loading="initLoading && !form.entry_no"
                     readonly
                     rounded="md"
                     color="primary"
@@ -93,6 +87,7 @@
                     :items="materialOptions"
                     item-title="label"
                     item-value="value"
+                    :loading="initLoading"
                     required
                     rounded="md"
                     color="primary"
@@ -136,6 +131,7 @@
                     :items="sourceTankOptions"
                     item-title="label"
                     item-value="value"
+                    :loading="initLoading"
                     :disabled="form.trf_type === 'out'"
                     rounded="md"
                     color="primary"
@@ -155,6 +151,7 @@
                     :items="destTankOptions"
                     item-title="label"
                     item-value="value"
+                    :loading="initLoading"
                     :disabled="form.trf_type === 'in'"
                     rounded="md"
                     color="primary"
@@ -179,7 +176,17 @@
                       variant="outlined"
                       class="mt-1"
                     />
-                    <VBtn color="primary" variant="outlined" size="small" @click="fetchTransferQty">Fetch Qty</VBtn>
+                    <div class="d-flex align-center gap-2 mt-1">
+                      <VBtn color="primary" variant="outlined" size="small" :loading="autoFetch.syncing.value" @click="autoFetch.manualFetch">
+                        Fetch Qty
+                      </VBtn>
+                      <div class="d-flex align-center gap-1 text-caption text-medium-emphasis">
+                        <VIcon icon="ri-time-line" size="12" />
+                        <span v-if="autoFetch.lastSyncAt.value">Last: {{ formatLastSync(autoFetch.lastSyncAt.value) }}</span>
+                        <span class="font-weight-bold text-primary">|</span>
+                        <span>Next: {{ autoFetch.countdownDisplay.value }} ({{ autoFetch.nextSyncLabel.value }})</span>
+                      </div>
+                    </div>
                 </VCol>
               </VRow>
             </VCardText>
@@ -229,7 +236,7 @@
               type="submit"
               color="primary"
               prepend-icon="ri-check-line"
-              :loading="loading"
+              :loading="submitting"
             >
               Save Entry
             </VBtn>
@@ -245,6 +252,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTsTransferStore } from '../stores'
 import { useToastStore } from '@/stores/toast.js'
+import { useAutoFetchQty } from '@/composables/useAutoFetchQty'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false }
@@ -256,8 +264,16 @@ const plantSelectionStore = usePlantSelectionStore()
 const store = useTsTransferStore()
 const toastStore = useToastStore()
 
+async function doFetchQty() {
+  if (!form.id_material) return
+  await fetchTransferQty()
+}
+
+const autoFetch = useAutoFetchQty(doFetchQty)
+
 const mode = 'ADD'
-const loading = ref(false)
+const initLoading = ref(false)
+const submitting = ref(false)
 
 const sourceTanks = ref([])
 const destTanks = ref([])
@@ -313,7 +329,7 @@ const sourceTankOptions = computed(() => {
     .map(t => {
       const label = t.tank || t.description || ''
       return {
-        value: String(t.id_sloc || t.id_tank),
+        value: String(t.id_sloc || t.tf_number),
         label: label
       }
     })
@@ -332,7 +348,7 @@ const destTankOptions = computed(() => {
     .map(t => {
       const label = t.tank || t.description || ''
       return {
-        value: String(t.id_sloc || t.id_tank),
+        value: String(t.id_sloc || t.tf_number),
         label: label
       }
     })
@@ -363,27 +379,29 @@ const showSpecificSlocRow = computed(() => {
 
 const specificSourceOptions = computed(() =>
   (specificSourceTanks.value || []).map(t => ({
-    value: String(t.id_sloc || t.id_tank_tail),
-    title: String(t.tankName || t.tankNo || t.tf_number || t.description || t.id_sloc || t.id_tank_tail || 'Unknown'),
+    value: String(t.id_sloc || t.id_sloc_tail),
+    title: String(t.tf_number || t.tankName || t.description || t.id_sloc || t.id_sloc_tail || 'Unknown'),
   }))
 )
 
 const specificDestOptions = computed(() =>
   (specificDestTanks.value || []).map(t => ({
-    value: String(t.id_sloc || t.id_tank_tail),
-    title: String(t.tankName || t.tankNo || t.tf_number || t.description || t.id_sloc || t.id_tank_tail || 'Unknown'),
+    value: String(t.id_sloc || t.id_sloc_tail),
+    title: String(t.tf_number || t.tankName || t.description || t.id_sloc || t.id_sloc_tail || 'Unknown'),
   }))
 )
 
 async function bootstrap() {
-  loading.value = true
+  initLoading.value = true
   try {
     await store.fetchActiveMaterials()
     resetForm()
+    autoFetch.startCountdown()
+    autoFetch.startAutoSync()
   } catch (err) {
     toastStore.error('Failed to load form data: ' + err.message)
   }
-  loading.value = false
+  initLoading.value = false
 }
 
 function resetForm() {
@@ -415,6 +433,7 @@ async function onMaterialChange() {
     if (form.trf_type) {
       await populateTanks()
     }
+    await fetchTransferQty()
   } catch (err) {
     toastStore.error(err.message)
   }
@@ -451,7 +470,7 @@ async function populateTanks() {
   try {
     if (trfType === 'in') {
       const [sourceRes, destRes] = await Promise.all([
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: true }),
+        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false }),
         store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false })
       ])
       sourceTanks.value = sourceRes?.data || []
@@ -472,12 +491,20 @@ async function populateTanks() {
       destTanks.value = destRes?.data || []
     }
 
+    const currentPlantCode = plantSelectionStore.selectedPlantCode
+
     if (trfType === 'out') {
-      const wipTank = sourceTanks.value.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+      const findWip = (tanks) => {
+        const byPlant = currentPlantCode
+          ? tanks.find(t => String(t.id_plant || '') === String(currentPlantCode) && String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+          : null
+        return byPlant || tanks.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+      }
+      const wipTank = findWip(sourceTanks.value)
       if (wipTank) {
-        form.source_sloc = String(wipTank.id_sloc || wipTank.id_tank)
+        form.source_sloc = String(wipTank.id_sloc || wipTank.tf_number)
       } else if (sourceTanks.value.length > 0) {
-        form.source_sloc = String(sourceTanks.value[0].id_sloc || sourceTanks.value[0].id_tank)
+        form.source_sloc = String(sourceTanks.value[0].id_sloc || sourceTanks.value[0].tf_number)
       }
       await onSourceChange()
     } else {
@@ -485,11 +512,17 @@ async function populateTanks() {
     }
 
     if (trfType === 'in') {
-      const wipTank = destTanks.value.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+      const findWip = (tanks) => {
+        const byPlant = currentPlantCode
+          ? tanks.find(t => String(t.id_plant || '') === String(currentPlantCode) && String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+          : null
+        return byPlant || tanks.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
+      }
+      const wipTank = findWip(destTanks.value)
       if (wipTank) {
-        form.trf_sloc = String(wipTank.id_sloc || wipTank.id_tank)
+        form.trf_sloc = String(wipTank.id_sloc || wipTank.tf_number)
       } else if (destTanks.value.length > 0) {
-        form.trf_sloc = String(destTanks.value[0].id_sloc || destTanks.value[0].id_tank)
+        form.trf_sloc = String(destTanks.value[0].id_sloc || destTanks.value[0].tf_number)
       }
       await onDestinationChange()
     } else {
@@ -549,8 +582,18 @@ async function updateEntryNoFromSloc() {
   }
 
   let activePlantId = plantId.value
-  const t = sourceTanks.value.find(x => String(x.id_sloc || x.id_tank) === String(form.source_sloc))
-  if (t && t.id_plant) activePlantId = t.id_plant
+  if (form.trf_sloc) {
+    const tDest = destTanks.value.find(x => String(x.id_sloc || x.tf_number) === String(form.trf_sloc))
+    if (tDest && tDest.id_plant) {
+      activePlantId = tDest.id_plant
+    } else {
+      const tSource = sourceTanks.value.find(x => String(x.id_sloc || x.tf_number) === String(form.source_sloc))
+      if (tSource && tSource.id_plant) activePlantId = tSource.id_plant
+    }
+  } else {
+    const tSource = sourceTanks.value.find(x => String(x.id_sloc || x.tf_number) === String(form.source_sloc))
+    if (tSource && tSource.id_plant) activePlantId = tSource.id_plant
+  }
 
   if (activePlantId && activePlantId !== 0) {
     try {
@@ -576,7 +619,16 @@ async function fetchTransferQty() {
       idPlant: plantId.value
     })
     if (res?.status === 1) {
-      form.trf_qty = res.data?.qty || 0
+      const qty = res.data?.qty || 0
+      const label = `Stock (MT): ${qty}`
+      if (form.trf_type === 'in') {
+        destStockLabel.value = label
+      } else if (form.trf_type === 'out') {
+        sourceStockLabel.value = label
+      } else {
+        sourceStockLabel.value = label
+        destStockLabel.value = label
+      }
     } else {
       toastStore.error(res?.message || 'Fetch failed')
     }
@@ -585,9 +637,15 @@ async function fetchTransferQty() {
   }
 }
 
+function formatLastSync(isoString) {
+  if (!isoString) return '-'
+  const d = new Date(isoString)
+  return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
 async function updateStock(type) {
-  const idTank = type === 'source' ? form.source_sloc : form.trf_sloc
-  if (!form.id_material || !idTank) return
+  const idSloc = type === 'source' ? form.source_sloc : form.trf_sloc
+  if (!form.id_material || !idSloc) return
 
   const isAutoInOut = (form.trf_type === 'in' && type === 'source') || 
                       (form.trf_type === 'out' && type === 'dest')
@@ -596,10 +654,10 @@ async function updateStock(type) {
     try {
       await store.fetchSupplierCode({
         idMaterial: form.id_material,
-        idTank: idTank,
+        idSloc: idSloc,
         id_plant: plantId.value
       })
-      const code = store.supplierCode?.supplierCode || 'N/A'
+      const code = store.supplierCode?.supplierCode || store.supplierCode?.suppliercode || 'N/A'
       const label = `AUTO IN/OUT (${code})`
       if (type === 'source') {
         sourceStockLabel.value = label
@@ -615,27 +673,7 @@ async function updateStock(type) {
       }
     }
   } else {
-    try {
-      const response = await store.fetchTotalStockMaterial({
-        idMaterial: form.id_material,
-        idTank: idTank,
-        id_plant: plantId.value
-      })
-      const total = store.totalStock || 0
-      const label = `Stock (MT): ${total}`
-
-      if (type === 'source') {
-        sourceStockLabel.value = label
-      } else {
-        destStockLabel.value = label
-      }
-    } catch (err) {
-      if (type === 'source') {
-        sourceStockLabel.value = 'Stock (MT): N/A'
-      } else {
-        destStockLabel.value = 'Stock (MT): N/A'
-      }
-    }
+    await fetchTransferQty()
   }
 }
 
@@ -645,7 +683,7 @@ async function handleSubmit() {
     return
   }
 
-  loading.value = true
+  submitting.value = true
   try {
     const payload = {
       entry_no: form.entry_no,
@@ -658,26 +696,29 @@ async function handleSubmit() {
       source_sloc_no: selectedSourceTails.value,
       trf_sloc_no: selectedDestTails.value,
       material_doc: form.material_doc,
-      id_plant: plantId.value
+      id_plant: plantId.value,
+      supplierCode: store.supplierCode?.supplierCode || store.supplierCode?.suppliercode || '',
+      idSupplier: store.supplierCode?.idSupplier || store.supplierCode?.idsupplier || 0
     }
-    const response = await store.submitTransferEntry(payload)
-
-    if (response?.status === 1) {
+    const res = await store.submitTransferEntry(payload)
+    if (res?.status === 1) {
+      toastStore.success('Transfer submitted successfully')
       emit('success')
       closeModal()
-    } else {
-      toastStore.error(response?.message || 'Transfer failed')
     }
   } catch (err) {
-    toastStore.error(err.response?.data?.message || err.message || 'Error')
+    toastStore.error(err.response?.data?.message || err.message || 'Failed to submit transfer')
+  } finally {
+    submitting.value = false
   }
-  loading.value = false
 }
 
 function closeModal() {
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur()
   }
+  autoFetch.stopCountdown()
+  autoFetch.stopAutoSync()
   emit('update:isOpen', false)
 }
 

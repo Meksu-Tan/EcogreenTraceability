@@ -1,12 +1,12 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsPackage\Services\Contracts;
 
 use Illuminate\Support\Collection;
 
 interface PackageServiceInterface
 {
-    public function getDtPckEntry(): Collection;
+    public function getDtPckEntry(int $plantId = 0, int $page = 1, int $perPage = 50): array;
     public function getActiveFgProduct(): Collection;
     public function getWipMaterialByFgProduct(array $data): Collection;
     public function getCmbActiveTankPck(array $data): Collection;
@@ -17,6 +17,6 @@ interface PackageServiceInterface
     public function updatePo(string $user, array $data): array;
     public function updateBatch(string $user, array $data): array;
     public function updateSubTank(string $user, array $data): array;
-    public function generateTraceNo(int $warehouseId, int $rundownId): string;
+    public function generateTraceNo(int $materialId, int $plantId): string;
     public function getAllWarehouses(): Collection;
 }

@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsTransfer\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -23,15 +23,17 @@ class TransferController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $plantId = (int) $request->input('id_plant', 0);
+        $plantId = (int) ($request->get('plant_context')['plant_code'] ?? $request->input('id_plant', 0));
         $page = max(1, (int) $request->input('page', 1));
         $perPage = max(1, min(100, (int) $request->input('per_page', 5)));
 
         try {
             $result = $this->transferService->getTransferList($plantId, $page, $perPage);
 
+            $data = is_array($result['data']) ? $result['data'] : $result['data']->toArray();
+
             return ApiResponse::paginated(
-                $result['data']->toArray(),
+                $data,
                 $result['total'],
                 $page,
                 $perPage,
@@ -61,7 +63,7 @@ class TransferController extends Controller
                 'post_updateEntrySubTank' => $this->transferService->updateEntrySubTank(
                     $user,
                     (int) $request->input('idHead'),
-                    $request->input('idTankTail', [])
+                    $request->input('idSlocTail', [])
                 ),
                 default => ['response' => 0],
             };
@@ -168,11 +170,11 @@ class TransferController extends Controller
     {
         $plantId = (int) $request->input('id_plant', 0);
         $materialId = (int) $request->input('idMaterial');
-        $tankId = (int) $request->input('idTank');
+        $tankId = (int) $request->input('idSloc');
 
         try {
             $total = $this->transferService->getTotalStockMaterial($materialId, $tankId, $plantId);
-            return ApiResponse::success([['total' => number_format($total, 3)]]);
+            return ApiResponse::success([['total' => $total]]);
         } catch (\Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
         }
@@ -207,7 +209,7 @@ class TransferController extends Controller
             $result = $this->transferService->updateEntrySubTank(
                 $user,
                 (int) $request->input('idHead'),
-                $request->input('idTankTail', [])
+                $request->input('idSlocTail', [])
             );
             return $this->buildResponse($result, $flag, $mode);
         } catch (\Exception $e) {
@@ -219,7 +221,7 @@ class TransferController extends Controller
     {
         $plantId = (int) $request->input('id_plant', 0);
         $materialId = (int) $request->input('idMaterial');
-        $tankId = (int) $request->input('idTank');
+        $tankId = (int) $request->input('idSloc');
 
         try {
             $result = $this->transferService->getUpdateSupplierMaterial($materialId, $tankId, $plantId);
@@ -337,7 +339,7 @@ class TransferController extends Controller
      */
     public function approvalHistory(Request $request): JsonResponse
     {
-        $idBalanceHead = $request->input('id_balance_head');
+        $idBalanceHead = (int) $request->input('id_balance_head');
 
         if (!$idBalanceHead) {
             return ApiResponse::error('id_balance_head is required', 422);

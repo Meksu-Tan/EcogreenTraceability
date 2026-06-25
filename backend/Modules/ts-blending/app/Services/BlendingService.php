@@ -1,15 +1,19 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsBlending\Services;
 
 use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
 use Modules\TsBlending\Services\Contracts\BlendingServiceInterface;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
+use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
+use Modules\Shared\Traits\DbCompatTrait;
 use Exception;
 use Illuminate\Support\Facades\DB;
 
 class BlendingService implements BlendingServiceInterface
 {
+    use DbCompatTrait;
     protected $movSeq = '000';
     protected $typeBlending = '8';
 
@@ -34,13 +38,13 @@ class BlendingService implements BlendingServiceInterface
         return $this->blendingRepo->getTotalStockMaterial($materialId, $plantId);
     }
 
-    public function getTotalQtyMaterial(string $mode, string $entryNo, ?int $idHead, int $plantId): float
+    public function getTotalQtyMaterial(?string $mode, string $entryNo, ?int $idHead, int $plantId): float
     {
         $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->getTotalQtyMaterial($mode, $entryNo, $idHead, $plantId);
     }
 
-    public function getMaterialList(string $mode, string $entryNo, ?int $idHead, int $plantId): \Illuminate\Support\Collection
+    public function getMaterialList(?string $mode, string $entryNo, ?int $idHead, int $plantId): \Illuminate\Support\Collection
     {
         $plantId = (int) $this->resolvePlantCode($plantId);
         return $this->blendingRepo->getMaterialList($mode, $entryNo, $idHead, $plantId);
@@ -87,7 +91,7 @@ class BlendingService implements BlendingServiceInterface
         $entryNo = $data['entryNo'];
         $idMaterial = $data['idMaterialSource'];
         $qty = (float) str_replace(',', '', (string)$data['qty']);
-        $idTank = $data['idTank'];
+        $idSloc = $data['idSloc'];
         $mode = $data['mode'];
 
         if ($mode === 'ADD' && $this->blendingRepo->checkMaterialInTemporary($idMaterial, $entryNo, $plantId)) {
@@ -95,7 +99,7 @@ class BlendingService implements BlendingServiceInterface
         }
 
         return $this->blendingRepo->addBlendingEntryMaterial(
-            $user, $entryNo, $idMaterial, $qty, $idTank, $plantId
+            $user, $entryNo, $idMaterial, $qty, $idSloc, $plantId
         );
     }
 
@@ -104,7 +108,7 @@ class BlendingService implements BlendingServiceInterface
         return $this->blendingRepo->deleteBlendingMaterial($id);
     }
 
-    public function createMaterialDocument(string $user, int $idTraceHead, string $materialDoc, string $mode): array
+    public function createMaterialDocument(string $user, int $idTraceHead, ?string $materialDoc, string $mode): array
     {
         return $this->blendingRepo->createMaterialDocument($user, $idTraceHead, $materialDoc, $mode);
     }
@@ -125,7 +129,7 @@ class BlendingService implements BlendingServiceInterface
             DB::connection('eudr_ts')->beginTransaction();
             return $this->processBlendingTransaction(
                 $preCheck['materialEntries'], $user, $ctx['entryDate'], $ctx['plantId'],
-                $ctx['idTankTailJson'], $feedEntryNo, $ctx['entryNo'],
+                $ctx['idSlocTailJson'], $feedEntryNo, $ctx['entryNo'],
                 $ctx['idMaterial'], $ctx['materialDoc'], $ctx['totalQty']
             );
         } catch (\Throwable $e) {
@@ -140,7 +144,7 @@ class BlendingService implements BlendingServiceInterface
 
     private function buildBlendingContext(array $data, int $plantId): array
     {
-        $idTankTail = $data['tankNo'] ?? [];
+        $idSlocTail = $data['tankNo'] ?? [];
         return [
             'plantId' => (int) $this->resolvePlantCode($plantId),
             'entryNo' => $data['entry_no'],
@@ -148,40 +152,49 @@ class BlendingService implements BlendingServiceInterface
             'idMaterial' => $data['id_material'],
             'materialDoc' => $data['material_doc'],
             'totalQty' => (float) str_replace(',', '', (string)$data['qty']),
-            'idTankTailJson' => json_encode($idTankTail),
+            'idSlocTailJson' => json_encode($idSlocTail),
         ];
     }
 
     private function processBlendingTransaction(
         \Illuminate\Support\Collection $materialEntries,
         string $user, string $entryDate, int $plantId,
-        string $idTankTailJson, string $feedEntryNo, string $entryNo,
+        string $idSlocTailJson, string $feedEntryNo, string $entryNo,
         $idMaterial, $materialDoc, float $totalQty
     ): array {
         $feedResult = $this->executeBlendingFeed(
             $materialEntries, $user, $entryDate, $plantId,
-            $idTankTailJson, $feedEntryNo, $entryNo
+            $idSlocTailJson, $feedEntryNo, $entryNo
         );
         if ($feedResult['response'] !== 1) {
             DB::connection('eudr_ts')->rollBack();
             return $feedResult;
         }
+
+        // Gap 3: Explicit check for feed trace header
+        $feedTraceExists = DB::connection('eudr_ts')
+            ->select('SELECT id_trace_head FROM t_trace_header WHERE to_trace_no = ? AND status = 1 LIMIT 1', [$feedEntryNo]);
+        if (empty($feedTraceExists)) {
+            DB::connection('eudr_ts')->rollBack();
+            return ['response' => 6, 'error_detail' => 'Feed trace not created'];
+        }
+
         return $this->continueBlendingAfterFeed(
             $feedEntryNo, $plantId, $entryNo, $idMaterial, $user,
-            $entryDate, $idTankTailJson, $totalQty, $materialDoc
+            $entryDate, $idSlocTailJson, $totalQty, $materialDoc
         );
     }
 
     private function continueBlendingAfterFeed(
         string $feedEntryNo, int $plantId, string $entryNo,
         $idMaterial, string $user, string $entryDate,
-        string $idTankTailJson, float $totalQty, $materialDoc
+        string $idSlocTailJson, float $totalQty, $materialDoc
     ): array {
         $prepared = $this->prepareBlendingSupplierData($feedEntryNo, $plantId, $entryNo, $idMaterial);
         if ($prepared['response'] !== 1) return $prepared;
         $rundownResult = $this->runBlendingRundown(
             $user, $entryDate, $entryNo, $prepared, $idMaterial,
-            $idTankTailJson, $plantId, $totalQty
+            $idSlocTailJson, $plantId, $totalQty
         );
         if ($rundownResult['response'] !== 1) {
             DB::connection('eudr_ts')->rollBack();
@@ -193,18 +206,18 @@ class BlendingService implements BlendingServiceInterface
 
     private function runBlendingRundown(
         string $user, string $entryDate, string $entryNo,
-        array $prepared, int $idMaterial, string $idTankTailJson,
+        array $prepared, int $idMaterial, string $idSlocTailJson,
         int $plantId, float $totalQty
     ): array {
         $fromTraceNo = $prepared['traceData']['headers'][0]->to_trace_no;
         return $this->executeBlendingRundown(
             $user, $entryDate, $entryNo, $fromTraceNo, $idMaterial,
-            $prepared['tankId'], $idTankTailJson, $plantId,
+            $prepared['tankId'], $idSlocTailJson, $plantId,
             $prepared['inQty'], $totalQty, $prepared['supplierRows']
         );
     }
 
-    private function finalizeBlending(string $user, int $idTraceHead, string $materialDoc, string $entryNo): void
+    private function finalizeBlending(string $user, int $idTraceHead, ?string $materialDoc, string $entryNo): void
     {
         $this->blendingRepo->createMaterialDocument($user, $idTraceHead, $materialDoc, 'ADD');
         DB::connection('eudr_ts')->delete('DELETE FROM t_balance_temporary WHERE entry_no = ?', [$entryNo]);
@@ -259,15 +272,15 @@ class BlendingService implements BlendingServiceInterface
     private function executeBlendingFeed(
         \Illuminate\Support\Collection $datMaterial,
         string $user, string $entryDate, int $plantId,
-        string $idTankTailJson, string $feedEntryNo, string $entryNo
+        string $idSlocTailJson, string $feedEntryNo, string $entryNo
     ): array {
         foreach ($datMaterial as $row) {
             $qtySource = (float) str_replace(',', '', (string)$row->qty);
             if ($qtySource <= 0) continue;
             $feedResult = Feed::generalFeed([
                 'user' => $user, 'entry_date' => $entryDate,
-                'id_material' => $row->id_material, 'id_tank' => $row->id_tank,
-                'id_tank_tail' => $idTankTailJson, 'id_plant' => $plantId,
+                'id_material' => $row->id_material, 'id_sloc' => $row->tf_number,
+                'id_sloc_tail' => $idSlocTailJson, 'id_plant' => $plantId,
                 'qty' => $qtySource, 'allow_partial' => true,
                 'trace_prefixes' => [1, 2, 7, 8, 9], 'to_trace_no' => $feedEntryNo,
             ]);
@@ -290,15 +303,17 @@ class BlendingService implements BlendingServiceInterface
     {
         $batchSeq = substr($feedEntryNo, 12, 2);
         $feedId = substr($feedEntryNo, 7, 3);
-        $sql = 'SELECT to_trace_no, id_trace_head, out_qty, id_material
+        $curDateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
+        $sql = "SELECT to_trace_no, id_trace_head, out_qty, id_material
                   FROM t_trace_header
-                 WHERE SUBSTRING(to_trace_no,2,6) = DATE_FORMAT(CURDATE(), "%y%m%d")
-                   AND SUBSTRING(to_trace_no,1,1) = 8
-                   AND SUBSTRING(to_trace_no,8,3) = ?
+                 WHERE SUBSTRING(to_trace_no,2,6) = {$curDateFmt}
+                   AND SUBSTRING(to_trace_no,1,1) = '8'
+                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
+                   AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $feedId) . "
                    AND SUBSTRING(to_trace_no,13,2) = ?
                    AND status = 1 AND out_qty > 0.0001
                    AND (id_plant = ? OR ? = 0)
-                 ORDER BY id_trace_head DESC';
+                 ORDER BY id_trace_head DESC";
         $bind = [$feedId, $batchSeq, $plantId, $plantId];
 
         $checkTrace = DB::connection('eudr_ts')->select($sql . ' LIMIT 1', $bind);
@@ -323,7 +338,7 @@ class BlendingService implements BlendingServiceInterface
                 if (!isset($supplierRows[$key])) {
                     $supplierRows[$key] = ['id_supplier' => $t->id_supplier, 'batch_sap' => $t->batch_sap, 'rundownSupplier' => 0];
                 }
-                $supplierRows[$key]['rundownSupplier'] += round($t->out_qty, 4);
+                $supplierRows[$key]['rundownSupplier'] += round((float)$t->out_qty, 4);
             }
         }
         return $supplierRows;
@@ -332,19 +347,19 @@ class BlendingService implements BlendingServiceInterface
     private function findBlendingTargetTank(int $idMaterial, int $plantId): ?int
     {
         $datTank = DB::connection('eudr_ts')->select(
-            'SELECT b.id_sloc AS id_tank FROM m_material a
-               LEFT JOIN m_sloc b ON a.type = b.code_2 COLLATE utf8mb4_unicode_ci AND b.status = 1 AND b.id_plant = ?
+            'SELECT b.id_sloc AS tf_number FROM m_material a
+               LEFT JOIN m_sloc b ON a.type = b.code_2 AND b.status = 1 AND b.id_plant = ?
               WHERE a.status = 1 AND a.id_material = ?',
             [$plantId, $idMaterial]
         );
 
-        return $datTank[0]->id_tank ?? null;
+        return $datTank[0]->tf_number ?? null;
     }
 
     private function executeBlendingRundown(
         string $user, string $entryDate, string $entryNo,
-        string $fromTraceNo, int $idMaterial, int $idTank,
-        string $idTankTailJson, int $plantId, float $inQty,
+        string $fromTraceNo, int $idMaterial, int $idSloc,
+        string $idSlocTailJson, int $plantId, float $inQty,
         float $totalQty, array $supplierRows
     ): array {
         return Rundown::generalRundown([
@@ -353,8 +368,8 @@ class BlendingService implements BlendingServiceInterface
             'trace_no' => $entryNo,
             'from_trace_no' => $fromTraceNo,
             'id_material' => $idMaterial,
-            'id_tank' => $idTank,
-            'id_tank_tail' => $idTankTailJson,
+            'id_sloc' => $idSloc,
+            'id_sloc_tail' => $idSlocTailJson,
             'id_plant' => $plantId,
             'in_qty' => $inQty,
             'last_qtf' => 0,
@@ -365,13 +380,7 @@ class BlendingService implements BlendingServiceInterface
 
     protected function resolvePlantCode($plantId)
     {
-        if ($plantId) {
-            $plant = DB::connection('eudr_ts')->table('m_plant')->select('code_3')->where('id_plant', $plantId)->first();
-            if ($plant && $plant->code_3) {
-                return $plant->code_3;
-            }
-        }
-        return $plantId;
+        return resolve(PlantContextServiceInterface::class)->resolvePlantId($plantId) ?: (string) $plantId;
     }
 
     private function handleBlendingException(\Throwable $e): array

@@ -5,23 +5,7 @@
         <VRow align="center" no-gutters>
           <VCol cols="auto" class="d-flex align-center ga-2">
             <VIcon icon="ri-file-list-3-line" color="primary" size="24" />
-            <div>
-              <span class="text-h6 font-weight-bold d-block">Summary of Daily Transaction</span>
-              <div class="d-flex align-center ga-2 mt-1">
-                <span class="text-body-2 text-medium-emphasis">Location:</span>
-                <VChip
-                  size="small"
-                  color="primary"
-                  variant="tonal"
-                  prepend-icon="ri-factory-line"
-                >
-                  {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
-                </VChip>
-              </div>
-            </div>
-          </VCol>
-          <VCol cols="auto" class="ml-auto">
-            <PlantSelector />
+            <span class="text-h6 font-weight-bold d-block">Summary of Daily Transaction</span>
           </VCol>
         </VRow>
       </VCardTitle>
@@ -401,10 +385,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTsReportStore } from '@/modules/ts-tsreport/stores/tsReportStore'
-import { usePlantSelectionStore } from '@/stores/plant.js'
-import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 
-const plantSelectionStore = usePlantSelectionStore()
 const store = useTsReportStore()
 const { rmSection: rm, wipSection: wip, transferSection: transfer, pckSection: pck, shipmentSection: shipment, loading } = storeToRefs(store)
 
@@ -489,7 +470,7 @@ const loadAll = async () => {
   pageTransfer.value = 1
   pagePck.value = 1
   pageShipment.value = 1
-  const plantId = plantSelectionStore.selectedPlantId || 0
+  const plantId = 0
   await store.fetchAllSections({
     entry_date: entryDate.value,
     id_plant: plantId
@@ -497,10 +478,6 @@ const loadAll = async () => {
 }
 
 onMounted(() => {
-  loadAll()
-})
-
-watch(() => plantSelectionStore.selectedPlantId, () => {
   loadAll()
 })
 

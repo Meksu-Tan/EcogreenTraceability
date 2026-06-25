@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Material\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -147,14 +147,16 @@ class MaterialController extends Controller
      */
     public function fetchQty(Request $request): JsonResponse
     {
-        $idMaterial = $request->query('id_material');
-        $idPlant = $request->query('id_plant');
+        $idMaterial = (int) $request->query('id_material', 0);
+        $idPlant    = (int) $request->query('id_plant', 0);
 
-        // Setup placeholder untuk konfigurasi curl/HTTP request eksternal
-        // $url = config('services.external_api.url');
-        // $response = Http::get($url, ['material' => $idMaterial, 'plant' => $idPlant]);
-        // ...
+        if ($idMaterial <= 0 || $idPlant <= 0) {
+            return ApiResponse::error('id_material and id_plant are required', 422);
+        }
 
-        return ApiResponse::error('Please Connect the Database', 500);
+        $result = $this->materialService->fetchBalance($idPlant, $idMaterial);
+        return $result['status'] === 1
+            ? ApiResponse::success($result['data'], 'Balance fetched', 200)
+            : ApiResponse::error($result['message'] ?? 'Plant not found', 404);
     }
 }

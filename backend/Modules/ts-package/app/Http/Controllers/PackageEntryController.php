@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsPackage\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -21,10 +21,17 @@ class PackageEntryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $plantId = (int) ($request->get('plant_context')['plant_code'] ?? $request->input('id_plant', 0));
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 50)));
+
         try {
-            $entries = $this->packageService->getDtPckEntry();
-            return ApiResponse::success(
-                PackageEntryResource::collection($entries),
+            $result = $this->packageService->getDtPckEntry($plantId, $page, $perPage);
+            return ApiResponse::paginated(
+                is_array($result['data']) ? $result['data'] : $result['data']->values()->toArray(),
+                $result['total'],
+                $page,
+                $perPage,
                 'Package entries retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -35,7 +42,7 @@ class PackageEntryController extends Controller
     public function store(StorePackageEntryRequest $request): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $data = $request->validated();
             // In case plant needs resolving
             $data['id_plant'] = $request->get('plant_context')['plant_code'] ?? (int) $request->input('id_plant', 0);
@@ -57,7 +64,7 @@ class PackageEntryController extends Controller
     public function destroy(Request $request, $id): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $traceNo = $request->input('traceNo');
             if (!$traceNo) {
                 return ApiResponse::error('Trace number is required for cancellation.', 422);
@@ -80,7 +87,7 @@ class PackageEntryController extends Controller
     public function updatePo(UpdatePackageEntryRequest $request): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $res = $this->packageService->updatePo($user, $request->validated());
             if ($res['response'] != 1) {
                 return ApiResponse::error($res['message'] ?? 'Failed to update PO.', 400);
@@ -94,7 +101,7 @@ class PackageEntryController extends Controller
     public function updateBatch(UpdatePackageEntryRequest $request): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $res = $this->packageService->updateBatch($user, $request->validated());
             if ($res['response'] != 1) {
                 return ApiResponse::error($res['message'] ?? 'Failed to update batch.', 400);
@@ -108,7 +115,7 @@ class PackageEntryController extends Controller
     public function updateSubTank(UpdatePackageEntryRequest $request): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $res = $this->packageService->updateSubTank($user, $request->validated());
             if ($res['response'] != 1) {
                 return ApiResponse::error($res['message'] ?? 'Failed to update subtank.', 400);
@@ -132,7 +139,7 @@ class PackageEntryController extends Controller
     public function getWipMaterialByFgProduct(Request $request): JsonResponse
     {
         try {
-            $plant = $request->get('plant_context')['plant_code'];
+            $plant = ($request->get('plant_context')['plant_code'] ?? null) ?? $request->input('id_plant') ?? $request->input('plant');
             $data = [
                 'idMaterialPck' => $request->input('idMaterialPck'),
                 'tank' => $request->input('tank'),
@@ -149,7 +156,8 @@ class PackageEntryController extends Controller
     {
         try {
             $results = $this->packageService->getCmbActiveTankPck([
-                'rundownID' => $request->input('rundownID')
+                'rundownID'  => $request->input('rundownID'),
+                'plant_code' => $request->get('plant_context')['plant_code'] ?? null,
             ]);
             return ApiResponse::success($results, 'Active tanks retrieved successfully');
         } catch (\Exception $e) {
@@ -173,9 +181,10 @@ class PackageEntryController extends Controller
     {
         try {
             $results = $this->packageService->getCmbActiveSpecificTank([
-                'sloc' => $request->input('sloc')
+                'sloc' => $request->input('sloc'),
+                'fgProduct' => $request->input('fgProduct'),
             ]);
-            return ApiResponse::success($results, 'Specific tanks retrieved successfully');
+            return ApiResponse::success($results, 'Active specific tanks retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to get specific tanks: ' . $e->getMessage(), 500);
         }
@@ -183,10 +192,10 @@ class PackageEntryController extends Controller
 
     public function newTraceNo(GenerateTraceNoRequest $request): JsonResponse
     {
-        $warehouseId = (int) $request->validated('warehouse');
+        $materialId = (int) $request->validated('id_material');
         $plantId = (int) ($request->get('plant_context')['plant_code'] ?? $request->input('id_plant', 0));
         try {
-            $traceNo = $this->packageService->generateTraceNo($warehouseId, $plantId);
+            $traceNo = $this->packageService->generateTraceNo($materialId, $plantId);
             return ApiResponse::success([['traceNo' => $traceNo]]);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to generate trace number: ' . $e->getMessage(), 500);

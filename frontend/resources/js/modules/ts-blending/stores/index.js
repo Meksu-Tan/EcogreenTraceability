@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import blendingApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
+import { registerCacheResetCallback } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const useTsBlendingStore = defineStore('transactionBlending', () => {
@@ -50,10 +51,15 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     _cache[key] = Date.now()
   }
 
+  function _invalidate(key) {
+    _cache[key] = 0
+  }
+
   function resetCache() {
     resetListCache()
     Object.keys(_cache).forEach(k => { _cache[k] = 0 })
   }
+  registerCacheResetCallback(resetCache)
 
   async function fetchActiveMaterials() {
     if (_isFresh('activeMaterials') && activeMaterials.value.length > 0) return
@@ -62,9 +68,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       activeMaterials.value = response?.data || []
       _touch('activeMaterials')
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch active materials: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -73,9 +79,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.getNewEntryNo(params)
       currentEntryNo.value = response?.data?.[0]?.entryNo || ''
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to generate entry no: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -84,9 +90,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.getTotalStockMaterial(params)
       totalStock.value = parseFloat(response?.data?.[0]?.total || 0)
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch total stock: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -105,9 +111,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.getTotalQtyMaterial(params)
       totalQty.value = parseFloat(response?.data?.[0]?.total || 0)
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch total qty: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -118,9 +124,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       materialList.value = response?.data || []
       _touch('materialList')
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch material list: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -129,9 +135,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.getActiveTanksRundown(params)
       activeTanks.value = response?.data || []
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch active tanks: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -141,9 +147,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       // ApiResponse::success() wraps Collection in data.data (2 levels)
       activeSpecificTanks.value = response?.data?.data || response?.data || []
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch specific tanks: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -152,9 +158,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.getTanks(params)
       tanks.value = response?.data || []
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch tanks: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -163,9 +169,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.getTankDetails(tankId, params)
       tankDetails.value = response?.data || []
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch tank details: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -174,9 +180,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.getAllTanks(params)
       allTanks.value = response?.data || []
       return response
-    } catch (err) {
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
       toastStore.error('Failed to fetch all tanks: ' + (err.message || err))
-      throw err
+      */
     }
   }
 
@@ -187,13 +193,14 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
       const response = await blendingApi.storeMaterial(data)
       if (response?.status === 1) {
         toastStore.success('Material added to blending')
+        _invalidate('materialList')
       } else {
         toastStore.error(response?.message || 'Failed to add material')
       }
       return response
-    } catch (err) {
-      error.value = err.message
-      throw err
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
+      
+      */
     } finally {
       loading.value = false
     }
@@ -211,9 +218,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
         toastStore.error(response?.message || 'Blending execution failed')
       }
       return response
-    } catch (err) {
-      error.value = err.message
-      throw err
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
+      
+      */
     } finally {
       loading.value = false
     }
@@ -224,10 +231,11 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     error.value = null
     try {
       const response = await blendingApi.deleteMaterial(data.id)
+      _invalidate('materialList')
       return response
-    } catch (err) {
-      error.value = err.message
-      throw err
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
+      
+      */
     } finally {
       loading.value = false
     }
@@ -243,9 +251,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
         await fetchBlendingList()
       }
       return response
-    } catch (err) {
-      error.value = err.message
-      throw err
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
+      
+      */
     } finally {
       loading.value = false
     }
@@ -260,9 +268,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
         toastStore.success(response?.message || 'Material document updated')
       }
       return response
-    } catch (err) {
-      error.value = err.message
-      throw err
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
+      
+      */
     } finally {
       loading.value = false
     }
@@ -277,9 +285,9 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
         toastStore.success('Sub-tank updated')
       }
       return response
-    } catch (err) {
-      error.value = err.message
-      throw err
+    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
+      
+      */
     } finally {
       loading.value = false
     }

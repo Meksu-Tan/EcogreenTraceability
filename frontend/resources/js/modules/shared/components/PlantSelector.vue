@@ -33,7 +33,7 @@
             :title="plant.description"
             :active="plantSelectionStore.selectedPlantId === plant.id_plant"
             base-color="primary"
-            @click="selectPlant(plant.id_plant, plant.description)"
+            @click="selectPlant(plant.id_plant, plant.description, plant.code_3)"
           >
             <template #append>
               <VIcon v-if="plantSelectionStore.selectedPlantId === plant.id_plant" icon="ri-check-line" color="primary" size="16" />
@@ -60,11 +60,23 @@ const isAdmin = computed(() => {
   return authStore.hasAnyRole(['super-admin', 'admin'])
 })
 
+const plantOrder = ['EOB-1', 'EOB-2', 'EOB-3', 'EOB-5', 'EOMB']
+
 const visiblePlants = computed(() => {
-  if (isAdmin.value) {
-    return plantStore.plants
-  }
-  return authStore.user?.plants || []
+  const allPlants = isAdmin.value
+    ? plantStore.plants
+    : (authStore.user?.plants || [])
+  const active = allPlants.filter(p => p.status == 1)
+  return active.sort((a, b) => {
+    const aName = (a.code_3 || '').toUpperCase()
+    const bName = (b.code_3 || '').toUpperCase()
+    const aIdx = plantOrder.indexOf(aName)
+    const bIdx = plantOrder.indexOf(bName)
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+    if (aIdx !== -1) return -1
+    if (bIdx !== -1) return 1
+    return aName.localeCompare(bName)
+  })
 })
 
 const canSwitch = computed(() => {
@@ -72,8 +84,8 @@ const canSwitch = computed(() => {
   return visiblePlants.value.length > 1
 })
 
-function selectPlant(id, name) {
-  plantSelectionStore.setPlant(id, name)
+function selectPlant(id, name, code = '') {
+  plantSelectionStore.setPlant(id, name, code)
   emit('change', id)
 }
 
@@ -84,7 +96,7 @@ onMounted(async () => {
   if (!isAdmin.value && plantSelectionStore.selectedPlantId === null) {
     const assigned = authStore.user?.plants || []
     if (assigned.length > 0) {
-      selectPlant(assigned[0].id_plant, assigned[0].description)
+      selectPlant(assigned[0].id_plant, assigned[0].description, assigned[0].code_3 || '')
     }
   }
 })

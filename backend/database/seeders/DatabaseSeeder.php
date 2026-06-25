@@ -13,7 +13,7 @@ class DatabaseSeeder extends Seeder
             // \Database\Seeders\TankSeeder::class, // Skipped - requires manual data entry
             \Database\Seeders\MaterialSeeder::class,
             \Database\Seeders\SupplierSeeder::class,
-            // \Database\Seeders\PlantSeeder::class,
+            \Database\Seeders\PlantSeeder::class,
             // \Database\Seeders\StorageSeeder::class,
         ]);
     }

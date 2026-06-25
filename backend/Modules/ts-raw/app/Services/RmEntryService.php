@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Services;
 
 use Modules\TsRaw\Repositories\Contracts\RmEntryRepositoryInterface;
@@ -16,11 +17,6 @@ class RmEntryService implements RmEntryServiceInterface
     public function __construct(
         protected RmEntryRepositoryInterface $rmEntryRepo
     ) {}
-
-    private function isPgsql(): bool
-    {
-        return DB::connection('eudr_ts')->getDriverName() === 'pgsql';
-    }
 
     private function jsonArrayContains(string $col, string $param): string
     {
@@ -42,9 +38,9 @@ class RmEntryService implements RmEntryServiceInterface
         return $this->rmEntryRepo->getNewNumber($plantId);
     }
 
-    public function generateTransferNumber($plantId): ?string
+    public function generateTransferNumber($plantId, $tankDescOrId = null): ?string
     {
-        return $this->rmEntryRepo->getTransferNumber($plantId);
+        return $this->rmEntryRepo->getTransferNumber($plantId, $tankDescOrId);
     }
 
     public function getTanks($plantId): array
@@ -180,7 +176,7 @@ class RmEntryService implements RmEntryServiceInterface
                 throw new Exception('Insufficient quantity in source tank');
             }
 
-            $transferNo = $this->rmEntryRepo->generateTransferNumber($data['id_plant']);
+            $transferNo = $this->rmEntryRepo->generateTransferNumber($data['id_plant'], $sourceBalance->id_sloc);
 
             $destBalance = $this->rmEntryRepo->createTransferBalance([
                 'entry_date' => $data['entry_date'],
@@ -227,9 +223,9 @@ class RmEntryService implements RmEntryServiceInterface
         }
     }
 
-    // ──────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //  Supporting Methods for Transfer Entry (standalone)
-    // ──────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     public function getActiveMaterialsForTransfer(): array
     {
@@ -263,7 +259,7 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function getLockStatus(string $entryDate): bool
     {
-        return $this->rmEntryRepo->getLockStatus($entryDate);
+        return \Modules\Shared\Services\PeriodLockService::isLocked($entryDate);
     }
 
     /**
@@ -341,6 +337,7 @@ class RmEntryService implements RmEntryServiceInterface
         );
         $totalReserve = (float) ($totalStock[0]->qty ?? 0);
 
+        $qty = (float) $qty;
         if (round($totalReserve - $qty, 4) < 0) {
             return ['response' => 4, 'message' => 'Insufficient stock in source tank'];
         }
@@ -390,21 +387,8 @@ class RmEntryService implements RmEntryServiceInterface
                 // Step 4: Create material document
                 if (!empty($materialDoc)) {
                     $traceHeadId = $rundownResult['id_trace_head'];
-                    $existingDoc = DB::connection('eudr_ts')->table('t_material_document')
-                        ->where('id_trace_head', $traceHeadId)
-                        ->first();
-
-                    if ($existingDoc) {
-                        DB::connection('eudr_ts')->table('t_material_document')
-                            ->where('id_trace_head', $traceHeadId)
-                            ->update(['material_document' => $materialDoc, 'updated_by' => $user]);
-                    } else {
-                        DB::connection('eudr_ts')->table('t_material_document')->insert([
-                            'id_trace_head' => $traceHeadId,
-                            'material_document' => $materialDoc,
-                            'created_by' => $user,
-                        ]);
-                    }
+                    app(\Modules\Shared\Services\TransactionCoreService::class)
+                        ->createMaterialDocument($user, $traceHeadId, $materialDoc, 'ADD');
                 }
 
                 return $rundownResult;
@@ -493,60 +477,37 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function getStorageTanks($plantId): array
     {
+        $resolvedPlant = null;
         if ($plantId) {
             if (is_numeric($plantId)) {
-                $plant = $this->rmEntryRepo->findPlantById($plantId);
+                $plant = $this->rmEntryRepo->findPlantById((int)$plantId);
                 if ($plant && $plant->code_3) {
-                    $plantId = $plant->code_3;
+                    $resolvedPlant = $plant->code_3;
                 }
+            } elseif ($plantId !== '0') {
+                $resolvedPlant = (string)$plantId;
             }
         }
 
-        $query = \Modules\Tank\Models\Tank::active()->storage();
-
-        if ($plantId) {
-            $query->where('id_plant', $plantId);
-        }
-
-        return $query->orderBy('description')
-            ->groupBy('description', 'id_plant')
-            ->get(['description as tank', 'id_plant'])
+        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+            ->getActiveTanksByKeywords(['STORAGE'], $resolvedPlant)
             ->toArray();
     }
 
-    public function getSpecificTankDetails($tankId, $plantId): array
+    public function getSpecificTankDetails(string $tankId, mixed $plantId): array
     {
-        if ($plantId) {
-            if (is_numeric($plantId)) {
-                $plant = $this->rmEntryRepo->findPlantById($plantId);
-                if ($plant && $plant->code_3) {
-                    $plantId = $plant->code_3;
-                }
-            }
-        }
+        $slocId = is_numeric($tankId)
+            ? (int)$tankId
+            : (int)(\Illuminate\Support\Facades\DB::table('m_sloc')
+                ->where('description', $tankId)
+                ->where('status', 1)
+                ->value('id_sloc') ?? 0);
 
-        $tanksQuery = \Modules\Tank\Models\Tank::active()->where('description', $tankId);
-        if ($plantId) {
-            $tanksQuery->where('id_plant', $plantId);
-        }
-        $tanks = $tanksQuery->get();
+        if (!$slocId) return [];
 
-        $result = [];
-        foreach ($tanks as $tank) {
-            if (!empty($tank->id_tank)) {
-                $result[] = [
-                    'id_tank_tail' => $tank->id_sloc,
-                    'tankNo' => $tank->id_tank,
-                    'id_sloc' => $tank->id_sloc
-                ];
-            }
-        }
-
-        usort($result, function($a, $b) {
-            return strcmp($a['tankNo'], $b['tankNo']);
-        });
-
-        return $result;
+        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+            ->getActiveSpecificTanksRundown($slocId)
+            ->toArray();
     }
 
     public function getRmMaterials(): array
@@ -591,22 +552,19 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function getDestTanksList($plantId): array
     {
+        $resolvedPlant = null;
         if ($plantId) {
             $plant = Plant::find($plantId);
             if ($plant && $plant->code_3) {
-                $plantId = $plant->code_3;
+                $resolvedPlant = $plant->code_3;
+            } elseif ($plantId !== '0' && $plantId !== 0) {
+                $resolvedPlant = (string) $plantId;
             }
         }
-        $query = \Modules\Tank\Models\Tank::active()
-            ->feed()
-            ->orderBy('description')
-            ->groupBy('description', 'id_plant');
-        
-        if ($plantId && $plantId !== '0' && $plantId !== 0) {
-            $query->where('id_plant', $plantId);
-        }
-        
-        return $query->get(['description as tank', 'id_plant'])->toArray();
+
+        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+            ->getActiveTanksByKeywords(['FEED'], $resolvedPlant)
+            ->toArray();
     }
 
     public function saveMatlDoc(string $mode, int $id, string $number, string $user): array
@@ -617,9 +575,9 @@ class RmEntryService implements RmEntryServiceInterface
         return ['success' => $res['response'] === 1, 'status' => $res['response']];
     }
 
-    public function updateSubTankSlocTail(int $idHead, $idTankTail, string $user): array
+    public function updateSubTankSlocTail(int $idHead, $idSlocTail, string $user): array
     {
-        $tails = is_array($idTankTail) ? $idTankTail : [$idTankTail];
+        $tails = is_array($idSlocTail) ? $idSlocTail : [$idSlocTail];
         return $this->rmEntryRepo->updateEntrySubTank($user, $idHead, $tails);
     }
 

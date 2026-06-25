@@ -56,7 +56,6 @@ export function createAppRouter(moduleRoutes = []) {
     const authStore = useAuthStore()
     const plantSelectionStore = usePlantSelectionStore()
 
-    // Check if user has token in localStorage
     const hasToken = localStorage.getItem('auth_token')
 
     if (to.meta.requiresAuth && !hasToken) {
@@ -64,19 +63,18 @@ export function createAppRouter(moduleRoutes = []) {
     }
 
     if (to.meta.requiresAuth && !authStore.isAuthenticated && hasToken) {
-      await authStore.fetchUser()
+      await authStore.initialize()
     }
 
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
       return { name: 'login' }
     }
 
-    if (to.path === '/login' && authStore.isAuthenticated) {
+    if (to.name === 'login' && authStore.isAuthenticated) {
       return { name: 'dashboard' }
     }
 
-    const resetRoutes = ['dashboard', 'login', 'setup', 'admin']
-    if (resetRoutes.some(r => to.path.includes(r))) {
+    if (to.name === 'plant-selection') {
       plantSelectionStore.clearPlant()
     }
 

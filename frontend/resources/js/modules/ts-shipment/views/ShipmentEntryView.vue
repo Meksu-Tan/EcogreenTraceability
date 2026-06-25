@@ -80,6 +80,8 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty')">Qty (MT)<VIcon v-if="sortKey==='qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier')">Supplier Qty (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:200px">Supplier / Batch SAP / Qty</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
               </tr>
             </thead>
@@ -112,6 +114,8 @@
                     </VChip>
                   </template>
                 </td>
+                <td class="text-caption text-medium-emphasis">{{ row.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ row.created_by }}</td>
                 <td class="text-center">
                   <div class="d-flex justify-center gap-1">
                     <VBtn icon="ri-article-line" size="x-small" color="primary" variant="tonal" @click="openSoModal(row)" title="Edit SO No" />
@@ -123,7 +127,7 @@
             </tbody>
             <tbody v-else>
               <tr>
-                <td colspan="11" class="text-center pa-8">
+                <td colspan="13" class="text-center pa-8">
                   <VIcon icon="ri-inbox-2-line" size="40" class="text-disabled mb-2" />
                   <p class="text-body-2 text-medium-emphasis">No shipment data yet</p>
                 </td>

@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsWip\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -24,7 +24,7 @@ class WipEntryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         $data = $this->wipEntryService->index($plantId);
 
         return ApiResponse::success($data, 'OK', 200);
@@ -41,7 +41,7 @@ class WipEntryController extends Controller
     public function storeFeed(Request $request): JsonResponse
     {
         $user = Auth::user()->name ?? 'System';
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->postMaterialFeed(array_merge($request->all(), ['id_plant' => $plantId]), $user), 'OK', 200);
     }
 
@@ -60,21 +60,21 @@ class WipEntryController extends Controller
     public function storeRundown(Request $request): JsonResponse
     {
         $user = Auth::user()->name ?? 'System';
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->postMaterialRundown(array_merge($request->all(), ['id_plant' => $plantId]), $user), 'OK', 200);
     }
 
     public function updateSubTank(Request $request): JsonResponse
     {
         $user = Auth::user()->name ?? 'System';
-        return ApiResponse::success($this->wipEntryService->updateEntrySubTank((int) $request->input('idHead'), $request->input('idTankTail', []), $user), 'OK', 200);
+        return ApiResponse::success($this->wipEntryService->updateEntrySubTank((int) $request->input('idHead'), $request->input('idSlocTail', []), $user), 'OK', 200);
     }
 
     // GET Methods
 
     public function getBalance(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         $page = max(1, (int) $request->input('page', 1));
         $perPage = max(1, (int) $request->input('per_page', 5));
         $res = $this->wipEntryService->getBalance((string)$request->input('rundownId'), $plantId, $request->input('subgroup'), $page, $perPage);
@@ -83,7 +83,7 @@ class WipEntryController extends Controller
 
     public function getFeed(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         $page = max(1, (int) $request->input('page', 1));
         $perPage = max(1, (int) $request->input('per_page', 5));
         $mode = $request->input('mode', 'LATEST');
@@ -94,7 +94,7 @@ class WipEntryController extends Controller
 
     public function getRundown(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         $page = max(1, (int) $request->input('page', 1));
         $perPage = max(1, (int) $request->input('per_page', 5));
         $mode = $request->input('mode', 'LATEST');
@@ -105,37 +105,37 @@ class WipEntryController extends Controller
 
     public function getFeedNewBatchNumber(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->getFeedNewBatchNumber($request->input('feedID'), $plantId), 'OK', 200);
     }
 
     public function getRundownNewBatchNumber(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->getRundownNewBatchNumber($request->input('rundownID'), $plantId), 'OK', 200);
     }
 
     public function getFeedLastBatch(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->getFeedLastBatch($request->input('feedID'), $plantId), 'OK', 200);
     }
 
     public function getRundownLastBatch(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->getRundownLastBatch($request->input('rundownID'), $plantId), 'OK', 200);
     }
 
     public function getActiveTanksForFeed(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->getActiveTanksForFeed($request->input('feedID'), $plantId), 'OK', 200);
     }
 
     public function getActiveTanksForRundown(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->getActiveTanksForRundown($request->input('rundownID'), $plantId, $request->input('subgroup')), 'OK', 200);
     }
 
@@ -155,19 +155,19 @@ class WipEntryController extends Controller
 
     public function getWipTree(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->getWipTree($plantId), 'OK', 200);
     }
 
     public function getNewFeedNumber(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->generateNewFeedNumber($request->input('feedId'), $plantId), 'OK', 200);
     }
 
     public function getNewRundownNumber(Request $request): JsonResponse
     {
-        $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         return ApiResponse::success($this->wipEntryService->generateNewRundownNumber($request->input('rundownId'), $plantId, $request->input('subgroup')), 'OK', 200);
     }
 

@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsShipment\Services;
 
 use Modules\TsShipment\Services\Contracts\ShipmentServiceInterface;
@@ -12,9 +12,9 @@ class ShipmentService implements ShipmentServiceInterface
         protected ShipmentRepositoryInterface $shipmentRepo
     ) {}
 
-    public function getDtShipEntry(): Collection
+    public function getDtShipEntry(int $plantId = 0, int $page = 1, int $perPage = 50): array
     {
-        return $this->shipmentRepo->getDtShipEntry();
+        return $this->shipmentRepo->getDtShipEntry($plantId, $page, $perPage);
     }
 
     public function getActiveFgProduct(): Collection
@@ -47,9 +47,9 @@ class ShipmentService implements ShipmentServiceInterface
         return $this->shipmentRepo->updateSo($user, $data);
     }
 
-    public function generateTraceNo(int $plantId): string
+    public function generateTraceNo(int $materialId, int $plantId): string
     {
-        return $this->shipmentRepo->generateTraceNo($plantId);
+        return $this->shipmentRepo->generateTraceNo($materialId, $plantId);
     }
 
     public function getShipmentBatchPackaging(array $data): Collection

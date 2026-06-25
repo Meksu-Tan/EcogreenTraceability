@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Auth\Services;
 
 use Modules\Auth\Repositories\Contracts\AuthRepositoryInterface;

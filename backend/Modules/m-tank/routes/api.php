@@ -1,9 +1,11 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 use Modules\Tank\Http\Controllers\TankController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::get('tanks', [TankController::class, 'index']);
+    Route::get('tanks/last-sync', [TankController::class, 'lastSync']);
     Route::post('tanks/sync', [TankController::class, 'sync']);
     Route::post('tanks', [TankController::class, 'store']);
     Route::put('tanks/{id}', [TankController::class, 'update']);

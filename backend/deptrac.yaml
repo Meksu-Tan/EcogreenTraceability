@@ -1,0 +1,30 @@
+parameters:
+  paths:
+    - ./app
+    - ./Modules
+  layers:
+    - name: Controller
+      collectors:
+        - type: classNameRegex
+          value: /.*\\\\Http\\\\Controllers\\\\.*/
+    - name: Service
+      collectors:
+        - type: classNameRegex
+          value: /.*\\\\Services\\\\.*/
+    - name: Repository
+      collectors:
+        - type: classNameRegex
+          value: /.*\\\\Repositories\\\\.*/
+    - name: Model
+      collectors:
+        - type: classNameRegex
+          value: /.*\\\\Models\\\\.*/
+  ruleset:
+    Controller:
+      - Service
+    Service:
+      - Repository
+      - Model
+    Repository:
+      - Model
+    Model: ~

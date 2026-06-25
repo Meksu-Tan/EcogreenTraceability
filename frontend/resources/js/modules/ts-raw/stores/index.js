@@ -316,7 +316,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
       await fetchSupplierList(entryNo)
       await fetchTotalQty(entryNo)
 
-      const tempTotal = parseFloat(totalQty.value.replace(/,/g, ''))
+      const tempTotal = parseFloat(String(totalQty.value ?? '0').replace(/,/g, ''))
 
       if (supplierList.value.length === 0) {
         return {
@@ -354,7 +354,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     loading.value = true
     try {
       const response = await rmEntryRepo.getStorageLog(params.id_plant || 0)
-      storageLogs.value = Array.isArray(response) ? response : []
+      storageLogs.value = Array.isArray(response) ? response : (response && Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       storageLogs.value = []
     } finally {
@@ -366,7 +366,7 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     feedLoading.value = true
     try {
       const response = await rmEntryRepo.getFeedLog(params)
-      feedLogs.value = Array.isArray(response) ? response : []
+      feedLogs.value = Array.isArray(response) ? response : (response && Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       feedLogs.value = []
     } finally {

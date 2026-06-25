@@ -31,9 +31,9 @@
             <div v-else class="mt-2 pa-2 border rounded overflow-y-auto" style="max-height: 192px;">
               <VCheckbox
                 v-for="tank in availableTanks"
-                :key="tank.id_tank_tail"
+                :key="tank.id_sloc_tail"
                 v-model="selectedTails"
-                :value="String(tank.id_tank_tail)"
+                :value="String(tank.id_sloc_tail)"
                 :label="tank.tankNo || tank.tf_number"
                 density="compact"
                 hide-details
@@ -80,9 +80,9 @@ import { useTsBlendingStore } from '../stores'
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
   idHead: { type: [String, Number], default: null },
-  idTank: { type: [String, Number], default: null },
+  idSloc: { type: [String, Number], default: null },
   mainSloc: { type: String, default: '' },
-  idTankTail: { type: Array, default: () => [] }
+  idSlocTail: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['update:isOpen', 'success'])
@@ -100,7 +100,7 @@ function closeModal() {
 async function loadTanks() {
   loadingTanks.value = true
   try {
-    const response = await blendingStore.fetchActiveSpecificTanksRundown({ sloc: props.idTank })
+    const response = await blendingStore.fetchActiveSpecificTanksRundown({ sloc: props.idSloc })
     availableTanks.value = response?.data || []
   } catch (err) {
     errorMsg.value = 'Failed to load tanks'
@@ -114,7 +114,7 @@ async function handleSave() {
   try {
     const response = await blendingStore.updateSubTank({
       idHead: props.idHead,
-      idTankTail: selectedTails.value
+      idSlocTail: selectedTails.value
     })
     if (response?.status === 1) {
       emit('success')
@@ -128,7 +128,7 @@ async function handleSave() {
 
 watch(() => props.isOpen, (val) => {
   if (val) {
-    selectedTails.value = [...(props.idTankTail || [])].map(String)
+    selectedTails.value = [...(props.idSlocTail || [])].map(String)
     errorMsg.value = ''
     loadTanks()
   }

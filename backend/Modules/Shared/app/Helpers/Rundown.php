@@ -1,10 +1,11 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
 
 /**
- * Rundown helper — balance header creation / accumulation engine.
+ * Rundown helper Ã¢â‚¬â€ balance header creation / accumulation engine.
  *
  * RAW SQL DEBT (C07): The t_balance_header EXISTS check and supplier
  * dedup queries remain as raw SQL because of JSON_CONTAINS predicates
@@ -19,6 +20,8 @@ class Rundown
 {
     protected $connection = 'eudr_ts';
 
+
+
     /**
      * Insert a new rundown balance entry together with all its supplier rows.
      *
@@ -31,42 +34,36 @@ class Rundown
 
         return DB::connection($connection)->transaction(function () use ($data, $connection) {
 
-            // CHECK IF BALANCE HEADER ALREADY EXISTS FOR THIS TRACE_NO
-            // Handle id_sloc as JSON array string, single int, or array
+            // Since id_sloc in t_balance_header has been migrated to INTEGER,
+            // we extract the single integer value directly and query it as a plain integer.
             $idSloc = $data['id_sloc'];
             $decoded = is_string($idSloc) ? json_decode($idSloc, true) : null;
             if (is_array($decoded)) {
-                // Already a JSON array string — pass directly as target
-                $existingHead = DB::connection($connection)->select(
-                    'SELECT id_balance_head, qty, in_qty, init_qty
-                       FROM t_balance_header
-                      WHERE trace_no = ?
-                        AND id_material = ?
-                        AND JSON_CONTAINS(id_sloc, ?)
-                        AND status = 1
-                      LIMIT 1 FOR UPDATE',
-                    [$data['trace_no'], $data['id_material'], $idSloc]
-                );
+                $slocInt = (int) ($decoded[0] ?? 0);
+            } elseif (is_array($idSloc)) {
+                $slocInt = (int) ($idSloc[0] ?? 0);
             } else {
-                // Single value — wrap with JSON_ARRAY
-                $existingHead = DB::connection($connection)->select(
-                    'SELECT id_balance_head, qty, in_qty, init_qty
-                       FROM t_balance_header
-                      WHERE trace_no = ?
-                        AND id_material = ?
-                        AND JSON_CONTAINS(id_sloc, JSON_ARRAY(?))
-                        AND status = 1
-                      LIMIT 1 FOR UPDATE',
-                    [$data['trace_no'], $data['id_material'], $idSloc]
-                );
+                $slocInt = (int) $idSloc;
             }
+
+            $existingHead = DB::connection($connection)->select(
+                "SELECT id_balance_head, qty, in_qty, init_qty
+                   FROM t_balance_header
+                  WHERE trace_no = ?
+                    AND id_material = ?
+                    AND id_sloc = ?
+                    AND status = 1
+                  LIMIT 1 FOR UPDATE",
+                [$data['trace_no'], $data['id_material'], $slocInt]
+            );
 
             if (!empty($existingHead)) {
                 // UPDATE EXISTING BALANCE HEADER
                 $idHead = $existingHead[0]->id_balance_head;
-                $newQty = round($existingHead[0]->qty + $data['in_qty'], 4);
-                $newInQty = round($existingHead[0]->in_qty + $data['in_qty'], 4);
-                $newInitQty = round($existingHead[0]->init_qty + $data['in_qty'], 4);
+                $inQtyFloat = (float) $data['in_qty'];
+                $newQty = round((float) $existingHead[0]->qty + $inQtyFloat, 4);
+                $newInQty = round((float) $existingHead[0]->in_qty + $inQtyFloat, 4);
+                $newInitQty = round((float) $existingHead[0]->init_qty + $inQtyFloat, 4);
 
                 DB::connection($connection)->table('t_balance_header')
                     ->where('id_balance_head', $idHead)
@@ -77,7 +74,6 @@ class Rundown
                         'updated_by' => $data['user'],
                     ]);
 
-                // INSERT TRACE HEADER (represents new inbound flow into existing balance)
                 $idTraceHead = DB::connection($connection)->table('t_trace_header')->insertGetId([
                     'from_trace_no' => $data['from_trace_no'] ?? null,
                     'to_trace_no' => $data['trace_no'],
@@ -90,21 +86,21 @@ class Rundown
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
                     'id_plant' => $data['id_plant'],
                     'created_by' => $data['user'],
-                ]);
+                ], 'id_trace_head');
             } else {
                 // INSERT NEW BALANCE HEADER
                 $idHead = DB::connection($connection)->table('t_balance_header')->insertGetId([
                     'entry_date' => $data['entry_date'],
                     'trace_no' => $data['trace_no'],
                     'id_material' => $data['id_material'],
-                    'id_sloc' => $data['id_sloc'] ?? '[]',
+                    'id_sloc' => $slocInt,
                     'qty' => $data['in_qty'],
                     'in_qty' => $data['in_qty'],
                     'out_qty' => 0,
                     'init_qty' => $data['in_qty'],
                     'id_plant' => $data['id_plant'],
                     'created_by' => $data['user'],
-                ]);
+                ], 'id_balance_head');
 
                 // INSERT TRACE HEADER
                 $idTraceHead = DB::connection($connection)->table('t_trace_header')->insertGetId([
@@ -119,14 +115,14 @@ class Rundown
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
                     'id_plant' => $data['id_plant'],
                     'created_by' => $data['user'],
-                ]);
+                ], 'id_trace_head');
             }
 
             // INSERT/UPDATE SUPPLIER ROWS (balance_detail + trace_detail)
             foreach ($data['supplier_rows'] as $row) {
                 $idSupplier = $row['id_supplier'];
                 $batchSap = $row['batch_sap'];
-                $qty = round($row['rundownSupplier'], 4);
+                $qty = round((float) $row['rundownSupplier'], 4);
 
                 if ($qty <= 0) continue;
 
@@ -157,7 +153,7 @@ class Rundown
                         'batch_sap' => $batchSap,
                         'id_plant' => $data['id_plant'],
                         'created_by' => $data['user'],
-                    ]);
+                    ], 'id_balance_tail');
 
                     // INSERT TRACE DETAIL
                     DB::connection($connection)->table('t_trace_detail')->insert([
@@ -176,7 +172,7 @@ class Rundown
                     // ACCUMULATE INTO EXISTING ROW (multi-feed scenario)
                     $idTail = $existing[0]->id_balance_tail;
                     $idTraceTail = $existing[0]->id_trace_tail;
-                    $newQty = round($existing[0]->in_qty + $qty, 4);
+                    $newQty = round((float) $existing[0]->in_qty + $qty, 4);
 
                     DB::connection($connection)->table('t_balance_detail')
                         ->where('id_balance_tail', $idTail)

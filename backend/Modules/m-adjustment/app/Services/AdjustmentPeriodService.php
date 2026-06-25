@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Services;
 
 use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
@@ -14,11 +14,11 @@ class AdjustmentPeriodService implements AdjustmentPeriodServiceInterface
         protected AuditService $auditService
     ) {}
 
-    // ——— Period Adjustment ———
+    // â€”â€”â€” Period Adjustment â€”â€”â€”
 
-    public function getPeriodHeaders(): array
+    public function getPeriodHeaders(array $filters = []): array
     {
-        return $this->repository->getPeriodHeaders();
+        return $this->repository->getPeriodHeaders($filters);
     }
 
     public function getPeriodViewData(int $idHead): array
@@ -64,7 +64,7 @@ class AdjustmentPeriodService implements AdjustmentPeriodServiceInterface
         return $this->repository->getLastAdjustmentRecord($plantId);
     }
 
-    // ——— WHX (Warehouse) ———
+    // â€”â€”â€” WHX (Warehouse) â€”â€”â€”
 
     public function storeAdjustmentWhx(string $user, array $data, mixed $plantId): array
     {

@@ -1,33 +1,26 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Shared\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Modules\Shared\Services\Contracts\PeriodLockServiceInterface;
 
-class PeriodLockService
+class PeriodLockService implements PeriodLockServiceInterface
 {
-    /**
-     * Check if a period is locked.
-     * Uses m_period_lock table (with fallback to t_report_pspa_head.lock_status).
-     *
-     * @param string $date Date in Y-m-d format
-     * @return bool True if period is locked
-     */
     public static function isLocked(string $date): bool
     {
         $lockDateTime = new \DateTime($date);
         $lockYear = $lockDateTime->format('Y');
         $lockMonth = $lockDateTime->format('m');
 
-        // Try m_period_lock first (primary table)
         try {
             $rows = DB::connection('eudr_ts')->select(
                 'SELECT lock_status
                    FROM m_period_lock
                   WHERE status = 1
-                    AND YEAR(period) = ?
-                    AND MONTH(period) = ?',
+                    AND EXTRACT(YEAR FROM period) = ?
+                    AND EXTRACT(MONTH FROM period) = ?',
                 [$lockYear, $lockMonth]
             );
 
@@ -35,18 +28,16 @@ class PeriodLockService
                 return true;
             }
         } catch (\Illuminate\Database\QueryException $e) {
-            // m_period_lock table doesn't exist, fallback to t_report_pspa_head
             Log::debug('PeriodLockService: m_period_lock not found, using fallback');
         }
 
-        // Fallback: check t_report_pspa_head.lock_status
         try {
             $rows = DB::connection('eudr_ts')->select(
                 'SELECT lock_status
                    FROM t_report_pspa_head
                   WHERE status = 1
-                    AND YEAR(period) = ?
-                    AND MONTH(period) = ?',
+                    AND EXTRACT(YEAR FROM period) = ?
+                    AND EXTRACT(MONTH FROM period) = ?',
                 [$lockYear, $lockMonth]
             );
 
@@ -60,42 +51,34 @@ class PeriodLockService
         return false;
     }
 
-    /**
-     * Lock a period.
-     *
-     * @param string $date Date in Y-m-d format
-     * @param string $user User performing the lock
-     * @param string|null $reason Reason for locking
-     * @return array ['response' => int, 'message' => string]
-     */
     public static function lock(string $date, string $user, ?string $reason = null): array
     {
         $lockDateTime = new \DateTime($date);
-        $period = $lockDateTime->format('Y-m-01'); // First day of month
+        $period = $lockDateTime->format('Y-m-01');
 
         try {
             $existing = DB::connection('eudr_ts')->select(
                 'SELECT id, lock_status FROM m_period_lock
-                 WHERE YEAR(period) = YEAR(?) AND MONTH(period) = MONTH(?) AND status = 1',
+                 WHERE EXTRACT(YEAR FROM period) = EXTRACT(YEAR FROM ?::date)
+                   AND EXTRACT(MONTH FROM period) = EXTRACT(MONTH FROM ?::date)
+                   AND status = 1',
                 [$period, $period]
             );
 
             if (!empty($existing)) {
-                // Update existing
                 if ($existing[0]->lock_status === '1') {
                     return ['response' => 2, 'message' => 'Period already locked'];
                 }
 
                 DB::connection('eudr_ts')->update(
-                    'UPDATE m_period_lock SET lock_status = "1", locked_by = ?, locked_at = NOW(), reason = ?, updated_by = ?
+                    'UPDATE m_period_lock SET lock_status = \'1\', locked_by = ?, locked_at = CURRENT_TIMESTAMP, reason = ?, updated_by = ?
                      WHERE id = ?',
                     [$user, $reason, $user, $existing[0]->id]
                 );
             } else {
-                // Insert new
                 DB::connection('eudr_ts')->insert(
                     'INSERT INTO m_period_lock (period, lock_status, locked_by, locked_at, reason, created_by)
-                     VALUES (?, "1", ?, NOW(), ?, ?)',
+                     VALUES (?, \'1\', ?, CURRENT_TIMESTAMP, ?, ?)',
                     [$period, $user, $reason, $user]
                 );
             }
@@ -107,13 +90,6 @@ class PeriodLockService
         }
     }
 
-    /**
-     * Unlock a period.
-     *
-     * @param string $date Date in Y-m-d format
-     * @param string $user User performing the unlock
-     * @return array ['response' => int, 'message' => string]
-     */
     public static function unlock(string $date, string $user): array
     {
         $lockDateTime = new \DateTime($date);
@@ -122,7 +98,9 @@ class PeriodLockService
         try {
             $existing = DB::connection('eudr_ts')->select(
                 'SELECT id, lock_status FROM m_period_lock
-                 WHERE YEAR(period) = YEAR(?) AND MONTH(period) = MONTH(?) AND status = 1',
+                 WHERE EXTRACT(YEAR FROM period) = EXTRACT(YEAR FROM ?::date)
+                   AND EXTRACT(MONTH FROM period) = EXTRACT(MONTH FROM ?::date)
+                   AND status = 1',
                 [$period, $period]
             );
 
@@ -135,7 +113,7 @@ class PeriodLockService
             }
 
             DB::connection('eudr_ts')->update(
-                'UPDATE m_period_lock SET lock_status = "0", unlocked_by = ?, unlocked_at = NOW(), updated_by = ?
+                'UPDATE m_period_lock SET lock_status = \'0\', unlocked_by = ?, unlocked_at = CURRENT_TIMESTAMP, updated_by = ?
                  WHERE id = ?',
                 [$user, $user, $existing[0]->id]
             );
@@ -147,13 +125,6 @@ class PeriodLockService
         }
     }
 
-    /**
-     * Get lock status for a date range.
-     *
-     * @param string $startDate Start date in Y-m-d format
-     * @param string $endDate End date in Y-m-d format
-     * @return array List of locked periods
-     */
     public static function getLockedPeriods(string $startDate, string $endDate): array
     {
         try {
@@ -161,7 +132,7 @@ class PeriodLockService
                 'SELECT period, lock_status, locked_by, locked_at
                    FROM m_period_lock
                   WHERE status = 1
-                    AND lock_status = "1"
+                    AND lock_status = 1
                     AND period BETWEEN ? AND ?
                   ORDER BY period ASC',
                 [$startDate, $endDate]

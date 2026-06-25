@@ -31,32 +31,41 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_get_dt_ship_entry_to_repository(): void
     {
-        $expected = collect([
-            (object) ['id_ship' => 1, 'trace_no' => 'SHP001'],
-            (object) ['id_ship' => 2, 'trace_no' => 'SHP002'],
-        ]);
+        $expected = [
+            'data' => collect([
+                (object) ['id_ship' => 1, 'trace_no' => 'SHP001'],
+                (object) ['id_ship' => 2, 'trace_no' => 'SHP002'],
+            ]),
+            'total' => 2,
+        ];
 
         $this->repoMock->shouldReceive('getDtShipEntry')
             ->once()
-            ->withNoArgs()
+            ->with(0, 1, 50)
             ->andReturn($expected);
 
-        $result = $this->service->getDtShipEntry();
+        $result = $this->service->getDtShipEntry(0, 1, 50);
 
         $this->assertSame($expected, $result);
-        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertIsArray($result);
     }
 
     public function test_it_returns_empty_collection_when_no_dt_ship_entry(): void
     {
+        $expected = [
+            'data' => collect([]),
+            'total' => 0,
+        ];
+
         $this->repoMock->shouldReceive('getDtShipEntry')
             ->once()
-            ->andReturn(collect([]));
+            ->with(0, 1, 50)
+            ->andReturn($expected);
 
-        $result = $this->service->getDtShipEntry();
+        $result = $this->service->getDtShipEntry(0, 1, 50);
 
-        $this->assertInstanceOf(Collection::class, $result);
-        $this->assertEmpty($result);
+        $this->assertIsArray($result);
+        $this->assertEmpty($result['data']);
     }
 
     // ========== getActiveFgProduct ==========
@@ -228,12 +237,12 @@ class ShipmentServiceTest extends TestCase
     {
         $this->repoMock->shouldReceive('generateTraceNo')
             ->once()
-            ->with(1)
-            ->andReturn('7260603SHP001');
+            ->with(1, 1)
+            ->andReturn('5260603010101');
 
-        $result = $this->service->generateTraceNo(1);
+        $result = $this->service->generateTraceNo(1, 1);
 
-        $this->assertEquals('7260603SHP001', $result);
+        $this->assertEquals('5260603010101', $result);
     }
 
     // ========== getShipmentBatchPackaging ==========

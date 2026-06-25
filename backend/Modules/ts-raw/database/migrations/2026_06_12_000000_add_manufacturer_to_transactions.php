@@ -1,16 +1,23 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    protected $connection = 'eudr_ts';
+
     /**
      * Run the migrations.
      */
     public function up(): void
     {
+        if (DB::connection('eudr_ts')->getDriverName() === 'sqlite') {
+            return;
+        }
+
         Schema::connection('eudr_ts')->table('t_balance_temporary', function (Blueprint $table) {
             $table->unsignedInteger('id_manufacturer')->nullable()->after('id_material');
             $table->index('id_manufacturer', 'idx_bt_manufacturer');
@@ -37,6 +44,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (DB::connection('eudr_ts')->getDriverName() === 'sqlite') {
+            return;
+        }
+
         Schema::connection('eudr_ts')->table('t_balance_temporary', function (Blueprint $table) {
             $table->dropIndex('idx_bt_manufacturer');
             $table->dropColumn('id_manufacturer');

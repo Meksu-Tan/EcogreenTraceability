@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Shared\Services;
 
 use Illuminate\Support\Facades\DB;
@@ -19,9 +19,9 @@ class TransactionCoreService
     {
         if ($mode === 'ADD') {
             DB::connection($this->connection)->insert(
-                'INSERT INTO t_material_document (id_trace_head, material_document, created_by)
-                 VALUES (?, ?, ?)',
-                [$idTraceHead, $materialDoc, $user]
+                'INSERT INTO t_material_document (id_trace_head, material_document, mode, created_by)
+                 VALUES (?, ?, ?, ?)',
+                [$idTraceHead, $materialDoc, $mode, $user]
             );
 
             $id = DB::connection($this->connection)->select(

@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Tank\Http\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -71,5 +72,11 @@ class TankController extends Controller
             return ApiResponse::success($result, $result['message'] ?? 'Tank sync completed');
         }
         return ApiResponse::error($result['message'] ?? 'Failed to sync tanks', 400);
+    }
+
+    public function lastSync(): JsonResponse
+    {
+        $info = $this->tankService->getLastSyncInfo();
+        return ApiResponse::success($info, 'OK');
     }
 }

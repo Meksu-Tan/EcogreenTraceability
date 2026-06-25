@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsShipment\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -15,6 +15,7 @@ class GenerateTraceNoRequest extends FormRequest
     {
         return [
             'id_plant' => ['required', 'integer', 'min:1'],
+            'id_material' => ['required', 'string'],
         ];
     }
 }

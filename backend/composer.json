@@ -16,7 +16,9 @@
         "spatie/laravel-permission": "^6.25"
     },
     "require-dev": {
+        "deptrac/deptrac": "^4.6",
         "fakerphp/faker": "^1.23",
+        "larastan/larastan": "^3.10",
         "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.24",
         "laravel/sail": "^1.41",
@@ -34,7 +36,6 @@
             "Modules\\Material\\": "Modules/m-material/app/",
             "Modules\\Plant\\": "Modules/m-plant/app/",
             "Modules\\Shared\\": "Modules/Shared/app/",
-            "Modules\\Storage\\": "Modules/m-storage/app/",
             "Modules\\Supplier\\": "Modules/m-supplier/app/",
             "Modules\\Tank\\": "Modules/m-tank/app/",
             "Modules\\TsRaw\\": "Modules/ts-raw/app/",
@@ -61,7 +62,6 @@
                 "Modules/m-material/database/factories/",
                 "Modules/m-plant/database/factories/",
                 "Modules/Shared/database/factories/",
-                "Modules/m-storage/database/factories/",
                 "Modules/m-supplier/database/factories/",
                 "Modules/m-tank/database/factories/",
                 "Modules/ts-raw/database/factories/",
@@ -82,7 +82,6 @@
                 "Modules/m-material/database/seeders/",
                 "Modules/m-plant/database/seeders/",
                 "Modules/Shared/database/seeders/",
-                "Modules/m-storage/database/seeders/",
                 "Modules/m-supplier/database/seeders/",
                 "Modules/m-tank/database/seeders/",
                 "Modules/ts-raw/database/seeders/",

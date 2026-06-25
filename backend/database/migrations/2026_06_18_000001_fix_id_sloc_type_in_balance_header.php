@@ -5,21 +5,30 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
+    protected $connection = 'eudr_ts';
+
     public function up(): void
     {
+        $conn = DB::connection($this->connection);
+
+        if ($conn->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         // Check current type and fix if JSONB
-        $result = DB::selectOne("
+        $result = $conn->selectOne("
             SELECT data_type FROM information_schema.columns
             WHERE table_name = 't_balance_header' AND column_name = 'id_sloc'
         ");
 
         if ($result && $result->data_type === 'jsonb') {
             // Add temporary integer column
-            DB::statement('ALTER TABLE t_balance_header ADD COLUMN id_sloc_temp integer');
+            $conn->statement('ALTER TABLE t_balance_header ADD COLUMN id_sloc_temp integer');
 
             // Migrate data: extract first value and cast
-            DB::statement('
+            $conn->statement('
                 UPDATE t_balance_header SET id_sloc_temp =
                 CASE
                     WHEN id_sloc IS NULL THEN NULL
@@ -29,8 +38,8 @@ return new class extends Migration {
             ');
 
             // Drop old JSONB column and rename temp integer column
-            DB::statement('ALTER TABLE t_balance_header DROP COLUMN id_sloc CASCADE');
-            DB::statement('ALTER TABLE t_balance_header RENAME COLUMN id_sloc_temp TO id_sloc');
+            $conn->statement('ALTER TABLE t_balance_header DROP COLUMN id_sloc CASCADE');
+            $conn->statement('ALTER TABLE t_balance_header RENAME COLUMN id_sloc_temp TO id_sloc');
         }
     }
 

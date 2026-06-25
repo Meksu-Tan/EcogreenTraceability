@@ -10,6 +10,10 @@ namespace Modules\Shared\Helpers;
  *   14-digit (current): type(1) + YYMMDD(6) + warehouse(3) + plant(2) + seq(2)
  *
  * Queries that parse positional fields must handle both.
+ *
+ * NOTE: All length checks use CAST(col AS TEXT) — not CHAR.
+ * In PostgreSQL, CAST(x AS CHAR) = CAST(x AS character(1)) which truncates to
+ * 1 character, making CHAR_LENGTH always return 1. VARCHAR/TEXT are correct.
  */
 class TraceHelper
 {
@@ -28,9 +32,9 @@ class TraceHelper
         $v2 = substr($value, 0, 2);
 
         return "(
-            (CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14 AND SUBSTRING(CAST({$col} AS CHAR),8,3) {$op} '{$value}')
+            (CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14 AND SUBSTRING(CAST({$col} AS TEXT),8,3) {$op} '{$value}')
             OR
-            (CHAR_LENGTH(CAST({$col} AS CHAR)) < 14 AND SUBSTRING(CAST({$col} AS CHAR),8,2) {$op} '{$v2}')
+            (CHAR_LENGTH(CAST({$col} AS TEXT)) < 14 AND SUBSTRING(CAST({$col} AS TEXT),8,2) {$op} '{$v2}')
         )";
     }
 
@@ -49,9 +53,9 @@ class TraceHelper
         $list = implode(',', array_map(fn(string $p): string => "'{$p}'", $plants));
 
         return "(
-            (CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14 AND SUBSTRING(CAST({$col} AS CHAR),11,2) {$op} ({$list}))
+            (CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14 AND SUBSTRING(CAST({$col} AS TEXT),11,2) {$op} ({$list}))
             OR
-            (CHAR_LENGTH(CAST({$col} AS CHAR)) < 14 AND SUBSTRING(CAST({$col} AS CHAR),8,2) {$op} ({$list}))
+            (CHAR_LENGTH(CAST({$col} AS TEXT)) < 14 AND SUBSTRING(CAST({$col} AS TEXT),8,2) {$op} ({$list}))
         )";
     }
 
@@ -65,7 +69,7 @@ class TraceHelper
      */
     public static function only14Digit(string $col): string
     {
-        return "CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14";
+        return "CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14";
     }
 
     /**
@@ -82,9 +86,39 @@ class TraceHelper
     public static function isStorageOrLegacy(string $col): string
     {
         return "(
-            (CHAR_LENGTH(CAST({$col} AS CHAR)) >= 14 AND SUBSTRING(CAST({$col} AS CHAR),8,3) = '000')
+            (CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14 AND SUBSTRING(CAST({$col} AS TEXT),8,3) = '000')
             OR
-            CHAR_LENGTH(CAST({$col} AS CHAR)) < 14
+            CHAR_LENGTH(CAST({$col} AS TEXT)) < 14
         )";
+    }
+
+    /**
+     * Build a SQL CASE expression that resolves a trace number's plant code
+     * to a human-readable plant abbreviation, dual-format aware.
+     *
+     * 11-digit: plant code at pos 8–9
+     * 14-digit: plant code at pos 11–12
+     *
+     * Returns the 2-digit plant code when no known mapping exists.
+     *
+     * Usage in SELECT:
+     *   TraceHelper::plantNameExpression('a.trace_no') . ' AS plant_name'
+     *
+     * @param string $col Column expression, e.g. "a.trace_no"
+     */
+    public static function plantNameExpression(string $col): string
+    {
+        $plantCode = "(CASE WHEN CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14
+                           THEN SUBSTRING(CAST({$col} AS TEXT), 11, 2)
+                           ELSE SUBSTRING(CAST({$col} AS TEXT), 8, 2) END)";
+
+        return "CASE ({$plantCode})
+                    WHEN '01' THEN 'EOMB'
+                    WHEN '02' THEN 'EOB1'
+                    WHEN '03' THEN 'EOB2'
+                    WHEN '05' THEN 'EOB5'
+                    WHEN '07' THEN 'EOB3'
+                    ELSE {$plantCode}
+                END";
     }
 }

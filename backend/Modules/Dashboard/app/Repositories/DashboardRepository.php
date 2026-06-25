@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Dashboard\Repositories;
 
 use App\Models\User;
@@ -9,17 +10,17 @@ class DashboardRepository implements DashboardRepositoryInterface
 {
     public function getMaterialCount(): int
     {
-        return DB::connection('mysql')->table('m_material')->where('status', 1)->count();
+        return DB::connection('eudr_ts')->table('m_material')->where('status', 1)->count();
     }
 
     public function getStorageCount(): int
     {
-        return DB::connection('mysql')->table('m_sloc')->where('status', 1)->count();
+        return DB::connection('eudr_ts')->table('m_sloc')->where('status', 1)->count();
     }
 
     public function getSupplierCount(): int
     {
-        return DB::connection('mysql')->table('m_supplier')->where('status', 1)->count();
+        return DB::connection('eudr_ts')->table('m_supplier')->where('status', 1)->count();
     }
 
     public function getUserCount(): int

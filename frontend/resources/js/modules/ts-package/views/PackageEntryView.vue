@@ -84,6 +84,8 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier')">Init Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance')">Balance (MT)<VIcon v-if="sortKey==='balance'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:200px">Supplier / Batch SAP / Init / Balance</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
               </tr>
             </thead>
@@ -92,7 +94,7 @@
                 <td class="text-caption text-medium-emphasis text-center">{{ (page - 1) * perPage + index + 1 }}</td>
                 <td class="text-center">{{ row.entry_date }}</td>
                 <td class="text-center font-weight-medium font-mono text-caption">{{ row.fromto_trace_no }}</td>
-                <td class="text-center"><VChip size="x-small" color="primary" variant="tonal">{{ row.plant_name || '-' }}</VChip></td>
+                <td class="text-center font-weight-medium text-caption">{{ row.plant_name || '-' }}</td>
                 <td class="text-center">{{ row.po_no || '-' }}</td>
                 <td class="text-center"><VChip size="x-small" variant="flat" color="neutral-100">{{ row.batch_no || '-' }}</VChip></td>
                 <td class="font-weight-medium text-truncate" style="max-width:160px" :title="row.feed">{{ row.feed || '-' }}</td>
@@ -120,6 +122,8 @@
                     </VChip>
                   </template>
                 </td>
+                <td class="text-caption text-medium-emphasis">{{ row.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ row.created_by }}</td>
                 <td class="text-center">
                   <div class="d-flex justify-center gap-1">
                     <VBtn icon="ri-article-line" size="x-small" color="primary" variant="tonal" @click="openPoModal(row)" title="Edit PO" />
@@ -131,13 +135,39 @@
             </tbody>
             <tbody v-else>
               <tr>
-                <td colspan="15" class="text-center pa-8">
+                <td colspan="17" class="text-center pa-8">
                   <VIcon icon="ri-inbox-2-line" size="40" class="text-disabled mb-2" />
                   <p class="text-body-2 text-medium-emphasis">No packaging data yet</p>
                 </td>
               </tr>
             </tbody>
           </VTable>
+        </div>
+
+        <div v-if="store.pagination.total > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+          <div class="d-flex align-center gap-3">
+            <span class="text-caption text-medium-emphasis">
+              Showing {{ (page - 1) * perPage + 1 }} - {{ Math.min(page * perPage, store.pagination.total) }} of {{ store.pagination.total }} records
+            </span>
+            <VSelect
+              v-model="perPage"
+              :items="[5, 10, 15, 20]"
+              density="compact"
+              variant="outlined"
+              hide-details
+              style="min-width: 80px; max-width: 100px;"
+            />
+          </div>
+          <VPagination
+            v-if="lastPage > 1"
+            v-model="page"
+            :length="lastPage"
+            :total-visible="5"
+            density="comfortable"
+            size="small"
+            show-first-last-page
+            @update:model-value="changePage"
+          />
         </div>
       </VCardText>
     </VCard>
@@ -151,7 +181,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant.js'
 import { usePackageEntryStore } from '../stores/usePackageEntryStore'
 import { useConfirmStore } from '@/stores/confirm.js'
@@ -175,6 +205,14 @@ const page = ref(1)
 const perPage = ref(10)
 const sortKey = ref(null)
 const sortDir = ref(null)
+
+const lastPage = computed(() => store.pagination.lastPage)
+
+async function changePage(p) {
+  page.value = p
+  store.setPage(p)
+  await fetchData()
+}
 
 function detectColumnType(key) {
   const rows = store.entries
@@ -220,8 +258,14 @@ const sortedList = computed(() => {
 })
 
 async function fetchData() {
-  await store.fetchEntries()
+  await store.fetchEntries({ page: page.value, per_page: perPage.value })
 }
+
+watch(perPage, async () => {
+  page.value = 1
+  store.setPage(1)
+  await fetchData()
+})
 
 onMounted(() => {
   fetchData()

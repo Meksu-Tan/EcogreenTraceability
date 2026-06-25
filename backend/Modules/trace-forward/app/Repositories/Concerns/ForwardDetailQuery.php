@@ -32,7 +32,7 @@ final class ForwardDetailQuery
                     CONCAT(b.from_trace_no, \'>\', b.to_trace_no) AS trace_chain
                 FROM t_trace_header b
                 LEFT JOIN t_material_document c ON b.id_trace_head = c.id_trace_head
-                WHERE b.from_trace_no = ? AND b.id_material = ? AND b.status = 1
+                WHERE b.to_trace_no = ? AND b.id_material = ? AND b.status = 1
 
                 UNION ALL
 
@@ -79,7 +79,7 @@ final class ForwardDetailQuery
                 {$inQtyFmt} AS in_qty,
                 CASE WHEN SUBSTRING(c.from_trace_no,1,1) = '4' THEN UPPER(i.description)
                      WHEN SUBSTRING(c.from_trace_no,1,1) = '5' THEN UPPER(i.description)
-                     ELSE CASE WHEN (c.id_sloc::text)::int < 7 THEN CONCAT('EOB1 ', h.description) ELSE h.description END
+                     ELSE CASE WHEN CAST(TRIM(BOTH '[]\"' FROM SPLIT_PART(COALESCE(c.id_sloc::text, '0'), ',', 1)) AS INTEGER) < 7 THEN CONCAT('EOB1 ', h.description) ELSE h.description END
                 END AS sloc,
                 {$outQtyFmt} AS out_qty,
                 CASE WHEN COALESCE(e.sum_in, 0) <> 0

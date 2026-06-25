@@ -3,9 +3,16 @@
 namespace Tests\Feature\Modules;
 
 use Tests\TestCase;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 
 class TransactionModuleTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(PlantContextMiddleware::class);
+    }
+
     public function test_rm_entries_index_requires_auth(): void
     {
         $response = $this->getJson('/api/v1/transactions/rm-entries');
@@ -29,4 +36,20 @@ class TransactionModuleTest extends TestCase
         $response = $this->postJson('/api/v1/transactions/rm-entries/transfer', []);
         $response->assertStatus(401);
     }
+
+    public function test_add_supplier_requires_auth(): void
+    {
+        $response = $this->postJson('/api/v1/transactions/rm-entries/suppliers', []);
+        $response->assertStatus(401);
+    }
+
+    public function test_add_supplier_validation(): void
+    {
+        $user = \App\Models\User::factory()->make();
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/transactions/rm-entries/suppliers', []);
+        
+        $response->assertStatus(422);
+    }
 }
+

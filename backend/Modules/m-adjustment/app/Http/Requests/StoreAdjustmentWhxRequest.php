@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -16,7 +17,7 @@ class StoreAdjustmentWhxRequest extends FormRequest
             'id_plant' => ['required'],
             'entry_date' => ['required', 'date'],
             'id_material' => ['required', 'integer'],
-            'id_tank' => ['required', 'integer'],
+            'tf_number' => ['required', 'integer'],
             'qty' => ['required', 'numeric'],
             'remarks' => ['nullable', 'string', 'max:500'],
         ];

@@ -20,11 +20,6 @@
       <VDivider />
 
       <VCardText class="pa-5 bg-neutral-50">
-        <div v-if="blendingStore.loading" class="d-flex flex-column align-center justify-center pa-8">
-          <VProgressCircular indeterminate color="primary" size="48" />
-          <span class="mt-3 text-body-2 text-medium-emphasis">Processing...</span>
-        </div>
-
         <VAlert
           v-if="formError"
           type="error"
@@ -35,7 +30,7 @@
           {{ formError }}
         </VAlert>
 
-        <form @submit.prevent="handleSubmit" :class="{ 'opacity-50': blendingStore.loading }" class="d-flex flex-column gap-4">
+        <form @submit.prevent="handleSubmit" class="d-flex flex-column gap-4">
           <VCard variant="outlined">
             <VCardText>
               <VRow dense>
@@ -90,6 +85,7 @@
                     :items="materialOptions"
                     item-title="label"
                     item-value="value"
+                    :loading="initLoading"
                     required
                     density="compact"
                     variant="outlined"
@@ -98,11 +94,12 @@
                 </VCol>
                 <VCol cols="12" md="4">
                   <VSelect
-                    v-model="form.id_tank"
+                    v-model="form.tf_number"
                     label="Storage Location (SLoc)"
                     :items="tankOptions"
                     item-title="label"
                     item-value="value"
+                    :loading="initLoading"
                     density="compact"
                     variant="outlined"
                     @update:model-value="onTankChange"
@@ -120,8 +117,8 @@
                     closable-chips
                     variant="outlined"
                     density="compact"
-                    :disabled="!form.id_tank"
-                    :placeholder="form.id_tank ? '' : 'Select a tank first'"
+                    :disabled="!form.tf_number"
+                    :placeholder="form.tf_number ? '' : 'Select a tank first'"
                   />
                 </VCol>
               </VRow>
@@ -202,7 +199,7 @@
     :entry-no="form.entry_no"
     :mode="mode"
     :id-head="form.idHead"
-    :id-tank="form.id_tank"
+    :id-tank="form.tf_number"
     :id-plant="activePlantId"
     @success="onSourceMaterialInserted"
   />
@@ -236,9 +233,9 @@ const activePlantId = computed(() => {
   if (!isAllPlant.value) {
     return plantSelectionStore.selectedPlantId
   }
-  if (form.id_tank) {
-    // Lookup using fallback: id_sloc (new) or id_tank (legacy)
-    const tank = blendingStore.allTanks.find(t => String(t.id_sloc || t.id_tank) === String(form.id_tank))
+  if (form.tf_number) {
+    // Lookup using fallback: id_sloc (new) or tf_number (legacy)
+    const tank = blendingStore.allTanks.find(t => String(t.id_sloc || t.tf_number) === String(form.tf_number))
     if (tank && tank.id_plant) {
       return tank.id_plant
     }
@@ -247,11 +244,13 @@ const activePlantId = computed(() => {
   return firstTank?.id_plant || setupPlantStore.plants[0]?.code_3 || setupPlantStore.plants[0]?.id || 0
 })
 
+const initLoading = ref(false)
+
 const form = reactive({
   entry_no: '',
   entry_date: new Date().toISOString().split('T')[0],
   id_material: '',
-  id_tank: '',
+  tf_number: '',
   material_doc: '',
   idHead: null
 })
@@ -271,7 +270,7 @@ const tankOptions = computed(() => {
     .map(t => {
       const label = t.tank || t.description || ''
       return {
-        value: t.id_sloc || t.id_tank,
+        value: t.id_sloc || t.tf_number,
         label: label
       }
     })
@@ -291,13 +290,14 @@ const formattedTotalQty = computed(() => {
 
 const specificTankOptions = computed(() =>
   (specificTanks.value || []).map(t => ({
-    value: String(t.id_sloc || t.id_tank_tail),
-    title: t.tankName || t.tankNo || t.tf_number,
+    value: String(t.id_sloc || t.id_sloc_tail),
+    title: t.tf_number || t.tankName,
   }))
 )
 
 async function bootstrap() {
   formError.value = null
+  initLoading.value = true
 
   try {
     if (setupPlantStore.plants.length === 0) {
@@ -310,7 +310,7 @@ async function bootstrap() {
 
     form.entry_no = ''
     form.id_material = ''
-    form.id_tank = ''
+    form.tf_number = ''
     form.material_doc = ''
     form.idHead = null
     form.entry_date = new Date().toISOString().split('T')[0]
@@ -320,6 +320,8 @@ async function bootstrap() {
     specificTanks.value = []
   } catch (err) {
     formError.value = 'Failed to load form data: ' + err.message
+  } finally {
+    initLoading.value = false
   }
 }
 
@@ -349,11 +351,11 @@ async function onMaterialChange() {
       id_plant: activePlantId.value
     })
     if (blendingStore.activeTanks.length > 0) {
-      // Use fallback: id_sloc (new) or id_tank (legacy)
-      const matchingTankId = blendingStore.activeTanks[0].id_sloc || blendingStore.activeTanks[0].id_tank
-      const found = blendingStore.allTanks.find(t => Number(t.id_sloc || t.id_tank) === Number(matchingTankId))
+      // Use fallback: id_sloc (new) or tf_number (legacy)
+      const matchingTankId = blendingStore.activeTanks[0].id_sloc || blendingStore.activeTanks[0].tf_number
+      const found = blendingStore.allTanks.find(t => Number(t.id_sloc || t.tf_number) === Number(matchingTankId))
       if (found) {
-        form.id_tank = found.id_sloc || found.id_tank
+        form.tf_number = found.id_sloc || found.tf_number
         await onTankChange()
       }
     }
@@ -363,10 +365,11 @@ async function onMaterialChange() {
   } catch (err) {
     formError.value = err.message
   }
+  if (form.idMaterialSource) await fetchQty()
 }
 
 async function onTankChange() {
-  if (form.id_material && form.id_tank) {
+  if (form.id_material && form.tf_number) {
     try {
       const entryResponse = await blendingStore.fetchNewEntryNo({
         id_plant: activePlantId.value,
@@ -378,13 +381,13 @@ async function onTankChange() {
     } catch (e) {}
   }
 
-  if (form.id_tank) {
+  if (form.tf_number) {
     try {
-      await blendingStore.fetchActiveSpecificTanksRundown({ sloc: form.id_tank })
+      await blendingStore.fetchActiveSpecificTanksRundown({ sloc: form.tf_number })
       specificTanks.value = blendingStore.activeSpecificTanks
       if (specificTanks.value.length === 1) {
-        // Use fallback: id_sloc or id_tank_tail (backend provides both as alias)
-        selectedTankTails.value = [String(specificTanks.value[0].id_sloc || specificTanks.value[0].id_tank_tail)]
+        // Use fallback: id_sloc or id_sloc_tail (backend provides both as alias)
+        selectedTankTails.value = [String(specificTanks.value[0].id_sloc || specificTanks.value[0].id_sloc_tail)]
       } else {
         selectedTankTails.value = []
       }

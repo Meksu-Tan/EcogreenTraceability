@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Plant\Repositories;
 
 use Modules\Plant\Models\Plant;
@@ -39,7 +39,7 @@ class PlantRepository implements PlantRepositoryInterface
             'code' => $data['code'] ?? null,
             'code_2' => $data['code_2'],
             'code_3' => $data['code_3'],
-            'id_tank' => $data['id_sloc'] ?? 'T000',
+            'id_sloc' => $data['id_sloc'] ?? 'T000',
             'description' => $data['description'],
             'status' => 1,
             'created_by' => $data['created_by'],

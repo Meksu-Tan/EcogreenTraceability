@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font-display); background: var(--bg-page); padding: 20px; }
+.row { display: flex; gap: 0; }
+.swatch { flex: 1; height: 80px; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; }
+.swatch span { font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
+.label-row { display: flex; gap: 0; }
+.lbl { flex: 1; padding: 4px 8px; font-family: var(--font-body); font-size: 11px; color: var(--fg-secondary); }
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="swatch" style="background:#1C3220"><span style="color:#fff">900</span></div>
+  <div class="swatch" style="background:#1E5C20"><span style="color:#fff">800</span></div>
+  <div class="swatch" style="background:#2A8030"><span style="color:#fff">700</span></div>
+  <div class="swatch" style="background:#339935"><span style="color:#fff">600</span></div>
+  <div class="swatch" style="background:#42B240"><span style="color:#fff">500 ★</span></div>
+  <div class="swatch" style="background:#65C463"><span style="color:#1C2420">400</span></div>
+  <div class="swatch" style="background:#90D58E"><span style="color:#1C2420">300</span></div>
+  <div class="swatch" style="background:#BDE8BC"><span style="color:#1C2420">200</span></div>
+  <div class="swatch" style="background:#E2F6E2"><span style="color:#1C2420">100</span></div>
+  <div class="swatch" style="background:#F3FBF3; border: 1px solid #D4DDD8"><span style="color:#1C2420">50</span></div>
+</div>
+<div class="label-row">
+  <div class="lbl">#1C3220</div>
+  <div class="lbl">#1E5C20</div>
+  <div class="lbl">#2A8030</div>
+  <div class="lbl">#339935</div>
+  <div class="lbl">#42B240 ★</div>
+  <div class="lbl">#65C463</div>
+  <div class="lbl">#90D58E</div>
+  <div class="lbl">#BDE8BC</div>
+  <div class="lbl">#E2F6E2</div>
+  <div class="lbl">#F3FBF3</div>
+</div>
+</body>
+</html>

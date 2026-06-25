@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Manufacturer\Services;
 
 use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;

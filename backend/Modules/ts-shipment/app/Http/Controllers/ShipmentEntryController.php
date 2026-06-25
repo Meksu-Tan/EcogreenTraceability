@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsShipment\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -21,10 +21,17 @@ class ShipmentEntryController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $plantId = (int) ($request->get('plant_context')['plant_code'] ?? $request->input('id_plant', 0));
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 10)));
+
         try {
-            $entries = $this->shipmentService->getDtShipEntry();
-            return ApiResponse::success(
-                ShipmentEntryResource::collection($entries),
+            $result = $this->shipmentService->getDtShipEntry($plantId, $page, $perPage);
+            return ApiResponse::paginated(
+                ShipmentEntryResource::collection($result['data'])->resolve(),
+                $result['total'],
+                $page,
+                $perPage,
                 'Shipment entries retrieved successfully'
             );
         } catch (\Exception $e) {
@@ -35,9 +42,9 @@ class ShipmentEntryController extends Controller
     public function store(StoreShipmentEntryRequest $request): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $data = $request->validated();
-            $data['id_plant'] = $request->get('plant_context')['plant_code'];
+            $data['id_plant'] = $request->get('plant_context')['plant_code'] ?? $request->input('id_plant') ?? $request->input('plant') ?? $request->validated('id_plant');
             
             $res = $this->shipmentService->store($user, $data);
             if ($res['response'] == ResponseCode::PERIOD_LOCKED) {
@@ -56,7 +63,7 @@ class ShipmentEntryController extends Controller
     public function destroy(Request $request, $id): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $traceNo = $request->input('traceNo');
             if (!$traceNo) {
                 return ApiResponse::error('Trace number is required for cancellation.', 422);
@@ -91,7 +98,7 @@ class ShipmentEntryController extends Controller
     public function getWipMaterialByFgProduct(Request $request): JsonResponse
     {
         try {
-            $plant = $request->get('plant_context')['plant_code'];
+            $plant = $request->get('plant_context')['plant_code'] ?? $request->input('id_plant') ?? $request->input('plant');
             $res = $this->shipmentService->getWipMaterialByFgProduct([
                 'idMaterial' => $request->input('idMaterial'),
                 'id_plant' => $plant
@@ -105,7 +112,7 @@ class ShipmentEntryController extends Controller
     public function getActiveBatchProduct(Request $request): JsonResponse
     {
         try {
-            $plant = $request->get('plant_context')['plant_code'];
+            $plant = $request->get('plant_context')['plant_code'] ?? $request->input('id_plant') ?? $request->input('plant');
             $res = $this->shipmentService->getActiveBatchProduct([
                 'idMaterial' => $request->input('idMaterial'),
                 'id_plant' => $plant
@@ -205,7 +212,7 @@ class ShipmentEntryController extends Controller
     public function updateSo(UpdateShipmentSoRequest $request): JsonResponse
     {
         try {
-            $user = $request->user()->username ?? 'System';
+            $user = $request->user()->name ?? 'System';
             $res = $this->shipmentService->updateSo($user, $request->validated());
             if ($res['response'] != 1) {
                 return ApiResponse::error($res['message'] ?? 'Failed to update SO.', 400);
@@ -220,8 +227,10 @@ class ShipmentEntryController extends Controller
     public function newTraceNo(GenerateTraceNoRequest $request): JsonResponse
     {
         $plantId = (int) (data_get($request->get('plant_context'), 'plant_code') ?: $request->validated('id_plant'));
+        $materialStr = $request->validated('id_material');
+        $materialId = (int) str_replace('PCK|', '', $materialStr);
         try {
-            $traceNo = $this->shipmentService->generateTraceNo($plantId);
+            $traceNo = $this->shipmentService->generateTraceNo($materialId, $plantId);
             return ApiResponse::success([['traceNo' => $traceNo]]);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to generate trace number: ' . $e->getMessage(), 500);

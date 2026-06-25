@@ -1,11 +1,12 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Shared\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Modules\Shared\Services\Contracts\AuditServiceInterface;
 
-class AuditService
+class AuditService implements AuditServiceInterface
 {
     protected string $connection = 'eudr_ts';
 

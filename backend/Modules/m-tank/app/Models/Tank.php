@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Tank\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -14,10 +15,12 @@ class Tank extends Model
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
+        'id_sloc',
         'id_plant',
         'plant_name',
-        'id_tank',
+        'tf_number',
         'description',
+        'code_3',
         'tank_height',
         'status',
         'created_by',
@@ -28,10 +31,10 @@ class Tank extends Model
         'status' => 'integer',
     ];
 
-    // Accessor for compatibility - tank_number returns id_tank
+    // Accessor for compatibility - tank_number returns tf_number
     public function getTankNumberAttribute()
     {
-        return $this->id_tank;
+        return $this->tf_number;
     }
 
     public function details()
@@ -52,12 +55,12 @@ class Tank extends Model
 
     public function scopeStorage($query)
     {
-        return $query->where('description', 'like', '%Storage%');
+        return $query->whereRaw("description ILIKE '%STORAGE%'");
     }
 
     public function scopeFeed($query)
     {
-        return $query->where('description', 'like', '%Feed%');
+        return $query->whereRaw("description ILIKE '%FEED%'");
     }
 
     public function scopeByPlant($query, $plantId)

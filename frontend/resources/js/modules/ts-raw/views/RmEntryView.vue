@@ -94,7 +94,7 @@
                 <td class="text-caption">{{ entry.manufacturer_name || '-' }}</td>
                 <td class="text-caption">
                   <a href="#" @click.prevent="openSlocEdit(entry)" class="text-medium-emphasis text-decoration-underline">
-                    {{ entry.tf_number }}
+                    {{ entry.tank_name }}
                   </a>
                 </td>
                 <td class="text-right font-weight-medium text-caption" :class="entry.init_qty === entry.balance_supplier ? 'text-success' : 'text-error'">{{ entry.init_qty }}</td>
@@ -102,7 +102,19 @@
                 <td class="text-right font-weight-bold text-caption">{{ entry.qty }}</td>
                 <td class="text-caption">
                   <div class="supplier-scroll text-caption" style="max-height:80px;overflow-y:auto;white-space:pre-wrap">
-                    {{ formatSuppliers(entry.supplier) }}
+                    <template v-if="entry.supplier">
+                      <VChip
+                        v-for="(sup, si) in (typeof entry.supplier === 'string' ? entry.supplier.split('|') : [entry.supplier])"
+                        :key="si"
+                        size="x-small"
+                        color="primary"
+                        variant="flat"
+                        class="mr-1 mb-1"
+                      >
+                        {{ sup.trim() }}
+                      </VChip>
+                    </template>
+                    <template v-else>-</template>
                   </div>
                 </td>
                 <td class="text-center">
@@ -205,8 +217,20 @@
                 <td class="text-right font-weight-medium text-caption">{{ log.in_qty }}</td>
                 <td class="text-right font-weight-bold text-caption">{{ log.in_qty }}</td>
                 <td class="text-caption">
-                  <div class="text-caption" style="max-height:80px;overflow-y:auto;white-space:pre-wrap">
-                    {{ log.material_name }} / {{ log.from_trace_no }} / {{ log.in_qty }} MT
+                  <div class="supplier-scroll text-caption" style="max-height:80px;overflow-y:auto;white-space:pre-wrap">
+                    <template v-if="log.supplier">
+                      <VChip
+                        v-for="(sup, si) in (typeof log.supplier === 'string' ? log.supplier.split('|') : [log.supplier])"
+                        :key="si"
+                        size="x-small"
+                        color="primary"
+                        variant="flat"
+                        class="mr-1 mb-1"
+                      >
+                        {{ sup.trim() }}
+                      </VChip>
+                    </template>
+                    <template v-else>-</template>
                   </div>
                 </td>
                 <td class="text-center">

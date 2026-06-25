@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Quantifier\Repositories;
 
 use Modules\Quantifier\Repositories\Contracts\QuantifierRepositoryInterface;
@@ -11,15 +11,15 @@ class QuantifierRepository implements QuantifierRepositoryInterface
 
     public function getQuantifierList(array $filters = []): array
     {
-        $sql = 'SELECT a.id_reset, a.reset_date, a.flowmeter, a.remark, a.value,
+        $sql = "SELECT a.id_reset, a.reset_date, a.flowmeter, a.remark, a.value,
                        a.status, a.created_by, a.created_at,
                        CASE a.status
-                           WHEN 1 THEN "Active"
-                           WHEN 0 THEN "Inactive"
-                           ELSE "Unknown"
+                           WHEN 1 THEN 'Active'
+                           WHEN 0 THEN 'Inactive'
+                           ELSE 'Unknown'
                        END AS status_desc,
                        a.updated_by, a.updated_at
-                FROM t_reset_quantifier a';
+                FROM t_reset_quantifier a";
 
         $conditions = [];
         $params = [];
@@ -61,11 +61,13 @@ class QuantifierRepository implements QuantifierRepositoryInterface
 
     public function getActiveFlowmeters(): array
     {
-        $sql = 'SELECT flowmeter FROM (
-                    SELECT qtf_feed AS flowmeter FROM m_material WHERE status = 1 AND qtf_feed LIKE "%FT%"
-                    UNION
-                    SELECT qtf_rundown AS flowmeter FROM m_material WHERE status = 1 AND qtf_rundown LIKE "%FT%"
-                ) t GROUP BY flowmeter ORDER BY flowmeter ASC';
+        $sql = "SELECT tf_number AS flowmeter 
+                  FROM m_sloc 
+                 WHERE status = 1 
+                   AND tf_number IS NOT NULL 
+                   AND tf_number != ''
+                 GROUP BY tf_number 
+                 ORDER BY tf_number ASC";
 
         return DB::connection($this->connection)->select($sql);
     }
@@ -75,7 +77,7 @@ class QuantifierRepository implements QuantifierRepositoryInterface
         $result = DB::connection($this->connection)->selectOne(
             'SELECT a.*, b.description AS flowmeter_desc
                FROM t_reset_quantifier a
-               LEFT JOIN m_material b ON (b.qtf_feed = a.flowmeter OR b.qtf_rundown = a.flowmeter)
+               LEFT JOIN m_sloc b ON b.tf_number = a.flowmeter
               WHERE a.id_reset = ?',
             [$id]
         );
@@ -91,7 +93,7 @@ class QuantifierRepository implements QuantifierRepositoryInterface
             'remark' => $remark,
             'status' => 1,
             'created_by' => $user,
-        ]);
+        ], 'id_reset');
 
         DB::connection($this->connection)->table('log_transactions')->insert([
             'log_module' => 'T_RESET_QTY',

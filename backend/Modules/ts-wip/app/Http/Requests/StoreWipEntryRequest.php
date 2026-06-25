@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsWip\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -30,6 +31,7 @@ class StoreWipEntryRequest extends FormRequest
             'idHead'          => 'nullable|integer',
             'id'              => 'nullable|integer',
             'number'          => 'nullable|string',
+            'wip_mode'        => 'nullable|integer',
         ];
     }
 }

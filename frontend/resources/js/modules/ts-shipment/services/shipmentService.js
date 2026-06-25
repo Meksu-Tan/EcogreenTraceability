@@ -51,9 +51,9 @@ export const shipmentService = {
   getDatSoAllocation(params = {}) {
     return api.get('/api/v1/transactions/shipment-entries/sap-so-allocation', { params })
   },
-  getNewTraceNo(id_plant) {
+  getNewTraceNo(id_plant, id_material) {
     return api.get('/api/v1/transactions/shipment-entries/new-trace-no', {
-      params: { id_plant }
+      params: { id_plant, id_material }
     })
   }
 }

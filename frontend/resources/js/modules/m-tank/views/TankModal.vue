@@ -83,6 +83,18 @@
           />
         </VCol>
       </VRow>
+
+      <VTextField
+        id="tank-description"
+        v-model="form.description"
+        type="text"
+        label="Description"
+        placeholder="e.g. Main storage tank"
+        :error-messages="errors.description"
+        density="compact"
+        variant="outlined"
+        hide-details="auto"
+      />
     </div>
   </BaseModal>
 </template>
@@ -105,8 +117,8 @@ const plantOptions = computed(() => {
   }))
 })
 
-const form = reactive({ id: '', plant_code: '', plant_name: '', tank_number: '', tank_height: '' })
-const errors = reactive({ plant_code: '', plant_name: '', tank_number: '', tank_height: '' })
+const form = reactive({ id: '', plant_code: '', plant_name: '', tank_number: '', tank_height: '', description: '' })
+const errors = reactive({ plant_code: '', plant_name: '', tank_number: '', tank_height: '', description: '' })
 
 onMounted(() => {
   if (plantStore.plants.length === 0) {
@@ -116,10 +128,10 @@ onMounted(() => {
 
 watch(() => props.editData, (val) => {
   Object.assign(form, val
-    ? { id: val.id||'', plant_code: val.plant_code||'', plant_name: val.plant_name||'', tank_number: val.tank_number||'', tank_height: val.tank_height||'' }
-    : { id: '', plant_code: '', plant_name: '', tank_number: '', tank_height: '' }
+    ? { id: val.id||'', plant_code: val.plant_code||'', plant_name: val.plant_name||'', tank_number: val.tank_number||'', tank_height: val.tank_height||'', description: val.description||'' }
+    : { id: '', plant_code: '', plant_name: '', tank_number: '', tank_height: '', description: '' }
   )
-  Object.assign(errors, { plant_code: '', plant_name: '', tank_number: '', tank_height: '' })
+  Object.assign(errors, { plant_code: '', plant_name: '', tank_number: '', tank_height: '', description: '' })
 })
 
 function onPlantChange() {

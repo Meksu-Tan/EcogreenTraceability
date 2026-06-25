@@ -7,18 +7,25 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    protected $connection = 'eudr_ts_pg';
+    protected $connection = 'eudr_ts';
 
     public function up(): void
     {
-        // Nuke and recreate schema — cleanest way to reset PG to known state
-        DB::connection('eudr_ts_pg')->statement('DROP SCHEMA public CASCADE');
-        DB::connection('eudr_ts_pg')->statement('CREATE SCHEMA public');
-        DB::connection('eudr_ts_pg')->statement('GRANT ALL ON SCHEMA public TO eudr_app');
-        DB::connection('eudr_ts_pg')->statement('GRANT ALL ON SCHEMA public TO public');
+        $conn = DB::connection($this->connection);
+
+        // PostgreSQL-only: nuke and recreate schema + tables.
+        // On SQLite (tests), skip — first migration already created tables.
+        if ($conn->getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        $conn->statement('DROP SCHEMA public CASCADE');
+        $conn->statement('CREATE SCHEMA public');
+        $conn->statement('GRANT ALL ON SCHEMA public TO eudr_app');
+        $conn->statement('GRANT ALL ON SCHEMA public TO public');
 
         // m_manufacturer
-        Schema::connection('eudr_ts_pg')->create('m_manufacturer', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('m_manufacturer', function (Blueprint $table) {
             $table->increments('id_manufacturer');
             $table->string('code', 50)->unique();
             $table->string('code_noneudr', 50)->nullable();
@@ -34,7 +41,7 @@ return new class extends Migration
         });
 
         // m_material
-        Schema::connection('eudr_ts_pg')->create('m_material', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('m_material', function (Blueprint $table) {
             $table->bigIncrements('id_material');
             $table->string('code', 50);  // Allow duplicates (MySQL has 5 duplicate code values)
             $table->string('code_noneudr', 50)->nullable();
@@ -55,7 +62,7 @@ return new class extends Migration
         });
 
         // m_material_pck — added batch_prefix to match MySQL
-        Schema::connection('eudr_ts_pg')->create('m_material_pck', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('m_material_pck', function (Blueprint $table) {
             $table->bigIncrements('id_materialpck');
             $table->unsignedBigInteger('id_material')->nullable();
             $table->string('code', 20)->nullable();
@@ -70,7 +77,7 @@ return new class extends Migration
         });
 
         // m_supplier — completely different from old migration
-        Schema::connection('eudr_ts_pg')->create('m_supplier', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('m_supplier', function (Blueprint $table) {
             $table->bigIncrements('id_supplier');
             $table->string('code', 13)->nullable();
             $table->string('batch_code', 13)->nullable();
@@ -84,11 +91,11 @@ return new class extends Migration
         });
 
         // m_sloc — NO auto_increment (MySQL id_sloc is int with no auto_increment)
-        Schema::connection('eudr_ts_pg')->create('m_sloc', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('m_sloc', function (Blueprint $table) {
             $table->integer('id_sloc')->primary();
             $table->string('id_plant', 10)->nullable();
             $table->string('plant_name', 100)->nullable();
-            $table->string('id_tank', 50)->nullable();
+            $table->string('id_sloc', 50)->nullable();
             $table->string('code', 50)->nullable();
             $table->string('code_2', 50)->nullable();
             $table->string('code_3', 50)->nullable();
@@ -103,7 +110,7 @@ return new class extends Migration
         });
 
         // m_warehouse — id_batch is varchar(20), no id_plant or capacity
-        Schema::connection('eudr_ts_pg')->create('m_warehouse', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('m_warehouse', function (Blueprint $table) {
             $table->bigIncrements('id_warehouse');
             $table->string('id_batch', 20)->nullable();
             $table->string('code', 20)->nullable();
@@ -116,7 +123,7 @@ return new class extends Migration
         });
 
         // t_balance_header — trace_no is bigint, id_sloc is longtext JSON, id_plant is varchar(10)
-        Schema::connection('eudr_ts_pg')->create('t_balance_header', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_balance_header', function (Blueprint $table) {
             $table->bigIncrements('id_balance_head');
             $table->date('entry_date')->nullable();
             $table->unsignedBigInteger('trace_no')->nullable();
@@ -138,7 +145,7 @@ return new class extends Migration
         });
 
         // t_balance_detail — id_sloc is longtext JSON, has id_supplier/id_manufacturer
-        Schema::connection('eudr_ts_pg')->create('t_balance_detail', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_balance_detail', function (Blueprint $table) {
             $table->bigIncrements('id_balance_tail');
             $table->unsignedBigInteger('id_balance_head')->nullable();
             $table->unsignedBigInteger('id_supplier')->nullable();
@@ -158,8 +165,8 @@ return new class extends Migration
             $table->timestamp('updated_at')->nullable();
         });
 
-        // t_trace_header — id_sloc is longtext JSON, no id_tank separate
-        Schema::connection('eudr_ts_pg')->create('t_trace_header', function (Blueprint $table) {
+        // t_trace_header — id_sloc is longtext JSON, no id_sloc separate
+        Schema::connection($this->connection)->create('t_trace_header', function (Blueprint $table) {
             $table->bigIncrements('id_trace_head');
             $table->date('entry_date')->nullable();
             $table->unsignedBigInteger('from_trace_no')->nullable();
@@ -180,7 +187,7 @@ return new class extends Migration
         });
 
         // t_trace_detail
-        Schema::connection('eudr_ts_pg')->create('t_trace_detail', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_trace_detail', function (Blueprint $table) {
             $table->bigIncrements('id_trace_tail');
             $table->unsignedBigInteger('id_trace_head')->nullable();
             $table->unsignedBigInteger('id_balance_tail')->nullable();
@@ -200,7 +207,7 @@ return new class extends Migration
         });
 
         // t_adjustment_header — adjust_no is bigint (not string), before_adjust/after_adjust
-        Schema::connection('eudr_ts_pg')->create('t_adjustment_header', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_adjustment_header', function (Blueprint $table) {
             $table->bigIncrements('id_adjust_head');
             $table->date('entry_date')->nullable();
             $table->unsignedBigInteger('adjust_no')->nullable();
@@ -219,8 +226,8 @@ return new class extends Migration
             $table->timestamp('updated_at')->nullable();
         });
 
-        // t_warehouse_header — id_material_feed/fg, no id_warehouse/id_tank_tail
-        Schema::connection('eudr_ts_pg')->create('t_warehouse_header', function (Blueprint $table) {
+        // t_warehouse_header — id_material_feed/fg, no id_warehouse/id_sloc_tail
+        Schema::connection($this->connection)->create('t_warehouse_header', function (Blueprint $table) {
             $table->bigIncrements('id_whx_head');
             $table->date('entry_date')->nullable();
             $table->unsignedBigInteger('from_trace_no')->nullable();
@@ -244,7 +251,7 @@ return new class extends Migration
         });
 
         // t_warehouse_detail
-        Schema::connection('eudr_ts_pg')->create('t_warehouse_detail', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_warehouse_detail', function (Blueprint $table) {
             $table->bigIncrements('id_whx_tail');
             $table->unsignedBigInteger('id_whx_head')->nullable();
             $table->unsignedBigInteger('id_material_feed')->nullable();
@@ -265,7 +272,7 @@ return new class extends Migration
         });
 
         // t_shipment_header — from_trace_no/trace_no are bigint, id_material_fg only
-        Schema::connection('eudr_ts_pg')->create('t_shipment_header', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_shipment_header', function (Blueprint $table) {
             $table->bigIncrements('id_ship_head');
             $table->date('entry_date')->nullable();
             $table->unsignedBigInteger('from_trace_no')->nullable();
@@ -283,7 +290,7 @@ return new class extends Migration
         });
 
         // t_shipment_detail
-        Schema::connection('eudr_ts_pg')->create('t_shipment_detail', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_shipment_detail', function (Blueprint $table) {
             $table->bigIncrements('id_ship_tail');
             $table->unsignedBigInteger('id_ship_head')->nullable();
             $table->unsignedBigInteger('id_material_fg')->nullable();
@@ -299,7 +306,7 @@ return new class extends Migration
         });
 
         // t_material_document — completely different from old migration
-        Schema::connection('eudr_ts_pg')->create('t_material_document', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_material_document', function (Blueprint $table) {
             $table->bigIncrements('id_matdoc');
             $table->unsignedBigInteger('id_trace_head')->nullable();
             $table->string('material_document', 50)->nullable();
@@ -312,7 +319,7 @@ return new class extends Migration
         });
 
         // t_report_pspa_head — period/batch_sap/adjust_status/lock_status
-        Schema::connection('eudr_ts_pg')->create('t_report_pspa_head', function (Blueprint $table) {
+        Schema::connection($this->connection)->create('t_report_pspa_head', function (Blueprint $table) {
             $table->bigIncrements('id_report_head');
             $table->date('period')->nullable();
             $table->string('batch_sap', 50)->nullable();
@@ -328,9 +335,15 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::connection('eudr_ts_pg')->statement('DROP SCHEMA public CASCADE');
-        DB::connection('eudr_ts_pg')->statement('CREATE SCHEMA public');
-        DB::connection('eudr_ts_pg')->statement('GRANT ALL ON SCHEMA public TO eudr_app');
-        DB::connection('eudr_ts_pg')->statement('GRANT ALL ON SCHEMA public TO public');
+        $conn = DB::connection($this->connection);
+
+        if ($conn->getDriverName() !== 'pgsql') {
+            return;
+        }
+
+        $conn->statement('DROP SCHEMA public CASCADE');
+        $conn->statement('CREATE SCHEMA public');
+        $conn->statement('GRANT ALL ON SCHEMA public TO eudr_app');
+        $conn->statement('GRANT ALL ON SCHEMA public TO public');
     }
 };

@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\TsRmreport\Http\Controllers\RmReportController;
 

@@ -51,8 +51,8 @@ export default {
   getLockStatus(params = {}) {
     return api.get(`${BASE_URL}/lock-status`, { params })
   },
-  getPeriodHeaders() {
-    return api.get(`${BASE_URL}/period-headers`)
+  getPeriodHeaders(params = {}) {
+    return api.get(`${BASE_URL}/period-headers`, { params })
   },
   getPeriodViewData(params = {}) {
     return api.get(`${BASE_URL}/period-view-data`, { params })

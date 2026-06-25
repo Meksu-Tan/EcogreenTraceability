@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsTransfer\Services;
 
 use Illuminate\Support\Facades\DB;
@@ -18,7 +18,7 @@ class TransferApprovalService
      * Submit transfer for approval.
      * Changes status from DRAFT to PENDING.
      */
-    public function submit(string $idBalanceHead, string $user): array
+    public function submit(int $idBalanceHead, string $user): array
     {
         try {
             $transfer = $this->approvalRepo->findTransferForApproval($idBalanceHead);
@@ -43,7 +43,7 @@ class TransferApprovalService
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $traceNo, $entryDate, $transfer) {
                 // Update status to PENDING
-                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'PENDING', $user);
+                $this->approvalRepo->updateBalanceApprovalStatus($idBalanceHead, 'PENDING', $user);
 
                 // Insert or update approval record
                 $existingApproval = $this->approvalRepo->findApprovalRecord($idBalanceHead);
@@ -80,11 +80,11 @@ class TransferApprovalService
      * Approve a transfer.
      * Changes status from PENDING to APPROVED.
      */
-    public function approve(string $idBalanceHead, string $user, ?string $notes = null): array
+    public function approve(int $idBalanceHead, string $user, ?string $notes = null): array
     {
         try {
             // Check period lock
-            $entryDate = $this->approvalRepo->findBalanceEntryDate((int) $idBalanceHead);
+            $entryDate = $this->approvalRepo->findBalanceEntryDate($idBalanceHead);
 
             if ($entryDate && PeriodLockService::isLocked($entryDate)) {
                 return ['response' => 99, 'message' => 'Period is locked'];
@@ -98,7 +98,7 @@ class TransferApprovalService
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $notes) {
                 // Update balance header status
-                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'APPROVED', $user);
+                $this->approvalRepo->updateBalanceApprovalStatus($idBalanceHead, 'APPROVED', $user);
 
                 // Update approval record
                 $this->approvalRepo->updateApprovalStatus($idBalanceHead, 'APPROVED', $user, $notes);
@@ -120,7 +120,7 @@ class TransferApprovalService
      * Reject a transfer.
      * Changes status from PENDING to REJECTED.
      */
-    public function reject(string $idBalanceHead, string $user, string $reason): array
+    public function reject(int $idBalanceHead, string $user, string $reason): array
     {
         try {
             // Check current status
@@ -131,7 +131,7 @@ class TransferApprovalService
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $reason) {
                 // Update balance header status
-                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'REJECTED', $user);
+                $this->approvalRepo->updateBalanceApprovalStatus($idBalanceHead, 'REJECTED', $user);
 
                 // Update approval record
                 $this->approvalRepo->updateApprovalStatus($idBalanceHead, 'REJECTED', $user, null, $reason);
@@ -153,11 +153,11 @@ class TransferApprovalService
      * Cancel a transfer.
      * Changes status from DRAFT to CANCELLED.
      */
-    public function cancel(string $idBalanceHead, string $user): array
+    public function cancel(int $idBalanceHead, string $user): array
     {
         try {
             // Check period lock
-            $entryDate = $this->approvalRepo->findBalanceEntryDate((int) $idBalanceHead);
+            $entryDate = $this->approvalRepo->findBalanceEntryDate($idBalanceHead);
 
             if ($entryDate && PeriodLockService::isLocked($entryDate)) {
                 return ['response' => 99, 'message' => 'Period is locked'];
@@ -171,7 +171,7 @@ class TransferApprovalService
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user) {
                 // Update balance header status
-                $this->approvalRepo->updateBalanceApprovalStatus((int) $idBalanceHead, 'CANCELLED', $user);
+                $this->approvalRepo->updateBalanceApprovalStatus($idBalanceHead, 'CANCELLED', $user);
 
                 // Update approval record
                 $this->approvalRepo->updateApprovalStatus($idBalanceHead, 'CANCELLED', $user);
@@ -200,7 +200,7 @@ class TransferApprovalService
     /**
      * Get approval history for a transfer.
      */
-    public function getApprovalHistory(string $idBalanceHead): array
+    public function getApprovalHistory(int $idBalanceHead): array
     {
         return $this->approvalRepo->getApprovalHistory($idBalanceHead);
     }
@@ -208,7 +208,7 @@ class TransferApprovalService
     /**
      * Get current approval status.
      */
-    public function getCurrentStatus(string $idBalanceHead): ?string
+    public function getCurrentStatus(int $idBalanceHead): ?string
     {
         return $this->approvalRepo->getCurrentApprovalStatus($idBalanceHead);
     }
@@ -216,7 +216,7 @@ class TransferApprovalService
     /**
      * Check if transfer can be edited based on approval status.
      */
-    public function canEdit(string $idBalanceHead): bool
+    public function canEdit(int $idBalanceHead): bool
     {
         $status = $this->getCurrentStatus($idBalanceHead);
         return in_array($status, ['DRAFT', 'REJECTED']);
@@ -225,7 +225,7 @@ class TransferApprovalService
     /**
      * Check if transfer can be deleted based on approval status.
      */
-    public function canDelete(string $idBalanceHead): bool
+    public function canDelete(int $idBalanceHead): bool
     {
         return $this->approvalRepo->canDelete($idBalanceHead);
     }
@@ -234,7 +234,7 @@ class TransferApprovalService
      * Create approval record when transfer is created.
      */
     public function createApprovalRecord(
-        string $idBalanceHead,
+        int $idBalanceHead,
         string $traceNo,
         string $entryDate,
         string $idMaterial,

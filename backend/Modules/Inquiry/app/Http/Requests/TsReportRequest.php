@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Inquiry\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;

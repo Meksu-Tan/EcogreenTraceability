@@ -1,15 +1,19 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsWip\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
 
+use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Traits\TransactionLoggerTrait;
 
 trait WipEntryWriteTrait
 {
     use TransactionLoggerTrait;
+    use DbCompatTrait;
+
     public function postMaterialDocument(string $mode, int $idTraceHead, string $materialDoc, string $user): array
     {
         return app(\Modules\Shared\Services\TransactionCoreService::class)
@@ -32,12 +36,11 @@ trait WipEntryWriteTrait
                 return [['response' => '5']];
             }
 
-            $feedId = $this->mapFrontendSectionToDbFeedId($data['feed_id']);
-            $idTank = $data['tank'];
-            $idTankTail = !empty($data['tankNo']) ? json_encode($data['tankNo']) : '[]';
-            if (is_array($idTankTail) || is_int($idTankTail)) {
-                $idTankTail = json_encode($idTankTail);
-            }
+            $wipMode = (int)($data['wip_mode'] ?? 1);
+            $feedId = $this->mapFrontendSectionToDbFeedId($data['feed_id'], null, $wipMode);
+            $idSloc = $data['tank'];
+            $idSlocTail = !empty($data['tankNo']) ? json_encode($data['tankNo']) : '[]';
+            
             $currQtf = $data['curr_feed'];
             $lastQtf = $data['last_feed'];
             $currEntryDate = $data['curr_entryDate'];
@@ -47,7 +50,7 @@ trait WipEntryWriteTrait
             \Log::info('WIP Feed Save - Input Data', [
                 'feed_id' => $data['feed_id'],
                 'mapped_feed_id' => $feedId,
-                'tank' => $idTank,
+                'tank' => $idSloc,
                 'curr_feed' => $currQtf,
                 'last_feed' => $lastQtf,
                 'entry_date' => $currEntryDate,
@@ -65,45 +68,55 @@ trait WipEntryWriteTrait
 
             \Log::info('WIP Feed Save - Calculated Out Qty', ['out_qty' => $outQty, 'curr_qtf' => $currQtf, 'last_qtf' => $lastQtf]);
 
-            $datHead = DB::connection('eudr_ts')->select('
-                SELECT IFNULL(SUM(b.qty),0) AS qty
-                  FROM m_material a
-                  LEFT JOIN t_balance_header b ON a.id_material = b.id_material AND b.status = 1
-                 WHERE a.id_feed = ? AND a.status = 1
-                   AND b.qty > 0.0001
-                   AND (b.id_sloc = ? OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(? AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(? AS CHAR))))))
-                   AND b.id_plant = ?
-            ', [$feedId, $idTank, $idTank, $idTank, $idPlant]);
-
-            $totalReserve = (float)($datHead[0]->qty ?? 0);
-            \Log::info('WIP Feed Save - Reserve Balance Check', ['total_reserve' => $totalReserve, 'out_qty' => $outQty, 'feed_id' => $feedId, 'tank' => $idTank]);
-            
-            if (($totalReserve - $outQty) < -0.000001) {
-                \Log::warning('WIP Feed Save - Insufficient Reserve Balance', ['total_reserve' => $totalReserve, 'out_qty' => $outQty]);
-                return [['response' => '3']];
-            }
-
+            // Resolve material ID first — needed for both balance check and trace write.
             $idMaterial = $this->getMaterialIdBySection($feedId, 'feed');
             \Log::info('WIP Feed Save - Material ID Lookup', ['feed_id' => $feedId, 'material_id' => $idMaterial]);
-            
+
             if (empty($idMaterial)) {
                 \Log::warning('WIP Feed Save - Material Not Found', ['feed_id' => $feedId]);
                 return [['response' => '4']];
             }
 
+            $slocClause = $this->dbSlocJsonClause('b.id_sloc');
+            $slocBindings = [$idSloc, $idSloc];
+
+            // Use id_material directly — avoids ambiguity when multiple materials share the same id_feed.
+            $datHead = DB::connection('eudr_ts')->select('
+                SELECT COALESCE(SUM(b.qty),0) AS qty
+                  FROM t_balance_header b
+                 WHERE b.id_material = ? AND b.status = 1
+                   AND b.qty > 0.0001
+                   AND (' . $slocClause . ')
+                   AND b.id_plant = ?
+            ', array_merge([$idMaterial], $slocBindings, [$idPlant]));
+
+            $totalReserve = (float)($datHead[0]->qty ?? 0);
+            \Log::info('WIP Feed Save - Reserve Balance Check', ['total_reserve' => $totalReserve, 'out_qty' => $outQty, 'feed_id' => $feedId, 'tank' => $idSloc]);
+
+            if (($totalReserve - $outQty) < -0.000001) {
+                \Log::warning('WIP Feed Save - Insufficient Reserve Balance', ['total_reserve' => $totalReserve, 'out_qty' => $outQty]);
+                return [['response' => '3']];
+            }
+
+            $slocClauseDup = $this->dbSlocJsonClause('id_sloc');
+            $slocBindingsDup = [$idSloc, $idSloc];
+
             $dup = DB::connection('eudr_ts')->select('
                 SELECT COUNT(id_trace_head) AS flag
                   FROM t_trace_header
                  WHERE status = 1 AND entry_date = ?
-                   AND (id_sloc = ? OR (JSON_VALID(id_sloc) AND (JSON_CONTAINS(id_sloc, CAST(? AS CHAR)) OR JSON_CONTAINS(id_sloc, JSON_QUOTE(CAST(? AS CHAR))))))
+                   AND (' . $slocClauseDup . ')
                    AND id_material = ?
                    AND in_qty = 0 AND SUBSTRING(to_trace_no,1,1) = 3 AND id_plant = ?
-            ', [$currEntryDate, $idTank, $idTank, $idTank, $idMaterial, $idPlant]);
+            ', array_merge([$currEntryDate], $slocBindingsDup, [$idMaterial, $idPlant]));
 
             if (!empty($dup) && $dup[0]->flag > 0) {
-                \Log::warning('WIP Feed Save - Duplicate Entry', ['entry_date' => $currEntryDate, 'tank' => $idTank, 'material_id' => $idMaterial]);
+                \Log::warning('WIP Feed Save - Duplicate Entry', ['entry_date' => $currEntryDate, 'tank' => $idSloc, 'material_id' => $idMaterial]);
                 return [['response' => '2']];
             }
+
+            $slocClauseBal = $this->dbSlocJsonClause('b.id_sloc');
+            $slocBindingsBal = [$idSloc, $idSloc];
 
             $balanceDetails = DB::connection('eudr_ts')->select('
                 SELECT COUNT(a.id_balance_tail) AS detail_count
@@ -111,17 +124,17 @@ trait WipEntryWriteTrait
                   LEFT JOIN t_balance_detail a ON b.id_balance_head = a.id_balance_head AND a.status = 1 AND a.qty > 0.0001
                  WHERE b.id_material = ? AND b.status = 1
                    AND b.qty > 0.0001
-                   AND (b.id_sloc = ? OR (JSON_VALID(b.id_sloc) AND (JSON_CONTAINS(b.id_sloc, CAST(? AS CHAR)) OR JSON_CONTAINS(b.id_sloc, JSON_QUOTE(CAST(? AS CHAR))))))
+                   AND (' . $slocClauseBal . ')
                    AND b.id_plant = ?
-            ', [$idMaterial, $idTank, $idTank, $idTank, $idPlant]);
+            ', array_merge([$idMaterial], $slocBindingsBal, [$idPlant]));
 
             $detailCount = (int)($balanceDetails[0]->detail_count ?? 0);
-            \Log::info('WIP Feed Save - Balance Detail Count', ['detail_count' => $detailCount, 'material_id' => $idMaterial, 'tank' => $idTank]);
-            
+            \Log::info('WIP Feed Save - Balance Detail Count', ['detail_count' => $detailCount, 'material_id' => $idMaterial, 'tank' => $idSloc]);
+
             if ($detailCount == 0) {
                 \Log::error('WIP Feed Save - No Supplier Details Available', [
                     'feed_id' => $feedId,
-                    'tank' => $idTank,
+                    'tank' => $idSloc,
                     'material_id' => $idMaterial,
                     'id_plant' => $idPlant,
                     'message' => 'Balance exists but has no supplier details (t_balance_detail). Please ensure the balance for this material/tank has supplier information setup.'
@@ -133,8 +146,8 @@ trait WipEntryWriteTrait
                 'user'         => $user,
                 'entry_date'   => $currEntryDate,
                 'id_material'  => $idMaterial,
-                'id_sloc'      => $idTank,
-                'id_sloc_tail' => $idTankTail,
+                'id_sloc'      => $idSloc,
+                'id_sloc_tail' => $idSlocTail,
                 'id_plant'     => $idPlant,
                 'qty'          => $outQty,
                 'to_trace_no'  => $entryNo,
@@ -155,19 +168,21 @@ trait WipEntryWriteTrait
                 return [['response' => (string)$errorMsg]];
             }
 
+            // @phpstan-ignore-next-line
             Feed::normalizeSupplierRundown($result['trace_head_ids'], $outQty);
 
             $feedTraceHeadId = $result['trace_head_ids'][0] ?? null;
             if ($feedTraceHeadId) {
                 \Log::info('WIP Feed Save - Inserting t_prod_log', ['trace_head_id' => $feedTraceHeadId, 'batch_no' => $entryNo]);
-                
+
                 DB::connection('eudr_ts')->table('t_prod_log')->insert([
                     'id_trace_head' => $feedTraceHeadId,
                     'section' => $feedId,
+                    'mode' => $wipMode,
                     'entry_date' => $currEntryDate,
                     'batch_no' => $entryNo,
-                    'tank_id' => $idTank,
-                    'tank_tail' => $idTankTail,
+                    'tank_id' => $idSloc,
+                    'tank_tail' => $idSlocTail,
                     'id_material' => $idMaterial,
                     'in_qty' => 0,
                     'out_qty' => $outQty,
@@ -178,7 +193,7 @@ trait WipEntryWriteTrait
                     'created_at' => now(),
                 ]);
                 $this->logTransaction('T_PROD_LOG', 'ADD', 'WIP FEED | IDTRACEHEAD: ' . $feedTraceHeadId . ' | BATCH: ' . $entryNo . ' | QTY: ' . $outQty, $user);
-                
+
                 \Log::info('WIP Feed Save - Success', ['batch_no' => $entryNo, 'out_qty' => $outQty]);
             }
 
@@ -209,21 +224,22 @@ trait WipEntryWriteTrait
             return [['response' => '5']];
         }
 
+        $wipMode = (int)($data['wip_mode'] ?? 1);
         $subgroup = $data['subgroup'] ?? null;
         $rundownId = $this->mapFrontendSectionToDbRundownId($data['rundown_id'], $subgroup);
         $lastQtf = $data['last_rundown'];
         $currQtf = $data['curr_rundown'];
         $currEntryDate = $data['curr_entryDate'];
         $entryNo = $data['batch_no'];
-        $idTank = $data['tank'];
-        $idTankTail = !empty($data['tankNo']) ? json_encode($data['tankNo']) : '[]';
+        $idSloc = $data['tank'];
+        $idSlocTail = !empty($data['tankNo']) ? json_encode($data['tankNo']) : '[]';
         $idPlant = $this->resolvePlantId($data['id_plant'] ?? null);
 
         \Log::info('WIP Rundown Save - Input Data', [
             'rundown_id' => $data['rundown_id'],
             'mapped_rundown_id' => $rundownId,
             'subgroup' => $subgroup,
-            'tank' => $idTank,
+            'tank' => $idSloc,
             'curr_rundown' => $currQtf,
             'last_rundown' => $lastQtf,
             'entry_date' => $currEntryDate,
@@ -260,7 +276,7 @@ trait WipEntryWriteTrait
             return [['response' => '7']];
         }
 
-        $feedSectionId = $this->mapRundownToFeedSectionId($rundownId);
+        $feedSectionId = $this->mapRundownToFeedSectionId($rundownId, $wipMode);
         $feedId = $feedSectionId;
 
         \Log::info('WIP Rundown Save - Looking for Feed Trace', ['rundown_id' => $rundownId, 'feed_section_id' => $feedSectionId, 'feed_id' => $feedId, 'entry_date' => $currEntryDate]);
@@ -269,12 +285,12 @@ trait WipEntryWriteTrait
             SELECT to_trace_no, id_trace_head, SUM(out_qty) AS out_qty, id_material
               FROM t_trace_header
              WHERE SUBSTRING(to_trace_no,1,1) = ?
-               AND SUBSTRING(to_trace_no,8,3) = ?
+               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $feedId) . '
                AND entry_date = ? AND id_plant = ? AND status = 1
                AND out_qty > 0.0001
              GROUP BY id_trace_head
              ORDER BY id_trace_head DESC LIMIT 1
-        ', [$this->movType2, $feedId, $currEntryDate, $idPlant]);
+        ', [$this->movType2, $currEntryDate, $idPlant]);
 
         if (empty($feedTrace) || $feedTrace[0]->out_qty === null) {
             \Log::warning('WIP Rundown Save - Feed Trace Not Found', ['rundown_id' => $rundownId, 'feed_id' => $feedId, 'entry_date' => $currEntryDate]);
@@ -287,23 +303,26 @@ trait WipEntryWriteTrait
 
         $idMaterial = $this->getMaterialIdBySection($rundownId, 'rundown', $subgroup);
         \Log::info('WIP Rundown Save - Material ID Lookup', ['rundown_id' => $rundownId, 'material_id' => $idMaterial]);
-        
+
         if (empty($idMaterial)) {
             \Log::warning('WIP Rundown Save - Material Not Found', ['rundown_id' => $rundownId]);
             return [['response' => '4']];
         }
 
+        $slocClauseDup5 = $this->dbSlocJsonClause('id_sloc');
+        $slocBindingsDup5 = [$idSloc, $idSloc];
+
         $dup = DB::connection('eudr_ts')->select('
             SELECT COUNT(id_trace_head) AS flag
               FROM t_trace_header
              WHERE status = 1 AND entry_date = ?
-               AND (id_sloc = ? OR (JSON_VALID(id_sloc) AND (JSON_CONTAINS(id_sloc, CAST(? AS CHAR)) OR JSON_CONTAINS(id_sloc, JSON_QUOTE(CAST(? AS CHAR))))))
+               AND (' . $slocClauseDup5 . ')
                AND id_material = ?
                AND out_qty = 0 AND id_plant = ? AND SUBSTRING(to_trace_no,1,1) = 2
-        ', [$currEntryDate, $idTank, $idTank, $idTank, $idMaterial, $idPlant]);
+        ', array_merge([$currEntryDate], $slocBindingsDup5, [$idMaterial, $idPlant]));
 
         if (!empty($dup) && $dup[0]->flag > 0) {
-            \Log::warning('WIP Rundown Save - Duplicate Entry', ['entry_date' => $currEntryDate, 'tank' => $idTank, 'material_id' => $idMaterial]);
+            \Log::warning('WIP Rundown Save - Duplicate Entry', ['entry_date' => $currEntryDate, 'tank' => $idSloc, 'material_id' => $idMaterial]);
             return [['response' => '2']];
         }
 
@@ -314,11 +333,12 @@ trait WipEntryWriteTrait
             SELECT to_trace_no, id_trace_head, out_qty, id_material
               FROM t_trace_header
              WHERE SUBSTRING(to_trace_no,1,1) = ?
-               AND SUBSTRING(to_trace_no,8,3) = ?
-               AND entry_date = ? AND status = 1
-               AND out_qty > 0.0001 AND id_plant = ?
-             ORDER BY id_trace_head DESC
-        ', [$this->movType2, $feedId, $currEntryDate, $idPlant]);
+               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $feedId) . '
+               AND entry_date = ? AND id_plant = ? AND status = 1
+               AND out_qty > 0.0001
+             GROUP BY id_trace_head
+             ORDER BY id_trace_head DESC LIMIT 1
+        ', [$this->movType2, $currEntryDate, $idPlant]);
 
         \Log::info('WIP Rundown Save - Feed Traces Found', ['count' => count($feedTraces)]);
 
@@ -354,24 +374,49 @@ trait WipEntryWriteTrait
             'from_trace_no' => $fromTraceNo,
             'trace_no'      => $entryNo,
             'id_material'   => $idMaterial,
-            'id_sloc'       => $idTank,
-            'id_sloc_tail'  => $idTankTail,
+            'id_sloc'       => $idSloc,
+            'id_sloc_tail'  => $idSlocTail,
             'in_qty'        => $inQty,
             'last_qtf'      => $lastQtf,
             'curr_qtf'      => $currQtf,
             'id_plant'      => $idPlant,
             'supplier_rows' => $supplierRows,
         ];
-        
+
         \Log::info('WIP Rundown Save - Calling Rundown::generalRundown', ['rundown_data' => $rundownData]);
 
         $rundownResult = Rundown::generalRundown($rundownData);
-        
+
         \Log::info('WIP Rundown Save - Rundown::generalRundown Result', ['result' => $rundownResult]);
 
         if (($rundownResult['response'] ?? 0) != 1) {
             \Log::warning('WIP Rundown Save - Rundown::generalRundown Failed', ['response' => $rundownResult['response'] ?? 0]);
             return [['response' => '3']];
+        }
+
+        $rundownTraceHead = DB::connection('eudr_ts')->selectOne(
+            'SELECT id_trace_head FROM t_trace_header WHERE to_trace_no = ? AND status = 1',
+            [$entryNo]
+        );
+        if ($rundownTraceHead) {
+            DB::connection('eudr_ts')->table('t_prod_log')->insert([
+                'id_trace_head' => $rundownTraceHead->id_trace_head,
+                'section' => $rundownId,
+                'mode' => $wipMode,
+                'entry_date' => $currEntryDate,
+                'batch_no' => $entryNo,
+                'tank_id' => $idSloc,
+                'tank_tail' => $idSlocTail,
+                'id_material' => $idMaterial,
+                'in_qty' => $inQty,
+                'out_qty' => 0,
+                'yield' => $processYield,
+                'id_plant' => $idPlant,
+                'status' => 1,
+                'created_by' => $user,
+                'created_at' => now(),
+            ]);
+            $this->logTransaction('T_PROD_LOG', 'ADD', 'WIP RUNDOWN | IDTRACEHEAD: ' . $rundownTraceHead->id_trace_head . ' | BATCH: ' . $entryNo . ' | QTY: ' . $inQty, $user);
         }
 
         \Log::info('WIP Rundown Save - Success', ['batch_no' => $entryNo, 'in_qty' => $inQty]);
@@ -381,167 +426,16 @@ trait WipEntryWriteTrait
 
     public function cancelFeed(string $traceNo, string $user): array
     {
-        $entryDate = DB::connection('eudr_ts')->select(
-            'SELECT entry_date FROM t_trace_header WHERE to_trace_no = ? AND status = 1',
-            [$traceNo]
-        );
-        if (empty($entryDate)) return [['response' => '0']];
-
-        if ($this->checkPeriodLock($entryDate[0]->entry_date)) {
-            return [['response' => '99']];
-        }
-
-        $traceHeads = DB::connection('eudr_ts')->select('
-            SELECT id_trace_head, id_balance_head, in_qty, out_qty
-              FROM t_trace_header
-             WHERE to_trace_no = ? AND status = 1
-             ORDER BY id_trace_head DESC
-        ', [$traceNo]);
-
-        foreach ($traceHeads as $head) {
-            $idTraceHead = $head->id_trace_head;
-            $idBalanceHead = $head->id_balance_head;
-            $traceHeadOutQty = (float)$head->out_qty;
-
-            DB::connection('eudr_ts')->update(
-                'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ? AND status = 1',
-                [$user, $idTraceHead]
-            );
-            $this->logTransaction('T_TRACE_HEAD', 'DELETE',
-                'IDTRACEHEAD: ' . $idTraceHead . ' IDHEAD: ' . $idBalanceHead . ' | Status: 1 >>> 0', $user);
-
-            $balHead = DB::connection('eudr_ts')->select('
-                SELECT qty, in_qty, out_qty FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
-                [$idBalanceHead]
-            );
-            if (!empty($balHead)) {
-                $oldQty = (float)$balHead[0]->qty;
-                $oldInQty = (float)$balHead[0]->in_qty;
-                $oldOutQty = (float)$balHead[0]->out_qty;
-
-                DB::connection('eudr_ts')->update('
-                    UPDATE t_balance_header SET qty = ?, in_qty = ?, out_qty = ?, updated_by = ?
-                    WHERE id_balance_head = ? AND status = 1',
-                    [$oldQty + $traceHeadOutQty, $oldInQty, $oldOutQty - $traceHeadOutQty, $user, $idBalanceHead]
-                );
-
-                $this->logTransaction('T_BALANCE_HEAD', 'UPDATE',
-                    'IDHEAD: ' . $idBalanceHead . ' | QTY: ' . $oldQty . ' >>> ' . ($oldQty + $traceHeadOutQty) .
-                    ' / OUT_QTY: ' . $oldOutQty . ' >>> ' . ($oldOutQty - $traceHeadOutQty) . ' | Status: 1', $user);
-            }
-
-            $traceTails = DB::connection('eudr_ts')->select('
-                SELECT id_trace_tail, id_balance_tail, in_qty, out_qty
-                  FROM t_trace_detail
-                 WHERE id_trace_head = ? AND status = 1
-                 ORDER BY id_trace_tail DESC
-            ', [$idTraceHead]);
-
-            foreach ($traceTails as $tail) {
-                DB::connection('eudr_ts')->update(
-                    'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ? AND status = 1',
-                    [$user, $tail->id_trace_tail]
-                );
-
-                $balTail = DB::connection('eudr_ts')->select('
-                    SELECT qty, in_qty, out_qty, init_qty FROM t_balance_detail
-                     WHERE id_balance_tail = ? AND status = 1
-                ', [$tail->id_balance_tail]);
-
-                if (!empty($balTail)) {
-                    $tailOutQty = (float)$tail->out_qty;
-                    DB::connection('eudr_ts')->update('
-                        UPDATE t_balance_detail SET qty = ?, in_qty = ?, out_qty = ?, updated_by = ?
-                        WHERE id_balance_tail = ? AND status = 1',
-                        [$balTail[0]->qty + $tailOutQty, $balTail[0]->in_qty, $balTail[0]->out_qty - $tailOutQty, $user, $tail->id_balance_tail]
-                    );
-                }
-            }
-
-            DB::connection('eudr_ts')->update(
-                'UPDATE t_prod_log SET status = 0, updated_by = ? WHERE id_trace_head = ? AND status = 1',
-                [$user, $idTraceHead]
-            );
-            $this->logTransaction('T_PROD_LOG', 'DELETE',
-                'IDTRACEHEAD: ' . $idTraceHead . ' | Status: 1 >>> 0 | Cancel Feed', $user);
-        }
-
-        return [['response' => '1']];
+        $service = app(\Modules\Shared\Services\TransactionCancellationService::class);
+        $res = $service->cancelWipFeed($traceNo, $user);
+        return [['response' => (string) $res['response']]];
     }
 
     public function cancelRundown(string $traceNo, string $user): array
     {
-        $entryDate = DB::connection('eudr_ts')->select(
-            'SELECT entry_date FROM t_trace_header WHERE to_trace_no = ? AND status = 1',
-            [$traceNo]
-        );
-        if (empty($entryDate)) return [['response' => '0']];
-
-        if ($this->checkPeriodLock($entryDate[0]->entry_date)) {
-            return [['response' => '99']];
-        }
-
-        $traceHeads = DB::connection('eudr_ts')->select('
-            SELECT id_trace_head, id_balance_head, in_qty, out_qty
-              FROM t_trace_header
-             WHERE to_trace_no = ? AND status = 1
-             ORDER BY id_trace_head DESC
-        ', [$traceNo]);
-
-        foreach ($traceHeads as $head) {
-            $idTraceHead = $head->id_trace_head;
-            $idBalanceHead = $head->id_balance_head;
-
-            DB::connection('eudr_ts')->update(
-                'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ? AND status = 1',
-                [$user, $idTraceHead]
-            );
-            $this->logTransaction('T_TRACE_HEAD', 'DELETE',
-                'IDTRACEHEAD: ' . $idTraceHead . ' IDHEAD: ' . $idBalanceHead . ' | Status: 1 >>> 0', $user);
-
-            DB::connection('eudr_ts')->update(
-                'UPDATE t_balance_header SET status = 0, updated_by = ? WHERE id_balance_head = ? AND status = 1',
-                [$user, $idBalanceHead]
-            );
-            $this->logTransaction('T_BALANCE_HEAD', 'UPDATE',
-                'IDHEAD: ' . $idBalanceHead . ' | Status: 1 >>> 0', $user);
-
-            $traceTails = DB::connection('eudr_ts')->select('
-                SELECT id_trace_tail, id_balance_tail FROM t_trace_detail
-                 WHERE id_trace_head = ? AND status = 1
-            ', [$idTraceHead]);
-
-            foreach ($traceTails as $tail) {
-                DB::connection('eudr_ts')->update(
-                    'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ? AND status = 1',
-                    [$user, $tail->id_trace_tail]
-                );
-                DB::connection('eudr_ts')->update(
-                    'UPDATE t_balance_detail SET status = 0, updated_by = ? WHERE id_balance_tail = ? AND status = 1',
-                    [$user, $tail->id_balance_tail]
-                );
-            }
-        }
-
-        $adjCode = substr($traceNo, 0, 1);
-        if ($adjCode === '9') {
-            $adjHead = DB::connection('eudr_ts')->select(
-                'SELECT id_adjust_head FROM t_adjustment_header WHERE adjust_no = ?', [$traceNo]
-            );
-            if (!empty($adjHead)) {
-                $idAdjustHead = $adjHead[0]->id_adjust_head;
-                DB::connection('eudr_ts')->update(
-                    'UPDATE t_adjustment_header SET status = 0, updated_by = ? WHERE id_adjust_head = ? AND status = 1',
-                    [$user, $idAdjustHead]
-                );
-                DB::connection('eudr_ts')->update(
-                    'UPDATE t_adjustment_detail SET status = 0, updated_by = ? WHERE id_adjust_head = ? AND status = 1',
-                    [$user, $idAdjustHead]
-                );
-            }
-        }
-
-        return [['response' => '1']];
+        $service = app(\Modules\Shared\Services\TransactionCancellationService::class);
+        $res = $service->cancelWipRundown($traceNo, $user);
+        return [['response' => (string) $res['response']]];
     }
 
     public function updateEntrySubTank(int $idHead, array $tails, string $user): array

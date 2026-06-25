@@ -2,11 +2,14 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as apiLogin, logout as apiLogout, getAuthUser } from '@/modules/auth/services/index.js'
 
+let _initPromise = null
+
 export const useAuthStore = defineStore('auth', () => {
   const user        = ref(null)
   const roles       = ref([])
   const permissions = ref([])
   const loading     = ref(false)
+  const initializing = ref(true)
 
   const isAuthenticated = computed(() => !!user.value)
 
@@ -75,10 +78,21 @@ export const useAuthStore = defineStore('auth', () => {
     return false
   }
 
+  async function initialize() {
+    if (_initPromise) return _initPromise
+    initializing.value = true
+    _initPromise = (async () => {
+      const hasToken = localStorage.getItem('auth_token')
+      if (hasToken) await fetchUser()
+      initializing.value = false
+    })()
+    return _initPromise
+  }
+
   return {
-    user, roles, permissions, loading,
+    user, roles, permissions, loading, initializing,
     isAuthenticated,
     hasRole, hasPermission, hasAnyRole,
-    login, logout, fetchUser,
+    login, logout, fetchUser, initialize,
   }
 })

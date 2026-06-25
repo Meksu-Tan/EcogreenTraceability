@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsTransfer\Repositories\Contracts;
 
 use Illuminate\Support\Collection;
@@ -19,7 +20,7 @@ interface TransferRepositoryInterface
 
     public function getLockStatus(string $entryDate): bool;
 
-    public function getUpdateSupplierMaterial(int $idMaterial, int $idTank, int $plantId): ?object;
+    public function getUpdateSupplierMaterial(int $idMaterial, int $idSloc, int $plantId): ?object;
 
     public function postAdjEntrySupplier(string $user, string $adjNumber, int $idSupplier, int $idMaterial, float $qty, string $batchSap, int $plantId): array;
 
@@ -48,4 +49,10 @@ interface TransferRepositoryInterface
     public function createAdjustmentHeader(array $data): int;
 
     public function createAdjustmentDetail(array $data): bool;
+
+    public function findMaterialRundown(int $idMaterial): string;
+
+    public function generateAdjSequence(string $prefix12): string;
+
+    public function getNextSequence(string $ymd, string $rundownCode, string $plantCode): string;
 }

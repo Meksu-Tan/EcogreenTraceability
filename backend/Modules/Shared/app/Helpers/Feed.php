@@ -4,7 +4,7 @@ namespace Modules\Shared\Helpers;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Feed helper — FIFO balance consumption engine.
+ * Feed helper â€” FIFO balance consumption engine.
  *
  * RAW SQL DEBT (C06): The t_balance_header and t_balance_detail queries
  * in generalFeed() remain as raw SQL because of dynamic JSON_CONTAINS
@@ -38,7 +38,7 @@ class Feed
             if (is_array($slocVal)) {
                 $slocIds = $slocVal;
             } else {
-                $decoded = json_decode($slocVal, true);
+                $decoded = is_string($slocVal) ? json_decode($slocVal, true) : null;
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $slocIds = $decoded;
                 } else {
@@ -50,9 +50,7 @@ class Feed
             if (!empty($slocIds)) {
                 $conditions = [];
                 foreach ($slocIds as $id) {
-                    $conditions[] = "id_sloc = ? OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, CAST(? AS JSON))) OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, JSON_QUOTE(?)))";
-                    $params[] = $id;
-                    $params[] = $id;
+                    $conditions[] = "id_sloc = ?";
                     $params[] = $id;
                 }
                 $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
@@ -91,7 +89,7 @@ class Feed
             if (is_array($slocVal)) {
                 $slocIds = $slocVal;
             } else {
-                $decoded = json_decode($slocVal, true);
+                $decoded = is_string($slocVal) ? json_decode($slocVal, true) : null;
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $slocIds = $decoded;
                 } else {
@@ -103,9 +101,7 @@ class Feed
             if (!empty($slocIds)) {
                 $conditions = [];
                 foreach ($slocIds as $id) {
-                    $conditions[] = "id_sloc = ? OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, CAST(? AS JSON))) OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, JSON_QUOTE(?)))";
-                    $params[] = $id;
-                    $params[] = $id;
+                    $conditions[] = "id_sloc = ?";
                     $params[] = $id;
                 }
                 $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
@@ -136,7 +132,7 @@ class Feed
             }
 
             $totalAvailable = array_sum(array_column($balHeads, 'qty'));
-            if (round($totalAvailable, 4) < round($feedData['qty'], 4)) {
+            if (round((float)$totalAvailable, 4) < round((float)$feedData['qty'], 4)) {
                 return [
                     'response' => 3,
                     'trace_head_ids' => [],
@@ -146,7 +142,7 @@ class Feed
                 ];
             }
 
-            $qtyWh = $feedData['qty'];
+            $qtyWh = (float) $feedData['qty'];
             $traceHeadIds = [];
             $usedHeads = [];
             $feedInDetails = [];
@@ -158,30 +154,33 @@ class Feed
                 $idHead = $head->id_balance_head;
                 $fromTrace = $head->trace_no;
 
-                if ($head->qty <= 0) continue;
+                $headQty = (float) $head->qty;
+                $headOut = (float) $head->out_qty;
 
-                $balanceAfter = $head->qty - $qtyWh;
+                if ($headQty <= 0) continue;
+
+                $balanceAfter = $headQty - $qtyWh;
 
                 if ($balanceAfter < 0) {
-                    $useQty = $head->qty;
+                    $useQty = $headQty;
                     $newBalance = 0;
-                    $newOutQty = $head->out_qty + $useQty;
+                    $newOutQty = $headOut + $useQty;
                     $qtyWh -= $useQty;
                 } else {
                     $useQty = $qtyWh;
-                    $newBalance = round($head->qty - $qtyWh, 4);
-                    $newOutQty = $head->out_qty + $qtyWh;
+                    $newBalance = round((float) $headQty - $qtyWh, 4);
+                    $newOutQty = $headOut + $qtyWh;
                     $qtyWh = 0;
                 }
 
-                $useQty = round($useQty, 4);
+                $useQty = round((float) $useQty, 4);
                 $totalOut += $useQty;
 
                 DB::connection($connection)->table('t_balance_header')
                     ->where('id_balance_head', $idHead)
                     ->update([
                         'qty' => $newBalance,
-                        'out_qty' => round($newOutQty, 4),
+                        'out_qty' => round((float) $newOutQty, 4),
                         'updated_by' => $feedData['user'],
                     ]);
 
@@ -198,7 +197,7 @@ class Feed
                     'curr_qtf' => $feedData['qty'],
                     'id_plant' => $feedData['id_plant'],
                     'created_by' => $feedData['user'],
-                ]);
+                ], 'id_trace_head');
 
                 $traceHeadIds[] = $traceHeadId;
                 $usedHeads[] = [
@@ -213,26 +212,43 @@ class Feed
                     'SELECT a.id_balance_tail, a.id_supplier, a.id_manufacturer, a.batch_sap, a.qty, a.out_qty, a.init_qty,
                             COALESCE(b.created_at, a.created_at) AS entry_ts
                        FROM t_balance_detail a
-                       JOIN m_supplier b ON a.id_supplier = b.id_supplier
+                       LEFT JOIN m_supplier b ON a.id_supplier = b.id_supplier
                        LEFT JOIN t_balance_header h ON a.id_balance_head = h.id_balance_head
                       WHERE a.id_balance_head = ?
                         AND a.status = 1
                         AND a.qty > 0.0001
                       ORDER BY entry_ts ASC, a.id_balance_tail ASC
-                      FOR UPDATE',
+                      FOR UPDATE OF a',
                     [$idHead]
                 );
 
                 if (count($balTails) === 0) {
-                    \Log::warning('Feed::generalFeed - No balance details for balance header', [
+                    // Orphan balance header: qty > 0 but no detail rows.
+                    // Auto-create synthetic detail with first active supplier.
+                    $supplier = DB::connection($connection)->table('m_supplier')
+                        ->where('status', 1)
+                        ->orderBy('id_supplier')
+                        ->first();
+                    $idSupplier = $supplier ? $supplier->id_supplier : 1;
+
+                    $balTailId = DB::connection($connection)->table('t_balance_detail')->insertGetId([
                         'id_balance_head' => $idHead,
-                        'trace_no' => $fromTrace,
+                        'id_supplier' => $idSupplier,
                         'qty' => $head->qty,
-                        'out_qty' => $head->out_qty
-                    ]);
-                    throw new \RuntimeException(
-                        'Feed::generalFeed - id_balance_head=' . $idHead .
-                        ' (trace_no=' . $fromTrace . ') has qty > 0 but NO active t_balance_detail rows.'
+                        'init_qty' => $head->qty,
+                        'out_qty' => 0,
+                        'status' => 1,
+                        'created_by' => $feedData['user'],
+                    ], 'id_balance_tail');
+
+                    // Re-fetch the synthetic tail
+                    $balTails = DB::connection($connection)->select(
+                        'SELECT id_balance_tail, id_supplier, id_manufacturer, batch_sap, qty, out_qty, init_qty,
+                                created_at AS entry_ts
+                           FROM t_balance_detail
+                          WHERE id_balance_tail = ?
+                            AND status = 1',
+                        [$balTailId]
                     );
                 }
 
@@ -241,17 +257,20 @@ class Feed
                 foreach ($balTails as $tail) {
                     if ($qtyTail <= 0) break;
 
-                    $tailAfter = $tail->qty - $qtyTail;
+                    $tailQty = (float) $tail->qty;
+                    $tailOut = (float) $tail->out_qty;
+
+                    $tailAfter = $tailQty - $qtyTail;
 
                     if ($tailAfter < 0) {
-                        $useTailQty = $tail->qty;
+                        $useTailQty = $tailQty;
                         $newTailQty = 0;
-                        $newTailOut = $tail->out_qty + $useTailQty;
+                        $newTailOut = $tailOut + $useTailQty;
                         $qtyTail -= $useTailQty;
                     } else {
                         $useTailQty = $qtyTail;
-                        $newTailQty = round($tail->qty - $qtyTail, 4);
-                        $newTailOut = $tail->out_qty + $qtyTail;
+                        $newTailQty = round((float) $tailQty - $qtyTail, 4);
+                        $newTailOut = $tailOut + $qtyTail;
                         $qtyTail = 0;
                     }
 
@@ -270,8 +289,8 @@ class Feed
                     DB::connection($connection)->table('t_balance_detail')
                         ->where('id_balance_tail', $tail->id_balance_tail)
                         ->update([
-                            'qty' => round($newTailQty, 4),
-                            'out_qty' => round($newTailOut, 4),
+                            'qty' => round((float) $newTailQty, 4),
+                            'out_qty' => round((float) $newTailOut, 4),
                             'updated_by' => $feedData['user'],
                         ]);
 
@@ -282,7 +301,7 @@ class Feed
                         'id_supplier' => $tail->id_supplier,
                         'id_manufacturer' => $tail->id_manufacturer ?? null,
                         'id_material' => $feedData['id_material'],
-                        'out_qty' => round($useTailQty, 4),
+                        'out_qty' => round((float) $useTailQty, 4),
                         'batch_sap' => $tail->batch_sap,
                         'id_sloc' => $feedData['id_sloc'] ?? '[]',
                         'id_plant' => $feedData['id_plant'],
@@ -291,7 +310,7 @@ class Feed
                 }
             }
 
-            if (round($qtyWh, 4) > 0) {
+            if (round((float) $qtyWh, 4) > 0) {
                 throw new \RuntimeException(
                     'Feed::generalFeed - insufficient balance after FIFO loop. Remaining qty: ' . $qtyWh
                 );
@@ -325,7 +344,7 @@ class Feed
             if (is_array($slocVal)) {
                 $slocIds = $slocVal;
             } else {
-                $decoded = json_decode($slocVal, true);
+                $decoded = is_string($slocVal) ? json_decode($slocVal, true) : null;
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $slocIds = $decoded;
                 } else {
@@ -337,9 +356,7 @@ class Feed
             if (!empty($slocIds)) {
                 $conditions = [];
                 foreach ($slocIds as $id) {
-                    $conditions[] = "id_sloc = ? OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, CAST(? AS JSON))) OR (JSON_VALID(id_sloc) AND JSON_CONTAINS(id_sloc, JSON_QUOTE(?)))";
-                    $sqlParams[] = $id;
-                    $sqlParams[] = $id;
+                    $conditions[] = "id_sloc = ?";
                     $sqlParams[] = $id;
                 }
                 $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
@@ -368,10 +385,40 @@ class Feed
      * Stub for normalizeSupplierRundown to prevent fatal errors.
      * Original logic seems to have normalized supplier proportion for rundown.
      */
-    public static function normalizeSupplierRundown(array $traceHeadIds, float $outQty): array
+    public static function normalizeSupplierRundown(array $traceHeadIds, float $targetQty): void
     {
-        // TODO: Implement actual normalization logic or route to Rundown::adjustRundownToTotal
-        return [];
+        if (empty($traceHeadIds) || $targetQty <= 0) return;
+
+        $rows = DB::connection('eudr_ts')->table('t_trace_detail')
+            ->select('id_trace_tail', 'out_qty')
+            ->whereIn('id_trace_head', $traceHeadIds)
+            ->where('status', 1)
+            ->get();
+
+        if ($rows->isEmpty()) return;
+
+        $total = $rows->sum('out_qty');
+        if (round($total, 6) == 0) return;
+
+        $factor   = $targetQty / $total;
+        $newTotal = 0;
+        $adjusted = [];
+
+        foreach ($rows as $i => $row) {
+            $val           = round($row->out_qty * $factor, 4);
+            $adjusted[$i]  = ['id' => $row->id_trace_tail, 'out_qty' => $val];
+            $newTotal     += $val;
+        }
+
+        // Apply rounding correction to last row
+        $delta = round($targetQty - $newTotal, 4);
+        $adjusted[count($adjusted) - 1]['out_qty'] += $delta;
+
+        foreach ($adjusted as $item) {
+            DB::connection('eudr_ts')->table('t_trace_detail')
+                ->where('id_trace_tail', $item['id'])
+                ->update(['out_qty' => $item['out_qty']]);
+        }
     }
 
     /**

@@ -22,9 +22,9 @@ export const packageService = {
   getActiveFgProducts() {
     return api.get('/api/v1/transactions/package-entries/active-fg-products')
   },
-  getWipMaterials(idMaterialPck, tank) {
+  getWipMaterials(idMaterialPck, tank, id_plant) {
     return api.get('/api/v1/transactions/package-entries/wip-materials', {
-      params: { idMaterialPck, tank }
+      params: { idMaterialPck, tank, id_plant }
     })
   },
   getActiveTanks(rundownID) {
@@ -37,14 +37,14 @@ export const packageService = {
       params: { batchNo }
     })
   },
-  getSpecificTanks(sloc) {
+  getSpecificTanks(sloc, fgProduct) {
     return api.get('/api/v1/transactions/package-entries/specific-tanks', {
-      params: { sloc }
+      params: { sloc, fgProduct }
     })
   },
-  getNewTraceNo(warehouse, id_plant) {
+  getNewTraceNo(id_material, id_plant) {
     return api.get('/api/v1/transactions/package-entries/new-trace-no', {
-      params: { warehouse, id_plant }
+      params: { id_material, id_plant }
     })
   },
   getAllWarehouses() {

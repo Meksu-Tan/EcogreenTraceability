@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #F7F4EF; padding: 24px; font-family: var(--font-body); display: flex; flex-direction: column; gap: 20px; }
+.row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.label { font-family: var(--font-mono); font-size: 10px; color: #97A49C; width: 80px; flex-shrink: 0; }
+button { cursor: pointer; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 14px; border: none; border-radius: 4px; padding: 10px 20px; transition: all 200ms ease; letter-spacing: 0.02em; }
+.btn-primary { background: #1A6B3C; color: #fff; }
+.btn-primary:hover { background: #155832; }
+.btn-secondary { background: transparent; color: #1A6B3C; border: 1.5px solid #1A6B3C; }
+.btn-secondary:hover { background: #E8F5EC; }
+.btn-ghost { background: transparent; color: #5A6860; }
+.btn-ghost:hover { color: #1A6B3C; background: #F4FAF5; }
+.btn-danger { background: #C62828; color: #fff; }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn-lg { padding: 13px 28px; font-size: 16px; }
+.btn-disabled { background: #D4DDD8; color: #97A49C; cursor: not-allowed; }
+.btn-icon { display: inline-flex; align-items: center; gap: 8px; }
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="row"><div class="label">Primary</div>
+    <button class="btn-primary">Download PDF</button>
+    <button class="btn-primary btn-sm">Small</button>
+    <button class="btn-primary btn-lg">Large</button>
+  </div>
+  <div class="row"><div class="label">Secondary</div>
+    <button class="btn-secondary">Contact Sales</button>
+    <button class="btn-secondary btn-sm">Small</button>
+  </div>
+  <div class="row"><div class="label">Ghost</div>
+    <button class="btn-ghost">Learn More</button>
+    <button class="btn-ghost btn-icon"><i class="fas fa-chevron-right" style="font-size:11px"></i> View All Products</button>
+  </div>
+  <div class="row"><div class="label">With Icon</div>
+    <button class="btn-primary btn-icon"><i class="fas fa-file-pdf"></i> Download TDS</button>
+    <button class="btn-secondary btn-icon"><i class="fas fa-envelope"></i> Get in Touch</button>
+  </div>
+  <div class="row"><div class="label">Disabled</div>
+    <button class="btn-disabled" disabled>Unavailable</button>
+  </div>
+</body>
+</html>

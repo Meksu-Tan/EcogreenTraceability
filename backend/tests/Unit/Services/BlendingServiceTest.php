@@ -140,7 +140,7 @@ class BlendingServiceTest extends TestCase
             'entryNo'          => '82605240010101',
             'idMaterialSource' => 3,
             'qty'              => '100',
-            'idTank'           => 5,
+            'idSloc'           => 5,
             'mode'             => 'ADD',
         ], 0);
 
@@ -166,7 +166,7 @@ class BlendingServiceTest extends TestCase
             'entryNo'          => '82605240010101',
             'idMaterialSource' => 3,
             'qty'              => '100',
-            'idTank'           => 5,
+            'idSloc'           => 5,
             'mode'             => 'ADD',
         ], 0);
 
@@ -190,7 +190,7 @@ class BlendingServiceTest extends TestCase
             'entryNo'          => '82605240010101',
             'idMaterialSource' => 3,
             'qty'              => '50.5',
-            'idTank'           => 5,
+            'idSloc'           => 5,
             'mode'             => 'EDIT',
         ], 0);
 
@@ -215,7 +215,7 @@ class BlendingServiceTest extends TestCase
             'entryNo'          => '82605240010101',
             'idMaterialSource' => 3,
             'qty'              => '1,500.25',
-            'idTank'           => 5,
+            'idSloc'           => 5,
             'mode'             => 'ADD',
         ], 0);
 
@@ -387,7 +387,7 @@ class BlendingServiceTest extends TestCase
     public function test_it_gets_tanks_without_plant_filter(): void
     {
         $repoMock = Mockery::mock(BlendingRepositoryInterface::class);
-        $expected = collect([(object)['id_tank' => 1, 'description' => 'T-01']]);
+        $expected = collect([(object)['id_sloc' => 1, 'description' => 'T-01']]);
 
         $repoMock->shouldReceive('getTanks')
             ->once()

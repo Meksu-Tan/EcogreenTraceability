@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import packageService from '../services/packageService'
 import { useToastStore } from '@/stores/toast.js'
-import { usePlantSelectionStore } from '@/stores/plant.js'
+import { usePlantSelectionStore, registerCacheResetCallback } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const usePackageEntryStore = defineStore('packageEntry', () => {
@@ -25,6 +25,11 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     (params) => packageService.getEntries(params),
     { listKey: 'entries' }
   )
+
+  function resetCache() {
+    resetListCache()
+  }
+  registerCacheResetCallback(resetCache)
 
   async function fetchEntries(params = {}) {
     return doFetchList({ plant: plantId.value, ...params })
@@ -66,7 +71,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
 
   async function fetchWipMaterials(idMaterialPck, tank = null) {
     try {
-      const res = await packageService.getWipMaterials(idMaterialPck, tank)
+      const res = await packageService.getWipMaterials(idMaterialPck, tank, plantId.value)
       if (res.data?.data && res.data.data.length > 0) {
         wipBalance.value = parseFloat(res.data.data[0].balance) || 0
         wipMaterialLabel.value = res.data.data[0].wip_material || ''
@@ -102,9 +107,9 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
   }
 
-  async function fetchSpecificTanks(sloc) {
+  async function fetchSpecificTanks(sloc, fgProduct) {
     try {
-      const res = await packageService.getSpecificTanks(sloc)
+      const res = await packageService.getSpecificTanks(sloc, fgProduct)
       specificTanks.value = res.data?.data || []
     } catch (error) {
       toastStore.error('Failed to load specific tanks')
@@ -182,11 +187,15 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
   }
 
-  async function fetchNewTraceNo(warehouse, id_plant) {
+  async function fetchNewTraceNo(id_material, id_plant) {
     const activePlant = id_plant || plantId.value || plantStore.selectedPlantId
+    if (!id_material) {
+      newTraceNo.value = ''
+      return
+    }
     traceNoLoading.value = true
     try {
-      const res = await packageService.getNewTraceNo(warehouse, activePlant)
+      const res = await packageService.getNewTraceNo(id_material, activePlant)
       if (res.data?.data && res.data.data.length > 0) {
         newTraceNo.value = res.data.data[0].traceNo || ''
       } else {
@@ -219,6 +228,9 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     pagination,
     setPage,
     hasEntries,
+    pagination,
+    setPage,
+    hasEntries,
     entriesCount,
     activeFgProducts,
     wipMaterials,
@@ -246,6 +258,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     updateBatch,
     updateSubTank,
     resetState,
-    clearTraceNo
+    clearTraceNo,
+    resetCache,
   }
 })

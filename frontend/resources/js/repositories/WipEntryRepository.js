@@ -113,7 +113,7 @@ class WipEntryRepository {
     const res = await wipApi.store({
       flag: 'post_updateEntrySubTank',
       idHead,
-      idTankTail: tankTails,
+      idSlocTail: tankTails,
     })
     return this.normalizeResponse(res)
   }

@@ -29,7 +29,7 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock = Mockery::mock(TransferApprovalRepositoryInterface::class);
         $this->service = new TransferApprovalService($this->repoMock);
 
-        // Allow Log calls in all tests — service uses them in catch blocks
+        // Allow Log calls in all tests ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â service uses them in catch blocks
         // and AuditService uses Log::channel('audit')->info() with metadata
         Log::shouldReceive('error')->andReturn(null)->byDefault();
 
@@ -69,10 +69,10 @@ class TransferApprovalServiceTest extends TestCase
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
             ->once()
-            ->with('42')
+            ->with(42)
             ->andReturn('PENDING');
 
-        $result = $this->service->getCurrentStatus('42');
+        $result = $this->service->getCurrentStatus(42);
 
         $this->assertEquals('PENDING', $result);
     }
@@ -81,10 +81,10 @@ class TransferApprovalServiceTest extends TestCase
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
             ->once()
-            ->with('9999')
+            ->with(9999)
             ->andReturn(null);
 
-        $result = $this->service->getCurrentStatus('9999');
+        $result = $this->service->getCurrentStatus(9999);
 
         $this->assertNull($result);
     }
@@ -96,33 +96,33 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_allows_edit_when_status_is_draft(): void
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('DRAFT');
+            ->once()->with(42)->andReturn('DRAFT');
 
-        $this->assertTrue($this->service->canEdit('42'));
+        $this->assertTrue($this->service->canEdit(42));
     }
 
     public function test_it_allows_edit_when_status_is_rejected(): void
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('REJECTED');
+            ->once()->with(42)->andReturn('REJECTED');
 
-        $this->assertTrue($this->service->canEdit('42'));
+        $this->assertTrue($this->service->canEdit(42));
     }
 
     public function test_it_disallows_edit_when_status_is_approved(): void
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('APPROVED');
+            ->once()->with(42)->andReturn('APPROVED');
 
-        $this->assertFalse($this->service->canEdit('42'));
+        $this->assertFalse($this->service->canEdit(42));
     }
 
     public function test_it_disallows_edit_when_status_is_pending(): void
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('PENDING');
+            ->once()->with(42)->andReturn('PENDING');
 
-        $this->assertFalse($this->service->canEdit('42'));
+        $this->assertFalse($this->service->canEdit(42));
     }
 
     // =========================================================================
@@ -132,41 +132,41 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_allows_deletion_when_status_is_draft(): void
     {
         $this->repoMock->shouldReceive('canDelete')
-            ->once()->with('42')->andReturn(true);
+            ->once()->with(42)->andReturn(true);
 
-        $this->assertTrue($this->service->canDelete('42'));
+        $this->assertTrue($this->service->canDelete(42));
     }
 
     public function test_it_allows_deletion_when_status_is_approved(): void
     {
         $this->repoMock->shouldReceive('canDelete')
-            ->once()->with('42')->andReturn(true);
+            ->once()->with(42)->andReturn(true);
 
-        $this->assertTrue($this->service->canDelete('42'));
+        $this->assertTrue($this->service->canDelete(42));
     }
 
     public function test_it_allows_deletion_when_status_is_cancelled(): void
     {
         $this->repoMock->shouldReceive('canDelete')
-            ->once()->with('42')->andReturn(true);
+            ->once()->with(42)->andReturn(true);
 
-        $this->assertTrue($this->service->canDelete('42'));
+        $this->assertTrue($this->service->canDelete(42));
     }
 
     public function test_it_allows_deletion_when_status_is_rejected(): void
     {
         $this->repoMock->shouldReceive('canDelete')
-            ->once()->with('42')->andReturn(true);
+            ->once()->with(42)->andReturn(true);
 
-        $this->assertTrue($this->service->canDelete('42'));
+        $this->assertTrue($this->service->canDelete(42));
     }
 
     public function test_it_disallows_deletion_when_status_is_pending(): void
     {
         $this->repoMock->shouldReceive('canDelete')
-            ->once()->with('42')->andReturn(false);
+            ->once()->with(42)->andReturn(false);
 
-        $this->assertFalse($this->service->canDelete('42'));
+        $this->assertFalse($this->service->canDelete(42));
     }
 
     // =========================================================================
@@ -177,10 +177,10 @@ class TransferApprovalServiceTest extends TestCase
     {
         $this->repoMock->shouldReceive('findTransferForApproval')
             ->once()
-            ->with('9999')
+            ->with(9999)
             ->andReturn(null);
 
-        $result = $this->service->submit('9999', 'admin');
+        $result = $this->service->submit(9999, 'admin');
 
         $this->assertEquals(98, $result['response']);
         $this->assertStringContainsString('not found', $result['message']);
@@ -192,7 +192,7 @@ class TransferApprovalServiceTest extends TestCase
 
         $this->repoMock->shouldReceive('findTransferForApproval')
             ->once()
-            ->with('42')
+            ->with(42)
             ->andReturn((object) [
                 'id_trace_head' => 10,
                 'trace_no'      => '726060310001',
@@ -203,7 +203,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->once()
             ->andReturn([(object) ['lock_status' => '1']]);
 
-        $result = $this->service->submit('42', 'admin');
+        $result = $this->service->submit(42, 'admin');
 
         $this->assertEquals(99, $result['response']);
         $this->assertStringContainsString('locked', $result['message']);
@@ -223,9 +223,9 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('PENDING');
+            ->once()->with(42)->andReturn('PENDING');
 
-        $result = $this->service->submit('42', 'admin');
+        $result = $this->service->submit(42, 'admin');
 
         $this->assertEquals(2, $result['response']);
         $this->assertStringContainsString('DRAFT', $result['message']);
@@ -245,7 +245,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('DRAFT');
+            ->once()->with(42)->andReturn('DRAFT');
 
         $conn->shouldReceive('transaction')->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
@@ -254,9 +254,9 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
             ->once()->with(42, 'PENDING', 'admin');
 
-        // findApprovalRecord → none
+        // findApprovalRecord ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ none
         $this->repoMock->shouldReceive('findApprovalRecord')
-            ->once()->with('42')->andReturn(null);
+            ->once()->with(42)->andReturn(null);
 
         // InsertApprovalRecord
         $this->repoMock->shouldReceive('insertApprovalRecord')
@@ -265,7 +265,7 @@ class TransferApprovalServiceTest extends TestCase
         // AuditService INSERT
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
-        $result = $this->service->submit('42', 'admin');
+        $result = $this->service->submit(42, 'admin');
 
         $this->assertEquals(1, $result['response']);
         $this->assertStringContainsString('submitted', $result['message']);
@@ -285,7 +285,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('DRAFT');
+            ->once()->with(42)->andReturn('DRAFT');
 
         $conn->shouldReceive('transaction')->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
@@ -294,14 +294,14 @@ class TransferApprovalServiceTest extends TestCase
             ->once()->with(42, 'PENDING', 'admin');
 
         $this->repoMock->shouldReceive('findApprovalRecord')
-            ->once()->with('42')->andReturn((object) ['id_approval' => 5]);
+            ->once()->with(42)->andReturn((object) ['id_approval' => 5]);
 
         $this->repoMock->shouldReceive('updateApprovalStatus')
             ->once()->with('42', 'PENDING', 'admin');
 
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
-        $result = $this->service->submit('42', 'admin');
+        $result = $this->service->submit(42, 'admin');
 
         $this->assertEquals(1, $result['response']);
     }
@@ -313,7 +313,7 @@ class TransferApprovalServiceTest extends TestCase
 
         // byDefault allows Log::error
 
-        $result = $this->service->submit('42', 'admin');
+        $result = $this->service->submit(42, 'admin');
 
         $this->assertEquals(0, $result['response']);
         $this->assertStringContainsString('Failed to submit', $result['message']);
@@ -333,7 +333,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->once()
             ->andReturn([(object) ['lock_status' => '1']]);
 
-        $result = $this->service->approve('42', 'admin');
+        $result = $this->service->approve(42, 'admin');
 
         $this->assertEquals(99, $result['response']);
     }
@@ -348,9 +348,9 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('DRAFT');
+            ->once()->with(42)->andReturn('DRAFT');
 
-        $result = $this->service->approve('42', 'admin');
+        $result = $this->service->approve(42, 'admin');
 
         $this->assertEquals(2, $result['response']);
         $this->assertStringContainsString('PENDING', $result['message']);
@@ -366,7 +366,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('PENDING');
+            ->once()->with(42)->andReturn('PENDING');
 
         $conn->shouldReceive('transaction')->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
@@ -379,7 +379,7 @@ class TransferApprovalServiceTest extends TestCase
 
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
-        $result = $this->service->approve('42', 'admin', 'Approved after review');
+        $result = $this->service->approve(42, 'admin', 'Approved after review');
 
         $this->assertEquals(1, $result['response']);
         $this->assertStringContainsString('approved', $result['message']);
@@ -393,7 +393,7 @@ class TransferApprovalServiceTest extends TestCase
             ->once()->with(42)->andReturn(null);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('PENDING');
+            ->once()->with(42)->andReturn('PENDING');
 
         $conn->shouldReceive('transaction')->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
@@ -406,7 +406,7 @@ class TransferApprovalServiceTest extends TestCase
 
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
-        $result = $this->service->approve('42', 'admin');
+        $result = $this->service->approve(42, 'admin');
 
         $this->assertEquals(1, $result['response'], $result['message'] ?? '');
     }
@@ -418,7 +418,7 @@ class TransferApprovalServiceTest extends TestCase
 
         Log::shouldReceive('error')->once();
 
-        $result = $this->service->approve('42', 'admin');
+        $result = $this->service->approve(42, 'admin');
 
         $this->assertEquals(0, $result['response']);
         $this->assertStringContainsString('Failed to approve', $result['message']);
@@ -431,9 +431,9 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_returns_response_2_when_transfer_is_not_pending_on_reject(): void
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('APPROVED');
+            ->once()->with(42)->andReturn('APPROVED');
 
-        $result = $this->service->reject('42', 'admin', 'Wrong quantity');
+        $result = $this->service->reject(42, 'admin', 'Wrong quantity');
 
         $this->assertEquals(2, $result['response']);
         $this->assertStringContainsString('PENDING', $result['message']);
@@ -444,7 +444,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn = $this->mockEudrConnection();
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('PENDING');
+            ->once()->with(42)->andReturn('PENDING');
 
         $conn->shouldReceive('transaction')->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
@@ -457,7 +457,7 @@ class TransferApprovalServiceTest extends TestCase
 
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
-        $result = $this->service->reject('42', 'admin', 'Incorrect source tank');
+        $result = $this->service->reject(42, 'admin', 'Incorrect source tank');
 
         $this->assertEquals(1, $result['response']);
         $this->assertStringContainsString('rejected', $result['message']);
@@ -466,9 +466,9 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_returns_response_2_when_rejecting_draft_transfer(): void
     {
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('DRAFT');
+            ->once()->with(42)->andReturn('DRAFT');
 
-        $result = $this->service->reject('42', 'admin', 'Some reason');
+        $result = $this->service->reject(42, 'admin', 'Some reason');
 
         $this->assertEquals(2, $result['response']);
     }
@@ -480,7 +480,7 @@ class TransferApprovalServiceTest extends TestCase
 
         Log::shouldReceive('error')->once();
 
-        $result = $this->service->reject('42', 'admin', 'Some reason');
+        $result = $this->service->reject(42, 'admin', 'Some reason');
 
         $this->assertEquals(0, $result['response']);
         $this->assertStringContainsString('Failed to reject', $result['message']);
@@ -500,7 +500,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->once()
             ->andReturn([(object) ['lock_status' => '1']]);
 
-        $result = $this->service->cancel('42', 'admin');
+        $result = $this->service->cancel(42, 'admin');
 
         $this->assertEquals(99, $result['response']);
     }
@@ -515,9 +515,9 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('APPROVED');
+            ->once()->with(42)->andReturn('APPROVED');
 
-        $result = $this->service->cancel('42', 'admin');
+        $result = $this->service->cancel(42, 'admin');
 
         $this->assertEquals(2, $result['response']);
         $this->assertStringContainsString('DRAFT', $result['message']);
@@ -533,7 +533,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('DRAFT');
+            ->once()->with(42)->andReturn('DRAFT');
 
         $conn->shouldReceive('transaction')->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
@@ -546,7 +546,7 @@ class TransferApprovalServiceTest extends TestCase
 
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
-        $result = $this->service->cancel('42', 'admin');
+        $result = $this->service->cancel(42, 'admin');
 
         $this->assertEquals(1, $result['response']);
         $this->assertStringContainsString('cancelled', $result['message']);
@@ -562,7 +562,7 @@ class TransferApprovalServiceTest extends TestCase
         $conn->shouldReceive('select')->twice()->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
-            ->once()->with('42')->andReturn('REJECTED');
+            ->once()->with(42)->andReturn('REJECTED');
 
         $conn->shouldReceive('transaction')->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
@@ -575,7 +575,7 @@ class TransferApprovalServiceTest extends TestCase
 
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
-        $result = $this->service->cancel('42', 'admin');
+        $result = $this->service->cancel(42, 'admin');
 
         $this->assertEquals(1, $result['response']);
     }
@@ -587,7 +587,7 @@ class TransferApprovalServiceTest extends TestCase
 
         Log::shouldReceive('error')->once();
 
-        $result = $this->service->cancel('42', 'admin');
+        $result = $this->service->cancel(42, 'admin');
 
         $this->assertEquals(0, $result['response']);
         $this->assertStringContainsString('Failed to cancel', $result['message']);
@@ -650,9 +650,9 @@ class TransferApprovalServiceTest extends TestCase
         ];
 
         $this->repoMock->shouldReceive('getApprovalHistory')
-            ->once()->with('42')->andReturn($expected);
+            ->once()->with(42)->andReturn($expected);
 
-        $result = $this->service->getApprovalHistory('42');
+        $result = $this->service->getApprovalHistory(42);
 
         $this->assertCount(3, $result);
         $this->assertEquals('APPROVED', $result[2]->status);
@@ -661,9 +661,9 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_returns_empty_array_when_no_history_exists(): void
     {
         $this->repoMock->shouldReceive('getApprovalHistory')
-            ->once()->with('9999')->andReturn([]);
+            ->once()->with(9999)->andReturn([]);
 
-        $result = $this->service->getApprovalHistory('9999');
+        $result = $this->service->getApprovalHistory(9999);
 
         $this->assertEmpty($result);
     }
@@ -675,13 +675,13 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_creates_approval_record_when_none_exists(): void
     {
         $this->repoMock->shouldReceive('findApprovalRecord')
-            ->once()->with('42')->andReturn(null);
+            ->once()->with(42)->andReturn(null);
 
         $this->repoMock->shouldReceive('insertApprovalRecord')
             ->once()->andReturn(1);
 
         $this->service->createApprovalRecord(
-            '42', '726060310001', '2026-06-03', '1',
+            42, '726060310001', '2026-06-03', '1',
             'PALM OIL', 100.0, 'SRC TANK', 'DST TANK', 1001, 'admin'
         );
 
@@ -691,15 +691,16 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_skips_insert_when_approval_record_already_exists(): void
     {
         $this->repoMock->shouldReceive('findApprovalRecord')
-            ->once()->with('42')->andReturn((object) ['id_approval' => 99]);
+            ->once()->with(42)->andReturn((object) ['id_approval' => 99]);
 
         $this->repoMock->shouldNotReceive('insertApprovalRecord');
 
         $this->service->createApprovalRecord(
-            '42', '726060310001', '2026-06-03', '1',
+            42, '726060310001', '2026-06-03', '1',
             'PALM OIL', 100.0, 'SRC TANK', 'DST TANK', 1001, 'admin'
         );
 
         $this->addToAssertionCount(1);
     }
 }
+

@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsTransfer\Repositories;
 
 use Modules\TsTransfer\Repositories\Contracts\TransferApprovalRepositoryInterface;
@@ -8,7 +9,7 @@ class TransferApprovalRepository implements TransferApprovalRepositoryInterface
 {
     protected string $connection = 'eudr_ts';
 
-    public function findTransferForApproval(string $idBalanceHead): ?object
+    public function findTransferForApproval(int $idBalanceHead): ?object
     {
         $result = DB::connection($this->connection)->select(
             'SELECT th.id_trace_head, bh.trace_no, bh.entry_date
@@ -40,7 +41,7 @@ class TransferApprovalRepository implements TransferApprovalRepositoryInterface
         }
     }
 
-    public function findApprovalRecord(string $idBalanceHead, string $activeStatus = '1'): ?object
+    public function findApprovalRecord(int $idBalanceHead, string $activeStatus = '1'): ?object
     {
         $result = DB::connection($this->connection)->select(
             'SELECT id_approval FROM t_transfer_approval WHERE id_balance_head = ? AND status = ?',
@@ -56,7 +57,7 @@ class TransferApprovalRepository implements TransferApprovalRepositoryInterface
         return (int) DB::connection($this->connection)->getPdo()->lastInsertId();
     }
 
-    public function updateApprovalStatus(string $idBalanceHead, string $approvalStatus, string $user, ?string $notes = null, ?string $reason = null): void
+    public function updateApprovalStatus(int $idBalanceHead, string $approvalStatus, string $user, ?string $notes = null, ?string $reason = null): void
     {
         switch ($approvalStatus) {
             case 'PENDING':
@@ -113,14 +114,14 @@ class TransferApprovalRepository implements TransferApprovalRepositoryInterface
                FROM t_transfer_approval ta
                LEFT JOIN t_balance_header bh ON ta.id_balance_head = bh.id_balance_head
                LEFT JOIN m_plant p ON bh.id_plant = p.code_3
-              WHERE ta.status = "PENDING" AND ta.approval_status != "CANCELLED"
+              WHERE ta.status = \'PENDING\' AND ta.approval_status != \'CANCELLED\'
                 ' . $plantFilter . '
               ORDER BY ta.submitted_at DESC',
             $bindings
         );
     }
 
-    public function getApprovalHistory(string $idBalanceHead): array
+    public function getApprovalHistory(int $idBalanceHead): array
     {
         return DB::connection($this->connection)->select(
             'SELECT ta.*, bh.trace_no
@@ -132,7 +133,7 @@ class TransferApprovalRepository implements TransferApprovalRepositoryInterface
         );
     }
 
-    public function getCurrentApprovalStatus(string $idBalanceHead): ?string
+    public function getCurrentApprovalStatus(int $idBalanceHead): ?string
     {
         $result = DB::connection($this->connection)->select(
             'SELECT COALESCE(approval_status, "APPROVED") AS approval_status
@@ -144,13 +145,13 @@ class TransferApprovalRepository implements TransferApprovalRepositoryInterface
         return $result[0]->approval_status ?? null;
     }
 
-    public function canDelete(string $idBalanceHead): bool
+    public function canDelete(int $idBalanceHead): bool
     {
         $status = $this->getCurrentApprovalStatus($idBalanceHead);
         return in_array($status, ['DRAFT', 'REJECTED', 'CANCELLED', 'APPROVED']);
     }
 
-    public function getTransferPlantBySubmit(string $idBalanceHead): int
+    public function getTransferPlantBySubmit(int $idBalanceHead): int
     {
         $result = DB::connection($this->connection)->select(
             'SELECT bh.id_plant

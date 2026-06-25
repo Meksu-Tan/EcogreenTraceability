@@ -1,9 +1,10 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Inquiry\Repositories;
 
 use Modules\Inquiry\Repositories\Contracts\PsPaReportRepositoryInterface;
 use Modules\Shared\Repositories\Traits\PlantFilterTrait;
+use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -80,7 +81,7 @@ class PsPaReportRepository implements PsPaReportRepositoryInterface
         }
 
         $tails = DB::connection($this->connection)->select(
-            'SELECT t.*, CONCAT(m.code, " :: ", m.description) AS material
+            'SELECT t.*, CONCAT(m.code, \' :: \', m.description) AS material
                FROM t_report_pspa_tail t
                LEFT JOIN m_material m ON t.id_material = m.id_material
               WHERE t.id_report_head = ?
@@ -99,7 +100,7 @@ class PsPaReportRepository implements PsPaReportRepositoryInterface
      */
     public function reportExists(string $period, mixed $plantId): bool
     {
-        $resolvedCode = \Modules\Shared\Services\PlantContextService::resolvePlantId($plantId);
+        $resolvedCode = app(PlantContextServiceInterface::class)->resolvePlantId($plantId);
 
         $result = DB::connection($this->connection)->selectOne(
             'SELECT COUNT(*) as cnt FROM t_report_pspa_head
@@ -115,7 +116,7 @@ class PsPaReportRepository implements PsPaReportRepositoryInterface
      */
     public function generateReport(string $user, mixed $plantId, string $period, array $data): array
     {
-        $resolvedCode = \Modules\Shared\Services\PlantContextService::resolvePlantId($plantId);
+        $resolvedCode = app(PlantContextServiceInterface::class)->resolvePlantId($plantId);
 
         $id = DB::connection($this->connection)->table('t_report_pspa_head')->insertGetId([
             'period' => $period,
@@ -124,11 +125,11 @@ class PsPaReportRepository implements PsPaReportRepositoryInterface
             'status' => 1, // DRAFT
             'id_plant' => $resolvedCode,
             'created_by' => $user,
-        ]);
+        ], 'id_report_head');
 
         // Auto-generate detail rows from materials
         $materials = DB::connection($this->connection)->select(
-            'SELECT id_material, code, description FROM m_material WHERE status = 1 AND type IN ("RM", "WIP", "PM")'
+            'SELECT id_material, code, description FROM m_material WHERE status = 1 AND type IN (\'RM\', \'WIP\', \'PM\')'
         );
 
         foreach ($materials as $mat) {
@@ -321,7 +322,7 @@ class PsPaReportRepository implements PsPaReportRepositoryInterface
               WHERE id_material = ?
                 AND id_plant = ?
                 AND entry_date BETWEEN ? AND ?
-                AND SUBSTRING(to_trace_no, 1, 1) = "3"
+                AND SUBSTRING(to_trace_no, 1, 1) = \'3\'
                 AND in_qty > 0
                 AND status = 1',
             [$materialId, $plantCode, $periodStart, $periodEnd]

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg-page); padding: 20px 24px; font-family: var(--font-body); }
+.grid { display: flex; gap: 6px; align-items: flex-end; margin-bottom: 12px; }
+.token { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bar { background: #1A6B3C; border-radius: 3px 3px 0 0; width: 36px; }
+.val { font-family: var(--font-mono); font-size: 9px; color: #5A6860; }
+.name { font-family: var(--font-mono); font-size: 9px; color: #1A6B3C; font-weight: 500; }
+.divider { height: 1px; background: #D4DDD8; margin-bottom: 12px; }
+.pairs { display: flex; gap: 8px; flex-wrap: wrap; }
+.pair { display: flex; align-items: center; gap: 6px; background: #F4FAF5; border-radius: 4px; padding: 5px 8px; }
+.sq { border-radius: 2px; background: #4C9A5A; }
+.pair-text { font-family: var(--font-mono); font-size: 10px; color: #1C2420; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="token"><div class="bar" style="height:4px"></div><div class="val">4px</div><div class="name">--space-1</div></div>
+  <div class="token"><div class="bar" style="height:8px"></div><div class="val">8px</div><div class="name">--space-2</div></div>
+  <div class="token"><div class="bar" style="height:12px"></div><div class="val">12px</div><div class="name">--space-3</div></div>
+  <div class="token"><div class="bar" style="height:16px"></div><div class="val">16px</div><div class="name">--space-4</div></div>
+  <div class="token"><div class="bar" style="height:20px"></div><div class="val">20px</div><div class="name">--space-5</div></div>
+  <div class="token"><div class="bar" style="height:24px"></div><div class="val">24px</div><div class="name">--space-6</div></div>
+  <div class="token"><div class="bar" style="height:32px"></div><div class="val">32px</div><div class="name">--space-8</div></div>
+  <div class="token"><div class="bar" style="height:40px"></div><div class="val">40px</div><div class="name">--space-10</div></div>
+  <div class="token"><div class="bar" style="height:48px"></div><div class="val">48px</div><div class="name">--space-12</div></div>
+  <div class="token"><div class="bar" style="height:64px"></div><div class="val">64px</div><div class="name">--space-16</div></div>
+  <div class="token"><div class="bar" style="height:80px"></div><div class="val">80px</div><div class="name">--space-20</div></div>
+</div>
+<div class="divider"></div>
+<div class="pairs">
+  <div class="pair"><div class="sq" style="width:4px;height:16px"></div><span class="pair-text">xs gap</span></div>
+  <div class="pair"><div class="sq" style="width:8px;height:16px"></div><span class="pair-text">sm gap</span></div>
+  <div class="pair"><div class="sq" style="width:16px;height:16px"></div><span class="pair-text">md gap</span></div>
+  <div class="pair"><div class="sq" style="width:24px;height:16px"></div><span class="pair-text">card pad</span></div>
+  <div class="pair"><div class="sq" style="width:80px;height:16px"></div><span class="pair-text">section pad</span></div>
+</div>
+</body>
+</html>

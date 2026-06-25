@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TraceBackward\Repositories;
 
 use Illuminate\Database\Connection;
@@ -14,7 +14,7 @@ use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterfac
  * (BackwardListQuery, BackwardDetailQuery, BackwardTraceQuery, BackwardSearchQuery).
  * The effective class size across all concerns likely exceeds 200 lines. Requires audit of concern line counts.
  * - Split into: TraceBackwardListQuery, TraceBackwardDetailQuery, TraceBackwardSearchQuery
- * Current concern-based decomposition is already a good pattern — verify each concern stays under 200 lines.
+ * Current concern-based decomposition is already a good pattern â€” verify each concern stays under 200 lines.
  */
 class TraceBackwardRepository implements TraceBackwardRepositoryInterface
 {

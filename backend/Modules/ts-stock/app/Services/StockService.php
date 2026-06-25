@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsStock\Services;
 
 use Modules\TsStock\Repositories\Contracts\StockRepositoryInterface;

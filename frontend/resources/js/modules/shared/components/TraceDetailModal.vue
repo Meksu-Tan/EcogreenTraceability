@@ -79,8 +79,17 @@
                     <td class="text-right font-mono font-weight-bold text-success">{{ t.in_qty || '0.000' }}</td>
                     <td class="text-medium-emphasis">{{ t.sloc || '-' }}</td>
                     <td class="text-right font-mono font-weight-bold text-error">{{ t.out_qty || '0.000' }}</td>
-                    <td style="max-width: 200px;" class="text-caption text-medium-emphasis">
-                      <div class="text-truncate" :title="t.supplier">{{ t.supplier || '-' }}</div>
+                    <td style="max-width: 280px; white-space: normal;" class="text-caption text-medium-emphasis">
+                      <div v-if="t.supplier">
+                        <div v-for="(item, idx) in formatDetailSupplier(t.supplier)" :key="idx" class="mb-1 pa-1 rounded border bg-grey-lighten-4" style="font-size: 11px;">
+                          <div class="font-weight-bold text-primary">{{ item.supplier }}</div>
+                          <div class="d-flex justify-space-between align-center mt-0.5">
+                            <span>Batch: <span class="font-weight-bold font-mono">{{ item.batch || '-' }}</span></span>
+                            <span>Qty: <span class="font-weight-bold text-success">{{ item.qty || '-' }}</span></span>
+                          </div>
+                        </div>
+                      </div>
+                      <span v-else>-</span>
                     </td>
                     <td class="font-mono text-medium-emphasis">{{ t.material_document || '-' }}</td>
                     <td class="text-medium-emphasis" style="font-size: 11px;">{{ t.created_at || '-' }}</td>
@@ -156,6 +165,18 @@ function badgeLabel(idx) {
 function badgeColor(idx) {
   if (props.mode === 'forward') return idx === 0 ? 'success' : 'info'
   return idx === 0 ? 'error' : 'default'
+}
+
+function formatDetailSupplier(val) {
+  if (!val) return []
+  return val.split(' || ').map(item => {
+    const parts = item.split(' / ')
+    return {
+      supplier: parts[0] || '',
+      batch: parts[1] || '',
+      qty: parts[2] || ''
+    }
+  })
 }
 </script>
 

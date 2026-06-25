@@ -1,188 +1,215 @@
 <template>
-  <VDialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" max-width="600px" persistent>
-    <VCard rounded="lg">
-      <VCardTitle class="pa-5 pb-3 d-flex align-center justify-space-between">
-        <span class="text-h6 font-weight-bold">NEW PACKAGING ENTRY</span>
-        <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="close" />
+  <VDialog
+    :model-value="modelValue"
+    max-width="960"
+    scrollable
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
+    <VCard>
+      <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+        <span class="text-h6 font-weight-bold">Packaging Entry</span>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="close"
+        />
       </VCardTitle>
+
       <VDivider />
-      <VCardText class="pa-5">
-        <VAlert v-if="submitError" type="error" density="compact" class="mb-4">{{ submitError }}</VAlert>
-        <VForm ref="formRef" v-model="isValid" @submit.prevent="save">
-          <VRow>
-            <!-- Entry Mode -->
-            <VCol cols="12" sm="6">
-              <VTextField
-                label="Entry Mode"
-                model-value="ADD"
-                readonly
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
 
-            <!-- Entry Date -->
-            <VCol cols="12" sm="6">
-              <VTextField
-                v-model="form.entryDate"
-                label="Entry Date"
-                type="date"
-                required
-                :rules="[v => !!v || 'Entry date is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
+      <VCardText class="pa-5 bg-neutral-50">
+        <VAlert v-if="submitError" type="error" variant="tonal" density="comfortable" class="mb-4">{{ submitError }}</VAlert>
 
-            <!-- Packaging Product -->
-            <VCol cols="12">
-              <VSelect
-                v-model="form.fgProduct"
-                label="Packaging Product"
-                :items="store.activeFgProducts"
-                item-title="material"
-                item-value="id_materialpck"
-                required
-                :rules="[v => !!v || 'Product is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                @update:model-value="onProductChange"
-              />
-              <div class="mt-1 text-caption text-primary font-weight-semibold">
-                {{ store.wipMaterialLabel || 'Product : N/A' }}
-              </div>
-            </VCol>
+        <form @submit.prevent="save" class="d-flex flex-column ga-4">
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Mode</label>
+                  <VTextField
+                    model-value="ADD"
+                    readonly
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
 
-            <!-- Source Sloc -->
-            <VCol cols="12" sm="6">
-              <VSelect
-                v-model="form.tank"
-                label="Source Sloc"
-                :items="store.activeTanks"
-                item-title="tank"
-                item-value="id_sloc"
-                required
-                :rules="[v => !!v || 'Source Sloc is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                :disabled="!form.fgProduct"
-                @update:model-value="onTankChange"
-              />
-            </VCol>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Date</label>
+                  <VTextField
+                    v-model="form.entryDate"
+                    type="date"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
 
-            <!-- Specific Source Sloc -->
-            <VCol cols="12" sm="6">
-              <VSelect
-                v-model="form.tankNo"
-                label="Specific Source Sloc"
-                :items="store.specificTanks"
-                item-title="tank"
-                item-value="id_sloc"
-                multiple
-                chips
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                :disabled="!form.tank"
-              />
-            </VCol>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Trace No</label>
+                  <VTextField
+                    v-model="newTraceNo"
+                    readonly
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    placeholder="Auto Generated"
+                    :loading="traceNoLoading"
+                    :append-inner-icon="traceNoLoading ? 'ri-loader-4-line ri-spin' : ''"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
 
-            <!-- PO No -->
-            <VCol cols="12">
-              <VTextField
-                v-model="form.poNo"
-                label="PO No"
-                required
-                :rules="[v => !!v || 'PO No is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                @input="form.poNo = form.poNo.toUpperCase()"
-              />
-            </VCol>
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" md="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Packaging Product</label>
+                  <VSelect
+                    v-model="form.fgProduct"
+                    :items="store.activeFgProducts"
+                    item-title="material"
+                    item-value="id_materialpck"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @update:model-value="onProductChange"
+                  />
+                  <div class="mt-1 text-caption text-primary font-weight-semibold">
+                    {{ store.wipMaterialLabel || 'Product : N/A' }}
+                  </div>
+                </VCol>
 
-            <!-- Packaging Batch No -->
-            <VCol cols="12" sm="6">
-              <VTextField
-                v-model="form.batchNo"
-                label="Packaging Batch No"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
+                <VCol cols="12" md="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">PO No</label>
+                  <VTextField
+                    v-model="form.poNo"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @input="form.poNo = form.poNo.toUpperCase()"
+                  />
+                </VCol>
+              </VRow>
 
-            <!-- Qty (MT) -->
-            <VCol cols="12" sm="6">
-              <VTextField
-                v-model.number="form.qty"
-                label="Qty (MT)"
-                type="number"
-                step="any"
-                required
-                :rules="[
-                  v => !!v || 'Qty is required',
-                  v => v > 0 || 'Qty must be greater than 0',
-                  v => v <= store.wipBalance || `Qty cannot exceed balance (${store.wipBalance} MT)`
-                ]"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
+              <VRow dense class="mt-2">
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Source Sloc</label>
+                  <VSelect
+                    v-model="form.tank"
+                    :items="store.activeTanks"
+                    item-title="tank"
+                    item-value="id_sloc"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    :disabled="!form.fgProduct"
+                    @update:model-value="onTankChange"
+                  />
+                </VCol>
 
-            <!-- Destination Sloc -->
-            <VCol cols="12" sm="6">
-              <VSelect
-                v-model="form.warehouse"
-                label="Destination Sloc"
-                :items="store.activeWarehouses.length > 0 ? store.activeWarehouses : store.allWarehouses"
-                item-title="warehouse"
-                item-value="id_warehouse"
-                required
-                :rules="[v => !!v || 'Destination warehouse is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Specific Source Sloc</label>
+                  <VSelect
+                    v-model="form.tankNo"
+                    :items="store.specificTanks"
+                    item-title="tf_number"
+                    item-value="id_sloc"
+                    multiple
+                    chips
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    :disabled="!form.tank"
+                  />
+                </VCol>
 
-            <!-- Trace No -->
-            <VCol cols="12" sm="6">
-              <VTextField
-                v-model="newTraceNo"
-                label="Trace No"
-                readonly
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                placeholder="Auto Generated"
-                :loading="traceNoLoading"
-                :append-inner-icon="traceNoLoading ? 'ri-loader-4-line ri-spin' : ''"
-              />
-            </VCol>
-          </VRow>
-        </VForm>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Destination Sloc</label>
+                  <VSelect
+                    v-model="form.warehouse"
+                    :items="store.activeWarehouses.length > 0 ? store.activeWarehouses : store.allWarehouses"
+                    item-title="warehouse"
+                    item-value="id_warehouse"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
+              </VRow>
+
+              <VRow dense class="mt-2">
+                <VCol cols="12" sm="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Packaging Batch No</label>
+                  <VTextField
+                    v-model="form.batchNo"
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                  <div class="mt-1 text-caption text-medium-emphasis">
+                    FB = Flexi bag | IS = Isotank | VS = Vessel
+                  </div>
+                </VCol>
+
+                <VCol cols="12" sm="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Qty (MT)</label>
+                  <VTextField
+                    v-model.number="form.qty"
+                    type="number"
+                    step="any"
+                    required
+                    :rules="[
+                      v => !!v || 'Qty is required',
+                      v => v > 0 || 'Qty must be greater than 0',
+                      v => v <= store.wipBalance || `Qty cannot exceed balance (${store.wipBalance} MT)`
+                    ]"
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
+
+          <VCardActions class="pa-0">
+            <VSpacer />
+            <VBtn variant="outlined" color="medium-emphasis" @click="close">Cancel</VBtn>
+            <VBtn color="primary" :loading="submitting" prepend-icon="ri-save-line" type="submit">Save</VBtn>
+          </VCardActions>
+        </form>
       </VCardText>
-      <VDivider />
-      <VCardActions class="pa-5 pt-3 justify-end gap-2">
-        <VBtn variant="outlined" color="medium-emphasis" :disabled="submitting" @click="close">Cancel</VBtn>
-        <VBtn color="primary" prepend-icon="ri-save-line" :disabled="!isValid" :loading="submitting" @click="save">Save</VBtn>
-      </VCardActions>
     </VCard>
   </VDialog>
 </template>
@@ -199,8 +226,6 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 
 const store = usePackageEntryStore()
 const { newTraceNo, traceNoLoading } = storeToRefs(store)
-const formRef = ref(null)
-const isValid = ref(false)
 const submitting = ref(false)
 const submitError = ref('')
 
@@ -243,7 +268,6 @@ async function initModal() {
   if (store.allWarehouses.length > 0) {
     const firstWh = store.allWarehouses[0]
     form.warehouse = firstWh.id_warehouse
-    await store.fetchNewTraceNo(firstWh.id_warehouse, store.plantId)
   }
 }
 
@@ -272,14 +296,14 @@ async function onTankChange(val) {
   if (val) {
     form.tankNo = []
     // val is already id_sloc (from the function item-value)
-    await store.fetchSpecificTanks(val)
+    await store.fetchSpecificTanks(val, form.fgProduct)
     if (form.fgProduct) {
       await store.fetchWipMaterials(form.fgProduct, val)
     }
   }
 }
 
-watch(() => form.warehouse, async (newVal) => {
+watch(() => form.fgProduct, async (newVal) => {
   if (newVal) {
     await store.fetchNewTraceNo(newVal, store.plantId)
   } else {
@@ -288,13 +312,12 @@ watch(() => form.warehouse, async (newVal) => {
 })
 
 watch(() => [store.plantId, form.entryDate], async ([newPlantId]) => {
-  if (form.warehouse && newPlantId) {
-    await store.fetchNewTraceNo(form.warehouse, newPlantId)
+  if (form.fgProduct && newPlantId) {
+    await store.fetchNewTraceNo(form.fgProduct, newPlantId)
   }
 }, { deep: true })
 
 async function save() {
-  if (!isValid.value) return
   submitting.value = true
   try {
     const res = await store.storeEntry(form)

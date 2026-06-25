@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@xiaomi-mimo/cli": "^0.3.0-alpha.0",
+    "headroom-ai": "^0.22.4"
+  }
+}

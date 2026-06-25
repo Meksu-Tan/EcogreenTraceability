@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Repositories\Contracts;
 
 interface RmEntryRepositoryInterface
@@ -22,7 +23,7 @@ interface RmEntryRepositoryInterface
     public function generateBatchCode($supplierId): ?string;
 
     // Transfer Number
-    public function getTransferNumber($plantId): ?string;
+    public function getTransferNumber($plantId, $tankDescOrId = null): ?string;
 
     // Stock Sync
     public function checkStockSynchronization(string $entryNo, int $materialId = null): array;
@@ -56,7 +57,7 @@ interface RmEntryRepositoryInterface
     public function debugFeedLog($plantId): array;
 
     // Transfer Methods (moved from ts-transfer)
-    public function generateTransferNumber($plantId, string $movSeq = '000'): ?string;
+    public function generateTransferNumber($plantId, $tankDescOrId = null): ?string;
     public function findBalanceByTraceNo(string $traceNo): ?object;
     public function findTraceByBalanceHeadId(int $balanceHeadId): ?object;
     public function createTransferBalance(array $data): object;
@@ -83,7 +84,7 @@ interface RmEntryRepositoryInterface
 
     // Model access methods (to avoid direct model queries in Service)
     public function findBalanceHeaderById(int $id): ?object;
-    public function findPlantById(int $plantId): ?object;
+    public function findPlantById(int|string $plantId): ?object;
     public function getActiveMaterialsSearch(): array;
     public function getSuppliersSearch(string $search): array;
     public function getSourceEntriesList($plantId): array;

@@ -32,6 +32,8 @@ final class ForwardListQuery
         $where    = ['bh.status = 1', "bh.id_sloc IN (SELECT id_sloc FROM m_sloc WHERE code_3 = 'STORAGE' AND status = 1)", $plantFilter['sql']];
         $bindings = $plantFilter['bindings'];
         $where[]  = "(SUBSTRING(bh.trace_no,1,1)='1' OR SUBSTRING(bh.trace_no,1,1)='9')";
+        $where[]  = \Modules\Shared\Helpers\TraceHelper::isStorageOrLegacy('bh.trace_no');
+        $where[]  = "m.type = 'RM'";
 
         if ($search !== null && $search !== '') {
             $like     = '%' . $search . '%';
@@ -58,10 +60,11 @@ final class ForwardListQuery
                    {$supplierConcat} AS supplier,
                    MAX(bd.batch_sap) AS batch_sap,
                    CASE WHEN SUM(bd.out_qty) = 0 THEN 'N/A' ELSE 'TRACED' END AS traced,
-                   md.material_document,
-                   md.po_so,
-                   bh.created_at, bh.created_by,
-                   bh.id_material
+                    md.material_document,
+                    md.po_so,
+                    bh.created_at, bh.created_by,
+                    bh.id_material,
+                    t.tf_number
               FROM t_balance_header bh
               LEFT JOIN m_material m ON bh.id_material = m.id_material
               LEFT JOIN m_sloc t ON {$this->dbSlocColumnClause('bh.id_sloc', 't.id_sloc')}
@@ -70,9 +73,9 @@ final class ForwardListQuery
               LEFT JOIN ({$mdSubquery}) md
                 ON md.id_balance_head = bh.id_balance_head
              WHERE " . implode(' AND ', $where) . "
-             GROUP BY bh.id_balance_head, bh.trace_no, bh.entry_date,
-                     m.code, m.description, t.description, t.code_3,
-                     md.material_document, md.po_so, bh.created_at, bh.created_by, bh.id_material
+              GROUP BY bh.id_balance_head, bh.trace_no, bh.entry_date,
+                      m.code, m.description, t.description, t.code_3, t.tf_number,
+                      md.material_document, md.po_so, bh.created_at, bh.created_by, bh.id_material
              ORDER BY {$sortColumn} {$sortDir}, bh.id_balance_head DESC
         ";
 

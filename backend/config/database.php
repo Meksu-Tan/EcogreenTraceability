@@ -61,6 +61,30 @@ return [
             ],
         ],
 
+        // ─── PostgreSQL separate connection for pgsql-only migrations ───────
+        'eudr_ts_pg' => [
+            'driver'         => env('DB_TS_PG_CONNECTION', 'pgsql'),
+            'host'           => env('DB_TS_HOST', '127.0.0.1'),
+            'port'           => env('DB_TS_PORT', '5432'),
+            'database'       => env('DB_TS_DATABASE', 'eudr_dev'),
+            'username'       => env('DB_TS_USERNAME', 'eudr_app'),
+            'password'       => env('DB_TS_PASSWORD', ''),
+            'prefix'         => '',
+            'prefix_indexes' => true,
+            'search_path'    => 'public',
+            'sslmode'        => env('DB_TS_SSLMODE', 'disable'),
+            'charset'        => env('DB_TS_CHARSET', 'utf8'),
+            'options'        => [
+                \PDO::ATTR_TIMEOUT         => env('DB_TS_TIMEOUT', 10),
+                \PDO::ATTR_PERSISTENT      => filter_var(env('DB_TS_PERSISTENT', false), FILTER_VALIDATE_BOOLEAN),
+                \PDO::ATTR_ERRMODE         => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+            ],
+        ],
+
+
+
+
         // ─── OEE MySQL (External — Packaging/Label integration) ──────────────
         // Queries oee_756.* tables from EloquentShipmentRepository.
         // Specification TBD — connection will fail-silently until configured.

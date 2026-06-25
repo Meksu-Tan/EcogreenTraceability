@@ -199,7 +199,7 @@ class RmReportServiceTest extends TestCase
     public function test_it_returns_rm_detail_on_tank_with_status_1(): void
     {
         $repoData = [
-            ['id_tank' => 1, 'tank_code' => 'T01', 'batch_sap' => 'BATCH001', 'qty' => 3000.0],
+            ['id_sloc' => 1, 'tank_code' => 'T01', 'batch_sap' => 'BATCH001', 'qty' => 3000.0],
         ];
 
         $this->repoMock->shouldReceive('getRmDetailRmPrdOnTank')

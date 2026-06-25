@@ -189,7 +189,7 @@ class TransferServiceTest extends TestCase
     public function test_it_delegates_get_active_tanks_rundown_to_repository(): void
     {
         $expected = [
-            (object) ['id_tank' => 1, 'tank' => 'Storage EOB1'],
+            (object) ['id_sloc' => 1, 'tank' => 'Storage EOB1'],
         ];
 
         // plantId=1001 > 0 → resolvePlantCode is called → findPlantCode is called
@@ -232,7 +232,7 @@ class TransferServiceTest extends TestCase
     public function test_it_delegates_get_active_specific_tanks_rundown_to_repository(): void
     {
         $expected = [
-            (object) ['id_sloc_tail' => 10, 'id_tank_tail' => 'S10'],
+            (object) ['id_sloc_tail' => 10, 'id_sloc_tail' => 'S10'],
         ];
 
         $this->repoMock->shouldReceive('getActiveSpecificTanksRundown')
@@ -382,10 +382,10 @@ class TransferServiceTest extends TestCase
 
         $this->approvalMock->shouldReceive('submit')
             ->once()
-            ->with('42', 'admin')
+            ->with(42, 'admin')
             ->andReturn($expected);
 
-        $result = $this->service->submitForApproval('42', 'admin');
+        $result = $this->service->submitForApproval(42, 'admin');
 
         $this->assertEquals($expected, $result);
     }
@@ -396,10 +396,10 @@ class TransferServiceTest extends TestCase
 
         $this->approvalMock->shouldReceive('approve')
             ->once()
-            ->with('42', 'admin', 'Looks good')
+            ->with(42, 'admin', 'Looks good')
             ->andReturn($expected);
 
-        $result = $this->service->approveTransfer('42', 'admin', 'Looks good');
+        $result = $this->service->approveTransfer(42, 'admin', 'Looks good');
 
         $this->assertEquals($expected, $result);
     }
@@ -410,10 +410,10 @@ class TransferServiceTest extends TestCase
 
         $this->approvalMock->shouldReceive('approve')
             ->once()
-            ->with('42', 'admin', null)
+            ->with(42, 'admin', null)
             ->andReturn($expected);
 
-        $result = $this->service->approveTransfer('42', 'admin');
+        $result = $this->service->approveTransfer(42, 'admin');
 
         $this->assertEquals($expected, $result);
     }
@@ -424,10 +424,10 @@ class TransferServiceTest extends TestCase
 
         $this->approvalMock->shouldReceive('reject')
             ->once()
-            ->with('42', 'admin', 'Incorrect amount')
+            ->with(42, 'admin', 'Incorrect amount')
             ->andReturn($expected);
 
-        $result = $this->service->rejectTransfer('42', 'admin', 'Incorrect amount');
+        $result = $this->service->rejectTransfer(42, 'admin', 'Incorrect amount');
 
         $this->assertEquals($expected, $result);
     }
@@ -438,10 +438,10 @@ class TransferServiceTest extends TestCase
 
         $this->approvalMock->shouldReceive('cancel')
             ->once()
-            ->with('42', 'admin')
+            ->with(42, 'admin')
             ->andReturn($expected);
 
-        $result = $this->service->cancelTransfer('42', 'admin');
+        $result = $this->service->cancelTransfer(42, 'admin');
 
         $this->assertEquals($expected, $result);
     }
@@ -484,10 +484,10 @@ class TransferServiceTest extends TestCase
 
         $this->approvalMock->shouldReceive('getApprovalHistory')
             ->once()
-            ->with('42')
+            ->with(42)
             ->andReturn($expected);
 
-        $result = $this->service->getApprovalHistory('42');
+        $result = $this->service->getApprovalHistory(42);
 
         $this->assertEquals($expected, $result);
     }

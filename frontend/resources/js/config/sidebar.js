@@ -114,11 +114,6 @@ export const sidebarMenu = [
         icon: 'ri:building-3-line'
       },
       {
-        path: '/setup/storage',
-        label: 'Storage',
-        icon: 'ri:database-line'
-      },
-      {
         path: '/setup/tank',
         label: 'Tank',
         icon: 'ri:water-flash-line'

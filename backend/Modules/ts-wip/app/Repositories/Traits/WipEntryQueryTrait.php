@@ -14,11 +14,12 @@ trait WipEntryQueryTrait
     {
         $idPlant = $this->resolvePlantId($plantId);
         $dbRundownId = $this->mapFrontendSectionToDbRundownId($rundownId, $subgroup);
+        $dbRundownIdStripped = ltrim(substr($dbRundownId, 0, 3), '0') ?: $dbRundownId;
         $column = (strpos($dbRundownId, '00') === 0) ? 'id_feed' : 'id_rundown';
 
         // Handle "all plants" case
         $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'd.id_plant = ?';
-        $bindings = ($idPlant === '0' || $idPlant === null) ? [$dbRundownId] : [$idPlant, $dbRundownId];
+        $bindings = ($idPlant === '0' || $idPlant === null) ? [$dbRundownIdStripped] : [$idPlant, $dbRundownIdStripped];
 
         $offset = ($page - 1) * $perPage;
 
@@ -127,7 +128,9 @@ SQL;
         $feedPrefix = substr($feedId, 0, 3);
         $idPlant = $this->resolvePlantId($plantId);
 
-        if (strlen($feedId) >= 6) {
+        /** @var array<string, mixed> $feedMaterialMap */
+        $feedMaterialMap = config('wip_material_mapping.feed_material_map', []);
+        if (strlen($feedId) >= 6 && isset($feedMaterialMap[$feedPrefix])) {
             $result = $this->getFeedWithMaterialSign($feedId, $feedPrefix, $mode, $idPlant);
             if ($mode === 'LOG') {
                 return ['data' => $result, 'total' => count($result), 'page' => $page, 'per_page' => $perPage];
@@ -135,9 +138,10 @@ SQL;
             return $result;
         }
 
+        $feedPrefixStripped = ltrim($feedPrefix, '0') ?: $feedPrefix;
         $materialRows = DB::connection('eudr_ts')->select(
             "SELECT id_material FROM m_material WHERE id_feed = ? AND status = 1 LIMIT 1",
-            [$feedPrefix]
+            [$feedPrefixStripped]
         );
         $idMaterial = $materialRows[0]->id_material ?? null;
 
@@ -196,7 +200,7 @@ SQL;
                         CASE WHEN ABS(ROUND(CAST(SUM(b.out_qty) AS numeric),3) - ROUND(CAST(MAX(h.out_qty) AS numeric),3)) > 0.005 THEN {$bsFmtSum} ELSE {$bsFmt2} END AS balance_supplier,
                         MIN(CAST(a.id_sloc AS TEXT)) AS sloc,
                         CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
-                                                    WHERE SUBSTRING(to_trace_no, 8, 3) = ?
+                                                    WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $feedPrefix) . "
                                                       AND SUBSTRING(to_trace_no, 1, 1) = ?
                                                       AND status = 1 AND {$subPlantFilter} {$subMatFilter}
                                                     ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
@@ -217,7 +221,7 @@ SQL;
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
 
                    LEFT JOIN m_plant p ON a.id_plant = p.code_3
-                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
+                  WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', $feedPrefix) . "
                     AND a.out_qty > 0 AND b.out_qty > 0
                     AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                     AND a.status = 1 AND {$plantFilter} {$matFilter}
@@ -272,7 +276,7 @@ SQL;
                         CASE WHEN ABS(ROUND(CAST(SUM(b.out_qty) AS numeric),3) - ROUND(CAST(MAX(h.out_qty) AS numeric),3)) > 0.005 THEN {$bsFmtSum} ELSE {$bsFmt2} END AS balance_supplier,
                         a.id_sloc AS sloc,
                         CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
-                                                    WHERE SUBSTRING(to_trace_no, 8, 3) = ?
+                                                    WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $feedPrefix) . "
                                                       AND SUBSTRING(to_trace_no, 1, 1) = ?
                                                       AND status = 1 AND {$plantFilter} {$matFilter}
                                                     ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
@@ -293,7 +297,7 @@ SQL;
                                GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
 
                    LEFT JOIN m_plant p ON a.id_plant = p.code_3
-                  WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
+                  WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', $feedPrefix) . "
                     AND a.out_qty > 0 AND b.out_qty > 0
                     AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                     AND a.status = 1 AND {$plantFilter} {$matFilter}
@@ -321,7 +325,7 @@ SQL;
             ->get()
             ->keyBy('id_sloc');
 
-        $plants = \Illuminate\Support\Facades\DB::connection('mysql')
+        $plants = \Illuminate\Support\Facades\DB::connection()
             ->table('m_plant')
             ->select('code_3', 'code_2')
             ->get()
@@ -330,7 +334,7 @@ SQL;
         foreach ($rows as $row) {
             $row->{$slocField} = '';
 
-            $sourceField = isset($row->tf_number) ? 'tf_number' : 'id_sloc';
+            $sourceField = isset($row->tf_number) ? 'tf_number' : $slocField;
             $slocVal = $row->{$sourceField} ?? null;
 
             if ($slocVal !== null && $slocVal !== '') {
@@ -445,7 +449,7 @@ SQL;
                                FROM t_trace_header h JOIN t_trace_detail d ON h.id_trace_head = d.id_trace_head
                               WHERE d.out_qty > 0 AND h.status = 1 GROUP BY h.to_trace_no) bs ON bs.to_trace_no = a.to_trace_no
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3
-                 WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
+                 WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', $feedId) . "
                    AND a.out_qty > 0 AND b.out_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                    AND {$matlWhere}
@@ -470,11 +474,11 @@ SQL;
                        CASE WHEN ABS(ROUND(CAST(SUM(b.out_qty) AS numeric),3) - ROUND(CAST(MAX(h.out_qty) AS numeric),3)) > 0.005 THEN {$bsFmtSum} ELSE {$bsFmt2} END AS balance_supplier,
                        a.id_sloc AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
-                                                   WHERE SUBSTRING(to_trace_no, 8, 3) = ?
-                                                     AND SUBSTRING(to_trace_no, 1, 1) = ?
-                                                     AND {$subMatlWhere}
-                                                     AND status = 1 AND {$subPlantFilter}
-                                                   ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
+                                                    WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $feedId) . "
+                                                      AND SUBSTRING(to_trace_no, 1, 1) = ?
+                                                      AND {$subMatlWhere}
+                                                      AND status = 1 AND {$subPlantFilter}
+                                                    ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                        CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                    WHERE from_trace_no = a.to_trace_no
                                                      AND {$subMatlWhere}
@@ -490,7 +494,7 @@ SQL;
                                FROM t_trace_header a WHERE a.status = 1 AND a.id_plant = ? GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
 
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3
-                 WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
+                 WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', $feedId) . "
                    AND a.out_qty > 0 AND b.out_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                    AND {$matlWhere}
@@ -575,7 +579,7 @@ SQL;
                   LEFT JOIN (SELECT id_trace_head, SUM(in_qty) AS supplier_qty
                                FROM t_trace_detail WHERE in_qty > 0 GROUP BY id_trace_head) bs ON bs.id_trace_head = a.id_trace_head
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3
-                 WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
+                 WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', $rundownId) . "
                    AND a.in_qty > 0 AND b.in_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                    AND a.status = 1 AND {$subPlantFilter}
@@ -611,10 +615,10 @@ SQL;
                        {$balFmt} AS balance_supplier,
                        MIN(CAST(a.id_sloc AS TEXT)) AS sloc,
                        CASE WHEN a.to_trace_no = (SELECT to_trace_no FROM t_trace_header
-                                                   WHERE (SUBSTRING(to_trace_no, 1, 1) = ? OR SUBSTRING(to_trace_no, 1, 1) = ?)
-                                                     AND SUBSTRING(to_trace_no, 8, 3) = ?
-                                                     AND status = 1 AND {$subPlantFilter}
-                                                   ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
+                                                    WHERE (SUBSTRING(to_trace_no, 1, 1) = ? OR SUBSTRING(to_trace_no, 1, 1) = ?)
+                                                      AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $rundownId) . "
+                                                      AND status = 1 AND {$subPlantFilter}
+                                                    ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                        CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                    WHERE from_trace_no = a.to_trace_no
                                                      AND status = 1 AND {$subPlantFilter}
@@ -629,7 +633,7 @@ SQL;
                                FROM t_trace_header a WHERE a.status = 1 GROUP BY a.to_trace_no) h ON a.to_trace_no = h.to_trace_no
 
                   LEFT JOIN m_plant p ON a.id_plant = p.code_3
-                 WHERE SUBSTRING(a.to_trace_no, 8, 3) = ?
+                 WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', $rundownId) . "
                    AND a.in_qty > 0 AND b.in_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
                    AND a.status = 1 AND {$plantFilter}
@@ -713,31 +717,37 @@ SQL;
                 m.description AS section_name,
                 (SELECT to_trace_no FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '3'
+                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
                    AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_trace,
                 (SELECT entry_date FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '3'
+                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
                    AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_date,
                 (SELECT curr_qtf FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '3'
+                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
                    AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_qty,
                 (SELECT to_trace_no FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '2'
+                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
                    AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_trace,
                 (SELECT entry_date FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '2'
+                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
                    AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_date,
                 (SELECT curr_qtf FROM t_trace_header
                  WHERE SUBSTRING(to_trace_no,1,1) = '2'
+                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
                    AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
                    AND status = 1 AND {$plantFilter}
                  ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_qty
@@ -767,9 +777,8 @@ SQL;
         );
     }
 
-    public function checkPeriodLock(string $date): bool
+    protected function checkPeriodLock(string $date): bool
     {
-        // Use shared PeriodLockService for consistent date lock mechanism
         return \Modules\Shared\Services\PeriodLockService::isLocked($date);
     }
 
@@ -797,20 +806,24 @@ SQL;
         return $sectionMap[$key] ?? null;
     }
 
-    protected function mapFrontendSectionToDbFeedId(string $sectionId, ?string $subgroup = null): string
+    protected function mapFrontendSectionToDbFeedId(string $sectionId, ?string $subgroup = null, int $mode = 1): string
     {
-        // Section 105 (Hidrogenasi) has two chains: short (ME28â†’CFA28) and long (ME80â†’CFA80).
-        // Caller passes subgroup 'short' or 'long' to disambiguate.
         if ($sectionId === '105') {
             return $subgroup === 'short' ? '006-01' : '006-02';
         }
+        if ($sectionId === '106' || $sectionId === '114') {
+            return $mode === 2 ? '008-02' : '008-01';
+        }
         $map = [
             '101' => '001',
+            '102' => '001',
             '103' => '002',
             '104' => '003',
             '110' => '004',
             '111' => '007',
+            '116' => '007',
             '112' => '009-01',
+            '302' => '005',
         ];
         return $map[$sectionId] ?? $sectionId;
     }
@@ -857,7 +870,6 @@ SQL;
                 'ecowax' => '019',
             ],
             '114' => [
-                'cfa28' => '016',
                 'ecowax' => '018',
                 'lefa' => '028',
                 'fa24' => '038',
@@ -881,12 +893,18 @@ SQL;
         return $sectionId;
     }
 
-    protected function mapRundownToFeedSectionId(string $rundownId): string
+    protected function mapRundownToFeedSectionId(string $rundownId, int $mode = 1): string
     {
+        // Rundown '028' (LEFA) is ambiguous: Mode 1 → section 112 feed (009), Mode 2 → CFA80 feed (008-02)
+        if ($mode === 2 && $rundownId === '028') {
+            return '008';
+        }
         /** @var array<string, string> $rundownToFeedMap */
         $rundownToFeedMap = config('wip_material_mapping.rundown_to_feed_map', []);
+        $feedId = $rundownToFeedMap[$rundownId] ?? $rundownId;
 
-        return $this->mapFrontendSectionToDbFeedId($rundownToFeedMap[$rundownId] ?? $rundownId);
+        // Normalize to 3-digit trace position (positions 8-10 of trace number)
+        return substr($feedId, 0, 3);
     }
 
     protected function getMaterialIdBySection(string $sectionId, string $type = 'feed', ?string $subgroup = null): ?int
@@ -895,31 +913,39 @@ SQL;
             ? $this->mapFrontendSectionToDbFeedId($sectionId)
             : $this->mapFrontendSectionToDbRundownId($sectionId, $subgroup);
 
+        // Long feedIds (e.g. '006-01', '008-02') → look up via feed_material_map for precision.
+        if ($type === 'feed' && strlen($dbId) >= 6) {
+            $prefix = substr($dbId, 0, 3);
+            $sign   = substr($dbId, 4, 2);
+            $feedMaterialMap = config('wip_material_mapping.feed_material_map', []);
+            if (isset($feedMaterialMap[$prefix][$sign])) {
+                $entry = $feedMaterialMap[$prefix][$sign];
+                // Prefer id_material; fall back to id_material1 for dual entries.
+                $matId = $entry['id_material'] ?? $entry['id_material1'] ?? null;
+                return $matId !== null ? (int) $matId : null;
+            }
+        }
+
+        // DB stores numeric IDs without leading zeros ('8' not '008'); strip them for match.
+        $dbIdStripped = ltrim(substr($dbId, 0, 3), '0') ?: $dbId;
+
         $column = ($type === 'feed') ? 'id_feed' : 'id_rundown';
         $rows = DB::connection('eudr_ts')->select(
             "SELECT id_material FROM m_material WHERE {$column} = ? AND status = 1 LIMIT 1",
-            [$dbId]
+            [$dbIdStripped]
         );
 
         return $rows[0]->id_material ?? null;
     }
 
-    protected function resolvePlantId($plantId): ?string
+    protected function resolvePlantId(mixed $plantId): ?string
     {
         if ($plantId === null || $plantId === '' || $plantId === 0 || $plantId === '0') {
-            // When plantId is 0, return '0' to indicate "all plants"
-            // The executeSelect method will handle this by removing plant filters
             return '0';
         }
-
-        if ($plantId && is_numeric($plantId)) {
-            $plant = Plant::find($plantId);
-            if ($plant && $plant->code_3) {
-                return $plant->code_3;
-            }
-        }
-
-        return $plantId !== null ? (string) $plantId : null;
+        $resolved = app(\Modules\Shared\Services\Contracts\PlantContextServiceInterface::class)
+            ->resolvePlantId($plantId);
+        return $resolved ?? (string) $plantId;
     }
 
     protected function executeSelect(string $sql, array $bindings, $idPlant)

@@ -98,7 +98,6 @@ const pageTitle = computed(() => {
   const map = {
     '/dashboard':              'Dashboard',
     '/setup/material':         'Setup Material',
-    '/setup/storage':          'Setup Storage',
     '/setup/supplier':         'Setup Supplier',
     '/setup/plant':            'Setup Plant',
     '/setup/tank':             'Setup Tank',

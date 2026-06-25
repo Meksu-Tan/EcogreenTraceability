@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
@@ -55,9 +55,7 @@ trait RmEntryTransactionTrait
     {
         $since = now()->subHours($hoursBack);
 
-        $jsonCond = $this->isPgsql('eudr_ts')
-            ? 'id_sloc = CAST(? AS TEXT)'
-            : 'JSON_CONTAINS(id_sloc, JSON_ARRAY(?))';
+        $jsonCond = 'id_sloc = CAST(? AS TEXT)';
 
         $entries = DB::connection('eudr_ts')->select(
             "SELECT id_balance_head, trace_no, qty, init_qty, entry_date, created_at
@@ -78,7 +76,7 @@ trait RmEntryTransactionTrait
             'separate_entries_created' => count($entries) > 1,
             'parameters' => [
                 'id_material' => $materialId,
-                'id_tank' => $tankId,
+                'tf_number' => $tankId,
                 'id_plant' => $plantId,
                 'hours_back' => $hoursBack
             ]
@@ -162,9 +160,13 @@ trait RmEntryTransactionTrait
         }
         $slocPlant = null;
         if ($firstSlocId) {
-            $slocPlant = DB::connection('eudr_ts')->table('m_sloc')
-                ->where('id_sloc', $firstSlocId)
-                ->value('id_plant');
+            $q = DB::connection('eudr_ts')->table('m_sloc');
+            if (is_numeric($firstSlocId)) {
+                $q->where('id_sloc', (int) $firstSlocId);
+            } else {
+                $q->where('description', $firstSlocId)->orWhere('code_3', $firstSlocId);
+            }
+            $slocPlant = $q->value('id_plant');
         }
         $data['id_plant'] = $this->resolvePlantCode($slocPlant ?: ($data['id_plant'] ?? 0));
 
@@ -230,12 +232,8 @@ trait RmEntryTransactionTrait
             $idTraceHead = $rundownResult['id_trace_head'];
 
             if (!empty($data['material_document'])) {
-                DB::connection('eudr_ts')->table('t_material_document')->insert([
-                    'id_trace_head' => $idTraceHead,
-                    'material_document' => $data['material_document'],
-                    'po_so' => $data['po_so'] ?? null,
-                    'created_by' => $user,
-                ]);
+                app(\Modules\Shared\Services\TransactionCoreService::class)
+                    ->createMaterialDocument($user, $idTraceHead, $data['material_document'], 'ADD');
             }
 
             $this->clearTempData($entry_no, $user);
@@ -257,22 +255,22 @@ trait RmEntryTransactionTrait
         try {
             $entry_no = $data['entry_no'];
             $curr_entryDate = $data['entry_date'];
-            $id_tankSource = is_array($data['source_tank']) ? $data['source_tank'] : [$data['source_tank']];
-            $id_tank = is_array($data['trf_tank']) ? $data['trf_tank'] : [$data['trf_tank']];
+            $id_slocSource = is_array($data['source_tank']) ? $data['source_tank'] : [$data['source_tank']];
+            $id_sloc = is_array($data['trf_tank']) ? $data['trf_tank'] : [$data['trf_tank']];
             $materialDoc = $data['material_document'] ?? null;
             $idPlant = $this->resolvePlantCode($data['id_plant'] ?? 0);
 
-            $id_tankSource_json = json_encode(array_map('strval', array_values($id_tankSource)));
-            $id_tank_json = json_encode(array_map('strval', array_values($id_tank)));
+            $id_slocSource_json = json_encode(array_map('strval', array_values($id_slocSource)));
+            $id_sloc_json = json_encode(array_map('strval', array_values($id_sloc)));
 
             $srcTankRec = DB::connection('eudr_ts')->table('m_sloc')
-                ->select('id_tank AS code', 'description', 'id_plant', 'plant_name')
-                ->whereIn('id_sloc', $id_tankSource)
+                ->select('tf_number AS code', 'description', 'id_plant', 'plant_name')
+                ->whereIn('id_sloc', $id_slocSource)
                 ->where('status', 1)
                 ->get();
             $tgtTankRec = DB::connection('eudr_ts')->table('m_sloc')
-                ->select('id_tank AS code', 'description', 'id_plant', 'plant_name')
-                ->whereIn('id_sloc', $id_tank)
+                ->select('tf_number AS code', 'description', 'id_plant', 'plant_name')
+                ->whereIn('id_sloc', $id_sloc)
                 ->where('status', 1)
                 ->get();
 
@@ -307,7 +305,7 @@ trait RmEntryTransactionTrait
 
                 $feedParams = [
                     'id_material' => $id_material,
-                    'id_sloc' => $id_tankSource_json,
+                    'id_sloc' => $id_slocSource_json,
                     'id_sloc_tail' => null,
                     'balance_plant' => $balancePlant,
                     'trace_prefixes' => ['1'],
@@ -328,7 +326,7 @@ trait RmEntryTransactionTrait
                         return $tank->description ?: ($tank->plant_name ? ($tank->plant_name . ' - ' . $tank->code) : $tank->code);
                     })->filter()->implode(', ');
                     if (empty($slocNames)) {
-                        $slocNames = implode(', ', $id_tankSource);
+                        $slocNames = implode(', ', $id_slocSource);
                     }
 
                     if ($tempCheck[0]->count > 0) {
@@ -346,7 +344,11 @@ trait RmEntryTransactionTrait
                     );
                 }
 
-                $entryTrfNo_in = $this->buildTraceNo('1', $batch_entryDate, '000', $batch_idPlant, $batch_sequence);
+                if (substr($entry_no, 7, 3) === '000') {
+                    $entryTrfNo_in = substr_replace($entry_no, '1', 9, 1);
+                } else {
+                    $entryTrfNo_in = substr_replace($entry_no, '0', 8, 1);
+                }
 
                 $feedResult = Feed::generalFeed(array_merge($feedParams, [
                     'user' => $user,
@@ -362,7 +364,7 @@ trait RmEntryTransactionTrait
                 }
 
                  $supplierRows = DB::connection('eudr_ts')->select(
-                    'SELECT id_supplier, id_manufacturer, batch_sap, SUM(out_qty) AS rundownSupplier
+                    'SELECT id_supplier, id_manufacturer, batch_sap, SUM(out_qty) AS rundown_supplier
                        FROM t_trace_detail
                       WHERE status = 1
                         AND id_trace_head IN (
@@ -388,7 +390,7 @@ trait RmEntryTransactionTrait
                         'id_supplier'     => $r->id_supplier,
                         'id_manufacturer' => $r->id_manufacturer,
                         'batch_sap'       => $r->batch_sap,
-                        'rundownSupplier' => (float) $r->rundownSupplier,
+                        'rundownSupplier' => (float) ($r->rundown_supplier ?? $r->rundownsupplier ?? 0),
                     ];
                 }
 
@@ -400,7 +402,7 @@ trait RmEntryTransactionTrait
                     'trace_no' => $this->traceNoToInt($entry_no),
                     'from_trace_no' => $this->traceNoToInt($entryTrfNo_in),
                     'id_material' => $id_material,
-                    'id_sloc' => $id_tank_json,
+                    'id_sloc' => $id_sloc_json,
                     'id_sloc_tail' => null,
                     'id_plant' => $tgtPlant,
                     'in_qty' => $out_qty,
@@ -414,12 +416,8 @@ trait RmEntryTransactionTrait
                 }
 
                 if (!empty($materialDoc)) {
-                    DB::connection('eudr_ts')->table('t_material_document')->insert([
-                        'id_trace_head' => $rundownResult['id_trace_head'],
-                        'material_document' => $materialDoc,
-                        'created_by' => $user,
-                        'created_at' => now(),
-                    ]);
+                    app(\Modules\Shared\Services\TransactionCoreService::class)
+                        ->createMaterialDocument($user, $rundownResult['id_trace_head'], $materialDoc, 'ADD');
                 }
             }
 

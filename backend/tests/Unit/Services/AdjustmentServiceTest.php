@@ -78,7 +78,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_get_active_tanks_to_repository(): void
     {
-        $expected = [['id_tank' => 1, 'description' => 'T-01']];
+        $expected = [['id_sloc' => 1, 'description' => 'T-01']];
 
         $this->repoMock
             ->shouldReceive('getActiveTanks')
@@ -93,7 +93,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_get_active_specific_tanks_to_repository(): void
     {
-        $expected = [['id_tank' => 3, 'sloc' => 'SL03']];
+        $expected = [['id_sloc' => 3, 'sloc' => 'SL03']];
 
         $this->repoMock
             ->shouldReceive('getActiveSpecificTanks')
@@ -211,7 +211,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_get_supplier_list_to_repository(): void
     {
-        $data     = ['id_material' => 1, 'id_tank' => 2];
+        $data     = ['id_material' => 1, 'id_sloc' => 2];
         $expected = [['id_supplier' => 5, 'name' => 'PT Supplier']];
 
         $this->repoMock
@@ -227,7 +227,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_get_total_qty_supplier_to_repository(): void
     {
-        $data     = ['id_material' => 1, 'id_tank' => 2, 'id_supplier' => 5];
+        $data     = ['id_material' => 1, 'id_sloc' => 2, 'id_supplier' => 5];
 
         $this->repoMock
             ->shouldReceive('getTotalQtySupplier')

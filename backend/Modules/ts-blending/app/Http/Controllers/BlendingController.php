@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsBlending\Http\Controllers;
 
 use App\Helpers\ApiResponse;
@@ -27,8 +27,10 @@ class BlendingController extends Controller
         try {
             $result = $this->blendingService->getBlendingList($plantId, $page, $perPage);
 
+            $data = is_array($result['data']) ? $result['data'] : $result['data']->toArray();
+
             return ApiResponse::paginated(
-                $result['data']->toArray(),
+                $data,
                 $result['total'],
                 $page,
                 $perPage,
@@ -40,7 +42,7 @@ class BlendingController extends Controller
     }
 
     /**
-     * Unified POST dispatcher — routes to the correct handler based on `flag`.
+     * Unified POST dispatcher â€” routes to the correct handler based on `flag`.
      * Supports: post_blendingEntryMaterial, post_blendingEntry, post_matlDocNumber, post_updateEntrySubTank
      */
     public function store(StoreBlendingRequest $request): JsonResponse
@@ -67,7 +69,7 @@ class BlendingController extends Controller
                 'entryNo' => $request->input('entryNo'),
                 'idMaterialSource' => (int) $request->input('idMaterialSource'),
                 'qty' => $request->input('qty'),
-                'idTank' => (int) $request->input('idTank'),
+                'idSloc' => (int) $request->input('idSloc'),
                 'mode' => $mode,
             ], $plantId);
             return $this->buildResponse($result, 'post_blendingEntryMaterial', $mode, $request);
@@ -122,7 +124,7 @@ class BlendingController extends Controller
             $result = $this->blendingService->updateEntrySubTank(
                 $user,
                 (int) $request->input('idHead'),
-                $request->input('idTankTail', [])
+                $request->input('idSlocTail', [])
             );
             return $this->buildResponse($result, 'post_updateEntrySubTank', 'UPDATE', $request);
         } catch (\Exception $e) {
@@ -180,7 +182,7 @@ class BlendingController extends Controller
 
         try {
             $total = $this->blendingService->getTotalStockMaterial($materialId, $plantId);
-            return ApiResponse::success([['total' => number_format($total, 3)]]);
+            return ApiResponse::success([['total' => (float) $total]]);
         } catch (\Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
         }
@@ -198,7 +200,7 @@ class BlendingController extends Controller
 
         try {
             $total = $this->blendingService->getTotalQtyMaterial($mode, $entryNo, $idHead ? (int) $idHead : null, $plantId);
-            return ApiResponse::success([['total' => number_format($total, 3)]]);
+            return ApiResponse::success([['total' => (float) $total]]);
         } catch (\Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
         }
@@ -284,7 +286,7 @@ class BlendingController extends Controller
     }
 
     /**
-     * Get all tanks (m_tank) for dropdown — independent of material
+     * Get all tanks (sloc) for dropdown â€” independent of material
      */
     public function allTanks(Request $request): JsonResponse
     {
@@ -353,10 +355,11 @@ class BlendingController extends Controller
                 'entryNo' => $request->input('entryNo'),
                 'idHead' => $request->input('idHead'),
                 'materialDoc' => $request->input('materialDoc'),
-                'idTank' => $request->input('idTank'),
+                'idSloc' => $request->input('idSloc'),
             ] : [];
             return ApiResponse::success(null, $message, 200, $extra);
         }
+        \Illuminate\Support\Facades\Log::error('Blending 422 Error: ' . $message, ['result' => $result]);
         return ApiResponse::error($message, 422);
     }
 }

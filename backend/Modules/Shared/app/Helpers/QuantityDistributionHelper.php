@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Shared\Helpers;
 
 /**
@@ -10,9 +10,7 @@ namespace Modules\Shared\Helpers;
  *   - EloquentShipmentRepository::adjustQtyToTotal()
  *
  * Algorithm: scale each item's $qtyKey by factor = $totalTarget / currentSum,
- * round to 4 decimals, then adjust the last item by the rounding delta so
- * the sum exactly matches $totalTarget.  No negative values are produced
- * (caller is responsible for ensuring $totalTarget >= 0).
+ * using high-precision bcmath library to avoid float precision drift.
  */
 class QuantityDistributionHelper
 {
@@ -26,27 +24,37 @@ class QuantityDistributionHelper
      */
     public static function adjustToTotal(array $items, float $totalTarget, string $qtyKey = 'out_qty'): array
     {
-        $currentSum = array_sum(array_column($items, $qtyKey));
-        if (abs($currentSum) < 1e-10) {
+        $targetStr = sprintf('%.10F', $totalTarget);
+
+        $currentSum = '0';
+        foreach ($items as $item) {
+            $val = sprintf('%.10F', (float) ($item[$qtyKey] ?? 0));
+            $currentSum = bcadd($currentSum, $val, 10);
+        }
+
+        if (bccomp($currentSum, '0', 10) === 0) {
             return $items;
         }
 
-        $factor = $totalTarget / $currentSum;
-        $newSum = 0.0;
-        $lastIdx = array_key_last($items);
+        $factor = bcdiv($targetStr, $currentSum, 10);
+        $newSum = '0';
 
         foreach ($items as $idx => $item) {
-            $adjusted = round((float) ($item[$qtyKey] ?? 0) * $factor, 4);
-            $items[$idx][$qtyKey] = $adjusted;
-            $newSum += $adjusted;
+            $val = sprintf('%.10F', (float) ($item[$qtyKey] ?? 0));
+            $adjusted = bcmul($val, $factor, 10);
+            $adjustedFloat = round((float) $adjusted, 4);
+
+            $items[$idx][$qtyKey] = $adjustedFloat;
+            $newSum = bcadd($newSum, sprintf('%.10F', $adjustedFloat), 10);
         }
 
-        // Absorb rounding drift into the last item
+        $lastIdx = array_key_last($items);
         if ($lastIdx !== null) {
-            $delta = round($totalTarget - $newSum, 4);
-            $items[$lastIdx][$qtyKey] += $delta;
+            $delta = bcsub($targetStr, $newSum, 10);
+            $items[$lastIdx][$qtyKey] = round($items[$lastIdx][$qtyKey] + (float) $delta, 4);
         }
 
         return $items;
     }
 }
+

@@ -2,7 +2,6 @@
     "Material": true,
     "Manufacturer": true,
     "Plant": true,
-    "Storage": true,
     "Supplier": true,
     "Tank": true,
     "Transaction": true,

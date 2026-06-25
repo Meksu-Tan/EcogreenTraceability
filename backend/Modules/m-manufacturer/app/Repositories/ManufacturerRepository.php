@@ -1,7 +1,8 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Manufacturer\Repositories;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Manufacturer\Models\Manufacturer;
 use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;
 
@@ -9,17 +10,17 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
 {
     public function getAll(): array
     {
-        return Manufacturer::selectRaw('
+        return Manufacturer::selectRaw("
             a.id_manufacturer, a.code, a.description, a.status,
             a.created_at, a.created_by, a.updated_at, a.updated_by,
             a.type, a.batch_code,
             CASE
-                WHEN b.id_sloc IS NULL THEN "other"
-                ELSE CONCAT(COALESCE(b.id_plant,""), " - ", COALESCE(b.description,""), " (", COALESCE(b.code_4,""), ")")
+                WHEN b.id_sloc IS NULL THEN 'other'
+                ELSE COALESCE(b.id_plant, '') || ' - ' || COALESCE(b.description, '') || ' (' || COALESCE(b.code_4, '') || ')'
             END AS sloc
-        ')
+        ")
         ->from('m_manufacturer AS a')
-        ->leftJoin('m_sloc AS b', 'a.type', '=', 'b.id_sloc')
+        ->leftJoin('m_sloc AS b', DB::raw('CAST(a.type AS TEXT)'), '=', DB::raw('CAST(b.id_sloc AS TEXT)'))
         ->orderBy('a.description')
         ->get()
         ->toArray();
@@ -109,7 +110,7 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
 
     public function getActive(): array
     {
-        return Manufacturer::selectRaw('a.id_manufacturer, CONCAT(a.code, " / ", a.description) AS manufacturer')
+        return Manufacturer::selectRaw("a.id_manufacturer, CONCAT(a.code, ' / ', a.description) AS manufacturer")
             ->from('m_manufacturer as a')
             ->where('a.status', '1')
             ->orderBy('a.description')

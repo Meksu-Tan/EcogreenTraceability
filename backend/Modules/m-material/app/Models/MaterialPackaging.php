@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Material\Models;
 
 use Illuminate\Database\Eloquent\Model;

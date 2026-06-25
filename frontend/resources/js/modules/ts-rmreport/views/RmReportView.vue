@@ -1,28 +1,6 @@
 <template>
   <div class="pa-6">
-    <VRow justify="space-between" align="center" class="mb-4">
-      <VCol cols="auto">
-        <VRow align="center" no-gutters>
-          <VCol cols="auto">
-            <h1 class="text-h5 font-weight-bold">Summary of Raw Material to Product</h1>
-            <div class="d-flex align-center gap-2 mt-1">
-              <span class="text-body-2 text-medium-emphasis">Location:</span>
-              <VChip
-                size="small"
-                color="primary"
-                variant="tonal"
-                prepend-icon="ri-factory-line"
-              >
-                {{ plantSelectionStore.selectedPlantName || 'All Plants' }}
-              </VChip>
-            </div>
-          </VCol>
-          <VCol cols="auto" class="ml-6 pl-6 border-s">
-            <PlantSelector @change="loadData" />
-          </VCol>
-        </VRow>
-      </VCol>
-    </VRow>
+    <h1 class="text-h5 font-weight-bold mb-4">Summary of Raw Material to Product</h1>
 
     <VCard class="mb-4">
       <VCardTitle class="d-flex align-center ga-2 pa-5">
@@ -174,7 +152,7 @@
         </VCardTitle>
 
         <VTabs v-model="detailTab" color="primary" align-tabs="start">
-          <VTab v-for="tab in detailTabs" :key="tab.key" :prepend-icon="tab.icon">
+          <VTab v-for="tab in detailTabs" :key="tab.key" :value="tab.key" :prepend-icon="tab.icon">
             {{ tab.label }}
           </VTab>
         </VTabs>
@@ -280,11 +258,8 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRmReportStore } from '../stores/rmReportStore'
-import { usePlantSelectionStore } from '@/stores/plant.js'
-import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 
 const rmReportStore = useRmReportStore()
-const plantSelectionStore = usePlantSelectionStore()
 const selectedYear = ref(new Date().getFullYear())
 const loading = ref(false)
 const tableData = ref([])
@@ -371,7 +346,7 @@ const loadData = async () => {
       selectedYear: selectedYear.value,
       page: page.value,
       per_page: perPage.value,
-      plant_id: (plantSelectionStore.selectedPlantId === null || plantSelectionStore.selectedPlantId === undefined) ? 0 : plantSelectionStore.selectedPlantId
+      plant_id: 0
     })
     const responseData = rmReportStore.rmReportSummary
     tableData.value = Array.isArray(responseData) ? responseData : (responseData.data || [])
@@ -381,11 +356,6 @@ const loadData = async () => {
     loading.value = false
   }
 }
-
-watch(() => plantSelectionStore.selectedPlantId, () => {
-  page.value = 1
-  loadData()
-})
 
 watch(perPage, () => {
   page.value = 1

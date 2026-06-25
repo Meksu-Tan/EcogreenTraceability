@@ -1,11 +1,14 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Shared\Traits\DbCompatTrait;
 
 trait RmEntrySupplierTrait
 {
+    use DbCompatTrait;
+
     public function searchSuppliers(string $query): array
     {
         return DB::connection('eudr_ts')->select(
@@ -60,16 +63,17 @@ trait RmEntrySupplierTrait
                         'created_by' => $user,
                         'created_at' => now(),
                         'updated_at' => now(),
-                    ]);
+                    ], 'id_manufacturer');
                 }
             }
         }
+
+        $hasManufacturerCol = $this->columnExists('t_balance_temporary', 'id_manufacturer');
 
         $insertData = [
             'entry_no' => $data['entry_no'],
             'id_supplier' => $data['id_supplier'] ?? null,
             'id_material' => $data['id_material'],
-            'id_manufacturer' => $idManufacturer,
             'id_plant' => $data['id_plant'],
             'qty' => $data['qty'],
             'batch_sap' => $data['batch_sap'] ?? null,
@@ -77,41 +81,75 @@ trait RmEntrySupplierTrait
             'created_by' => $user,
         ];
 
-        if (isset($data['id_tank'])) {
-            $insertData['id_tank'] = $data['id_tank'];
+        if ($hasManufacturerCol) {
+            $insertData['id_manufacturer'] = $idManufacturer;
         }
 
-        $result = DB::connection('eudr_ts')->table('t_balance_temporary')->insertGetId($insertData);
+        if (isset($data['tf_number'])) {
+            $insertData['tf_number'] = $data['tf_number'];
+        }
+
+        $result = DB::connection('eudr_ts')->table('t_balance_temporary')->insertGetId($insertData, 'id_balance_temp');
 
         return ['id_balance_temp' => $result];
     }
 
     public function getSupplierList(string $entryNo): array
     {
-        $results = DB::connection('eudr_ts')->select(
-            "SELECT a.id_balance_temp, a.id_supplier, a.id_material, a.id_manufacturer, a.batch_sap, a.qty,
-                    b.code AS supplier_code, b.description AS supplier_name,
-                    c.code AS material_code,
-                    d.code AS manufacturer_code, d.description AS manufacturer_name
-               FROM t_balance_temporary a
-               LEFT JOIN m_supplier b ON a.id_supplier = b.id_supplier
-               LEFT JOIN m_material c ON a.id_material = c.id_material
-               LEFT JOIN m_manufacturer d ON a.id_manufacturer = d.id_manufacturer
-              WHERE a.entry_no = ? AND a.status = 1
-              ORDER BY a.id_balance_temp",
-            [$entryNo]
-        );
+        $hasManufacturer = $this->columnExists('t_balance_temporary', 'id_manufacturer');
+
+        $sql = "SELECT a.id_balance_temp, a.id_supplier, a.id_material, a.batch_sap, a.qty,
+                       b.code AS supplier_code, b.description AS supplier_name,
+                       c.code AS material_code";
+
+        if ($hasManufacturer) {
+            $sql .= ", a.id_manufacturer,
+                       d.code AS manufacturer_code, d.description AS manufacturer_name";
+        }
+
+        $sql .= "  FROM t_balance_temporary a
+                  LEFT JOIN m_supplier b ON a.id_supplier = b.id_supplier
+                  LEFT JOIN m_material c ON a.id_material = c.id_material";
+
+        if ($hasManufacturer) {
+            $sql .= " LEFT JOIN m_manufacturer d ON a.id_manufacturer = d.id_manufacturer";
+        }
+
+        $sql .= " WHERE a.entry_no = ? AND a.status = 1 ORDER BY a.id_balance_temp";
+
+        $results = DB::connection('eudr_ts')->select($sql, [$entryNo]);
 
         return array_map(function ($item) {
             return [
                 'id' => $item->id_balance_temp,
                 'supplier' => $item->supplier_code ? ($item->supplier_code . ' :: ' . $item->supplier_name) : 'N/A',
                 'material' => $item->material_code ?? 'N/A',
-                'manufacturer' => $item->manufacturer_code ? ($item->manufacturer_code . ' :: ' . $item->manufacturer_name) : 'N/A',
+                'manufacturer' => isset($item->manufacturer_code) && $item->manufacturer_code ? ($item->manufacturer_code . ' :: ' . $item->manufacturer_name) : 'N/A',
                 'batch_sap' => $item->batch_sap ?? 'N/A',
-                'qty' => number_format($item->qty, 3),
+                'qty' => (float) $item->qty,
             ];
         }, $results);
+    }
+
+    protected function columnExists(string $table, string $column): bool
+    {
+        try {
+            $driver = DB::connection('eudr_ts')->getDriverName();
+            if ($driver === 'pgsql') {
+                $result = DB::connection('eudr_ts')->select(
+                    "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+                    [$table, $column]
+                );
+                return !empty($result);
+            }
+            $result = DB::connection('eudr_ts')->select(
+                "SHOW COLUMNS FROM {$table} WHERE Field = ?",
+                [$column]
+            );
+            return !empty($result);
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     public function deleteSupplierTemp(int $id, string $user): bool
@@ -159,28 +197,30 @@ trait RmEntrySupplierTrait
             return null;
         }
 
+        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
+
         $datSeq = DB::connection('eudr_ts')->select(
-            'SELECT a.seq_no
-               FROM (SELECT LPAD(SUBSTRING(a.batch_sap,7,2) + 1, 2,0) AS seq_no
+            "SELECT a.seq_no
+               FROM (SELECT LPAD(CAST(CAST(SUBSTRING(a.batch_sap,7,2) AS INTEGER) + 1 AS TEXT), 2, '0') AS seq_no
                        FROM t_balance_detail a
                        LEFT JOIN t_balance_header b ON a.id_balance_head = b.id_balance_head
                       WHERE a.status = 1
-                        AND SUBSTRING(a.batch_sap,1,6) = DATE_FORMAT(NOW(), "%y%m%d")
-                        AND SUBSTRING(b.trace_no,1,1) = 1
+                        AND SUBSTRING(a.batch_sap,1,6) = {$dateFmt}
+                        AND SUBSTRING(b.trace_no::text,1,1) = '1'
                       ORDER BY SUBSTRING(a.batch_sap,1,8) DESC
                       LIMIT 1) a
-               UNION ALL SELECT "01" AS seq_no LIMIT 1',
+               UNION ALL SELECT '01' AS seq_no LIMIT 1",
             []
         );
         $seqNo = $datSeq[0]->seq_no ?? '01';
 
         $result = DB::connection('eudr_ts')->select(
-            'SELECT CONCAT(DATE_FORMAT(NOW(), "%y%m%d"), ?, "-", UCASE(a.batch_code)) AS batchCode
+            "SELECT CONCAT({$dateFmt}, CAST(? AS TEXT), '-', UPPER(a.batch_code)) AS batchCode
                FROM m_supplier a
-              WHERE a.status = 1 AND a.id_supplier = ?',
+              WHERE a.status = 1 AND a.id_supplier = ?",
             [$seqNo, $supplierId]
         );
 
-        return $result[0]->batchCode ?? null;
+        return $result[0]->batchcode ?? $result[0]->batchCode ?? null;
     }
 }

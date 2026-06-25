@@ -43,7 +43,17 @@
               hide-details="auto"
               required
             />
-            <VBtn color="primary" variant="outlined" size="small" @click="fetchQty">Fetch Qty</VBtn>
+            <div class="d-flex align-center gap-2">
+              <VBtn color="primary" variant="outlined" size="small" :loading="autoFetch.syncing.value" @click="autoFetch.manualFetch">
+                Fetch Qty
+              </VBtn>
+              <div class="d-flex align-center gap-1 text-caption text-medium-emphasis">
+                <VIcon icon="ri-time-line" size="12" />
+                <span v-if="autoFetch.lastSyncAt.value">Last: {{ formatLastSync(autoFetch.lastSyncAt.value) }}</span>
+                <span class="font-weight-bold text-primary">|</span>
+                <span>Next: {{ autoFetch.countdownDisplay.value }} ({{ autoFetch.nextSyncLabel.value }})</span>
+              </div>
+            </div>
 
           <div class="d-flex justify-end gap-2 mt-2">
             <VBtn
@@ -70,13 +80,14 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useTsBlendingStore } from '../stores'
 import { useToastStore } from '@/stores/toast.js'
+import { useAutoFetchQty } from '@/composables/useAutoFetchQty'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
   entryNo: { type: String, default: '' },
   mode: { type: String, default: 'ADD' },
   idHead: { type: [String, Number], default: null },
-  idTank: { type: [String, Number], default: null },
+  idSloc: { type: [String, Number], default: null },
   idMaterial: { type: [String, Number], default: null },
   idPlant: { type: [String, Number], default: 0 }
 })
@@ -108,6 +119,19 @@ const stockDisplay = computed(() => {
   return stock ? `${stock.toFixed(3)} MT` : '0.000 MT'
 })
 
+async function doFetchQty() {
+  if (!form.idMaterialSource) return
+  await fetchQty()
+}
+
+const autoFetch = useAutoFetchQty(doFetchQty)
+
+function formatLastSync(isoString) {
+  if (!isoString) return '-'
+  const d = new Date(isoString)
+  return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
 function closeModal() {
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur()
@@ -119,7 +143,7 @@ function onMaterialChange() {
   if (form.idMaterialSource) {
     blendingStore.fetchTotalStockMaterial({
       idMaterial: form.idMaterialSource,
-      idTank: props.idTank,
+      idSloc: props.idSloc,
       id_plant: props.idPlant
     })
   } else {
@@ -153,7 +177,7 @@ async function handleInsert() {
       entryNo: props.entryNo,
       idMaterialSource: form.idMaterialSource,
       qty: form.qty,
-      idTank: props.idTank,
+      idSloc: props.idSloc,
       id_plant: plantId,
       mode: props.mode
     })
@@ -171,13 +195,19 @@ async function handleInsert() {
 }
 
 watch(() => props.isOpen, (val) => {
-  if (!val && document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur()
+  if (!val) {
+    autoFetch.stopCountdown()
+    autoFetch.stopAutoSync()
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
   }
   if (val) {
     form.idMaterialSource = ''
     form.qty = ''
     blendingStore.totalStock = 0
+    autoFetch.startCountdown()
+    autoFetch.startAutoSync()
   }
 })
 </script>

@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Http\Controllers;
 
 use App\Http\Controllers\Controller;
@@ -27,8 +27,10 @@ class RmEntryController extends Controller
 
         $result = $this->rmEntryService->getRmList($plantId, $page, $perPage);
 
+        $data = is_array($result['data']) ? $result['data'] : $result['data']->toArray();
+
         return ApiResponse::paginated(
-            $result['data']->toArray(),
+            $data,
             $result['total'],
             $page,
             $perPage,
@@ -144,7 +146,7 @@ class RmEntryController extends Controller
     {
         $entryNo = $request->input('entry_no') ?? '';
         $total = $this->rmEntryService->getTotalQtyTemp($entryNo);
-        return ApiResponse::success(['total' => number_format($total, 3)], 'OK', 200);
+        return ApiResponse::success(['total' => (float) $total], 'OK', 200);
     }
 
     public function transfer(TransferEntryRequest $request): JsonResponse
@@ -160,7 +162,8 @@ class RmEntryController extends Controller
     public function transferNumber(Request $request): JsonResponse
     {
         $plantId = $request->input('id_plant', Auth::user()?->id_plant ?? 0);
-        $rmNumber = $this->rmEntryService->generateTransferNumber($plantId);
+        $tankDesc = $request->input('tank_desc');
+        $rmNumber = $this->rmEntryService->generateTransferNumber($plantId, $tankDesc);
         return ApiResponse::success(['rm_number' => $rmNumber], 'OK', 200);
     }
 
@@ -180,8 +183,8 @@ class RmEntryController extends Controller
     public function debugFifoStock(Request $request): JsonResponse
     {
         $materialId = $request->input('id_material');
-        $tankId = $request->input('id_tank');
-        $tankTail = $request->input('id_tank_tail');
+        $tankId = $request->input('tf_number');
+        $tankTail = $request->input('id_sloc_tail');
         $plantId = $request->input('id_plant');
         $tankMatching = $request->input('tank_matching', 'flexible');
 
@@ -219,7 +222,7 @@ class RmEntryController extends Controller
     public function verifySeparateEntries(Request $request): JsonResponse
     {
         $materialId = (int)$request->input('id_material');
-        $tankId = (int)$request->input('id_tank');
+        $tankId = (int)$request->input('tf_number');
         $plantId = (int)$request->input('id_plant');
         $hoursBack = (int)$request->input('hours_back', 24);
 
@@ -308,7 +311,7 @@ class RmEntryController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'id_head' => 'required|integer',
-            'id_tank_tail' => 'required'
+            'id_sloc_tail' => 'required'
         ]);
 
         if ($validator->fails()) {
@@ -316,10 +319,10 @@ class RmEntryController extends Controller
         }
 
         $idHead = (int)$request->input('id_head');
-        $idTankTail = $request->input('id_tank_tail');
+        $idSlocTail = $request->input('id_sloc_tail');
         $user = Auth::user()->name ?? 'System';
 
-        $result = $this->rmEntryService->updateSubTankSlocTail($idHead, $idTankTail, $user);
+        $result = $this->rmEntryService->updateSubTankSlocTail($idHead, $idSlocTail, $user);
         return ApiResponse::success($result, 'Sub Tank updated successfully', 200);
     }
 

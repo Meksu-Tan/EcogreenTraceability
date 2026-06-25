@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsPackage\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -18,7 +18,7 @@ class UpdatePackageEntryRequest extends FormRequest
             'poNo' => ['nullable', 'string', 'max:50'],
             'batchNo' => ['nullable', 'string', 'max:50'],
             'warehouse' => ['nullable', 'integer'],
-            'idTankTail' => ['nullable', 'array'],
+            'idSlocTail' => ['nullable', 'array'],
         ];
     }
 }

@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Services\Contracts;
 
 interface AdjustmentMutationServiceInterface

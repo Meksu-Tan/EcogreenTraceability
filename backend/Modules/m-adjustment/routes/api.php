@@ -1,11 +1,11 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Adjustment\Http\Controllers\AdjustmentController;
 
 Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('master/adjustment')->group(function () {
-        // ——— Lookups (exact routes BEFORE {id}) ———
+        // â€”â€”â€” Lookups (exact routes BEFORE {id}) â€”â€”â€”
         Route::get('supplier-list', [AdjustmentController::class, 'getSupplierList']);
         Route::get('total-qty', [AdjustmentController::class, 'getTotalQty']);
         Route::get('suppliers/search', [AdjustmentController::class, 'searchSuppliers']);
@@ -19,7 +19,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::get('supplier-by-filter', [AdjustmentController::class, 'getSupplierByFilter']);
         Route::get('batch-by-supplier', [AdjustmentController::class, 'getBatchBySupplier']);
 
-        // ——— Period Adjustment ———
+        // â€”â€”â€” Period Adjustment â€”â€”â€”
         Route::get('period-headers', [AdjustmentController::class, 'getPeriodHeaders']);
         Route::get('period-view-data', [AdjustmentController::class, 'getPeriodViewData']);
         Route::post('period-headers-upload', [AdjustmentController::class, 'periodHeadersUpload']);
@@ -29,7 +29,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::delete('destroy-adjustment-period/{id}', [AdjustmentController::class, 'destroyAdjustmentPeriod']);
         Route::get('last-record', [AdjustmentController::class, 'getLastRecord']);
 
-        // ——— Mutations (exact routes BEFORE {id}) ———
+        // â€”â€”â€” Mutations (exact routes BEFORE {id}) â€”â€”â€”
         Route::post('detail', [AdjustmentController::class, 'storeDetail']);
         Route::post('approve/{id}', [AdjustmentController::class, 'approve']);
         Route::post('execute/{id}', [AdjustmentController::class, 'execute']);
@@ -47,7 +47,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::get('adjust-status', [AdjustmentController::class, 'getAdjustStatus']);
         Route::put('material-document/{id}', [AdjustmentController::class, 'adjustMaterialDocument']);
 
-        // ——— Generic (must be LAST) ———
+        // â€”â€”â€” Generic (must be LAST) â€”â€”â€”
         Route::get('/', [AdjustmentController::class, 'index']);
         Route::get('{id}', [AdjustmentController::class, 'show']);
         Route::post('/', [AdjustmentController::class, 'store']);

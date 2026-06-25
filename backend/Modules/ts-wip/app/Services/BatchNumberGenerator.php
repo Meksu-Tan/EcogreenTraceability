@@ -1,7 +1,5 @@
 <?php
-
 declare(strict_types=1);
-
 namespace Modules\TsWip\Services;
 
 /**
@@ -12,7 +10,7 @@ namespace Modules\TsWip\Services;
  *  YYMMDD = date
  *  TTT    = section/feed ID (3-digit, zero-padded)
  *  PP     = last 2 chars of plant code_3
- *  SS     = daily sequence (01–99)
+ *  SS     = daily sequence (01â€“99)
  */
 use Modules\Shared\Services\TraceNumberGeneratorService;
 

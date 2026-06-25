@@ -793,9 +793,9 @@ class StockRepository implements StockRepositoryInterface
         if ($mode === 'SUMMARY_WIP') {
             return DB::connection($this->connection)->select('SELECT bgn.entry_date, bgn."description", bgn."in", bgn."out", bgn."supplier", bgn."sloc",
                                      bgn."balance", bgn."balance" AS balances,
-                                     CASE WHEN bgn.delta > 0.009 THEN  TO_CHAR(ROUND(CAST(CAST(bgn."balance_supplier" AS numeric) AS numeric),3), \'FM999999999999990.000\') ELSE  bgn.last_balance END AS balance_supplier,
+                                     CASE WHEN bgn.delta > 0.009 THEN  TO_CHAR(ROUND(CAST(CAST(bgn."balance_supplier" AS numeric) AS numeric),3), \'FM999999999999990.000\') ELSE  CAST(bgn.last_balance AS TEXT) END AS balance_supplier,
                                      bgn.material, bgn.init_balance, bgn.last_balance AS last_balance
-                                FROM (SELECT CONCAT(?, \' to \', ?) AS entry_date, bgn."description",
+                                FROM (SELECT CONCAT(CAST(? AS TEXT), \' to \', CAST(? AS TEXT)) AS entry_date, bgn."description",
                                              TO_CHAR(ROUND(CAST(CAST(bgn."in" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS "in", TO_CHAR(ROUND(CAST(CAST(bgn."out" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS "out",
                                              TO_CHAR(ROUND(CAST(CAST(bgn."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS balance, bgn."supplier", bgn."sloc", TO_CHAR(ROUND(CAST(CAST(bgn."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS balances,
                                              bgn.material, TO_CHAR(ROUND(CAST(CAST(bgn.init_balance AS numeric) AS numeric),3), \'FM999999999999990.000\') AS init_balance,
@@ -886,7 +886,7 @@ class StockRepository implements StockRepositoryInterface
                                                                                   GROUP BY d.id_material
                                                                               ) d
                                                                   ON a.id_material = d.id_material
-                                                               GROUP BY a.code
+                                                               GROUP BY a.code, a.id_material
                                                               ) c
                                                      ON z.code = c.code
                                                   LEFT JOIN (SELECT bb.id_material,
@@ -915,16 +915,16 @@ class StockRepository implements StockRepositoryInterface
                                                               ) d
                                                    ON a.id_material = d.id_material
                                                 WHERE b.entry_date IS NOT NULL
-                                                GROUP BY a.code
+                                                GROUP BY a.code, a.id_material, z.code, z.description
                                             ) bgn
-                                    ORDER BY bgn."supplier" ASC', [$startDateVal, $endDateVal, $startDateVal, $endDateVal, $idSloc, $endDateVal, $idSloc, $startDateVal, $idSloc]);
+                                    ORDER BY bgn."supplier" ASC) bgn', [$startDateVal, $endDateVal, $startDateVal, $endDateVal, $idSloc, $endDateVal, $idSloc, $startDateVal, $idSloc]);
         } else {
             // SUMMARY_WH
             return DB::connection($this->connection)->select('SELECT bgn.entry_date, bgn."description", bgn."in", bgn."out", bgn."supplier", bgn."sloc",
                                      TO_CHAR(ROUND(CAST(CAST(bgn."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS "balance", bgn."balance" AS balances,
                                      CASE WHEN ABS(bgn.balance_supplier - bgn."balance") < 0.0005 THEN  TO_CHAR(ROUND(CAST(CAST(bgn.balance_supplier AS numeric) AS numeric),3), \'FM999999999999990.000\') ELSE  TO_CHAR(ROUND(CAST(CAST(bgn."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\') END AS balance_supplier,
                                      bgn.material, bgn.init_balance, bgn.last_balance AS last_balance
-                                FROM (SELECT CONCAT(?, \' to \', ?) AS entry_date, b."description", TO_CHAR(ROUND(CAST(CAST(b."in" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS "in",
+                                FROM (SELECT CONCAT(CAST(? AS TEXT), \' to \', CAST(? AS TEXT)) AS entry_date, b."description", TO_CHAR(ROUND(CAST(CAST(b."in" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS "in",
                                              TO_CHAR(ROUND(CAST(CAST(b."out" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS "out", COALESCE(b.balance,0) AS balance, c."supplier",
                                              c."balance_supplier" AS balance_supplier,
                                              b.sloc, CONCAT(a.description, \' (\', a.code, \')\') AS material,

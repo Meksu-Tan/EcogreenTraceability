@@ -1,6 +1,8 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Material\Services;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Material\Repositories\Contracts\MaterialRepositoryInterface;
 use Modules\Material\Services\Contracts\MaterialServiceInterface;
 
@@ -91,5 +93,26 @@ class MaterialService implements MaterialServiceInterface
     public function getActiveSourceProducts(): array
     {
         return $this->materialRepo->getActiveSourceProducts();
+    }
+
+    public function fetchBalance(int $idPlant, int $idMaterial): array
+    {
+        $plantCode = DB::connection()
+            ->table('m_plant')
+            ->where('id_plant', $idPlant)
+            ->value('code_3');
+
+        if (!$plantCode) {
+            return ['status' => 0, 'message' => 'Plant not found', 'data' => ['qty' => 0]];
+        }
+
+        $qty = DB::connection('eudr_ts')
+            ->table('t_balance_header')
+            ->where('id_material', $idMaterial)
+            ->where('id_plant', $plantCode)
+            ->where('status', 1)
+            ->sum('qty');
+
+        return ['status' => 1, 'data' => ['qty' => round((float) $qty, 3)]];
     }
 }

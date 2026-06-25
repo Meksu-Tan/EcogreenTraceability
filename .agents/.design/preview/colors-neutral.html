@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font-display); background: var(--bg-page); padding: 20px; }
+.row { display: flex; gap: 0; }
+.swatch { flex: 1; height: 80px; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; }
+.swatch span { font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
+.label-row { display: flex; gap: 0; }
+.lbl { flex: 1; padding: 4px 8px; font-family: var(--font-body); font-size: 11px; color: var(--fg-secondary); }
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="swatch" style="background:#0F1410"><span style="color:#fff">950</span></div>
+  <div class="swatch" style="background:#1C2420"><span style="color:#fff">900</span></div>
+  <div class="swatch" style="background:#2E3730"><span style="color:#fff">800</span></div>
+  <div class="swatch" style="background:#445048"><span style="color:#fff">700</span></div>
+  <div class="swatch" style="background:#5A6860"><span style="color:#fff">600</span></div>
+  <div class="swatch" style="background:#768078"><span style="color:#fff">500</span></div>
+  <div class="swatch" style="background:#97A49C"><span style="color:#1C2420">400</span></div>
+  <div class="swatch" style="background:#B8C4BC"><span style="color:#1C2420">300</span></div>
+  <div class="swatch" style="background:#D4DDD8"><span style="color:#1C2420">200</span></div>
+  <div class="swatch" style="background:#F7F4EF; border:1px solid #D4DDD8"><span style="color:#1C2420">50 ★</span></div>
+</div>
+<div class="label-row">
+  <div class="lbl">#0F1410</div>
+  <div class="lbl">#1C2420</div>
+  <div class="lbl">#2E3730</div>
+  <div class="lbl">#445048</div>
+  <div class="lbl">#5A6860</div>
+  <div class="lbl">#768078</div>
+  <div class="lbl">#97A49C</div>
+  <div class="lbl">#B8C4BC</div>
+  <div class="lbl">#D4DDD8</div>
+  <div class="lbl">#F7F4EF</div>
+</div>
+</body>
+</html>

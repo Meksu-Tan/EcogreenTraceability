@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsTransfer\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -10,6 +11,19 @@ class StoreTransferRequest extends FormRequest
     public function rules(): array
     {
         $flag = $this->input('flag');
+
+        if (!$flag) {
+            $path = $this->path();
+            if ($this->isMethod('POST')) {
+                if (str_ends_with($path, '/transfers')) {
+                    $flag = 'post_transferEntry';
+                } elseif (str_ends_with($path, '/matl-doc')) {
+                    $flag = 'post_matlDocNumber';
+                } elseif (str_ends_with($path, '/update-sub-tank')) {
+                    $flag = 'post_updateEntrySubTank';
+                }
+            }
+        }
 
         return match ($flag) {
             'post_transferEntry' => [
@@ -33,7 +47,7 @@ class StoreTransferRequest extends FormRequest
             ],
             'post_updateEntrySubTank' => [
                 'idHead' => 'required|integer',
-                'idTankTail' => 'required|array',
+                'idSlocTail' => 'required|array',
             ],
             default => [
                 'flag' => 'required|string|in:post_transferEntry,post_matlDocNumber,post_updateEntrySubTank',

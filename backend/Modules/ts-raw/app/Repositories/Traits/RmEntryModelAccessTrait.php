@@ -1,11 +1,8 @@
 <?php
-
 declare(strict_types=1);
-
 namespace Modules\TsRaw\Repositories\Traits;
 
 // Cross-module model access — acceptable coupling for complex JOIN queries.
-// TODO: Refactor to repository interfaces in a dedicated architecture sprint.
 use Modules\TsRaw\Models\BalanceHeader;
 use Modules\Material\Models\Material;
 use Modules\Supplier\Models\Supplier;
@@ -30,7 +27,7 @@ trait RmEntryModelAccessTrait
     /**
      * Find Plant by ID
      */
-    public function findPlantById(int $plantId): ?object
+    public function findPlantById(int|string $plantId): ?object
     {
         return Plant::find($plantId);
     }
@@ -92,7 +89,7 @@ trait RmEntryModelAccessTrait
                     'trace_no' => $item->trace_no,
                     'material' => $item->material->description ?? 'N/A',
                     'tank' => $item->sloc->description ?? 'N/A',
-                    'qty' => number_format($item->qty, 3),
+                    'qty' => (float) $item->qty,
                 ];
             })
             ->toArray();

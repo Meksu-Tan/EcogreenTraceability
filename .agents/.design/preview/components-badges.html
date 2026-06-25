@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600&family=Source+Sans+3:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #F7F4EF; padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.lbl { font-family: var(--font-mono); font-size: 10px; color: #97A49C; width: 90px; }
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 100px; font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+.badge-green { background: #E8F5EC; color: #1A6B3C; }
+.badge-dark { background: #1A6B3C; color: #fff; }
+.badge-amber { background: #FDF3E3; color: #9A5E1A; }
+.badge-neutral { background: #EBF0EC; color: #445048; }
+.badge-outline { background: transparent; color: #1A6B3C; border: 1.5px solid #1A6B3C; }
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 4px; font-family: 'Source Sans 3', sans-serif; font-size: 12px; background: #F4FAF5; color: #226B45; border: 1px solid #C2E6C8; }
+.cert { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 4px; font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 600; background: #fff; border: 1px solid #D4DDD8; color: #2E3730; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.dot { width: 6px; height: 6px; border-radius: 50%; }
+</style>
+</head>
+<body>
+  <div class="row"><div class="lbl">Status</div>
+    <span class="badge badge-green"><span class="dot" style="background:#4C9A5A"></span>Available</span>
+    <span class="badge badge-amber"><span class="dot" style="background:#C8873A"></span>Limited</span>
+    <span class="badge badge-neutral"><span class="dot" style="background:#97A49C"></span>Enquire</span>
+  </div>
+  <div class="row"><div class="lbl">Product</div>
+    <span class="badge badge-dark">Ecorol®</span>
+    <span class="badge badge-dark">Rofanol®</span>
+    <span class="badge badge-outline">Ecoric®</span>
+    <span class="badge badge-green">MCT</span>
+  </div>
+  <div class="row"><div class="lbl">Application</div>
+    <span class="tag"><i class="fas fa-leaf" style="font-size:10px;color:#4C9A5A"></i> Personal Care</span>
+    <span class="tag">Cosmetics</span>
+    <span class="tag">Pharmaceutical</span>
+    <span class="tag">Food</span>
+    <span class="tag">Lubricants</span>
+  </div>
+  <div class="row"><div class="lbl">Certs</div>
+    <span class="cert"><i class="fas fa-certificate" style="font-size:9px;color:#1A6B3C"></i> ISO 9001</span>
+    <span class="cert"><i class="fas fa-certificate" style="font-size:9px;color:#1A6B3C"></i> RSPO</span>
+    <span class="cert"><i class="fas fa-certificate" style="font-size:9px;color:#1A6B3C"></i> Halal</span>
+    <span class="cert"><i class="fas fa-certificate" style="font-size:9px;color:#1A6B3C"></i> Kosher</span>
+  </div>
+</body>
+</html>

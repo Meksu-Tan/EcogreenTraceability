@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Tank\Services\Contracts;
 
 interface TankServiceInterface
@@ -9,4 +10,5 @@ interface TankServiceInterface
     public function deactivateTank(int $id, string $user): array;
     public function activateTank(int $id, string $user): array;
     public function syncFromExternal(string $user): array;
+    public function getLastSyncInfo(): array;
 }

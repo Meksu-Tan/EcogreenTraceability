@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -20,7 +20,7 @@ class UpdateRmEntryRequest extends FormRequest
             'po_so' => 'sometimes|nullable|string',
             'total_qty' => 'sometimes|required|numeric|min:0.001',
             'id_sloc' => 'sometimes|required',
-            'id_tank' => 'sometimes|nullable',
+            'tf_number' => 'sometimes|nullable',
         ];
     }
 }

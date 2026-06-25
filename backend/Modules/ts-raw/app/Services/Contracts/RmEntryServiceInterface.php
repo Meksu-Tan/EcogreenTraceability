@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Services\Contracts;
 
 use Illuminate\Support\Collection;
@@ -8,7 +9,7 @@ interface RmEntryServiceInterface
     public function getRmList($plantId, int $page = 1, int $perPage = 5): array;
     public function getRmEntryById($id): ?array;
     public function generateRmNumber($plantId): ?string;
-    public function generateTransferNumber($plantId): ?string;
+    public function generateTransferNumber($plantId, $tankDescOrId = null): ?string;
     public function getTanks($plantId): array;
     public function getTankDetails($tankId, $plantId): array;
     public function getMaterials(): array;

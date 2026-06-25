@@ -1,10 +1,10 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Services\Contracts;
 
 interface AdjustmentPeriodServiceInterface
 {
-    public function getPeriodHeaders(): array;
+    public function getPeriodHeaders(array $filters = []): array;
     public function getPeriodViewData(int $idHead): array;
     public function periodHeadersUpload(string $user, array $data, mixed $file): array;
     public function periodViewOnHand(string $user, int $idHead): array;

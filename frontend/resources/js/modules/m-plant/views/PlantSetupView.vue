@@ -21,7 +21,7 @@
       <VCardText class="pa-0">
         <DataTable
           :columns="columns"
-          :data="store.plants"
+          :data="sortedPlants"
           :loading="store.loading"
           row-key="id_plant"
         >
@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import DataTable from '@/modules/shared/components/DataTable.vue'
 import PlantModal from './PlantModal.vue'
 import { useSetupPlantStore } from '@/stores/plant.js'
@@ -74,6 +74,22 @@ import { useConfirmStore } from '@/stores/confirm.js'
 const store      = useSetupPlantStore()
 const toast      = useToastStore()
 const confirmStore = useConfirmStore()
+const plantOrder = ['EOB-1', 'EOB-2', 'EOB-3', 'EOB-5', 'EOMB']
+
+const sortedPlants = computed(() => {
+  const list = store.plants || []
+  return [...list].sort((a, b) => {
+    const aCode = (a.code_3 || '').toUpperCase()
+    const bCode = (b.code_3 || '').toUpperCase()
+    const aIdx = plantOrder.indexOf(aCode)
+    const bIdx = plantOrder.indexOf(bCode)
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+    if (aIdx !== -1) return -1
+    if (bIdx !== -1) return 1
+    return aCode.localeCompare(bCode)
+  })
+})
+
 const showModal  = ref(false)
 const editData   = ref(null)
 const submitting = ref(false)

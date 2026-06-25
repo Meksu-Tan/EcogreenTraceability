@@ -1,149 +1,172 @@
 <template>
-  <VDialog :model-value="modelValue" @update:modelValue="$emit('update:modelValue', $event)" max-width="600px" persistent>
-    <VCard rounded="lg">
-      <VCardTitle class="pa-5 pb-3 d-flex align-center justify-space-between">
-        <span class="text-h6 font-weight-bold">NEW SHIPMENT ENTRY</span>
-        <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="close" />
+  <VDialog
+    :model-value="modelValue"
+    max-width="960"
+    scrollable
+    @update:model-value="$emit('update:modelValue', $event)"
+  >
+    <VCard>
+      <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+        <span class="text-h6 font-weight-bold">Shipment Entry</span>
+        <VBtn
+          icon="ri-close-line"
+          variant="text"
+          size="small"
+          color="medium-emphasis"
+          @click="close"
+        />
       </VCardTitle>
+
       <VDivider />
-      <VCardText class="pa-5">
-        <VAlert v-if="submitError" type="error" density="compact" class="mb-4">{{ submitError }}</VAlert>
-        <VForm ref="formRef" v-model="isValid" @submit.prevent="save">
-          <VRow>
-            <!-- Entry Mode -->
-            <VCol cols="12" sm="4">
-              <VTextField
-                label="Entry Mode"
-                model-value="ADD"
-                readonly
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
 
-            <!-- Entry Date -->
-            <VCol cols="12" sm="4">
-              <VTextField
-                v-model="form.entryDate"
-                label="Entry Date"
-                type="date"
-                required
-                :rules="[v => !!v || 'Entry date is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
+      <VCardText class="pa-5 bg-neutral-50">
+        <VAlert v-if="submitError" type="error" variant="tonal" density="comfortable" class="mb-4">{{ submitError }}</VAlert>
 
-            <!-- Trace No -->
-            <VCol cols="12" sm="4">
-              <VTextField
-                v-model="newTraceNo"
-                label="Trace No"
-                readonly
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                placeholder="Auto Generated"
-                :loading="traceNoLoading"
-                :append-inner-icon="traceNoLoading ? 'ri-loader-4-line ri-spin' : ''"
-              />
-            </VCol>
+        <form @submit.prevent="save" class="d-flex flex-column ga-4">
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Mode</label>
+                  <VTextField
+                    model-value="ADD"
+                    readonly
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
 
-            <!-- Product -->
-            <VCol cols="12">
-              <VSelect
-                v-model="form.fgProduct"
-                label="Product"
-                :items="store.activeFgProducts"
-                item-title="material"
-                item-value="id_material"
-                required
-                :rules="[v => !!v || 'Product is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                @update:modelValue="onProductChange"
-              />
-              <div class="mt-1 text-caption text-primary font-weight-semibold">
-                {{ store.wipMaterialLabel || 'Product : N/A' }}
-              </div>
-            </VCol>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Date</label>
+                  <VTextField
+                    v-model="form.entryDate"
+                    type="date"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
 
-            <!-- Batch No -->
-            <VCol cols="12" sm="6">
-              <VTextField
-                v-model="form.batch_no"
-                label="Batch No"
-                required
-                :rules="[v => !!v || 'Batch No is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                @input="form.batch_no = form.batch_no.toUpperCase()"
-              />
-            </VCol>
+                <VCol cols="12" sm="6" md="4">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Trace No</label>
+                  <VTextField
+                    v-model="newTraceNo"
+                    readonly
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    placeholder="Auto Generated"
+                    :loading="traceNoLoading"
+                    :append-inner-icon="traceNoLoading ? 'ri-loader-4-line ri-spin' : ''"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
 
-            <!-- Qty (MT) -->
-            <VCol cols="12" sm="6">
-              <VTextField
-                v-model.number="form.qty"
-                label="Qty (MT)"
-                type="number"
-                step="any"
-                required
-                :rules="[
-                  v => !!v || 'Qty is required',
-                  v => v > 0 || 'Qty must be greater than 0',
-                  v => v <= store.wipBalance || `Qty cannot exceed balance (${store.wipBalance} MT)`
-                ]"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
+          <VCard variant="outlined">
+            <VCardText>
+              <VRow dense>
+                <VCol cols="12" md="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Product</label>
+                  <VSelect
+                    v-model="form.fgProduct"
+                    :items="store.activeFgProducts"
+                    item-title="material"
+                    item-value="id_material"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @update:model-value="onProductChange"
+                  />
+                  <div class="mt-1 text-caption text-primary font-weight-semibold">
+                    {{ store.wipMaterialLabel || 'Product : N/A' }}
+                  </div>
+                </VCol>
 
-            <!-- SO No -->
-            <VCol cols="12">
-              <VTextField
-                v-model="form.soNo"
-                label="SO No"
-                required
-                :rules="[v => !!v || 'SO No is required']"
-                rounded="md"
-                color="primary"
-                variant="outlined"
-                density="compact"
-                @input="form.soNo = form.soNo.toUpperCase()"
-              />
-            </VCol>
+                <VCol cols="12" md="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Batch No</label>
+                  <VTextField
+                    v-model="form.batch_no"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @input="form.batch_no = form.batch_no.toUpperCase()"
+                  />
+                  <div class="mt-1 text-caption text-medium-emphasis">
+                    FB = Flexi bag | IS = Isotank | VS = Vessel
+                  </div>
+                </VCol>
+              </VRow>
 
-            <!-- File Upload -->
-            <VCol cols="12">
-              <VFileInput
-                v-model="uploadedFile"
-                label="Upload Shipment Document (PDF)"
-                accept="application/pdf"
-                prepend-icon="ri-file-pdf-line"
-                variant="outlined"
-                density="compact"
-              />
-            </VCol>
-          </VRow>
-        </VForm>
+              <VRow dense class="mt-2">
+                <VCol cols="12" sm="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Qty (MT)</label>
+                  <VTextField
+                    v-model.number="form.qty"
+                    type="number"
+                    step="any"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
+
+                <VCol cols="12" sm="6">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">SO No</label>
+                  <VTextField
+                    v-model="form.soNo"
+                    required
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    @input="form.soNo = form.soNo.toUpperCase()"
+                  />
+                </VCol>
+              </VRow>
+
+              <VRow dense class="mt-2">
+                <VCol cols="12">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Upload Shipment Document (PDF)</label>
+                  <VFileInput
+                    v-model="uploadedFile"
+                    accept="application/pdf"
+                    prepend-icon="ri-file-pdf-line"
+                    variant="outlined"
+                    density="compact"
+                    class="mt-1"
+                  />
+                </VCol>
+              </VRow>
+            </VCardText>
+          </VCard>
+
+          <VCardActions class="pa-0">
+            <VSpacer />
+            <VBtn variant="outlined" color="medium-emphasis" @click="close">Cancel</VBtn>
+            <VBtn color="primary" :loading="submitting" prepend-icon="ri-save-line" type="submit">Save</VBtn>
+          </VCardActions>
+        </form>
       </VCardText>
-      <VDivider />
-      <VCardActions class="pa-5 pt-3 justify-end gap-2">
-        <VBtn variant="outlined" color="medium-emphasis" :disabled="submitting" @click="close">Cancel</VBtn>
-        <VBtn color="primary" prepend-icon="ri-save-line" :disabled="!isValid" :loading="submitting" @click="save">Save</VBtn>
-      </VCardActions>
     </VCard>
   </VDialog>
 </template>
@@ -160,8 +183,6 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 
 const store = useShipmentEntryStore()
 const { newTraceNo, traceNoLoading } = storeToRefs(store)
-const formRef = ref(null)
-const isValid = ref(false)
 const submitting = ref(false)
 const submitError = ref('')
 const uploadedFile = ref(null)
@@ -179,16 +200,18 @@ watch(() => props.modelValue, async (newVal) => {
     if (newVal) {
       resetForm()
       await store.fetchActiveFgProducts()
-      if (store.plantId) {
-        await store.fetchNewTraceNo(store.plantId)
+      if (store.plantId && form.fgProduct) {
+        await store.fetchNewTraceNo(store.plantId, form.fgProduct)
       }
     }
   })
 
-  // Regenerate trace number when plant or entry date changes
-  watch(() => [store.plantId, form.entryDate], async ([newPlantId, newEntryDate]) => {
-    if (newPlantId) {
-      await store.fetchNewTraceNo(newPlantId)
+  // Regenerate trace number when plant, entry date, or fgProduct changes
+  watch(() => [store.plantId, form.entryDate, form.fgProduct], async ([newPlantId, newEntryDate, newFgProduct]) => {
+    if (newPlantId && newFgProduct) {
+      await store.fetchNewTraceNo(newPlantId, newFgProduct)
+    } else {
+      store.newTraceNo = ''
     }
   }, { deep: true })
 
@@ -221,7 +244,6 @@ async function onProductChange(val) {
 }
 
 async function save() {
-  if (!isValid.value) return
   submitting.value = true
   try {
     const formData = new FormData()
@@ -236,7 +258,7 @@ async function save() {
     }
 
     const res = await store.storeEntry(formData)
-    if (res.response == 1) {
+    if (res.success || res.response == 1 || !res.error) {
       emit('saved')
       close()
     }

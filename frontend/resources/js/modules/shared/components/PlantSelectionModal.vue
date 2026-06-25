@@ -47,7 +47,7 @@
             base-color="primary"
             rounded="lg"
             class="mb-2"
-            @click="selectPlant(plant.id_plant, plant.description)"
+            @click="selectPlant(plant.id_plant, plant.description, plant.code_3)"
           >
             <template #prepend>
               <VAvatar color="primary-lighten-2" rounded="lg" size="44">
@@ -93,8 +93,8 @@ const isOpen              = ref(false)
 function open()  { isOpen.value = true }
 function close() { isOpen.value = false; emit('close') }
 
-function selectPlant(id, name) {
-  plantSelectionStore.setPlant(id, name)
+function selectPlant(id, name, code = '') {
+  plantSelectionStore.setPlant(id, name, code)
   isOpen.value = false
   emit('selected', id)
 }

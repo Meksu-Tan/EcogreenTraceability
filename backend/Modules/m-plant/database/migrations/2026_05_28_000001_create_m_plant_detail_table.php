@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -22,7 +22,7 @@ return new class extends Migration
             if (DB::getDriverName() === 'sqlite') {
                 $table->timestamp('updated_at')->nullable();
             } else {
-                $table->timestamp('updated_at')->default(DB::raw('null on update CURRENT_TIMESTAMP'))->nullable();
+                $table->timestamp('updated_at')->nullable();
             }
             
             $table->charset = 'utf8mb4';

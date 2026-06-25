@@ -17,9 +17,7 @@
               </VChip>
             </div>
           </VCol>
-          <VCol cols="auto" class="ml-6 pl-6 border-s">
-            <PlantSelector />
-          </VCol>
+
         </VRow>
       </VCardTitle>
       <VCardText>
@@ -147,217 +145,272 @@
       </VCardText>
     </VCard>
 
-    <VDialog v-model="showLastRecordModal" max-width="500">
+    <VDialog v-model="showLastRecordModal" max-width="960" scrollable>
       <VCard>
         <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
           <span class="text-h6 font-weight-bold">{{ adjMode === 'wip' ? 'Adjustment Last Record' : 'New Adjustment' }}</span>
           <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showLastRecordModal = false" />
         </VCardTitle>
         <VDivider />
-        <VCardText class="pa-5">
-          <VRow dense>
-            <VCol cols="12" md="6">
-              <VTextField :model-value="lastRecordForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model="lastRecordForm.entryDate" label="Adjustment Entry Date" type="date" density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12">
-              <VSelect
-                v-model="lastRecordForm.idMaterial"
-                label="Material"
-                :items="materialOptions"
-                item-title="material"
-                item-value="id_material"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VSelect
-                v-model="lastRecordForm.idTank"
-                label="Sloc"
-                :items="tankOptions"
-                item-title="tank"
-                item-value="id_tank"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol v-if="adjMode === 'wip' && activeSpecificTanks.length > 0" cols="12">
-              <VSelect
-                v-model="lastRecordForm.idSloc"
-                label="Specific Sloc"
-                :items="specificTankOptions"
-                item-title="tankNo"
-                item-value="id_tank_tail"
-                multiple
-                chips
-                closable-chips
-                variant="outlined"
-                density="compact"
-                placeholder="Select Specific Sloc"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField
-                v-model.number="lastRecordForm.qty"
-                label="New Balance Qty (MT)"
-                type="number"
-                step="0.001"
-                min="0"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-          </VRow>
+        <VCardText class="pa-5 bg-neutral-50">
+          <form @submit.prevent="submitLastRecord" class="d-flex flex-column ga-4">
+            <VCard variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">Entry Details</span>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="3">
+                    <VTextField :model-value="lastRecordForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <VTextField v-model="lastRecordForm.entryDate" label="Adjustment Entry Date" type="date" density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <VSelect
+                      v-model="lastRecordForm.idMaterial"
+                      label="Material"
+                      :items="materialOptions"
+                      item-title="material"
+                      item-value="id_material"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <VSelect
+                      v-model="lastRecordForm.slocDesc"
+                      label="Sloc"
+                      :items="tankOptions"
+                      item-title="tank"
+                      item-value="tf_number"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                </VRow>
+                <VRow dense class="mt-2">
+                  <VCol v-if="lastRecordSlocOptions.length > 1" cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="lastRecordForm.idSloc"
+                      label="Specific Sloc"
+                      :items="lastRecordSlocOptions"
+                      item-title="label"
+                      item-value="tf_number"
+                      density="compact"
+                      variant="outlined"
+                      placeholder="Select Specific Sloc"
+                    />
+                  </VCol>
+                  <VCol v-if="adjMode === 'wip' && activeSpecificTanks.length > 0" cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="lastRecordForm.idSloc"
+                      label="Sub-Sloc"
+                      :items="specificTankOptions"
+                      item-title="tf_number"
+                      item-value="id_sloc_tail"
+                      multiple
+                      chips
+                      closable-chips
+                      variant="outlined"
+                      density="compact"
+                      placeholder="Select Sub-Sloc"
+                    />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField
+                      v-model.number="lastRecordForm.qty"
+                      label="New Balance Qty (MT)"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                </VRow>
+              </VCardText>
+            </VCard>
+            <VCard variant="outlined">
+              <VCardText class="d-flex flex-wrap align-center justify-end gap-3">
+                <div class="d-flex ga-2">
+                  <VBtn variant="outlined" color="medium-emphasis" @click="showLastRecordModal = false">Cancel</VBtn>
+                  <VBtn type="submit" color="primary" :loading="saving">{{ saving ? 'Saving...' : 'Save' }}</VBtn>
+                </div>
+              </VCardText>
+            </VCard>
+          </form>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-5 pt-3 justify-end gap-2">
-          <VBtn variant="outlined" color="medium-emphasis" @click="showLastRecordModal = false">Cancel</VBtn>
-          <VBtn color="primary" :loading="saving" @click="submitLastRecord">{{ saving ? 'Saving...' : 'Save' }}</VBtn>
-        </VCardActions>
       </VCard>
     </VDialog>
 
-    <VDialog v-model="showInitModal" max-width="800" scrollable>
+    <VDialog v-model="showInitModal" max-width="960" scrollable>
       <VCard>
         <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
           <span class="text-h6 font-weight-bold">Stock Initialization Entry</span>
           <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showInitModal = false" />
         </VCardTitle>
         <VDivider />
-        <VCardText class="pa-5">
-          <VRow dense>
-            <VCol cols="12" md="4">
-              <VTextField :model-value="initForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12" md="4">
-              <VTextField v-model="initForm.entry_date" label="Date (Auto Detect)" type="date" density="compact" variant="outlined" @update:model-value="onInitDateChange" />
-            </VCol>
-            <VCol v-if="adjMode === 'wip'" cols="12" md="4">
-              <VTextField v-model="initForm.material_doc" label="Material Document (SAP)" density="compact" variant="outlined" />
-            </VCol>
-            <VCol v-if="adjMode === 'wh'" cols="12" md="4">
-              <VTextField v-model="initForm.po_no" label="PO No" density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VSelect
-                v-model="initForm.tank"
-                label="Sloc"
-                :items="tankOptions"
-                item-title="tank"
-                item-value="id_tank"
-                density="compact"
-                variant="outlined"
-                @update:model-value="onInitTankChange"
-              />
-            </VCol>
-            <VCol v-if="adjMode === 'wh'" cols="12" md="6">
-              <VTextField v-model="initForm.batch_no" label="Batch No" density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VSelect
-                v-model="initForm.id_material"
-                label="Material (Do not change after input supplier!)"
-                :items="materialOptions"
-                item-title="material"
-                item-value="id_material"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol v-if="adjMode === 'wip' && activeSpecificTanks.length > 0" cols="12" md="6">
-              <VSelect
-                v-model="initForm.tankNo"
-                label="Specific Sloc"
-                :items="specificTankOptions"
-                item-title="tankNo"
-                item-value="id_tank_tail"
-                multiple
-                chips
-                closable-chips
-                variant="outlined"
-                density="compact"
-                placeholder="Select Specific Sloc"
-              />
-            </VCol>
-          </VRow>
+        <VCardText class="pa-5 bg-neutral-50">
+          <form @submit.prevent="submitInit" class="d-flex flex-column ga-4">
+            <VCard variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">Entry Details</span>
+                <p class="text-caption text-primary ma-0">Do not change material after adding supplier.</p>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="3">
+                    <VTextField :model-value="initForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <VTextField v-model="initForm.entry_date" label="Date (Auto Detect)" type="date" density="compact" variant="outlined" @update:model-value="onInitDateChange" />
+                  </VCol>
+                  <VCol v-if="adjMode === 'wip'" cols="12" sm="6" md="3">
+                    <VTextField v-model="initForm.material_doc" label="Material Document (SAP)" density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol v-if="adjMode === 'wh'" cols="12" sm="6" md="3">
+                    <VTextField v-model="initForm.po_no" label="PO No" density="compact" variant="outlined" />
+                  </VCol>
+                </VRow>
+                <VRow dense class="mt-2">
+                  <VCol cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="initForm.slocDesc"
+                      label="Sloc"
+                      :items="tankOptions"
+                      item-title="tank"
+                      item-value="tf_number"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                  <VCol v-if="initSlocOptions.length > 1" cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="initForm.tank"
+                      label="Specific Sloc"
+                      :items="initSlocOptions"
+                      item-title="label"
+                      item-value="tf_number"
+                      density="compact"
+                      variant="outlined"
+                      placeholder="Select Specific Sloc"
+                      @update:model-value="onInitTankChange"
+                    />
+                  </VCol>
+                  <VCol v-if="adjMode === 'wh'" cols="12" sm="6" md="4">
+                    <VTextField v-model="initForm.batch_no" label="Batch No" density="compact" variant="outlined" />
+                  </VCol>
+                </VRow>
+                <VRow dense class="mt-2">
+                  <VCol cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="initForm.id_material"
+                      label="Material (Do not change after input supplier!)"
+                      :items="materialOptions"
+                      item-title="material"
+                      item-value="id_material"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                  <VCol v-if="adjMode === 'wip' && activeSpecificTanks.length > 0" cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="initForm.tankNo"
+                      label="Specific Sloc"
+                      :items="specificTankOptions"
+                      item-title="tf_number"
+                      item-value="id_sloc_tail"
+                      multiple
+                      chips
+                      closable-chips
+                      variant="outlined"
+                      density="compact"
+                      placeholder="Select Specific Sloc"
+                    />
+                  </VCol>
+                </VRow>
+                <VRow class="mt-2 border-t pt-4" dense>
+                  <VCol cols="12" class="d-flex flex-wrap align-center justify-space-between ga-3">
+                    <div class="d-flex flex-wrap ga-2">
+                      <VBtn color="secondary" prepend-icon="ri-user-add-line" @click="openInitSupplierForm">Add Supplier &amp; Qty</VBtn>
+                      <VBtn type="submit" color="primary" :loading="saving">{{ saving ? 'Saving...' : 'Save Entry' }}</VBtn>
+                    </div>
+                    <div class="d-flex align-center ga-3">
+                      <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Total Qty (MT)</span>
+                      <VTextField :model-value="initForm.qty" readonly density="compact" variant="outlined" class="text-right" style="width:144px" />
+                    </div>
+                  </VCol>
+                </VRow>
+              </VCardText>
+            </VCard>
 
-          <VRow class="mt-2 align-end justify-space-between" dense>
-            <VCol cols="auto">
-              <div class="d-flex ga-2">
-                <VBtn color="secondary" prepend-icon="ri-add-line" @click="openInitSupplierForm">Add Supplier &amp; Qty</VBtn>
-                <VBtn color="primary" :loading="saving" @click="submitInit">{{ saving ? 'Saving...' : 'Save Entry' }}</VBtn>
-              </div>
-            </VCol>
-            <VCol cols="auto">
-              <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Total Qty (MT)</label>
-              <VTextField :model-value="initForm.qty" readonly density="compact" variant="outlined" class="mt-1 text-right" style="width:144px" />
-            </VCol>
-          </VRow>
+            <VCard v-if="showInitSupplierForm" variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">Add Supplier</span>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="initSupplierForm.idSupplier"
+                      label="Supplier"
+                      :items="supplierOptions"
+                      item-title="supplier"
+                      item-value="id_supplier"
+                      density="compact"
+                      variant="outlined"
+                      @update:model-value="onInitSupplierChange"
+                    />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField v-model="initSupplierForm.batchSap" label="Batch SAP (auto)" readonly density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField v-model.number="initSupplierForm.qty" label="Qty (MT)" type="number" step="0.001" density="compact" variant="outlined" />
+                  </VCol>
+                </VRow>
+                <div class="d-flex justify-end ga-2 mt-3">
+                  <VBtn variant="outlined" color="medium-emphasis" @click="showInitSupplierForm = false">Cancel</VBtn>
+                  <VBtn color="primary" :loading="saving" @click="addSupplierToInit">Add</VBtn>
+                </div>
+              </VCardText>
+            </VCard>
 
-          <VAlert v-if="showInitSupplierForm" type="info" variant="tonal" class="mt-3">
-            <h4 class="text-body-2 font-weight-bold mb-2">Add Supplier</h4>
-            <VRow dense>
-              <VCol cols="12" md="4">
-                <VSelect
-                  v-model="initSupplierForm.idSupplier"
-                  label="Supplier"
-                  :items="supplierOptions"
-                  item-title="supplier"
-                  item-value="id_supplier"
-                  density="compact"
-                  variant="outlined"
-                />
-              </VCol>
-              <VCol cols="12" md="4">
-                <VTextField v-model="initSupplierForm.batchSap" label="Batch SAP" placeholder="Enter Batch SAP" density="compact" variant="outlined" />
-              </VCol>
-              <VCol cols="12" md="4">
-                <VTextField v-model.number="initSupplierForm.qty" label="Qty (MT)" type="number" step="0.001" density="compact" variant="outlined" />
-              </VCol>
-            </VRow>
-            <div class="d-flex justify-end ga-2 mt-3">
-              <VBtn size="small" variant="outlined" color="medium-emphasis" @click="showInitSupplierForm = false">Cancel</VBtn>
-              <VBtn size="small" color="primary" :loading="saving" @click="addSupplierToInit">Add</VBtn>
-            </div>
-          </VAlert>
-
-          <div class="mt-3 overflow-x-auto border rounded">
-            <VTable density="compact" class="text-caption">
-              <thead class="bg-neutral-50">
-                <tr>
-                  <th class="text-center" style="width:40px">No</th>
-                  <th class="text-center" style="width:60px">Action</th>
-                  <th>Material</th>
-                  <th>Supplier</th>
-                  <th class="text-center">Batch SAP</th>
-                  <th class="text-right">Qty (MT)</th>
-                </tr>
-              </thead>
-              <tbody v-if="initSupplierList.length === 0">
-                <tr><td colspan="6" class="text-center pa-4 text-disabled">No supplier added yet.</td></tr>
-              </tbody>
-              <tbody v-else>
-                <tr v-for="(item, i) in initSupplierList" :key="item.idTail">
-                  <td class="text-center text-medium-emphasis">{{ i + 1 }}</td>
-                  <td class="text-center">
-                    <VBtn icon="ri-delete-bin-line" size="x-small" color="error" variant="text" @click="removeSupplierFromInit(item.idTail)" />
-                  </td>
-                  <td>{{ item.material || '-' }}</td>
-                  <td>{{ item.supplier || item.idSupplier }}</td>
-                  <td class="text-center font-monospace">{{ item.batch_sap || '-' }}</td>
-                  <td class="text-right font-monospace">{{ item.qty }}</td>
-                </tr>
-              </tbody>
-            </VTable>
-          </div>
+            <VCard variant="outlined">
+              <VCardTitle class="bg-neutral-50 text-caption font-weight-bold text-uppercase pa-3">
+                Supplier List
+              </VCardTitle>
+              <VTable density="compact" class="text-body-2">
+                <thead>
+                  <tr class="bg-neutral-50">
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:80px">Action</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Supplier</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Batch SAP</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Qty (MT)</th>
+                  </tr>
+                </thead>
+                <tbody v-if="initSupplierList.length === 0">
+                  <tr><td colspan="6" class="text-center text-disabled py-6 text-body-2">No supplier yet — use "Add Supplier &amp; Qty" button.</td></tr>
+                </tbody>
+                <tbody v-else>
+                  <tr v-for="(item, i) in initSupplierList" :key="item.idTail">
+                    <td class="text-center text-caption text-medium-emphasis">{{ i + 1 }}</td>
+                    <td class="text-center">
+                      <VBtn icon="ri-delete-bin-line" size="x-small" color="error" variant="tonal" @click="removeSupplierFromInit(item.idTail)" />
+                    </td>
+                    <td class="text-caption">{{ item.material || '-' }}</td>
+                    <td class="text-caption">{{ item.supplier || item.idSupplier }}</td>
+                    <td class="text-caption font-mono">{{ item.batch_sap || '-' }}</td>
+                    <td class="text-right font-weight-medium text-caption font-mono">{{ item.qty }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </VCard>
+          </form>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-5 pt-3 justify-end gap-2">
-          <VBtn variant="outlined" color="medium-emphasis" @click="showInitModal = false">Close</VBtn>
-        </VCardActions>
       </VCard>
     </VDialog>
 
@@ -368,118 +421,119 @@
           <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showPeriodModal = false" />
         </VCardTitle>
         <VDivider />
-        <VCardText class="pa-5">
-          <div class="mb-4">
-            <VBtn color="primary" prepend-icon="ri-add-line" @click="openNewPeriodForm">Create New Period</VBtn>
-          </div>
-
-          <VAlert v-if="showNewPeriodForm" type="info" variant="tonal" class="mb-4">
-            <h4 class="text-body-2 font-weight-bold mb-2">New Period Entry</h4>
-            <VRow dense>
-              <VCol cols="12" md="4">
-                <VTextField :model-value="periodNewForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
-              </VCol>
-              <VCol cols="12" md="4">
-                <VTextField v-model="periodNewForm.period" label="Period (Month &amp; Year)" type="month" density="compact" variant="outlined" />
-              </VCol>
-              <VCol cols="12" md="4">
-                <VTextField v-model="periodNewForm.batch" label="Batch SAP" density="compact" variant="outlined" />
-              </VCol>
-            </VRow>
-            <div class="d-flex justify-end ga-2 mt-2">
-              <VBtn size="small" variant="outlined" color="medium-emphasis" @click="showNewPeriodForm = false">Cancel</VBtn>
-              <VBtn size="small" color="primary" :loading="saving" @click="submitNewPeriod">Save Period</VBtn>
+        <VCardText class="pa-5 bg-neutral-50">
+          <div class="d-flex flex-column ga-4">
+            <div class="mb-2">
+              <VBtn color="secondary" prepend-icon="ri-add-line" @click="openNewPeriodForm">Create New Period</VBtn>
             </div>
-          </VAlert>
 
-          <h3 class="text-body-2 font-weight-bold text-medium-emphasis mb-2">Period History</h3>
-          <div class="overflow-x-auto border rounded">
-            <VTable density="compact" class="text-body-2">
-              <thead class="bg-neutral-50">
-                <tr>
-                  <th class="text-center" style="width:40px">No</th>
-                  <th class="text-center" style="width:160px">Action</th>
-                  <th>Batch</th>
-                  <th>Period</th>
-                  <th class="text-center">Uploaded File</th>
-                  <th class="text-center">Adjust Status</th>
-                  <th class="text-center">Lock Status</th>
-                  <th>Created By</th>
-                  <th>Created At</th>
-                </tr>
-              </thead>
-              <tbody v-if="periodHeaders.length === 0">
-                <tr><td colspan="9" class="text-center pa-6 text-disabled">No period history found.</td></tr>
-              </tbody>
-              <tbody v-else>
-                <tr v-for="(row, i) in periodHeaders" :key="row.id_pspa_head">
-                  <td class="text-center text-medium-emphasis text-caption">{{ i + 1 }}</td>
-                  <td class="text-center">
-                    <div class="d-flex ga-1 justify-center align-center">
-                      <VBtn icon="ri-eye-line" size="x-small" color="primary" variant="text" title="View Detail" @click="viewPeriodDetail(row)" />
-                      
-                      <!-- Hidden file input for uploading Excel to this specific row -->
-                      <input
-                        :id="'file-input-' + row.id_pspa_head"
-                        type="file"
-                        accept=".xlsx,.xls,.csv"
-                        style="display: none"
-                        @change="handleRowFileChange($event, row)"
-                      />
-                      <VBtn
-                        v-if="row.status !== 3"
-                        icon="ri-upload-2-line"
-                        size="x-small"
-                        color="success"
-                        variant="text"
-                        title="Upload Excel"
-                        @click="triggerRowFileUpload(row.id_pspa_head)"
-                      />
+            <VCard v-if="showNewPeriodForm" variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">New Period Entry</span>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField :model-value="periodNewForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField v-model="periodNewForm.period" label="Period (Month &amp; Year)" type="month" :disabled="periodNewForm.mode === 'UPDATE'" density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField v-model="periodNewForm.batch" label="Batch SAP" density="compact" variant="outlined" />
+                  </VCol>
+                </VRow>
+                <div class="d-flex justify-end ga-2 mt-3">
+                  <VBtn variant="outlined" color="medium-emphasis" @click="showNewPeriodForm = false">Cancel</VBtn>
+                  <VBtn color="primary" :loading="saving" @click="submitNewPeriod">Save Period</VBtn>
+                </div>
+              </VCardText>
+            </VCard>
 
-                      <VBtn v-if="row.status !== 3" icon="ri-lock-line" size="x-small" color="warning" variant="text" title="Lock Period" @click="lockPeriod(row.id_pspa_head)" />
-                      <VBtn v-if="row.status !== 3" icon="ri-delete-bin-line" size="x-small" color="error" variant="text" title="Delete Period" @click="deletePeriod(row.id_pspa_head)" />
-                    </div>
-                  </td>
-                  <td class="font-monospace text-caption">{{ row.batch_sap || '-' }}</td>
-                  <td class="font-weight-medium">{{ row.period }}</td>
-                  <td class="text-center">
-                    <VChip
-                      size="x-small"
-                      :color="row.uploaded_file === 1 ? 'success' : 'error'"
-                      variant="tonal"
-                    >
-                      {{ row.uploaded_file === 1 ? 'Yes' : 'No' }}
-                    </VChip>
-                  </td>
-                  <td class="text-center">
-                    <VChip
-                      size="x-small"
-                      :color="row.adjust_status === 1 ? 'success' : 'warning'"
-                      variant="tonal"
-                    >
-                      {{ row.adjust_status === 1 ? 'Adjusted' : 'Pending' }}
-                    </VChip>
-                  </td>
-                  <td class="text-center">
-                    <VChip
-                      size="x-small"
-                      :color="row.status === 3 ? 'success' : 'warning'"
-                      variant="tonal"
-                    >
-                      {{ row.status === 3 ? 'Locked' : 'Open' }}
-                    </VChip>
-                  </td>
-                  <td class="text-caption">{{ row.created_by }}</td>
-                  <td class="text-caption text-medium-emphasis">{{ row.created_at }}</td>
-                </tr>
-              </tbody>
-            </VTable>
+            <VCard variant="outlined">
+              <VCardTitle class="bg-neutral-50 text-caption font-weight-bold text-uppercase pa-3">
+                Period History
+              </VCardTitle>
+              <div class="overflow-x-auto">
+                <VTable density="compact" class="text-body-2">
+                  <thead>
+                    <tr class="bg-neutral-50">
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:160px">Action</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Batch</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Period</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Uploaded File</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Adjust Status</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Lock Status</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                    </tr>
+                  </thead>
+                  <tbody v-if="periodHeaders.length === 0">
+                    <tr><td colspan="9" class="text-center text-disabled py-6 text-body-2">No period history found.</td></tr>
+                  </tbody>
+                  <tbody v-else>
+                    <tr v-for="(row, i) in periodHeaders" :key="row.id_pspa_head">
+                      <td class="text-center text-caption text-medium-emphasis">{{ (periodMeta.page - 1) * periodMeta.perPage + i + 1 }}</td>
+                      <td class="text-center">
+                        <div class="d-flex ga-1 justify-center align-center">
+                          <VBtn v-if="row.status !== 3" icon="ri-delete-bin-line" size="x-small" color="error" variant="tonal" title="Delete Period" @click="deletePeriod(row.id_pspa_head)" />
+                          <input
+                            :id="'file-input-' + row.id_pspa_head"
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            style="display: none"
+                            @change="handleRowFileChange($event, row)"
+                          />
+                          <VBtn
+                            v-if="row.status !== 3"
+                            icon="ri-upload-2-line"
+                            size="x-small"
+                            color="success"
+                            variant="tonal"
+                            title="Upload Excel"
+                            @click="triggerRowFileUpload(row.id_pspa_head)"
+                          />
+                          <VBtn icon="ri-edit-line" size="x-small" color="primary" variant="tonal" title="Update" @click="updatePeriod(row)" />
+                          <VBtn v-if="row.uploaded_file === 1" icon="ri-eye-line" size="x-small" color="info" variant="tonal" title="View Detail" @click="viewPeriodDetail(row)" />
+                          <VBtn v-if="row.status !== 3" icon="ri-lock-line" size="x-small" color="warning" variant="tonal" title="Lock Period" @click="lockPeriod(row.id_pspa_head)" />
+                        </div>
+                      </td>
+                      <td class="font-monospace text-caption">{{ row.batch_sap || '-' }}</td>
+                      <td class="font-weight-medium">{{ row.period }}</td>
+                      <td class="text-center">
+                        <VChip size="x-small" :color="row.uploaded_file === 1 ? 'success' : 'error'" variant="tonal">
+                          {{ row.uploaded_file === 1 ? 'Yes' : 'No' }}
+                        </VChip>
+                      </td>
+                      <td class="text-center">
+                        <VChip size="x-small" :color="row.adjust_status === 1 ? 'success' : 'warning'" variant="tonal">
+                          {{ row.adjust_status === 1 ? 'Adjusted' : 'Pending' }}
+                        </VChip>
+                      </td>
+                      <td class="text-center">
+                        <VChip size="x-small" :color="row.status === 3 ? 'success' : 'warning'" variant="tonal">
+                          {{ row.status === 3 ? 'Locked' : 'Open' }}
+                        </VChip>
+                      </td>
+                      <td class="text-caption">{{ row.created_by }}</td>
+                      <td class="text-caption text-medium-emphasis">{{ row.created_at }}</td>
+                    </tr>
+                  </tbody>
+                </VTable>
+              </div>
+              <div class="d-flex justify-center pa-3" v-if="periodMeta.lastPage > 1">
+                <VPagination
+                  v-model="periodMeta.page"
+                  :length="periodMeta.lastPage"
+                  :total-visible="5"
+                  size="small"
+                  @update:model-value="changePeriodPage"
+                />
+              </div>
+            </VCard>
           </div>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-5 pt-3 justify-end gap-2">
-          <VBtn variant="outlined" color="medium-emphasis" @click="showPeriodModal = false">Close</VBtn>
-        </VCardActions>
       </VCard>
     </VDialog>
 
@@ -490,227 +544,314 @@
           <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showPeriodDetailModal = false" />
         </VCardTitle>
         <VDivider />
-        <VCardText class="pa-5">
-          <VRow dense class="mb-4">
-            <VCol cols="12" md="4">
-              <VTextField :model-value="selectedPeriodHeader.period" label="Period" readonly density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12" md="4">
-              <VTextField :model-value="selectedPeriodHeader.batch_sap || '-'" label="Batch SAP" readonly density="compact" variant="outlined" />
-            </VCol>
-          </VRow>
-
-          <div class="d-flex ga-2 mb-4 pb-3 border-b">
-            <VBtn
-              color="primary"
-              prepend-icon="ri-calculator-line"
-              :disabled="selectedPeriodHeader.status === 3 || saving"
-              @click="calculatePeriodOnHand(selectedPeriodHeader.id_pspa_head)"
-            >
-              1. Calc Qty (On-Hand)
-            </VBtn>
-            <VBtn
-              color="primary"
-              prepend-icon="ri-play-circle-line"
-              :disabled="selectedPeriodHeader.status === 3 || saving"
-              @click="doPeriodAdjustment(selectedPeriodHeader.id_pspa_head)"
-            >
-              2. Do Adjustment
-            </VBtn>
-          </div>
-
-          <div class="overflow-x-auto border rounded">
-            <VTable density="compact" class="text-caption">
-              <thead class="bg-neutral-50">
-                <tr>
-                  <th class="text-center" style="width:40px">No</th>
-                  <th class="text-center">Plant</th>
-                  <th class="text-center">Tank</th>
-                  <th>Sloc</th>
-                  <th>Material</th>
-                  <th class="text-right">Qty (PSPA)</th>
-                  <th class="text-right">Qty (On-Hand)</th>
-                  <th class="text-right">Total</th>
-                  <th class="text-center">Adj. Type</th>
-                  <th class="text-center">Adj. No</th>
-                  <th class="text-center">Adj. Status</th>
-                  <th class="text-center">CalOnHand At</th>
-                </tr>
-              </thead>
-              <tbody v-if="!periodViewData || periodViewData.length === 0">
-                <tr><td colspan="12" class="text-center pa-4 text-disabled">No detail rows found.</td></tr>
-              </tbody>
-              <tbody v-else>
-                <tr v-for="(item, i) in periodViewData" :key="item.id_pspa_detail">
-                  <td class="text-center text-medium-emphasis">{{ i + 1 }}</td>
-                  <td class="text-center">{{ item.plant || '-' }}</td>
-                  <td class="text-center">{{ item.tank || '-' }}</td>
-                  <td>{{ item.sloc || '-' }}</td>
-                  <td>{{ item.material || '-' }}</td>
-                  <td class="text-right font-monospace">{{ parseFloat(item.qty_pspa || 0).toFixed(3) }}</td>
-                  <td class="text-right font-monospace">{{ item.qty_onhand !== null ? parseFloat(item.qty_onhand).toFixed(3) : '-' }}</td>
-                  <td class="text-right font-monospace">{{ item.total !== null ? parseFloat(item.total).toFixed(3) : '-' }}</td>
-                  <td class="text-center">{{ item.adj_type || '-' }}</td>
-                  <td class="text-center font-monospace">{{ item.adjust_number || '-' }}</td>
-                  <td class="text-center">
-                    <VChip
-                      v-if="item.adjust_status !== null"
-                      size="x-small"
-                      :color="item.adjust_status === 1 ? 'success' : item.adjust_status === 2 ? 'error' : 'warning'"
-                      variant="tonal"
+        <VCardText class="pa-5 bg-neutral-50">
+          <div class="d-flex flex-column ga-4">
+            <VCard variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">Period Info</span>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField :model-value="selectedPeriodHeader.period" label="Period" readonly density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField :model-value="selectedPeriodHeader.batch_sap || '-'" label="Batch SAP" readonly density="compact" variant="outlined" />
+                  </VCol>
+                </VRow>
+                <VRow class="mt-2 border-t pt-4" dense>
+                  <VCol cols="12" class="d-flex flex-wrap ga-2">
+                    <VBtn
+                      color="primary"
+                      prepend-icon="ri-calculator-line"
+                      :disabled="selectedPeriodHeader.status === 3 || saving"
+                      @click="calculatePeriodOnHand(selectedPeriodHeader.id_pspa_head)"
                     >
-                      {{ item.adjust_status === 1 ? 'Success' : item.adjust_status === 2 ? 'Failed' : 'No Adj' }}
-                    </VChip>
-                    <span v-else>-</span>
-                  </td>
-                  <td class="text-center text-medium-emphasis">{{ item.populated_at || '-' }}</td>
-                </tr>
-              </tbody>
-            </VTable>
+                      1. Calc Qty (On-Hand)
+                    </VBtn>
+                    <VBtn
+                      color="primary"
+                      prepend-icon="ri-play-circle-line"
+                      :disabled="selectedPeriodHeader.status === 3 || saving"
+                      @click="doPeriodAdjustment(selectedPeriodHeader.id_pspa_head)"
+                    >
+                      2. Do Adjustment
+                    </VBtn>
+                  </VCol>
+                </VRow>
+              </VCardText>
+            </VCard>
+
+            <VCard variant="outlined">
+              <VCardTitle class="bg-neutral-50 text-caption font-weight-bold text-uppercase pa-3">
+                Period Detail
+              </VCardTitle>
+              <div class="overflow-x-auto">
+                <VTable density="compact" class="text-caption">
+                  <thead>
+                    <tr class="bg-neutral-50">
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Plant</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Tank</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sloc</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Qty (PSPA)</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Qty (On-Hand)</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Total</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Adj. Type</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Adj. No</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Adj. Status</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">CalOnHand At</th>
+                    </tr>
+                  </thead>
+                  <tbody v-if="!periodViewData || periodViewData.length === 0">
+                    <tr><td colspan="12" class="text-center text-disabled py-6 text-body-2">No detail rows found.</td></tr>
+                  </tbody>
+                  <tbody v-else>
+                    <tr v-for="(item, i) in periodViewData" :key="item.id_pspa_detail">
+                      <td class="text-center text-caption text-medium-emphasis">{{ i + 1 }}</td>
+                      <td class="text-center text-caption">{{ item.plant || '-' }}</td>
+                      <td class="text-center text-caption">{{ item.tank || '-' }}</td>
+                      <td class="text-caption">{{ item.sloc || '-' }}</td>
+                      <td class="text-caption">{{ item.material || '-' }}</td>
+                      <td class="text-right font-mono text-caption">{{ parseFloat(item.qty_pspa || 0).toFixed(3) }}</td>
+                      <td class="text-right font-mono text-caption">{{ item.qty_onhand !== null ? parseFloat(item.qty_onhand).toFixed(3) : '-' }}</td>
+                      <td class="text-right font-mono text-caption">{{ item.total !== null ? parseFloat(item.total).toFixed(3) : '-' }}</td>
+                      <td class="text-center text-caption">{{ item.adj_type || '-' }}</td>
+                      <td class="text-center font-mono text-caption">{{ item.adjust_number || '-' }}</td>
+                      <td class="text-center">
+                        <VChip
+                          v-if="item.adjust_status !== null"
+                          size="x-small"
+                          :color="item.adjust_status === 1 ? 'success' : item.adjust_status === 2 ? 'error' : 'warning'"
+                          variant="tonal"
+                        >
+                          {{ item.adjust_status === 1 ? 'Success' : item.adjust_status === 2 ? 'Failed' : 'No Adj' }}
+                        </VChip>
+                        <span v-else>-</span>
+                      </td>
+                      <td class="text-center text-caption text-medium-emphasis">{{ item.populated_at || '-' }}</td>
+                    </tr>
+                  </tbody>
+                </VTable>
+              </div>
+            </VCard>
           </div>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-5 pt-3 justify-end gap-2">
-          <VBtn variant="outlined" color="medium-emphasis" @click="showPeriodDetailModal = false">Close</VBtn>
-        </VCardActions>
       </VCard>
     </VDialog>
 
-    <VDialog v-model="showSupplierModal" max-width="700" scrollable>
+    <VDialog v-model="showSupplierModal" max-width="960" scrollable>
       <VCard>
         <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
           <span class="text-h6 font-weight-bold">Supplier Adjustment Entry</span>
           <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showSupplierModal = false" />
         </VCardTitle>
         <VDivider />
-        <VCardText class="pa-5">
-          <VRow dense>
-            <VCol cols="12" md="6">
-              <VTextField :model-value="supplierAdjForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model="supplierAdjForm.entryDate" label="Date (Auto Detect)" type="date" density="compact" variant="outlined" />
-            </VCol>
-            <VCol cols="12">
-              <VSelect
-                v-model="supplierAdjForm.idMaterial"
-                label="Material"
-                :items="materialOptions"
-                item-title="material"
-                item-value="id_material"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VSelect
-                v-model="supplierAdjForm.idTank"
-                label="Sloc"
-                :items="tankOptions"
-                item-title="tank"
-                item-value="id_tank"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol v-if="adjMode === 'wip' && activeSpecificTanks.length > 0" cols="12">
-              <VSelect
-                v-model="supplierAdjForm.idSloc"
-                label="Specific Sloc"
-                :items="specificTankOptions"
-                item-title="tankNo"
-                item-value="id_tank_tail"
-                multiple
-                chips
-                closable-chips
-                variant="outlined"
-                density="compact"
-                placeholder="Select Specific Sloc"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VSelect
-                v-model="supplierAdjForm.adjustType"
-                label="Adjustment Type"
-                :items="[
-                  { value: '-', title: '- Select Adjust Type -' },
-                  { value: 'in', title: '- Adjust IN -' },
-                  { value: 'out', title: '- Adjust OUT -' }
-                ]"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VSelect
-                v-model="supplierAdjForm.idSupplier"
-                label="Supplier"
-                :items="supplierOptions"
-                item-title="supplier"
-                item-value="id_supplier"
-                density="compact"
-                variant="outlined"
-              />
-              <span v-if="supplierAdjForm.idSupplier" class="text-caption text-medium-emphasis mt-1 d-block">Stock (MT): {{ supplierAdjStock }}</span>
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField
-                v-model="supplierAdjForm.batchSap"
-                label="Batch SAP"
-                density="compact"
-                variant="outlined"
-              />
-            </VCol>
-            <VCol cols="12" md="6">
-              <VTextField v-model.number="supplierAdjForm.qty" label="Adjustment Qty (MT)" type="number" step="0.1" density="compact" variant="outlined" />
-            </VCol>
-          </VRow>
+        <VCardText class="pa-5 bg-neutral-50">
+          <form @submit.prevent="submitSupplierAdj" class="d-flex flex-column ga-4">
+            <VCard variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">Entry Details</span>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="3">
+                    <VTextField :model-value="supplierAdjForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <VTextField v-model="supplierAdjForm.entryDate" label="Date (Auto Detect)" type="date" density="compact" variant="outlined" />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <VSelect
+                      v-model="supplierAdjForm.idMaterial"
+                      label="Material"
+                      :items="materialOptions"
+                      item-title="material"
+                      item-value="id_material"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <VSelect
+                      v-model="supplierAdjForm.slocDesc"
+                      label="Sloc"
+                      :items="tankOptions"
+                      item-title="tank"
+                      item-value="tf_number"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                </VRow>
+                <VRow dense class="mt-2">
+                  <VCol v-if="supplierAdjSlocOptions.length > 1" cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="supplierAdjForm.idSloc"
+                      label="Specific Sloc"
+                      :items="supplierAdjSlocOptions"
+                      item-title="label"
+                      item-value="tf_number"
+                      density="compact"
+                      variant="outlined"
+                      placeholder="Select Specific Sloc"
+                    />
+                  </VCol>
+                  <VCol v-if="adjMode === 'wip' && activeSpecificTanks.length > 0" cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="supplierAdjForm.idSloc"
+                      label="Sub-Sloc"
+                      :items="specificTankOptions"
+                      item-title="tf_number"
+                      item-value="id_sloc_tail"
+                      multiple
+                      chips
+                      closable-chips
+                      variant="outlined"
+                      density="compact"
+                      placeholder="Select Sub-Sloc"
+                    />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="supplierAdjForm.adjustType"
+                      label="Adjustment Type"
+                      :items="[
+                        { value: '-', title: '- Select Adjust Type -' },
+                        { value: 'in', title: '- Adjust IN -' },
+                        { value: 'out', title: '- Adjust OUT -' }
+                      ]"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                </VRow>
+                <VRow dense class="mt-2">
+                  <VCol cols="12" sm="6" md="4">
+                    <VSelect
+                      v-model="supplierAdjForm.idSupplier"
+                      label="Supplier"
+                      :items="supplierOptions"
+                      item-title="supplier"
+                      item-value="id_supplier"
+                      density="compact"
+                      variant="outlined"
+                    />
+                    <span v-if="supplierAdjForm.idSupplier" class="text-caption text-medium-emphasis mt-1 d-block">Stock (MT): {{ supplierAdjStock }}</span>
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VSelect
+                      v-if="supplierAdjBatchOptions.length > 0"
+                      v-model="supplierAdjForm.batchSap"
+                      label="Batch SAP"
+                      :items="supplierAdjBatchOptions"
+                      item-title="label"
+                      item-value="value"
+                      density="compact"
+                      variant="outlined"
+                    />
+                    <VTextField
+                      v-else
+                      v-model="supplierAdjForm.batchSap"
+                      label="Batch SAP"
+                      density="compact"
+                      variant="outlined"
+                    />
+                  </VCol>
+                  <VCol cols="12" sm="6" md="4">
+                    <VTextField v-model.number="supplierAdjForm.qty" label="Adjustment Qty (MT)" type="number" step="0.1" density="compact" variant="outlined" />
+                  </VCol>
+                </VRow>
+                <VRow class="mt-2 border-t pt-4" dense>
+                  <VCol cols="12" class="d-flex justify-end">
+                    <div class="d-flex ga-2">
+                      <VBtn variant="outlined" color="medium-emphasis" @click="showSupplierModal = false">Cancel</VBtn>
+                      <VBtn type="submit" color="primary" :loading="saving">{{ saving ? 'Saving...' : 'Save Entry' }}</VBtn>
+                    </div>
+                  </VCol>
+                </VRow>
+              </VCardText>
+            </VCard>
+          </form>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-5 pt-3 justify-end gap-2">
-          <VBtn variant="outlined" color="medium-emphasis" @click="showSupplierModal = false">Cancel</VBtn>
-          <VBtn color="primary" :loading="saving" @click="submitSupplierAdj">{{ saving ? 'Saving...' : 'Save Entry' }}</VBtn>
-        </VCardActions>
       </VCard>
     </VDialog>
 
-    <VDialog v-model="showDetail" max-width="700" scrollable>
+    <VDialog v-model="showDetail" max-width="960" scrollable>
       <VCard v-if="detailData">
         <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
           <span class="text-h6 font-weight-bold">Adjustment Detail - {{ detailData.header?.adjust_no }}</span>
           <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showDetail = false" />
         </VCardTitle>
         <VDivider />
-        <VCardText class="pa-5">
-          <VRow dense class="mb-4">
-            <VCol cols="6"><span class="text-caption text-medium-emphasis">Material</span><p class="font-weight-medium text-body-2">{{ detailData.header?.material || '-' }}</p></VCol>
-            <VCol cols="6"><span class="text-caption text-medium-emphasis">Entry Date</span><p class="font-weight-medium text-body-2">{{ detailData.header?.entry_date }}</p></VCol>
-            <VCol cols="6"><span class="text-caption text-medium-emphasis">SLoc</span><p class="font-weight-medium text-body-2">{{ detailData.header?.sloc || '-' }}</p></VCol>
-            <VCol cols="6">
-              <span class="text-caption text-medium-emphasis">Status</span>
-              <p>
-                <VChip :color="statusColor(detailData.header?.status)" size="small" variant="tonal">
-                  {{ detailData.header?.status_label || detailData.header?.status }}
-                </VChip>
-              </p>
-            </VCol>
-            <VCol cols="6"><span class="text-caption text-medium-emphasis">Before</span><p class="font-monospace text-body-2">{{ detailData.header?.before_adjust }} MT</p></VCol>
-            <VCol cols="6"><span class="text-caption text-medium-emphasis">After</span><p class="font-monospace text-body-2">{{ detailData.header?.after_adjust }} MT</p></VCol>
-          </VRow>
-          <div v-if="detailData.details?.length" class="border-t pt-3">
-            <h3 class="text-body-2 font-weight-bold text-medium-emphasis mb-2">Supplier Details</h3>
-            <div class="d-flex flex-column ga-2">
-              <VCard v-for="d in detailData.details" :key="d.id_adjust_detail" variant="outlined" class="pa-3">
-                <p class="font-weight-medium text-body-2">{{ d.supplier || 'Unknown' }}</p>
-                <p class="text-caption text-medium-emphasis">Batch: {{ d.batch_sap || '-' }} | Before: {{ d.before_adjust }} → After: {{ d.after_adjust }}</p>
-              </VCard>
-            </div>
+        <VCardText class="pa-5 bg-neutral-50">
+          <div class="d-flex flex-column ga-4">
+            <VCard variant="outlined">
+              <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
+                <span class="text-body-1 font-weight-bold">Summary</span>
+              </VCardTitle>
+              <VCardText class="pt-4">
+                <VRow dense>
+                  <VCol cols="12" sm="6" md="3">
+                    <span class="text-caption text-medium-emphasis">Material</span>
+                    <p class="font-weight-medium text-body-2">{{ detailData.header?.material || '-' }}</p>
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <span class="text-caption text-medium-emphasis">Entry Date</span>
+                    <p class="font-weight-medium text-body-2">{{ detailData.header?.entry_date }}</p>
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <span class="text-caption text-medium-emphasis">SLoc</span>
+                    <p class="font-weight-medium text-body-2">{{ detailData.header?.sloc || '-' }}</p>
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <span class="text-caption text-medium-emphasis">Status</span>
+                    <p>
+                      <VChip :color="statusColor(detailData.header?.status)" size="small" variant="tonal">
+                        {{ detailData.header?.status_label || detailData.header?.status }}
+                      </VChip>
+                    </p>
+                  </VCol>
+                </VRow>
+                <VRow dense class="mt-2">
+                  <VCol cols="12" sm="6" md="3">
+                    <span class="text-caption text-medium-emphasis">Before</span>
+                    <p class="font-mono text-body-2">{{ detailData.header?.before_adjust }} MT</p>
+                  </VCol>
+                  <VCol cols="12" sm="6" md="3">
+                    <span class="text-caption text-medium-emphasis">After</span>
+                    <p class="font-mono text-body-2">{{ detailData.header?.after_adjust }} MT</p>
+                  </VCol>
+                </VRow>
+              </VCardText>
+            </VCard>
+
+            <VCard v-if="detailData.details?.length" variant="outlined">
+              <VCardTitle class="bg-neutral-50 text-caption font-weight-bold text-uppercase pa-3">
+                Supplier Details
+              </VCardTitle>
+              <VTable density="compact" class="text-body-2">
+                <thead>
+                  <tr class="bg-neutral-50">
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Supplier</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Batch SAP</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Before</th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">After</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="d in detailData.details" :key="d.id_adjust_detail">
+                    <td class="text-caption">{{ d.supplier || 'Unknown' }}</td>
+                    <td class="font-mono text-caption">{{ d.batch_sap || '-' }}</td>
+                    <td class="text-right font-mono text-caption">{{ d.before_adjust }}</td>
+                    <td class="text-right font-mono text-caption">{{ d.after_adjust }}</td>
+                  </tr>
+                </tbody>
+              </VTable>
+            </VCard>
           </div>
         </VCardText>
-        <VDivider />
-        <VCardActions class="pa-5 pt-3 justify-end gap-2">
-          <VBtn variant="outlined" color="medium-emphasis" @click="showDetail = false">Close</VBtn>
-        </VCardActions>
       </VCard>
     </VDialog>
 
@@ -735,7 +876,7 @@ import { storeToRefs } from 'pinia'
 import { useAdjustmentStore } from '../stores/adjustmentStore'
 import { useToastStore } from '@/stores/toast.js'
 import { usePlantSelectionStore } from '@/stores/plant.js'
-import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
+
 import adjustmentApi from '@/modules/m-adjustment/services/index.js'
 
 const plantSelectionStore = usePlantSelectionStore()
@@ -743,7 +884,7 @@ const plantSelectionStore = usePlantSelectionStore()
 const store = useAdjustmentStore()
 const toast = useToastStore()
 
-const { data, loading, activeMaterials, activeTanks, activeSpecificTanks, periodHeaders, searchSuppliersList, listMeta } = storeToRefs(store)
+const { data, loading, activeMaterials, activeTanks, activeSpecificTanks, periodHeaders, searchSuppliersList, listMeta, periodMeta } = storeToRefs(store)
 
 const adjMode = ref('wip')
 const saving = ref(false)
@@ -816,7 +957,7 @@ const lastRecordForm = reactive({
   mode: 'ADD',
   entryDate: new Date().toISOString().split('T')[0],
   idMaterial: '',
-  idTank: '',
+  slocDesc: '',
   idSloc: [],
   qty: 0
 })
@@ -829,6 +970,7 @@ const initForm = reactive({
   po_no: '',
   batch_no: '',
   id_material: '',
+  slocDesc: '',
   tank: '',
   tankNo: [],
   qty: '0.000'
@@ -836,13 +978,13 @@ const initForm = reactive({
 const initSupplierForm = reactive({ idSupplier: '', batchSap: '', qty: 0 })
 const initSupplierList = ref([])
 
-const periodNewForm = reactive({ mode: 'ADD', period: '', batch: '' })
+const periodNewForm = reactive({ mode: 'ADD', id_head: null, period: '', batch: '' })
 
 const supplierAdjForm = reactive({
   mode: 'ADD',
   entryDate: new Date().toISOString().split('T')[0],
   idMaterial: '',
-  idTank: '',
+  slocDesc: '',
   idSloc: [],
   adjustType: '-',
   idSupplier: '',
@@ -854,15 +996,42 @@ const supplierAdjBatchOptions = ref([])
 
 const materialOptions = computed(() => activeMaterials.value || [])
 const tankOptions = computed(() => {
-  return (activeTanks.value || []).map(t => ({
-    id_tank: t.id_tank || t.id_sloc,
-    tank: String(t.tank || t.description || t.id_sloc || t.id_tank || 'Unknown')
+  const seen = new Set()
+  return (activeTanks.value || []).filter(t => {
+    const desc = String(t.tank || t.description || '')
+    if (!desc || seen.has(desc)) return false
+    seen.add(desc)
+    return true
+  }).map(t => ({
+    tf_number: String(t.tank || t.description || ''),
+    tank: String(t.tank || t.description || '')
   }))
+})
+
+const lastRecordSlocOptions = computed(() => {
+  if (!lastRecordForm.slocDesc) return []
+  return (activeTanks.value || [])
+    .filter(t => String(t.tank || t.description || '') === lastRecordForm.slocDesc)
+    .map(t => ({ tf_number: t.tf_number, label: String(t.tf_number) }))
+})
+
+const initSlocOptions = computed(() => {
+  if (!initForm.slocDesc) return []
+  return (activeTanks.value || [])
+    .filter(t => String(t.tank || t.description || '') === initForm.slocDesc)
+    .map(t => ({ tf_number: t.tf_number, label: String(t.tf_number) }))
+})
+
+const supplierAdjSlocOptions = computed(() => {
+  if (!supplierAdjForm.slocDesc) return []
+  return (activeTanks.value || [])
+    .filter(t => String(t.tank || t.description || '') === supplierAdjForm.slocDesc)
+    .map(t => ({ tf_number: t.tf_number, label: String(t.tf_number) }))
 })
 const specificTankOptions = computed(() => {
   return (activeSpecificTanks.value || []).map(t => ({
-    id_tank_tail: t.id_tank_tail || t.id_sloc,
-    tankNo: String(t.tankNo || t.tankName || t.description || t.id_sloc || t.id_tank_tail || 'Unknown')
+    id_sloc_tail: t.id_sloc_tail || t.id_sloc,
+    tf_number: String(t.tf_number || t.description || t.id_sloc || t.id_sloc_tail || 'Unknown')
   }))
 })
 const supplierOptions = computed(() => searchSuppliersList.value || [])
@@ -872,76 +1041,6 @@ const confirmIcon = computed(() => {
   if (confirmType.value === 'cancel') return 'ri-close-circle-line'
   return 'ri-play-circle-line'
 })
-
-onMounted(() => {
-  loadData()
-  loadFormOptions()
-})
-
-watch(adjMode, () => {
-  loadData()
-  loadFormOptions()
-})
-
-watch(() => plantSelectionStore.selectedPlantId, () => {
-  listMeta.value.page = 1
-  loadData()
-  loadFormOptions()
-})
-
-watch(perPage, (val) => {
-  listMeta.value.perPage = val
-  listMeta.value.page = 1
-  loadData()
-})
-
-watch(() => lastRecordForm.idTank, async (val) => {
-  lastRecordForm.idSloc = []
-  if (!val) {
-    activeSpecificTanks.value = []
-    return
-  }
-  await store.fetchActiveSpecificTanks(val)
-})
-
-watch(() => supplierAdjForm.idMaterial, () => {
-  supplierAdjForm.idSupplier = ''
-  supplierAdjForm.batchSap = ''
-  supplierAdjStock.value = 'N/A'
-  supplierAdjBatchOptions.value = []
-})
-
-watch(() => supplierAdjForm.idTank, async (val) => {
-  supplierAdjForm.idSupplier = ''
-  supplierAdjForm.batchSap = ''
-  supplierAdjStock.value = 'N/A'
-  supplierAdjBatchOptions.value = []
-  supplierAdjForm.idSloc = []
-  if (!val) {
-    activeSpecificTanks.value = []
-    return
-  }
-  await store.fetchActiveSpecificTanks(val)
-})
-
-watch(() => supplierAdjForm.idSupplier, (val) => {
-  if (!val) {
-    supplierAdjStock.value = 'N/A'
-    supplierAdjBatchOptions.value = []
-    supplierAdjForm.batchSap = ''
-    return
-  }
-  fetchSupplierAdjStockAndBatches().then(() => {
-    if (supplierAdjBatchOptions.value.length > 0 && !supplierAdjForm.batchSap) {
-      supplierAdjForm.batchSap = supplierAdjBatchOptions.value[0].value
-    }
-  })
-})
-
-const switchMode = (mode) => {
-  adjMode.value = mode
-  store.setPage(1)
-}
 
 const loadData = async () => {
   const plantId = plantSelectionStore.selectedPlantId || 0
@@ -966,10 +1065,92 @@ const loadFormOptions = async () => {
   store.fetchActiveTanks({ id_plant: plantId })
 }
 
-const onPlantChange = () => {
+onMounted(() => {
+  // Initial load handled by immediate watch on selectedPlantId
+})
+
+watch(adjMode, () => {
   loadData()
   loadFormOptions()
+})
+
+watch(() => plantSelectionStore.selectedPlantId, () => {
+  listMeta.value.page = 1
+  loadData()
+  loadFormOptions()
+}, { immediate: true })
+
+watch(perPage, (val) => {
+  listMeta.value.perPage = val
+  listMeta.value.page = 1
+  loadData()
+})
+
+watch(() => lastRecordForm.slocDesc, (val) => {
+  lastRecordForm.idSloc = []
+  store.clearSpecificTanks()
+  if (val && lastRecordSlocOptions.value.length === 1) {
+    lastRecordForm.idSloc = [lastRecordSlocOptions.value[0].tf_number]
+  }
+})
+
+watch(() => lastRecordForm.idSloc, async (val) => {
+  if (!val || val.length === 0) {
+    store.clearSpecificTanks()
+    return
+  }
+  await store.fetchActiveSpecificTanks(val)
+})
+
+watch(() => supplierAdjForm.idMaterial, () => {
+  supplierAdjForm.idSupplier = ''
+  supplierAdjForm.batchSap = ''
+  supplierAdjStock.value = 'N/A'
+  supplierAdjBatchOptions.value = []
+})
+
+watch(() => supplierAdjForm.slocDesc, (val) => {
+  supplierAdjForm.idSloc = []
+  supplierAdjForm.idSupplier = ''
+  supplierAdjForm.batchSap = ''
+  supplierAdjStock.value = 'N/A'
+  supplierAdjBatchOptions.value = []
+  store.clearSpecificTanks()
+  if (val && supplierAdjSlocOptions.value.length === 1) {
+    supplierAdjForm.idSloc = [supplierAdjSlocOptions.value[0].tf_number]
+  }
+})
+
+watch(() => supplierAdjForm.idSloc, async (val) => {
+  supplierAdjForm.idSupplier = ''
+  supplierAdjForm.batchSap = ''
+  supplierAdjStock.value = 'N/A'
+  supplierAdjBatchOptions.value = []
+  if (!val || val.length === 0) {
+    store.clearSpecificTanks()
+    return
+  }
+  await store.fetchActiveSpecificTanks(val)
+})
+
+watch(() => supplierAdjForm.idSupplier, async (val) => {
+  if (!val) {
+    supplierAdjStock.value = 'N/A'
+    supplierAdjBatchOptions.value = []
+    supplierAdjForm.batchSap = ''
+    return
+  }
+  await fetchSupplierAdjStockAndBatches()
+  const batchCode = await store.generateBatchCode(val)
+  supplierAdjForm.batchSap = batchCode
+})
+
+const switchMode = (mode) => {
+  adjMode.value = mode
+  store.setPage(1)
 }
+
+
 
 function toggleTankNo(id, checked) {
   if (checked) {
@@ -986,7 +1167,7 @@ const openLastRecord = () => {
     mode: 'ADD',
     entryDate: new Date().toISOString().split('T')[0],
     idMaterial: '',
-    idTank: '',
+    slocDesc: '',
     idSloc: [],
     qty: 0
   })
@@ -1002,6 +1183,7 @@ const openInit = () => {
     po_no: '',
     batch_no: '',
     id_material: '',
+    slocDesc: '',
     tank: '',
     tankNo: [],
     qty: '0.000'
@@ -1013,16 +1195,35 @@ const openInit = () => {
 }
 
 const openPeriod = async () => {
-  await store.fetchPeriodHeaders()
+  store.setPeriodPage(1)
+  await store.fetchPeriodHeaders({ page: 1, per_page: periodMeta.value.perPage })
   showNewPeriodForm.value = false
   showPeriodModal.value = true
 }
 
+const changePeriodPage = async (p) => {
+  if (p < 1 || p > periodMeta.value.lastPage) return
+  store.setPeriodPage(p)
+  await store.fetchPeriodHeaders({ page: p, per_page: periodMeta.value.perPage })
+}
+
 const openNewPeriodForm = () => {
   periodNewForm.mode = 'ADD'
-  periodNewForm.period = ''
+  periodNewForm.id_head = null
+  const now = new Date()
+  const yyyy = now.getFullYear()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  periodNewForm.period = `${yyyy}-${mm}`
   periodNewForm.batch = ''
   periodNewFile.value = null
+  showNewPeriodForm.value = true
+}
+
+const updatePeriod = (row) => {
+  periodNewForm.mode = 'UPDATE'
+  periodNewForm.id_head = row.id_pspa_head
+  periodNewForm.period = row.period
+  periodNewForm.batch = row.batch_sap
   showNewPeriodForm.value = true
 }
 
@@ -1036,7 +1237,7 @@ const openSupplier = () => {
     mode: 'ADD',
     entryDate: new Date().toISOString().split('T')[0],
     idMaterial: '',
-    idTank: '',
+    slocDesc: '',
     idSloc: [],
     adjustType: '-',
     idSupplier: '',
@@ -1049,16 +1250,16 @@ const openSupplier = () => {
 }
 
 const fetchSupplierAdjStockAndBatches = async () => {
-  const { idMaterial, idTank, idSupplier } = supplierAdjForm
-  if (!idMaterial || !idTank || !idSupplier) {
+  const { idMaterial, idSloc, idSupplier } = supplierAdjForm
+  if (!idMaterial || !idSloc || !idSupplier) {
     supplierAdjStock.value = 'N/A'
     supplierAdjBatchOptions.value = []
     return
   }
   try {
     const [supplierRes, batchRes] = await Promise.all([
-      adjustmentApi.getSupplierByFilter({ id_material: idMaterial, id_tank: idTank }),
-      adjustmentApi.getBatchBySupplier({ id_material: idMaterial, id_tank: idTank, id_supplier: idSupplier })
+      adjustmentApi.getSupplierByFilter({ id_material: idMaterial, tf_number: idSloc }),
+      adjustmentApi.getBatchBySupplier({ id_material: idMaterial, tf_number: idSloc, id_supplier: idSupplier })
     ])
     const suppliers = supplierRes.data?.data || []
     const matched = suppliers.find(s => String(s.id_supplier) === String(idSupplier))
@@ -1073,6 +1274,15 @@ const fetchSupplierAdjStockAndBatches = async () => {
     supplierAdjStock.value = 'N/A'
     supplierAdjBatchOptions.value = []
   }
+}
+
+const onInitSupplierChange = async (val) => {
+  if (!val) {
+    initSupplierForm.batchSap = ''
+    return
+  }
+  const batchCode = await store.generateBatchCode(val)
+  initSupplierForm.batchSap = batchCode
 }
 
 const openInitSupplierForm = () => {
@@ -1092,7 +1302,7 @@ const submitLastRecord = async () => {
     const payload = {
       entry_date: lastRecordForm.entryDate,
       id_material: lastRecordForm.idMaterial,
-      id_tank: lastRecordForm.idTank,
+      tf_number: lastRecordForm.idSloc,
       id_sloc: lastRecordForm.idSloc,
       qty: lastRecordForm.qty,
       id_plant: plantSelectionStore.selectedPlantId || 0
@@ -1120,9 +1330,19 @@ const onInitDateChange = async () => {
   if (store.entryNo) initForm.entry_no = store.entryNo
 }
 
+watch(() => initForm.slocDesc, async (val) => {
+  initForm.tank = ''
+  initForm.tankNo = []
+  store.clearSpecificTanks()
+  if (val && initSlocOptions.value.length === 1) {
+    initForm.tank = initSlocOptions.value[0].tf_number
+    await onInitTankChange()
+  }
+})
+
 const onInitTankChange = async () => {
   if (!initForm.tank) {
-    activeSpecificTanks.value = []
+    store.clearSpecificTanks()
     return
   }
   await store.fetchActiveSpecificTanks(initForm.tank)
@@ -1227,23 +1447,25 @@ const submitInit = async () => {
 }
 
 const submitNewPeriod = async () => {
-  if (!periodNewForm.period) {
+  if (!periodNewForm.period && periodNewForm.mode === 'ADD') {
     toast.error('Period is required.')
     return
   }
   saving.value = true
   try {
     const formData = new FormData()
+    formData.append('mode', periodNewForm.mode)
+    if (periodNewForm.id_head) formData.append('id_head', periodNewForm.id_head)
     formData.append('period', periodNewForm.period)
     formData.append('batch', periodNewForm.batch)
     
     const result = await store.periodHeadersUpload(formData)
     if (result?.response === 1) {
-      toast.success(result?.message || 'Period Header Created Successfully')
+      toast.success(result?.message || 'Period Header Saved Successfully')
       showNewPeriodForm.value = false
-      await store.fetchPeriodHeaders()
+      await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
     } else {
-      toast.error(result?.message || 'Failed to create period header')
+      toast.error(result?.message || 'Failed to save period header')
     }
   } catch (err) {
     toast.error(err.response?.data?.message || err.message)
@@ -1265,13 +1487,14 @@ const handleRowFileChange = async (event, row) => {
   saving.value = true
   try {
     const formData = new FormData()
+    formData.append('mode', 'UPLOAD')
     formData.append('id_head', row.id_pspa_head)
     formData.append('file', file)
     
     const result = await store.periodHeadersUpload(formData)
     if (result?.response === 1) {
       toast.success(result?.message || 'Excel File Uploaded Successfully')
-      await store.fetchPeriodHeaders()
+      await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
     } else {
       toast.error(result?.message || 'Upload failed')
     }
@@ -1297,7 +1520,7 @@ const calculatePeriodOnHand = async (idHead) => {
     if (res?.response === 1) {
       toast.success(res?.message || 'On-Hand Qty Calculated Successfully')
       await store.fetchPeriodViewData(idHead)
-      await store.fetchPeriodHeaders()
+      await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
       // update selected period header to refresh count
       const updated = store.periodHeaders.find(h => h.id_pspa_head === idHead)
       if (updated) selectedPeriodHeader.value = updated
@@ -1318,7 +1541,7 @@ const doPeriodAdjustment = async (idHead) => {
     if (res?.response === 1) {
       toast.success(res?.message || 'Period Adjustment Executed Successfully')
       await store.fetchPeriodViewData(idHead)
-      await store.fetchPeriodHeaders()
+      await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
       const updated = store.periodHeaders.find(h => h.id_pspa_head === idHead)
       if (updated) selectedPeriodHeader.value = updated
     } else {
@@ -1337,7 +1560,7 @@ const lockPeriod = async (idHead) => {
     const res = await store.periodHeaderLock({ id_head: idHead })
     if (res?.response === 1) {
       toast.success(res?.message || 'Period Locked Successfully')
-      await store.fetchPeriodHeaders()
+      await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
     } else {
       toast.error(res?.message || 'Lock Failed')
     }
@@ -1355,7 +1578,7 @@ const deletePeriod = async (idHead) => {
     const res = await store.destroyAdjustmentPeriod(idHead)
     if (res?.response === 1) {
       toast.success(res?.message || 'Period Deleted Successfully')
-      await store.fetchPeriodHeaders()
+      await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
     } else {
       toast.error(res?.message || 'Delete Failed')
     }
@@ -1367,7 +1590,7 @@ const deletePeriod = async (idHead) => {
 }
 
 const submitSupplierAdj = async () => {
-  if (!supplierAdjForm.idMaterial || !supplierAdjForm.idTank || supplierAdjForm.adjustType === '-' || !supplierAdjForm.idSupplier || !supplierAdjForm.qty) {
+  if (!supplierAdjForm.idMaterial || !supplierAdjForm.idSloc || supplierAdjForm.adjustType === '-' || !supplierAdjForm.idSupplier || !supplierAdjForm.qty) {
     toast.error('Please fill all required fields.')
     return
   }
@@ -1375,7 +1598,7 @@ const submitSupplierAdj = async () => {
   try {
     const result = await store.adjustmentSupplier({
       entry_date: supplierAdjForm.entryDate,
-      id_tank: supplierAdjForm.idTank,
+      tf_number: supplierAdjForm.idSloc,
       id_sloc: supplierAdjForm.idSloc,
       id_material: supplierAdjForm.idMaterial,
       id_supplier: supplierAdjForm.idSupplier,

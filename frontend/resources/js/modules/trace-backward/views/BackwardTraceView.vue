@@ -195,7 +195,7 @@
       v-model="showModal"
       mode="backward"
       :trace-no="modalTraceNo"
-      :items="detail"
+      :items="allTraceRows"
       :loading="loadingDetail"
     />
 
@@ -218,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTraceBackwardStore } from '../stores/traceBackwardStore'
 import { parseSoNo } from '../utils/parseSoNo'
@@ -228,6 +228,8 @@ import BatchPackagingModal from '../components/BatchPackagingModal.vue'
 
 const store = useTraceBackwardStore()
 const { listMeta: meta, list, detail, shipmentData, batchData, preparationRecords, sapAllocations, loading, loadingDetail, loadingShipment, loadingBatch, error } = storeToRefs(store)
+
+const allTraceRows = computed(() => [...(detail.value.initial || []), ...(detail.value.chain || [])])
 
 const filters = reactive({ id_plant: '', search: '' })
 const showModal = ref(false)

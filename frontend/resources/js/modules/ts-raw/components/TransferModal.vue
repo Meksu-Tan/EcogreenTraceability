@@ -20,11 +20,6 @@
       <VDivider />
 
       <VCardText class="pa-5 bg-neutral-50">
-        <div v-if="initLoading" class="d-flex flex-column align-center justify-center pa-8">
-          <VProgressCircular indeterminate color="primary" size="48" />
-          <span class="mt-3 text-body-2 text-medium-emphasis">Loading transfer form...</span>
-        </div>
-
         <VAlert
           v-if="initError && !initLoading"
           type="error"
@@ -38,7 +33,7 @@
           </div>
         </VAlert>
 
-        <form @submit.prevent="handleSubmit" :class="{ 'opacity-50': initLoading }" class="d-flex flex-column gap-4">
+        <form @submit.prevent="handleSubmit" class="d-flex flex-column gap-4">
           <VCard variant="outlined">
             <VCardTitle class="d-flex align-center justify-space-between border-b pa-4">
               <span class="text-body-1 font-weight-bold">Transfer summary</span>
@@ -61,7 +56,8 @@
                 <VCol cols="12" sm="6" md="4">
                   <VTextField
                     :model-value="form.entry_no"
-                    label="Entry number (auto)"
+                    :label="initLoading && !form.entry_no ? 'Generating entry number...' : 'Entry number (auto)'"
+                    :loading="initLoading && !form.entry_no"
                     :placeholder="entryNoPlaceholder"
                     readonly
                     density="compact"
@@ -107,6 +103,7 @@
                             :items="tankOptions"
                             item-title="label"
                             item-value="value"
+                            :loading="initLoading"
                             required
                             density="compact"
                             variant="outlined"
@@ -118,7 +115,7 @@
                             v-model="form.source_tank_id"
                             label="Sub-Sloc"
                             :items="sourceTankDetails"
-                            item-title="tankNo"
+                            item-title="tf_number"
                             item-value="id_sloc"
                             multiple
                             chips
@@ -151,6 +148,7 @@
                             :items="destTankOptions"
                             item-title="label"
                             item-value="value"
+                            :loading="initLoading"
                             required
                             density="compact"
                             variant="outlined"
@@ -162,7 +160,7 @@
                             v-model="form.trf_tank_id"
                             label="Sub-Sloc"
                             :items="trfTankDetails"
-                            item-title="tankNo"
+                            item-title="tf_number"
                             item-value="id_sloc"
                             multiple
                             chips
@@ -506,7 +504,8 @@ async function bootstrap() {
 async function onSourceTankChange() {
   form.value.source_tank_id = []
   if (form.value.source_tank) {
-    await store.fetchTankDetails(form.value.source_tank, plantSelectionStore.selectedPlantId)
+    const selectedTank = tanks.value.find(t => t.tank === form.value.source_tank)
+    await store.fetchTankDetails(selectedTank?.id_sloc ?? form.value.source_tank, plantSelectionStore.selectedPlantId)
     sourceTankDetails.value = [...store.tankDetails]
     if (sourceTankDetails.value.length === 1) {
       form.value.source_tank_id = [sourceTankDetails.value[0].id_sloc]
@@ -531,7 +530,8 @@ async function onSourceTankChange() {
 async function onTrfTankChange() {
   form.value.trf_tank_id = []
   if (form.value.trf_tank) {
-    await store.fetchTankDetails(form.value.trf_tank, plantSelectionStore.selectedPlantId)
+    const destTank = store.destTanks.find(t => t.tank === form.value.trf_tank)
+    await store.fetchTankDetails(destTank?.id_sloc ?? form.value.trf_tank, plantSelectionStore.selectedPlantId)
     trfTankDetails.value = [...store.tankDetails]
     if (trfTankDetails.value.length === 1) {
       form.value.trf_tank_id = [trfTankDetails.value[0].id_sloc]

@@ -1,10 +1,9 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
+use Modules\Inquiry\Http\Controllers\PsPaReportController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
-    // Inquiry routes have been moved to dedicated modules:
-    // - ts-stock: /api/v1/transactions/stock
-    // - ts-tsreport: /api/v1/transactions/ts-report
-    // - ts-rmreport: /api/v1/transactions/rm-report
+// PSPA inquiry routes
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1/inquiries/pspa-report')->group(function () {
+    Route::get('material-stock', [PsPaReportController::class, 'materialStock']);
 });

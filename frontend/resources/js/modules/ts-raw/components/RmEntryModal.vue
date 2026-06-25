@@ -20,11 +20,6 @@
       <VDivider />
 
       <VCardText class="pa-5 bg-neutral-50">
-        <div v-if="initLoading" class="d-flex flex-column align-center justify-center pa-8">
-          <VProgressCircular indeterminate color="primary" size="48" />
-          <span class="mt-3 text-body-2 text-medium-emphasis">Loading RM Entry form...</span>
-        </div>
-
         <VAlert
           v-if="initError && !initLoading"
           type="error"
@@ -38,7 +33,7 @@
           </div>
         </VAlert>
 
-        <form @submit.prevent="handleSubmit" :class="{ 'opacity-50': initLoading }" class="d-flex flex-column ga-4">
+        <form @submit.prevent="handleSubmit" class="d-flex flex-column ga-4">
           <VCard variant="outlined">
             <VCardTitle class="d-flex flex-wrap align-end justify-space-between border-b pa-4 ga-3">
               <span class="text-body-1 font-weight-bold">Entry details</span>
@@ -58,7 +53,8 @@
                 <VCol cols="12" sm="6" md="4">
                   <VTextField
                     v-model="form.rm_number"
-                    label="Entry number (auto)"
+                    :label="initLoading && !form.rm_number ? 'Generating entry number...' : 'Entry number (auto)'"
+                    :loading="initLoading && !form.rm_number"
                     readonly
                     density="compact"
                     variant="outlined"
@@ -79,11 +75,12 @@
               <VRow dense class="mt-2">
                 <VCol cols="12" sm="6" md="4">
                   <VSelect
-                    v-model="form.id_tank"
+                    v-model="form.tf_number"
                     label="Sloc"
                     :items="tankOptions"
                     item-title="label"
                     item-value="value"
+                    :loading="initLoading"
                     required
                     density="compact"
                     variant="outlined"
@@ -118,6 +115,7 @@
                     :items="materialOptions"
                     item-title="label"
                     item-value="value"
+                    :loading="initLoading"
                     required
                     density="compact"
                     variant="outlined"
@@ -128,14 +126,14 @@
                     v-model="form.id_sloc"
                     label="Sub-Sloc"
                     :items="tankDetails"
-                    item-title="tankNo"
+                    item-title="tf_number"
                     item-value="id_sloc"
                     multiple
                     chips
                     closable-chips
                     variant="outlined"
                     density="compact"
-                    :disabled="!form.id_tank"
+                    :disabled="!form.tf_number"
                     placeholder="Select Sloc first"
                   />
                 </VCol>
@@ -337,7 +335,7 @@ const form = ref({
   entry_date: new Date().toISOString().split('T')[0],
   rm_number: '',
   id_material: '',
-  id_tank: '',
+  tf_number: '',
   id_sloc: [],
   material_document: '',
   po_so: '',
@@ -360,7 +358,15 @@ const supplierList = computed(() => store.supplierList)
 const totalQty = computed(() => store.totalQty)
 
 const tankOptions = computed(() => {
-  return (tanks.value || []).map(t => ({ value: t.tank, label: t.tank }))
+  const seen = new Set()
+  return (tanks.value || [])
+    .filter(t => {
+      const label = t.tank || t.description || ''
+      if (!label || seen.has(label)) return false
+      seen.add(label)
+      return true
+    })
+    .map(t => ({ value: t.id_sloc ?? t.tf_number, label: t.tank || t.description || '' }))
 })
 
 const materialOptions = computed(() => {
@@ -392,7 +398,7 @@ const canSubmit = computed(() => {
          form.value.entry_date &&
          form.value.rm_number &&
          form.value.id_material &&
-         form.value.id_tank &&
+         form.value.tf_number &&
          form.value.id_sloc.length > 0 &&
          supplierList.value.length > 0 &&
          parseFloat(qtyStr) > 0
@@ -408,7 +414,7 @@ async function bootstrap() {
     entry_date: new Date().toISOString().split('T')[0],
     rm_number: '',
     id_material: '',
-    id_tank: '',
+    tf_number: '',
     id_sloc: [],
     material_document: '',
     po_so: '',
@@ -445,7 +451,7 @@ async function bootstrap() {
         entry_date: editData.entry_date,
         rm_number: String(editData.rm_number),
         id_material: Number(editData.id_material),
-        id_tank: editData.sloc_desc || '',
+        tf_number: editData.sloc_desc || '',
         id_sloc: parsedSloc,
         material_document: editData.material_document || '',
         po_so: editData.po_so || '',
@@ -455,7 +461,10 @@ async function bootstrap() {
       store.rmNumber = form.value.rm_number
 
       if (editData.sloc_desc) {
-        await store.fetchTankDetails(editData.sloc_desc, plantSelectionStore.selectedPlantId)
+        const matchedTank = (tanks.value || []).find(t => t.tank === editData.sloc_desc || t.description === editData.sloc_desc)
+        const slocIdForEdit = matchedTank?.id_sloc ?? editData.sloc_desc
+        form.value.tf_number = slocIdForEdit
+        await store.fetchTankDetails(slocIdForEdit, plantSelectionStore.selectedPlantId)
       }
     } else {
       await store.generateRmNumber(params)
@@ -491,8 +500,8 @@ async function bootstrap() {
 
 async function onTankChange() {
   form.value.id_sloc = []
-  if (form.value.id_tank) {
-    await store.fetchTankDetails(form.value.id_tank, plantSelectionStore.selectedPlantId)
+  if (form.value.tf_number) {
+    await store.fetchTankDetails(form.value.tf_number, plantSelectionStore.selectedPlantId)
 
     if (store.tankDetails.length === 1) {
       form.value.id_sloc = [store.tankDetails[0].id_sloc]
@@ -501,7 +510,7 @@ async function onTankChange() {
     if (!plantSelectionStore.selectedPlantId || plantSelectionStore.selectedPlantId == 0) {
       await store.generateRmNumber({
         id_plant: 0,
-        tank_desc: form.value.id_tank
+        tank_desc: form.value.tf_number
       })
       form.value.rm_number = store.rmNumber || ''
     }
@@ -518,7 +527,7 @@ async function onSupplierChange() {
 async function addSupplier() {
   if (!canAddSupplier.value) return
 
-  const selectedTankObj = tanks.value.find(t => t.tank === form.value.id_tank)
+  const selectedTankObj = tanks.value.find(t => (t.id_sloc ?? t.tf_number) == form.value.tf_number || t.tank === form.value.tf_number)
   const autoPlantId = selectedTankObj ? selectedTankObj.id_plant : 0
 
   try {
@@ -554,16 +563,16 @@ async function removeSupplier(id) {
 async function handleSubmit() {
   if (!canSubmit.value) return
 
-  const selectedTankObj = tanks.value.find(t => t.tank === form.value.id_tank)
+  const selectedTankObj = tanks.value.find(t => (t.id_sloc ?? t.tf_number) == form.value.tf_number || t.tank === form.value.tf_number)
   const autoPlantId = selectedTankObj ? selectedTankObj.id_plant : 0
 
   try {
     const data = {
       ...form.value,
       id_sloc: form.value.id_sloc,
-      id_tank: form.value.id_sloc,
+      tf_number: form.value.id_sloc,
       id_sloc_tail: null,
-      id_tank_tail: null,
+      id_sloc_tail: null,
       id_plant: plantSelectionStore.selectedPlantId || autoPlantId,
       total_qty: parseFloat(String(totalQty.value ?? '0').replace(/,/g, ''), 10)
     }

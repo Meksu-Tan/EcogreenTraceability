@@ -43,7 +43,7 @@
           <VCol
             v-for="link in quickLinks"
             :key="link.to"
-            cols="12" sm="6" md="4"
+            cols="12" sm="6" md="4" lg="2"
           >
             <VCard
               :to="link.to"
@@ -73,12 +73,12 @@ const firstRole = computed(() => authStore.roles?.[0] || 'User')
 const today     = computed(() => new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }))
 
 const quickLinks = [
-  { to: '/setup/material',      label: 'Setup Material',     icon: 'ri-flask-line' },
-  { to: '/setup/storage',       label: 'Setup Storage',      icon: 'ri-database-2-line' },
-  { to: '/setup/supplier',      label: 'Setup Supplier',     icon: 'ri-truck-line' },
-  { to: '/setup/tank',          label: 'Setup Tank',         icon: 'ri-water-flash-line' },
-  { to: '/setup/manufacturer',  label: 'Setup Manufacturer', icon: 'ri-building-3-line' },
-  { to: '/setup/plant',         label: 'Setup Plant',        icon: 'ri-building-4-line' },
+  { to: '/ts-raw/rm-entry',         label: 'RM Entry',         icon: 'ri-archive-line' },
+  { to: '/ts-blending/blending',    label: 'Blending',         icon: 'ri-flask-line' },
+  { to: '/ts-transfer/transfer',    label: 'Transfer',         icon: 'ri-arrow-left-right-line' },
+  { to: '/ts-stock/stock',          label: 'Stock Inquiry',    icon: 'ri-stack-line' },
+  { to: '/ts-package/package-entry', label: 'Package Entry',   icon: 'ri-box-3-line' },
+  { to: '/ts-shipment/shipment-entry', label: 'Shipment Entry', icon: 'ri-truck-line' },
 ]
 </script>
 

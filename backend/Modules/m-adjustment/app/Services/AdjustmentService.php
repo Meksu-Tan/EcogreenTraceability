@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Services;
 
 use Modules\Adjustment\Services\Contracts\AdjustmentServiceInterface;
@@ -20,7 +20,7 @@ class AdjustmentService implements AdjustmentServiceInterface
         protected AdjustmentMutationServiceInterface $mutationService
     ) {}
 
-    // ——— Lookups (pure delegate) ———
+    // â€”â€”â€” Lookups (pure delegate) â€”â€”â€”
     public function getActiveMaterials(): array
     {
         return $this->repository->getActiveMaterials();
@@ -51,17 +51,17 @@ class AdjustmentService implements AdjustmentServiceInterface
         return $this->repository->getLockStatus($entryDate);
     }
 
-    public function getSupplierByFilter(int $idMaterial, int $idTank): array
+    public function getSupplierByFilter(int $idMaterial, int $idSloc): array
     {
-        return $this->repository->getSupplierByFilter($idMaterial, $idTank);
+        return $this->repository->getSupplierByFilter($idMaterial, $idSloc);
     }
 
-    public function getBatchBySupplier(int $idMaterial, int $idTank, int $idSupplier): array
+    public function getBatchBySupplier(int $idMaterial, int $idSloc, int $idSupplier): array
     {
-        return $this->repository->getBatchBySupplier($idMaterial, $idTank, $idSupplier);
+        return $this->repository->getBatchBySupplier($idMaterial, $idSloc, $idSupplier);
     }
 
-    // ——— Mutations with audit ———
+    // â€”â€”â€” Mutations with audit â€”â€”â€”
     public function storeAdjustment(string $user, array $data, mixed $plantId): array
     {
         return $this->mutationService->storeAdjustment($user, $data, $plantId);
@@ -97,7 +97,7 @@ class AdjustmentService implements AdjustmentServiceInterface
         return $this->mutationService->adjustMaterialDocument($idAdjustHead, $materialDoc, $user);
     }
 
-    // ——— Existing methods follow ———
+    // â€”â€”â€” Existing methods follow â€”â€”â€”
     public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array
     {
         return $this->repository->getAdjustmentList($plantId, $userId, $adjType, $filters);
@@ -153,13 +153,13 @@ class AdjustmentService implements AdjustmentServiceInterface
         return $this->repository->getAdjustmentDetail($headerId);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  Period + WHX — delegasi ke AdjustmentPeriodService
-    // ═══════════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    //  Period + WHX â€” delegasi ke AdjustmentPeriodService
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-    public function getPeriodHeaders(): array
+    public function getPeriodHeaders(array $filters = []): array
     {
-        return $this->periodService->getPeriodHeaders();
+        return $this->periodService->getPeriodHeaders($filters);
     }
 
     public function getPeriodViewData(int $idHead): array

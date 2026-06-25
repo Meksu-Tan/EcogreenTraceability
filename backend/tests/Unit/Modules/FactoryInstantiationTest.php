@@ -31,13 +31,6 @@ class FactoryInstantiationTest extends TestCase
         $this->assertTrue(class_exists(\Database\Factories\TankFactory::class));
     }
 
-    public function test_storage_factories_class_exist(): void
-    {
-        $this->assertTrue(class_exists(\Database\Factories\WarehouseFactory::class));
-        $this->assertTrue(class_exists(\Database\Factories\StorageTankFactory::class));
-        $this->assertTrue(class_exists(\Database\Factories\StorageDetailFactory::class));
-    }
-
     public function test_transaction_factories_class_exist(): void
     {
         $this->assertTrue(class_exists(\Database\Factories\BalanceHeaderFactory::class));

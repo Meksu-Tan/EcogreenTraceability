@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsPackage\Services;
 
 use Modules\TsPackage\Services\Contracts\PackageServiceInterface;
@@ -12,9 +12,9 @@ class PackageService implements PackageServiceInterface
         protected PackageRepositoryInterface $packageRepo
     ) {}
 
-    public function getDtPckEntry(): Collection
+    public function getDtPckEntry(int $plantId = 0, int $page = 1, int $perPage = 50): array
     {
-        return $this->packageRepo->getDtPckEntry();
+        return $this->packageRepo->getDtPckEntry($plantId, $page, $perPage);
     }
 
     public function getActiveFgProduct(): Collection
@@ -67,9 +67,9 @@ class PackageService implements PackageServiceInterface
         return $this->packageRepo->updateSubTank($user, $data);
     }
 
-    public function generateTraceNo(int $warehouseId, int $rundownId): string
+    public function generateTraceNo(int $materialId, int $plantId): string
     {
-        return $this->packageRepo->generateTraceNo($warehouseId, $rundownId);
+        return $this->packageRepo->generateTraceNo($materialId, $plantId);
     }
 
     public function getAllWarehouses(): Collection

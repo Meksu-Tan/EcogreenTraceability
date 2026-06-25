@@ -1,10 +1,10 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Adjustment\Repositories\Contracts;
 
 interface AdjustmentRepositoryInterface
 {
-    // ——— Existing ———
+    // â€”â€”â€” Existing â€”â€”â€”
     public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array;
     public function getSupplierList(array $data, ?int $userId = null): array;
     public function getTotalQtySupplier(array $data, ?int $userId = null): ?float;
@@ -18,19 +18,19 @@ interface AdjustmentRepositoryInterface
     public function getAdjustmentDetail(int $headerId): ?array;
     public function getAdjustmentHeader(int $headerId): ?object;
 
-    // ——— Lookups ———
+    // â€”â€”â€” Lookups â€”â€”â€”
     public function getActiveMaterials(): array;
     public function getActiveMaterialWhx(): array;
     public function getActiveTanks(mixed $plantId): array;
     public function getActiveSpecificTanks(int $sloc): array;
     public function getActiveWhx(): array;
 
-    // ——— Supplier adjustments ———
+    // â€”â€”â€” Supplier adjustments â€”â€”â€”
     public function getLockStatus(string $entryDate): array;
-    public function getSupplierByFilter(int $idMaterial, int $idTank): array;
-    public function getBatchBySupplier(int $idMaterial, int $idTank, int $idSupplier): array;
+    public function getSupplierByFilter(int $idMaterial, int $idSloc): array;
+    public function getBatchBySupplier(int $idMaterial, int $idSloc, int $idSupplier): array;
 
-    // ——— Mutations ———
+    // â€”â€”â€” Mutations â€”â€”â€”
     public function storeAdjustment(string $user, array $data, mixed $plantId): array;
     public function destroyAdjustment(int $id, string $user): array;
     public function addEntrySupplier(string $user, array $data, mixed $plantId): array;
@@ -39,8 +39,8 @@ interface AdjustmentRepositoryInterface
     public function adjustmentSupplier(string $user, array $data, mixed $plantId): array;
     public function adjustMaterialDocument(int $idAdjustHead, ?string $materialDoc, string $user): array;
 
-    // ——— Period Adjustment ———
-    public function getPeriodHeaders(): array;
+    // â€”â€”â€” Period Adjustment â€”â€”â€”
+    public function getPeriodHeaders(array $filters = []): array;
     public function getPeriodViewData(int $idHead): array;
     public function periodHeadersUpload(string $user, array $data, $file): array;
     public function periodViewOnHand(string $user, int $idHead): array;
@@ -49,7 +49,7 @@ interface AdjustmentRepositoryInterface
     public function destroyAdjustmentPeriod(int $id, string $user): array;
     public function getLastAdjustmentRecord(mixed $plantId): array;
 
-    // ——— WHX ———
+    // â€”â€”â€” WHX â€”â€”â€”
     public function adjustmentInitWhx(string $user, array $data, mixed $plantId): array;
     public function storeAdjustmentWhx(string $user, array $data, mixed $plantId): array;
     public function getAdjustStatus(?string $adjustNo, ?int $idAdjustHead): array;

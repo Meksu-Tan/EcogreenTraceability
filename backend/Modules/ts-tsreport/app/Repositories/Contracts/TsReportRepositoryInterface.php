@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsTsreport\Repositories\Contracts;
 
 interface TsReportRepositoryInterface

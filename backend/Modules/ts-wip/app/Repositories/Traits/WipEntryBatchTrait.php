@@ -1,26 +1,33 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsWip\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Shared\Traits\DbCompatTrait;
 use Modules\TsWip\Services\BatchNumberGenerator;
 
 trait WipEntryBatchTrait
 {
+    use DbCompatTrait;
+
     public function getFeedNewBatchNumber(string $feedId, $plantId): ?string
     {
         $idPlant = $this->resolvePlantId($plantId);
         $feedPrefix = substr($feedId, 0, 3);
         $datePrefix = date('ymd');
 
+        // Legacy fallback — only 14-digit feed traces (type 3) exist by definition.
+        $only14 = \Modules\Shared\Helpers\TraceHelper::only14Digit('a.to_trace_no');
         $rows = $this->executeSelect('
             SELECT a.feed_number
               FROM (SELECT a.to_trace_no+1 AS feed_number
                       FROM t_trace_header a
-                     WHERE SUBSTRING(a.to_trace_no,1,10) = CONCAT(3, ?, ?)
+                     WHERE ' . $only14 . '
+                       AND SUBSTRING(a.to_trace_no,1,10) = CONCAT(3, ?, ?)
                        AND a.status = 1 AND a.id_plant = ?
                      ORDER BY a.id_trace_head DESC LIMIT 1) a
              UNION ALL
-            SELECT CONCAT(3, ?, ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS feed_number
+            SELECT CONCAT(3, ?, ? , LPAD(RIGHT(?, 2), 2, \'0\'), \'01\') AS feed_number
              LIMIT 1
         ', [$datePrefix, $feedPrefix, $idPlant, $datePrefix, $feedPrefix, $idPlant], $idPlant);
 
@@ -34,27 +41,33 @@ trait WipEntryBatchTrait
         $datePrefix = date('ymd');
 
         if ($section === '9' || $section === '8') {
+            // Legacy fallback — only 14-digit rundown traces (type 2) exist.
+            $only14 = \Modules\Shared\Helpers\TraceHelper::only14Digit('a.to_trace_no');
             $rows = $this->executeSelect('
-                SELECT CONCAT(2, SUBSTRING(a.to_trace_no,2,6), ?, LPAD(RIGHT(?, 2), 2, "0"), SUBSTRING(a.to_trace_no,13,2)) AS rundown_number
+                SELECT CONCAT(2, SUBSTRING(a.to_trace_no,2,6), ?, LPAD(RIGHT(?, 2), 2, \'0\'), SUBSTRING(a.to_trace_no,13,2)) AS rundown_number
                   FROM (SELECT to_trace_no + 1 AS to_trace_no
                           FROM t_trace_header a
                          WHERE a.status = 1 AND a.id_plant = ?
+                           AND ' . $only14 . '
                            AND SUBSTRING(a.to_trace_no,1,10) = CONCAT(2, ?, ?)
                          ORDER BY to_trace_no DESC LIMIT 1) a
                  UNION ALL
-                SELECT CONCAT(2, ?, ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS rundown_number
+                SELECT CONCAT(2, ?, ? , LPAD(RIGHT(?, 2), 2, \'0\'), \'01\') AS rundown_number
                  LIMIT 1
             ', [$rundownId, $idPlant, $idPlant, $datePrefix, $rundownId, $datePrefix, $rundownId, $idPlant], $idPlant);
         } else {
+            // Legacy fallback — only 14-digit rundown traces (type 2) exist.
+            $only14 = \Modules\Shared\Helpers\TraceHelper::only14Digit('a.to_trace_no');
             $rows = $this->executeSelect('
                 SELECT a.rundown_number
                   FROM (SELECT a.to_trace_no+1 AS rundown_number
                           FROM t_trace_header a
-                         WHERE SUBSTRING(a.to_trace_no,1,10) = CONCAT(2, ?, ?)
+                         WHERE ' . $only14 . '
+                           AND SUBSTRING(a.to_trace_no,1,10) = CONCAT(2, ?, ?)
                            AND a.status = 1 AND a.id_plant = ?
                          ORDER BY a.id_trace_head DESC LIMIT 1) a
                  UNION ALL
-                SELECT CONCAT(2, ?, ? , LPAD(RIGHT(?, 2), 2, "0"), "01") AS rundown_number
+                SELECT CONCAT(2, ?, ? , LPAD(RIGHT(?, 2), 2, \'0\'), \'01\') AS rundown_number
                  LIMIT 1
             ', [$datePrefix, $rundownId, $idPlant, $datePrefix, $rundownId, $idPlant], $idPlant);
         }
@@ -74,23 +87,23 @@ trait WipEntryBatchTrait
 
         if ($flowType === 'quantifier') {
             $db = $this->executeSelect('
-                SELECT a.curr_qtf, a.entry_date, "-NORMAL-" AS status
+                SELECT a.curr_qtf, a.entry_date, \'-NORMAL-\' AS status
                   FROM (SELECT a.curr_qtf, a.entry_date
                           FROM t_trace_header a
-                         WHERE SUBSTRING(a.to_trace_no,1,1) = 2
-                           AND SUBSTRING(a.to_trace_no,8,3) = ?
-                           AND a.status = 1 AND a.id_plant = ?
-                         ORDER BY a.id_trace_head DESC LIMIT 1) a
-                 UNION ALL
-                SELECT 0 AS curr_qtf, DATE_FORMAT(CURDATE(), "%Y-%m-%d") AS entry_date, "-INIT-" AS status
-                 LIMIT 1
-            ', [substr($feedId, 0, 3), $idPlant], $idPlant);
+             WHERE SUBSTRING(a.to_trace_no,1,1) = 2
+               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', substr($feedId, 0, 3)) . '
+               AND a.status = 1 AND a.id_plant = ?
+             ORDER BY a.id_trace_head DESC LIMIT 1) a
+            UNION ALL
+            SELECT 0 AS curr_qtf, ' . $this->dbDateFormat($this->dbCurDate(), '%Y-%m-%d') . ' AS entry_date, \'-INIT-\' AS status
+             LIMIT 1
+        ', [$idPlant], $idPlant);
 
             if (!empty($db) && (float)($db[0]->curr_qtf ?? 0) !== 0.0) {
                 $db1 = DB::connection('eudr_ts')->select('
-                    SELECT IFNULL(b.curr_qtf, 0) AS curr_qtf,
-                           IFNULL(b.entry_date, DATE_FORMAT(CURDATE(), "%Y-%m-%d")) AS entry_date,
-                           "-RESET-" AS status
+                    SELECT COALESCE(b.curr_qtf, 0) AS curr_qtf,
+                           COALESCE(b.entry_date, ' . $this->dbDateFormat($this->dbCurDate(), '%Y-%m-%d') . ') AS entry_date,
+                           \'-RESET-\' AS status
                       FROM m_material a
                       LEFT JOIN (SELECT b.flowmeter, b.value AS curr_qtf, b.reset_date AS entry_date
                                    FROM t_reset_quantifier b
@@ -106,9 +119,9 @@ trait WipEntryBatchTrait
             return $db;
         }
 
-        return DB::connection('eudr_ts')->select(
-            'SELECT 0 AS curr_qtf, DATE_FORMAT(CURDATE(), "%Y-%m-%d") AS entry_date, "-QTF-" AS status'
-        );
+        return DB::connection('eudr_ts')->select('
+            SELECT 0 AS curr_qtf, ' . $this->dbDateFormat($this->dbCurDate(), '%Y-%m-%d') . ' AS entry_date, \'-QTF-\' AS status
+        ');
     }
 
     public function getRundownLastBatch(string $rundownId, $plantId): array
@@ -123,23 +136,23 @@ trait WipEntryBatchTrait
 
         if ($flowType === 'quantifier') {
             $db = $this->executeSelect('
-                SELECT a.curr_qtf, a.entry_date, "-NORMAL-" AS status, a.created_at
+                SELECT a.curr_qtf, a.entry_date, \'-NORMAL-\' AS status, a.created_at
                   FROM (SELECT a.curr_qtf, a.entry_date, a.created_at
                           FROM t_trace_header a
-                         WHERE SUBSTRING(a.to_trace_no,1,1) = 1
-                           AND SUBSTRING(a.to_trace_no,8,3) = ?
-                           AND a.status = 1 AND a.id_plant = ?
-                         ORDER BY a.id_trace_head DESC LIMIT 1) a
-                 UNION ALL
-                SELECT 0 AS curr_qtf, DATE_FORMAT(CURDATE(), "%Y-%m-%d") AS entry_date, "-INIT-" AS status, "" AS created_at
-                 LIMIT 1
-            ', [substr($rundownId, 0, 3), $idPlant], $idPlant);
+             WHERE SUBSTRING(a.to_trace_no,1,1) = 1
+               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', substr($rundownId, 0, 3)) . '
+               AND a.status = 1 AND a.id_plant = ?
+             ORDER BY a.id_trace_head DESC LIMIT 1) a
+            UNION ALL
+            SELECT 0 AS curr_qtf, ' . $this->dbDateFormat($this->dbCurDate(), '%Y-%m-%d') . ' AS entry_date, \'-INIT-\' AS status, \'\' AS created_at
+             LIMIT 1
+        ', [$idPlant], $idPlant);
 
             if (!empty($db) && (float)($db[0]->curr_qtf ?? 0) !== 0.0) {
                 $db1 = DB::connection('eudr_ts')->select('
-                    SELECT IFNULL(b.curr_qtf, 0) AS curr_qtf, b.created_at,
-                           IFNULL(b.entry_date, DATE_FORMAT(CURDATE(), "%Y-%m-%d")) AS entry_date,
-                           "-RESET-" AS status
+                    SELECT COALESCE(b.curr_qtf, 0) AS curr_qtf, b.created_at,
+                           COALESCE(b.entry_date, ' . $this->dbDateFormat($this->dbCurDate(), '%Y-%m-%d') . ') AS entry_date,
+                           \'-RESET-\' AS status
                       FROM m_material a
                       LEFT JOIN (SELECT b.flowmeter, b.value AS curr_qtf, b.reset_date AS entry_date, b.created_at
                                    FROM t_reset_quantifier b
@@ -155,9 +168,9 @@ trait WipEntryBatchTrait
             return $db;
         }
 
-        return DB::connection('eudr_ts')->select(
-            'SELECT 0 AS curr_qtf, DATE_FORMAT(CURDATE(), "%Y-%m-%d") AS entry_date, "-QTF-" AS status'
-        );
+        return DB::connection('eudr_ts')->select('
+            SELECT 0 AS curr_qtf, ' . $this->dbDateFormat($this->dbCurDate(), '%Y-%m-%d') . ' AS entry_date, \'-QTF-\' AS status
+        ');
     }
 
     public function generateNewFeedNumber(string $feedId, $plantId): ?string
@@ -185,11 +198,10 @@ trait WipEntryBatchTrait
         $existing = DB::connection('eudr_ts')
             ->table('t_trace_header')
             ->where('status', 1)
-            // TODO [TD-3]: raw SQL — refactor ke Query Builder saat architecture sprint
             ->whereRaw('SUBSTRING(to_trace_no, 1, 1) = ?', [$prefix])
             ->whereRaw('SUBSTRING(to_trace_no, 2, 6) = ?', [$date])
-            ->whereRaw('SUBSTRING(to_trace_no, 8, 3) = ?', [$section])
-            ->whereRaw('SUBSTRING(to_trace_no, 11, 2) = ?', [$plantCode])
+            ->whereRaw(\Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $section))
+            ->whereRaw(\Modules\Shared\Helpers\TraceHelper::plantCondition('to_trace_no', [$plantCode]))
             ->lockForUpdate()
             ->pluck('to_trace_no');
 

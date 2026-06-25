@@ -34,7 +34,7 @@
           rounded="lg"
           elevation="1"
           class="plant-card cursor-pointer"
-          @click="selectPlant(plant.id_plant, plant.description)"
+          @click="selectPlant(plant.id_plant, plant.description, plant.code_3)"
         >
           <VCardText class="pa-6">
             <VAvatar color="primary-lighten-2" size="48" rounded="lg" class="mb-4">
@@ -64,8 +64,8 @@ onMounted(async () => {
   await plantStore.fetchPlants()
 })
 
-function selectPlant(id, name) {
-  selectionStore.setPlant(id, name)
+function selectPlant(id, name, code = '') {
+  selectionStore.setPlant(id, name, code)
   router.push('/dashboard')
 }
 </script>

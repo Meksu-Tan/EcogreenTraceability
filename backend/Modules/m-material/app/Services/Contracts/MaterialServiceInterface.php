@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Material\Services\Contracts;
 
 interface MaterialServiceInterface
@@ -14,4 +15,5 @@ interface MaterialServiceInterface
     public function deactivatePackaging(int $id, string $user): array;
     public function activatePackaging(int $id, string $user): array;
     public function getActiveSourceProducts(): array;
+    public function fetchBalance(int $idPlant, int $idMaterial): array;
 }

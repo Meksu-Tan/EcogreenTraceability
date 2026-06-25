@@ -2,15 +2,29 @@
 
 namespace Tests;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Database\Connection;
 
 abstract class TestCase extends BaseTestCase
 {
+    use RefreshDatabase;
     protected function setUp(): void
     {
         Connection::resolverFor('sqlite', function ($pdo, $database, $prefix, $config) {
             return new class($pdo, $database, $prefix, $config) extends \Illuminate\Database\SQLiteConnection {
+                protected function executeBeginTransactionStatement()
+                {
+                    try {
+                        parent::executeBeginTransactionStatement();
+                    } catch (\PDOException $e) {
+                        if (str_contains($e->getMessage(), 'already an active transaction')) {
+                            return;
+                        }
+                        throw $e;
+                    }
+                }
+
                 public function select($query, $bindings = [], $useReadPdo = true)
                 {
                     if (str_contains(strtolower($query), 'set sql_mode')) {
@@ -49,6 +63,17 @@ abstract class TestCase extends BaseTestCase
         if (! $this->app) {
             $this->refreshApplication();
         }
+
+        $db = $this->app->make('db');
+        // dump("Cached connections before extend: ", array_keys($db->getConnections()));
+        $db->purge('eudr_ts');
+        $db->purge('eudr_ts_pg');
+        $db->purge('mysql');
+
+        $sqliteConnection = $db->connection('sqlite');
+        $db->extend('eudr_ts', fn() => $sqliteConnection);
+        $db->extend('eudr_ts_pg', fn() => $sqliteConnection);
+        $db->extend('mysql', fn() => $sqliteConnection);
 
         parent::setUp();
     }

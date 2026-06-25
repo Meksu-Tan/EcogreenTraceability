@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Tank\Repositories;
 
 use Modules\Tank\Models\Tank;
@@ -9,7 +9,7 @@ class TankRepository implements TankRepositoryInterface
 {
     public function getAll(): array
     {
-        return Tank::selectRaw('id_sloc as id, id_plant AS plant_code, plant_name, id_tank, id_tank AS tank_number, tank_height, status, created_at, created_by, updated_at, updated_by')
+        return Tank::selectRaw('id_sloc as id, id_plant AS plant_code, plant_name, tf_number, tf_number AS tank_number, tank_height, description, status, created_at, created_by, updated_at, updated_by')
             ->orderBy('id_sloc')
             ->get()
             ->toArray();
@@ -26,8 +26,9 @@ class TankRepository implements TankRepositoryInterface
             'id' => $model->id_sloc,
             'plant_code' => $model->id_plant,
             'plant_name' => $model->plant_name,
-            'tank_number' => $model->id_tank,
+            'tank_number' => $model->tf_number,
             'tank_height' => $model->tank_height,
+            'description' => $model->description,
             'status' => $model->status,
             'created_at' => $model->created_at,
             'created_by' => $model->created_by,
@@ -38,7 +39,7 @@ class TankRepository implements TankRepositoryInterface
 
     public function create(array $data): int|bool
     {
-        $exists = Tank::where('id_tank', $data['tank_number'])
+        $exists = Tank::where('tf_number', $data['tank_number'])
             ->where('id_plant', $data['plant_code'])
             ->where('status', '1')
             ->exists();
@@ -57,8 +58,9 @@ class TankRepository implements TankRepositoryInterface
             'id_sloc' => $id,
             'id_plant' => $data['plant_code'],
             'plant_name' => $data['plant_name'],
-            'id_tank' => $data['tank_number'],
+            'tf_number' => $data['tank_number'],
             'tank_height' => $data['tank_height'],
+            'description' => $data['description'] ?? null,
             'status' => 1,
             'created_by' => $data['created_by'] ?? 'System',
         ]);
@@ -84,15 +86,16 @@ class TankRepository implements TankRepositoryInterface
 
         \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
             'M_SLOC', 'UPDATE',
-            'ID: ' . $id . ' | TANK: ' . $model->id_tank . ' >> ' . $data['tank_number'],
+            'ID: ' . $id . ' | TANK: ' . $model->tf_number . ' >> ' . $data['tank_number'],
             $data['updated_by'] ?? 'System',
         ]);
 
         return (bool) $model->update([
             'id_plant' => $data['plant_code'],
             'plant_name' => $data['plant_name'],
-            'id_tank' => $data['tank_number'],
+            'tf_number' => $data['tank_number'],
             'tank_height' => $data['tank_height'],
+            'description' => $data['description'] ?? $model->description,
             'updated_by' => $data['updated_by'] ?? 'System',
         ]);
     }
@@ -127,7 +130,7 @@ class TankRepository implements TankRepositoryInterface
 
     public function syncUpdateOrCreate(array $data, string $user): bool
     {
-        $existing = Tank::where('id_tank', $data['tank_number'])
+        $existing = Tank::where('tf_number', $data['tank_number'])
             ->where('id_plant', $data['plant_code'])
             ->first();
 
@@ -136,6 +139,7 @@ class TankRepository implements TankRepositoryInterface
                 $existing->update([
                     'plant_name' => $data['plant_name'],
                     'tank_height' => $data['tank_height'],
+                    'description' => $data['description'] ?? $existing->description,
                     'updated_by' => $user,
                 ]);
                 return true;
@@ -147,8 +151,9 @@ class TankRepository implements TankRepositoryInterface
                 'id_sloc' => $maxId + 1,
                 'id_plant' => $data['plant_code'],
                 'plant_name' => $data['plant_name'],
-                'id_tank' => $data['tank_number'],
+                'tf_number' => $data['tank_number'],
                 'tank_height' => $data['tank_height'],
+                'description' => $data['description'] ?? null,
                 'status' => '1',
                 'created_by' => $user,
             ]);

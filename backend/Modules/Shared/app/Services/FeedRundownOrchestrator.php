@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Shared\Services;
 
 use Modules\Shared\Helpers\Feed;
@@ -30,6 +30,9 @@ class FeedRundownOrchestrator
         }
 
         $actualQty = round($feedResult['total_out'], 4);
+
+        // 2.5 Apply rounding correction to prevent float drift
+        Rundown::adjustRundownToTotal($supplierRows, $actualQty);
 
         // 3. Inject dynamic values into Rundown params
         $rundownParams['in_qty'] = $actualQty;

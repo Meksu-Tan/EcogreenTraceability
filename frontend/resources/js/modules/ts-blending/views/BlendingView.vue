@@ -82,6 +82,8 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'balance_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('balance_supplier')">Init Supplier (MT)<VIcon v-if="sortKey==='balance_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty')">On-Hand (MT)<VIcon v-if="sortKey==='qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:200px">Supplier / Batch SAP / Init Qty (MT) / Remark</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
               </tr>
             </thead>
@@ -112,7 +114,7 @@
                   </VBtn>
                 </td>
                 <td class="text-center font-weight-medium font-mono text-caption">{{ item.trace_no }}</td>
-                <td class="text-center">{{ item.plant_name || '-' }}</td>
+                <td class="text-center font-weight-medium text-caption">{{ item.plant_name || '-' }}</td>
                 <td class="font-weight-medium text-truncate" style="max-width:160px" :title="item.material">{{ item.material }}</td>
                 <td class="text-caption">
                   <template v-if="item.from_trace_no">
@@ -149,6 +151,8 @@
                     </VChip>
                   </template>
                 </td>
+                <td class="text-caption text-medium-emphasis">{{ item.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ item.created_by }}</td>
                 <td class="text-center">
                   <VBtn
                     v-if="!item.next_process"
@@ -161,7 +165,7 @@
                 </td>
               </tr>
               <tr v-if="sortedList.length === 0">
-                <td colspan="13" class="text-center pa-8">
+                <td colspan="15" class="text-center pa-8">
                   <VIcon icon="ri-inbox-2-line" size="40" class="text-disabled mb-2" />
                   <p class="text-body-2 text-medium-emphasis">No blending data yet</p>
                 </td>
@@ -209,9 +213,9 @@
     <SubTankEditModal
       v-model:is-open="isSubTankModalOpen"
       :id-head="subTankContext.idHead"
-      :id-tank="subTankContext.idTank"
+      :id-tank="subTankContext.idSloc"
       :main-sloc="subTankContext.mainSloc"
-      :id-tank-tail="subTankContext.idTankTail"
+      :id-tank-tail="subTankContext.idSlocTail"
       @success="onSubTankSuccess"
     />
   </div>
@@ -219,7 +223,7 @@
 
 <script setup>
 import { useConfirmStore } from '@/stores/confirm.js'
-import { ref, watch, reactive, computed } from 'vue'
+import { ref, watch, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTsBlendingStore } from '@/modules/ts-blending/stores'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
@@ -246,13 +250,13 @@ const matlDocContext = reactive({
 
 const subTankContext = reactive({
   idHead: null,
-  idTank: null,
+  idSloc: null,
   mainSloc: '',
-  idTankTail: []
+  idSlocTail: []
 })
 
 const page = ref(1)
-const perPage = ref(5)
+const perPage = ref(10)
 
 const sortKey = ref(null)
 const sortDir = ref(null)
@@ -315,6 +319,7 @@ function initSupplierColor(item) {
 
 async function changePage(p) {
   if (p < 1 || p > lastPage.value) return
+  page.value = p
   blendingStore.setPage(p)
   await fetchData()
 }
@@ -347,14 +352,14 @@ function onMatlDocSuccess() {
 }
 
 function openSubTankEdit(item) {
-  let tankTails = item.id_tank_tail
+  let tankTails = item.id_sloc_tail
   if (typeof tankTails === 'string') {
     try { tankTails = JSON.parse(tankTails) } catch { tankTails = [] }
   }
   subTankContext.idHead = item.idHead
-  subTankContext.idTank = item.id_tank
+  subTankContext.idSloc = item.tf_number
   subTankContext.mainSloc = item.sloc || ''
-  subTankContext.idTankTail = Array.isArray(tankTails) ? tankTails : []
+  subTankContext.idSlocTail = Array.isArray(tankTails) ? tankTails : []
   isSubTankModalOpen.value = true
 }
 
@@ -378,6 +383,10 @@ watch(() => plantSelectionStore.selectedPlantId, () => {
 
 watch(perPage, () => {
   page.value = 1
+  fetchData()
+})
+
+onMounted(() => {
   fetchData()
 })
 </script>

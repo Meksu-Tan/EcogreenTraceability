@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Tank\Services;
 
 use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
@@ -58,33 +59,41 @@ class TankService implements TankServiceInterface
         $url = config('services.tankfarm.url');
         $token = config('services.tankfarm.token');
 
+        if (!$url || !$token) {
+            return ['status' => 0, 'message' => 'Tank farm API URL or token not configured.'];
+        }
+
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(10)->withOptions(['verify' => false])->withHeaders([
+            $response = \Illuminate\Support\Facades\Http::timeout(30)->withOptions(['verify' => false])->withHeaders([
                 'Accept' => 'application/json',
                 'Authorization' => 'Bearer ' . $token
             ])->post($url, [
-                'plantCodes' => ['1007'],
+                'plantCodes' => [],
                 'type' => 'tanks'
             ]);
 
             if (!$response->successful()) {
-                return ['status' => 0, 'message' => 'Failed to fetch data from external API.'];
+                return ['status' => 0, 'message' => 'Failed to fetch data from external API. HTTP ' . $response->status()];
             }
 
             $data = $response->json();
             if (!isset($data['success']) || !$data['success'] || !isset($data['data'])) {
                 return ['status' => 0, 'message' => 'Invalid response from external API.'];
             }
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            return ['status' => 0, 'message' => 'Connection timeout. Please check network to tank farm API.'];
         } catch (\Exception $e) {
             return ['status' => 0, 'message' => 'Connection failed: ' . $e->getMessage()];
         }
 
         $syncCount = 0;
+        $plantCount = 0;
         foreach ($data['data'] as $plantData) {
             $plantCode = $plantData['plantCode'] ?? null;
             $plantName = $plantData['plantName'] ?? null;
 
             if (!$plantCode || empty($plantData['tanks'])) continue;
+            $plantCount++;
 
             foreach ($plantData['tanks'] as $tankItem) {
                 $tankNumber = $tankItem['tankNumber'] ?? null;
@@ -105,10 +114,22 @@ class TankService implements TankServiceInterface
             }
         }
 
+        // Save last sync timestamp
+        \Cache::put('tank_last_sync_at', now()->toIso8601String(), 86400 * 7);
+        \Cache::put('tank_last_sync_user', $user, 86400 * 7);
+
         if ($syncCount > 0) {
-            return ['status' => 1, 'message' => "Successfully synced {$syncCount} tanks from external API."];
+            return ['status' => 1, 'message' => "Synced {$syncCount} tanks from {$plantCount} plants.", 'synced' => $syncCount, 'plants' => $plantCount];
         } else {
-            return ['status' => 2, 'message' => "All tanks are up to date. No updates needed."];
+            return ['status' => 2, 'message' => "All {$plantCount} plants are up to date. No changes needed.", 'synced' => 0, 'plants' => $plantCount];
         }
+    }
+
+    public function getLastSyncInfo(): array
+    {
+        return [
+            'last_sync_at' => \Cache::get('tank_last_sync_at'),
+            'last_sync_user' => \Cache::get('tank_last_sync_user'),
+        ];
     }
 }

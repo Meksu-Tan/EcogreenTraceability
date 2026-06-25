@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TsBlending\Repositories\Contracts;
 
 use Illuminate\Support\Collection;
@@ -23,12 +24,12 @@ interface BlendingRepositoryInterface
     /**
      * Get total quantity for material entry (temporary or balance detail)
      */
-    public function getTotalQtyMaterial(string $mode, string $entryNo, ?int $idHead, int $plantId): float;
+    public function getTotalQtyMaterial(?string $mode, string $entryNo, ?int $idHead, int $plantId): float;
 
     /**
      * Get material list (from temporary or balance detail)
      */
-    public function getMaterialList(string $mode, string $entryNo, ?int $idHead, int $plantId): Collection;
+    public function getMaterialList(?string $mode, string $entryNo, ?int $idHead, int $plantId): Collection;
 
     /**
      * Get blending list with all related data
@@ -56,14 +57,14 @@ interface BlendingRepositoryInterface
     public function getTankDetails(string $tankDescription, ?int $plantId = null): Collection;
 
     /**
-     * Get all active m_tank records for a plant (independent of material)
+     * Get all active sloc records for a plant (independent of material)
      */
     public function getAllTanks(int $plantId): Collection;
 
     /**
      * Add material to blending entry (temporary storage)
      */
-    public function addBlendingEntryMaterial(string $user, string $entryNo, int $idMaterial, float $qty, int $idTank, int $plantId): array;
+    public function addBlendingEntryMaterial(string $user, string $entryNo, int $idMaterial, float $qty, int $idSloc, int $plantId): array;
 
     /**
      * Delete blending material from temporary

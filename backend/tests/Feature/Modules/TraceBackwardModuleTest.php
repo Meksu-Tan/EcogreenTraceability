@@ -135,11 +135,11 @@ class TraceBackwardModuleTest extends TestCase
             ->andReturn($mockData);
         $this->app->instance(TraceBackwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward/detail?trace_no=300001-001&id_material=3');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward/detail?trace_no=30000100001&id_material=3');
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.0.curr_trace', '100001-001')
-            ->assertJsonPath('data.0.material', 'CPO');
+            ->assertJsonPath('data.initial.0.curr_trace', '100001-001')
+            ->assertJsonPath('data.initial.0.material', 'CPO');
     }
 
     public function test_it_returns_500_when_service_throws_on_index(): void
@@ -169,7 +169,7 @@ class TraceBackwardModuleTest extends TestCase
             ->andThrow(new \RuntimeException('SQL syntax error'));
         $this->app->instance(TraceBackwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward/detail?trace_no=B456');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/backward/detail?trace_no=10000100001');
 
         $response->assertStatus(500)
             ->assertJsonPath('status', 0)

@@ -1,0 +1,89 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(cd c:\\\\XAMPP\\\\htdocs\\\\EODS\\\\Master; $branch = \"fix/CRITICAL-audit-gaps-\" + \\(Get-Date -Format \"yyyyMMdd-HHmmss\"\\); git checkout -b $branch 2>&1; Write-Output \"Branch: $branch\")",
+      "Bash(git -C /c/XAMPP/htdocs/EODS/Master/.claude/worktrees/agent-a0dcbf54c01306d03 status --short)",
+      "Bash(git -C /c/XAMPP/htdocs/EODS/Master/.claude/worktrees/agent-a0dcbf54c01306d03 log --oneline -3)",
+      "Bash(git -C /c/XAMPP/htdocs/EODS/Master show HEAD --stat)",
+      "Bash(git -C /c/XAMPP/htdocs/EODS/Master show ff82b407 --stat)",
+      "Bash(git -C /c/XAMPP/htdocs/EODS/Master/.claude/worktrees/agent-a0dcbf54c01306d03 show HEAD --stat)",
+      "Bash(git merge *)",
+      "Bash(ls backend/Modules/m-manufacturer/app/Services/)",
+      "Bash(ls backend/Modules/m-supplier/app/Services/)",
+      "Bash(ls backend/Modules/m-tank/app/Services/)",
+      "Bash(Test-Path \"C:\\\\XAMPP\\\\htdocs\\\\EODS\\\\Master\\\\backend\\\\tests\\\\Feature\\\\Modules\\\\BlendingModuleTest.php\")",
+      "Bash(Test-Path \"C:\\\\XAMPP\\\\htdocs\\\\EODS\\\\Master\\\\backend\\\\tests\\\\Unit\\\\Services\\\\AdjustmentMutationServiceTest.php\")",
+      "Bash(Test-Path \"C:\\\\XAMPP\\\\htdocs\\\\EODS\\\\Master\\\\backend\\\\tests\\\\Unit\\\\Services\\\\AdjustmentServiceTest.php\")",
+      "Bash(php -l \"C:/XAMPP/htdocs/EODS/Master/.claude/worktrees/agent-a415bb505472e191a/backend/config/wip_material_mapping.php\")",
+      "Bash(php -l \"C:/XAMPP/htdocs/EODS/Master/.claude/worktrees/agent-a415bb505472e191a/backend/Modules/ts-wip/app/Repositories/Traits/WipEntryQueryTrait.php\")",
+      "Bash(php -r \"require 'vendor/autoload.php'; var_dump\\(class_exists\\('Modules\\\\Inquiry\\\\Services\\\\PsPaReportService'\\)\\);\")",
+      "Bash(php -r 'require '\\\\''vendor/autoload.php'\\\\''; $loader = require '\\\\''vendor/autoload.php'\\\\''; $map = $loader->getPrefixesPsr4\\(\\); foreach\\($map as $prefix => $paths\\) { if\\(str_contains\\($prefix, '\\\\''Inquiry'\\\\''\\)\\) { echo $prefix . '\\\\'': '\\\\'' . implode\\('\\\\'', '\\\\'', $paths\\) . PHP_EOL; } }')",
+      "Bash(php -r \"require 'vendor/autoload.php'; var_dump\\(class_exists\\('Modules\\\\Inquiry\\\\Repositories\\\\PsPaReportRepository'\\)\\);\")",
+      "Bash(composer dump-autoload *)",
+      "Bash(php -r \"require 'vendor/autoload.php'; var_dump\\(class_exists\\('Modules\\\\Inquiry\\\\Services\\\\PsPaReportService'\\)\\); var_dump\\(class_exists\\('Modules\\\\Inquiry\\\\Repositories\\\\PsPaReportRepository'\\)\\);\")",
+      "PowerShell(git -C \"C:\\\\XAMPP\\\\htdocs\\\\EODS\\\\Master\" worktree list)",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/rm-entries?id_plant=0&page=1&per_page=5\" -H \"Accept: application/json\")",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/rm-entries/feed-log?id_plant=0\" -H \"Accept: application/json\")",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/rm-entries/tanks?id_plant=0\" -H \"Accept: application/json\")",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/rm-entries/suppliers/search?q=\" -H \"Accept: application/json\")",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/wip-entries/get_dtFeed?flag=get_dtFeed&feedId=001&mode=LATEST&per_page=5&id_plant=0&page=1\" -H \"Accept: application/json\")",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/wip-entries/get_dtRundown?flag=get_dtRundown&rundownId=011&mode=LATEST&per_page=5&id_plant=0&page=1\" -H \"Accept: application/json\")",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/blendings?id_plant=0\" -H \"Accept: application/json\")",
+      "PowerShell(curl -s -o NUL -w \"%{http_code}\" \"http://127.0.0.1:8000/api/v1/transactions/transfers?id_plant=0\" -H \"Accept: application/json\")",
+      "Bash(xargs -I{} basename {})",
+      "Bash(\"C:\\\\Program Files\\\\PostgreSQL\\\\17\\\\bin\\\\psql.exe\" -U eudr_app -d eudr_dev -c \"\\\\dt\")",
+      "Bash(xargs ls -la)",
+      "Bash(awk '{print $NF}')",
+      "PowerShell(& \"C:\\\\Program Files\\\\PostgreSQL\\\\17\\\\bin\\\\psql.exe\" -U eudr_app -d eudr_dev -c \"\\\\dt\" 2>&1)",
+      "Bash(grep -v \"//\\\\|#\\\\|repository\\\\|Repository\\\\|Service\\\\|Controller\")",
+      "Bash(Start-Process powershell *)",
+      "Bash(Start-Sleep 3)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@ecogreenoleo.com\",\"password\":\"password123\"}')",
+      "Bash(curl -s http://localhost:8000/api/v1/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"email\":\"admin@ecogreenoleo.com\",\"password\":\"Admin@123\"}')",
+      "Bash(curl -s http://localhost:8000/api/)",
+      "Bash(curl -s http://localhost:8000/)",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@ecogreenoleo.com\",\"password\":\"Admin@123\"}')",
+      "Bash(curl -s -X POST http://localhost:8000/api/v1/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@ecogreenoleo.com\",\"password\":\"Admin@2024\"}')",
+      "Bash(curl -s http://localhost:8000/api/v1/me -H 'Authorization: Bearer 2|PDy2hhLrNJml4nS3R2YJeB6cPZR3hp8NtKd2BNzR7c77a434')",
+      "Bash(curl -s http://localhost:8000/api/v1/master/material?per_page=3 -H 'Authorization: Bearer 2|PDy2hhLrNJml4nS3R2YJeB6cPZR3hp8NtKd2BNzR7c77a434')",
+      "Bash(curl -s http://localhost:8000/api/v1/materials?per_page=3 -H 'Authorization: Bearer 2|PDy2hhLrNJml4nS3R2YJeB6cPZR3hp8NtKd2BNzR7c77a434' -H 'X-Plant-Id: 1')",
+      "Bash(grep -v \"//\\\\|vendor\\\\|test\\\\|Test\")",
+      "Bash(xargs -I{} php -l {})",
+      "Bash(php artisan *)",
+      "Bash(python3 -c ' *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CMD=$(python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',d).get('command',''))\" 2>/dev/null || true); case \"$CMD\" in *grep*|*rg\\ *|*ripgrep*|*find\\ *|*fd\\ *|*ack\\ *|*ag\\ *)   [ -f graphify-out/graph.json ] &&   echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"graphify: knowledge graph at graphify-out/. For focused questions, run `graphify query \\\"<question>\\\"` (scoped subgraph, usually much smaller than GRAPH_REPORT.md) instead of grepping raw files. Read GRAPH_REPORT.md only for broad architecture context.\"}}'   || true ;; esac"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HIT=$(python3 -c \"import json,sys;d=json.load(sys.stdin);t=d.get('tool_input',d);s=(str(t.get('file_path') or '')+' '+str(t.get('pattern') or '')+' '+str(t.get('path') or '')).lower().replace(chr(92),'/');exts=('.py','.js','.ts','.tsx','.jsx','.go','.rs','.java','.rb','.c','.h','.cpp','.hpp','.cc','.cs','.kt','.swift','.php','.scala','.lua','.sh','.md','.rst','.txt','.mdx');sys.stdout.write('1' if 'graphify-out/' not in s and any(e in s for e in exts) else '')\" 2>/dev/null || true); if [ \"$HIT\" = 1 ] && [ -f graphify-out/graph.json ]; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"graphify: knowledge graph at graphify-out/. For codebase questions, run `graphify query \\\"<question>\\\"` (scoped subgraph, usually much smaller than reading files one by one), `graphify explain \\\"<concept>\\\"`, or `graphify path \\\"<A>\\\" \\\"<B>\\\"`, instead of reading source files to answer. Read raw files to modify or debug specific code, or when the graph lacks the detail.\"}}'; fi || true"
+          }
+        ]
+      }
+    ]
+  },
+  "theme": "dark",
+  "mcpServers": {
+    "and_wiki": {
+      "type": "http",
+      "url": "http://172.16.11.33:8310/mcp",
+      "headers": {
+        "x-api-key": "Barelang123.456"
+      }
+    }
+  },
+  "hasCompletedOnboarding": true
+}

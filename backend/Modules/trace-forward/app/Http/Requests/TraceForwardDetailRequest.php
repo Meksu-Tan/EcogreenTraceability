@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\TraceForward\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -14,7 +15,7 @@ class TraceForwardDetailRequest extends FormRequest
     {
         return [
             'id_header' => ['nullable', 'integer'],
-            'trace_no' => ['nullable', 'string', 'max:100'],
+            'trace_no' => ['nullable', 'string', 'regex:/^[1-9]\d{10}$|^[1-9]\d{13}$/'],
             'id_material' => ['nullable', 'integer'],
             'id_plant' => ['nullable'],
         ];

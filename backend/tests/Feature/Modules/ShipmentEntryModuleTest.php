@@ -47,12 +47,12 @@ class ShipmentEntryModuleTest extends TestCase
         $mockService = Mockery::mock(ShipmentServiceInterface::class);
         $mockService->shouldReceive('generateTraceNo')
             ->once()
-            ->with(1)
+            ->with(1, 1)
             ->andReturn('5' . date('ymd') . '0010101');
         $this->app->instance(ShipmentServiceInterface::class, $mockService);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson('/api/v1/transactions/shipment-entries/new-trace-no?id_plant=1');
+            ->getJson('/api/v1/transactions/shipment-entries/new-trace-no?id_plant=1&id_material=1');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.0.traceNo', '5' . date('ymd') . '0010101');

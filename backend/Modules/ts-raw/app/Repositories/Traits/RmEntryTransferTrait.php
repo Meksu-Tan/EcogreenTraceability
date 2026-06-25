@@ -8,30 +8,71 @@ use Modules\Shared\Traits\DbCompatTrait;
 trait RmEntryTransferTrait
 {
     use DbCompatTrait;
-    public function getTransferNumber($plantId): ?string
+
+    /**
+     * Shared sequence query for trace number generation.
+     * Finds MAX(seq) for today's traces matching prefix + warehouse + plant,
+     * then returns the next sequence as a 2-digit padded string.
+     *
+     * @param string $prefix    Type prefix ('3', '7', etc.)
+     * @param string $warehouse 3-digit warehouse/section code
+     * @param string $plantCode 2-digit plant suffix
+     */
+    private function nextTraceSeq(string $prefix, string $warehouse, string $plantCode): int
+    {
+        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
+        $castSeq = "CAST(SUBSTRING(CAST(to_trace_no AS TEXT), 13, 2) AS INTEGER)";
+        $result = DB::connection('eudr_ts')->select(
+            "SELECT MAX({$castSeq}) as max_seq
+               FROM t_trace_header
+              WHERE SUBSTRING(CAST(to_trace_no AS TEXT), 1, 1) = ?
+                AND SUBSTRING(CAST(to_trace_no AS TEXT), 2, 6) = {$dateFmt}
+                AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
+                AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $warehouse) . "
+                AND " . \Modules\Shared\Helpers\TraceHelper::plantCondition('to_trace_no', [$plantCode]) . "
+                AND status = 1",
+            [$prefix]
+        );
+        return ((int) ($result[0]->max_seq ?? 0)) + 1;
+    }
+
+    public function getTransferNumber($plantId, $tankDescOrId = null): ?string
     {
         $resolvedPlantId = $this->resolvePlantCode($plantId);
         $warehouse = '000';
-        $section = '3';
-        $tracePlantCode = ($resolvedPlantId == 0 || $resolvedPlantId == '0') ? '00' : str_pad(substr($resolvedPlantId, -2), 2, '0', STR_PAD_LEFT);
+        $tankDesc = null;
 
-        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
-        $castRight = "CAST(RIGHT(trace_no, 2) AS INTEGER)";
-        $result = DB::connection('eudr_ts')->select(
-            "SELECT MAX({$castRight}) as max_seq
-               FROM t_balance_header
-              WHERE SUBSTRING(trace_no,1,1) = ?
-                AND SUBSTRING(trace_no,2,6) = {$dateFmt}
-                AND SUBSTRING(trace_no,8,3) = ?
-                AND SUBSTRING(trace_no,11,2) = ?
-                AND status = 1",
-            [$section, $warehouse, $tracePlantCode]
-        );
+        if ($tankDescOrId !== null) {
+            if (is_numeric($tankDescOrId)) {
+                $srcTank = DB::connection('eudr_ts')->table('m_sloc')
+                    ->where('id_sloc', (int) $tankDescOrId)
+                    ->where('status', 1)
+                    ->first();
+                if ($srcTank) {
+                    $tankDesc = $srcTank->description;
+                }
+            } else {
+                $tankDesc = (string) $tankDescOrId;
+            }
+        }
 
-        $maxSeq = $result[0]->max_seq ?? 0;
-        $newSeq = $maxSeq + 1;
+        if ($tankDesc) {
+            $targetDesc = str_ireplace('Storage', 'Feed', $tankDesc);
+            $tank = DB::connection('eudr_ts')->table('m_sloc')
+                ->where('description', $targetDesc)
+                ->where('status', 1)
+                ->first();
+            if ($tank && $tank->code) {
+                $warehouse = str_pad(substr($tank->code, -3), 3, '0', STR_PAD_LEFT);
+            }
+        }
 
-        return $this->buildTraceNo($section, date("ymd"), $warehouse, $tracePlantCode, $newSeq);
+        $section       = '3';
+        $tracePlantCode = ($resolvedPlantId == 0 || $resolvedPlantId == '0')
+            ? '00' : str_pad(substr((string) $resolvedPlantId, -2), 2, '0', STR_PAD_LEFT);
+
+        return $this->buildTraceNo($section, date('ymd'), $warehouse, $tracePlantCode,
+            $this->nextTraceSeq($section, $warehouse, $tracePlantCode));
     }
 
     public function getStorageLog($plantId): array
@@ -57,6 +98,8 @@ trait RmEntryTransferTrait
                          MIN(d.description) AS tank_description,
                          {$tankNumbersAgg} AS tank_numbers,
                          a.entry_date,
+                         MIN(a.created_by) AS created_by,
+                         MIN(a.created_at) AS created_at,
                          {$supplierAgg} AS supplier,
                          f.material_document, f.po_so, f.id_trace_head,
                          {$traceSub} AS trace_info,
@@ -77,7 +120,7 @@ trait RmEntryTransferTrait
                       ON f.id_balance_head = a.id_balance_head
                    WHERE c.type = 'RM'
                      AND (CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 1 OR CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 9)
-                     AND SUBSTRING(a.trace_no,8,3) = '000'
+                     AND " . \Modules\Shared\Helpers\TraceHelper::isStorageOrLegacy('a.trace_no') . "
                      AND a.status = 1
                      AND (a.id_plant = ? OR ? = '0')
                    GROUP BY a.trace_no
@@ -285,27 +328,42 @@ trait RmEntryTransferTrait
         return $results;
     }
 
-    public function generateTransferNumber($plantId, string $movSeq = '000'): ?string
+    public function generateTransferNumber($plantId, $tankDescOrId = null): ?string
     {
         $plantId = $this->resolvePlantCode($plantId);
-        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
-        $result = DB::connection('eudr_ts')->select(
-            "SELECT a.trace_no
-               FROM (SELECT CAST(a.trace_no AS BIGINT) + 1 AS trace_no
-                       FROM t_balance_header a
-                      WHERE SUBSTRING(a.trace_no,1,7) = CONCAT('7', {$dateFmt})
-                        AND SUBSTRING(a.trace_no,8,3) = ?
-                        AND a.status = 1
-                        AND a.id_plant = ?
-                      ORDER BY a.id_balance_head DESC
-                      LIMIT 1) a
-             UNION ALL
-            SELECT CONCAT('7', {$dateFmt}, ?, LPAD(RIGHT(?, 2), 2, '0'), '01') AS trace_no
-               LIMIT 1",
-            [$movSeq, $plantId, $movSeq, $plantId]
-        );
+        $movSeq  = '000';
+        $tankDesc = null;
 
-        return $result[0]->trace_no ?? null;
+        if ($tankDescOrId !== null) {
+            if (is_numeric($tankDescOrId)) {
+                $srcTank = DB::connection('eudr_ts')->table('m_sloc')
+                    ->where('id_sloc', (int) $tankDescOrId)
+                    ->where('status', 1)
+                    ->first();
+                if ($srcTank) {
+                    $tankDesc = $srcTank->description;
+                }
+            } else {
+                $tankDesc = (string) $tankDescOrId;
+            }
+        }
+
+        if ($tankDesc) {
+            $targetDesc = str_ireplace('Storage', 'Feed', $tankDesc);
+            $tank = DB::connection('eudr_ts')->table('m_sloc')
+                ->where('description', $targetDesc)
+                ->where('status', 1)
+                ->first();
+            if ($tank && $tank->code) {
+                $movSeq = str_pad(substr($tank->code, -3), 3, '0', STR_PAD_LEFT);
+            }
+        }
+
+        $tracePlantCode = ($plantId == 0 || $plantId == '0')
+            ? '00' : str_pad(substr((string) $plantId, -2), 2, '0', STR_PAD_LEFT);
+
+        return $this->buildTraceNo('7', date('ymd'), $movSeq, $tracePlantCode,
+            $this->nextTraceSeq('7', $movSeq, $tracePlantCode));
     }
 
     public function findBalanceByTraceNo(string $traceNo): ?object
@@ -530,28 +588,19 @@ trait RmEntryTransferTrait
 
     public function generateTransferEntryNo(int $materialId, $plantId): ?string
     {
-        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
-        $result = DB::connection('eudr_ts')->select(
-            "SELECT a.entryNo
-               FROM (SELECT b.trace_no + 1 AS entryNo
-                       FROM m_material a
-                       LEFT JOIN t_balance_header b
-                         ON a.id_rundown = SUBSTRING(b.trace_no, 8,3) AND b.status = 1
-                      WHERE a.id_material = ?
-                        AND SUBSTRING(b.trace_no, 1, 7) = CONCAT('7', {$dateFmt})
-                        AND a.status = 1
-                      ORDER BY b.id_balance_head DESC
-                      LIMIT 1) a
-               UNION ALL
-               SELECT CONCAT('7', {$dateFmt}, CASE WHEN a.id_rundown <> '-' THEN a.id_rundown ELSE '000' END, LPAD(RIGHT(?, 2), 2, '0'), '01') AS entryNo
-                 FROM m_material a
-                WHERE a.status = 1
-                  AND a.id_material = ?
-                LIMIT 1",
-            [$materialId, $plantId, $materialId]
-        );
+        $plantId = $this->resolvePlantCode($plantId);
 
-        return $result[0]->entryNo ?? null;
+        $mat = DB::connection('eudr_ts')->table('m_material')
+            ->where('id_material', $materialId)
+            ->where('status', 1)
+            ->first();
+        $idRundown = ($mat && $mat->id_rundown && $mat->id_rundown !== '-')
+            ? $mat->id_rundown : '000';
+        $tracePlantCode = ($plantId == 0 || $plantId == '0')
+            ? '00' : str_pad(substr((string) $plantId, -2), 2, '0', STR_PAD_LEFT);
+
+        return $this->buildTraceNo('7', date('ymd'), $idRundown, $tracePlantCode,
+            $this->nextTraceSeq('7', $idRundown, $tracePlantCode));
     }
 
     public function getActiveTanksForTransfer(?int $materialId, $plantId): array

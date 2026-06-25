@@ -83,6 +83,8 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty')">On-Hand Material (MT)<VIcon v-if="sortKey==='qty'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'qty_supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('qty_supplier')">On-Hand Supplier (MT)<VIcon v-if="sortKey==='qty_supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="min-width:200px">Supplier / Batch SAP / Init Qty (MT)</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:120px">Action</th>
               </tr>
             </thead>
@@ -127,6 +129,8 @@
                     {{ sup }}
                   </VChip>
                 </td>
+                <td class="text-caption text-medium-emphasis">{{ trf.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ trf.created_by }}</td>
                 <td class="text-center">
                   <VBtn
                     :loading="deactivatingId === trf.id_balance_head"
@@ -139,7 +143,7 @@
                 </td>
               </tr>
               <tr v-if="sortedList.length === 0">
-                <td colspan="11" class="text-center pa-8">
+                <td colspan="13" class="text-center pa-8">
                   <VIcon icon="ri-inbox-2-line" size="40" class="text-disabled mb-2" />
                   <p class="text-body-2 text-medium-emphasis">No transfer data yet</p>
                 </td>

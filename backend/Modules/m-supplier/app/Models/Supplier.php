@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -20,9 +21,4 @@ class Supplier extends Model
     ];
 
     public $timestamps = false;
-
-    public function storageTank()
-    {
-        return $this->belongsTo(\Modules\Storage\Models\StorageTank::class, 'type', 'id_sloc');
-    }
 }

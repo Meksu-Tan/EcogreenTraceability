@@ -25,9 +25,6 @@
           color="primary"
           style="min-width: 200px;"
         />
-        <VBtn color="primary" prepend-icon="ri-loader-4-line" :loading="loading" @click="reloadAll">
-          Sync Data
-        </VBtn>
         <VAlert
           type="error"
           variant="tonal"
@@ -48,7 +45,21 @@
         elevation="1"
       >
         <VCardTitle class="pa-5 pb-3 bg-neutral-50">
-          <h2 class="text-h6 font-weight-bold">{{ section.title }}</h2>
+          <div class="d-flex align-center ga-3">
+            <h2 class="text-h6 font-weight-bold">{{ section.title }}</h2>
+            <VBtnToggle
+              v-if="section.modeKey"
+              :model-value="section.modeKey === 'section104' ? selectedMode104 : section.modeKey === 'section105' ? selectedMode105 : selectedMode106Major"
+              mandatory
+              rounded="md"
+              density="compact"
+              color="primary"
+              @update:model-value="onSectionModeChange(section.modeKey, $event)"
+            >
+              <VBtn :value="1" size="small">Mode 1</VBtn>
+              <VBtn :value="2" size="small">Mode 2</VBtn>
+            </VBtnToggle>
+          </div>
         </VCardTitle>
         <VCardText class="pa-4">
           <div class="d-flex flex-column ga-4">
@@ -157,11 +168,11 @@
     </div>
 
     <BaseModal v-model="feedModalOpen" :title="feedModalTitle" :loading="storeLoading" submit-label="Save Feed" max-width="640px" @submit="submitFeed">
-      <EntryForm mode="feed" :form="feedForm" :tanks="feedTanks" :specific-tanks="feedSpecificTanks" :dcs-status="feedDcsStatus" @tank-change="onFeedTankChange" @fetch-dcs="fetchFeedDcs" />
+      <EntryForm mode="feed" :form="feedForm" :tanks="feedTanks" :specific-tanks="feedSpecificTanks" :dcs-status="feedDcsStatus" :timer-syncing="autoFetchFeed.syncing.value" :timer-countdown="autoFetchFeed.countdownDisplay.value" :timer-next-sync="autoFetchFeed.nextSyncLabel.value" :timer-last-sync="autoFetchFeed.lastSyncAt.value ? formatLastSync(autoFetchFeed.lastSyncAt.value) : ''" @tank-change="onFeedTankChange" @fetch-dcs="fetchFeedDcs" />
     </BaseModal>
 
     <BaseModal v-model="rundownModalOpen" :title="rundownModalTitle" :loading="storeLoading" submit-label="Save Rundown" max-width="640px" @submit="submitRundown">
-      <EntryForm mode="rundown" :form="rundownForm" :tanks="rundownTanks" :specific-tanks="rundownSpecificTanks" :dcs-status="rundownDcsStatus" @tank-change="onRundownTankChange" @fetch-dcs="fetchRundownDcs" />
+      <EntryForm mode="rundown" :form="rundownForm" :tanks="rundownTanks" :specific-tanks="rundownSpecificTanks" :dcs-status="rundownDcsStatus" :timer-syncing="autoFetchRundown.syncing.value" :timer-countdown="autoFetchRundown.countdownDisplay.value" :timer-next-sync="autoFetchRundown.nextSyncLabel.value" :timer-last-sync="autoFetchRundown.lastSyncAt.value ? formatLastSync(autoFetchRundown.lastSyncAt.value) : ''" @tank-change="onRundownTankChange" @fetch-dcs="fetchRundownDcs" />
     </BaseModal>
 
     <BaseModal v-model="balanceModalOpen" :title="balanceTitle" max-width="1000px">
@@ -244,12 +255,13 @@ import { storeToRefs } from 'pinia'
 import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant.js'
 import { useTsWipEntryStore } from '@/modules/ts-wip/stores/wip'
 import { useToastStore } from '@/stores/toast.js'
+import { useAutoFetchQty } from '@/composables/useAutoFetchQty'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import BaseModal from '@/modules/shared/components/BaseModal.vue'
 import WipMiniTable from './WipMiniTable.vue'
 
 const EntryForm = {
-  props: { mode: String, form: Object, tanks: Array, specificTanks: Array, dcsStatus: String },
+  props: { mode: String, form: Object, tanks: Array, specificTanks: Array, dcsStatus: String, timerSyncing: Boolean, timerCountdown: String, timerNextSync: String, timerLastSync: String },
   emits: ['tank-change', 'fetch-dcs'],
   setup(props, { emit }) {
     const VTextField = resolveComponent('VTextField')
@@ -261,7 +273,7 @@ const EntryForm = {
       if (!Array.isArray(props.tanks)) return []
       const map = new Map()
       for (const t of props.tanks) {
-        const name = t.tank || t.description || t.id_tank
+        const name = t.tank || t.description || t.tf_number
         const existing = map.get(name)
         if (!existing || (t.details_count && Number(t.details_count) > (existing.details_count || 0))) {
           map.set(name, t)
@@ -277,7 +289,7 @@ const EntryForm = {
       h('div', { class: 'd-flex ga-4' }, [
         h('div', { class: 'flex-grow-1' }, [
           h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Trace No'),
-          h(VTextField, { modelValue: props.form.batchNo, readonly: true, density: 'comfortable', variant: 'outlined', hideDetails: true }),
+          h(VTextField, { modelValue: props.form.batchNo, readonly: true, density: 'comfortable', variant: 'outlined', hideDetails: true, loading: props.form.batchNo === 'Generating...' }),
         ]),
         h('div', { class: 'flex-grow-1' }, [
           h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Entry Date'),
@@ -288,9 +300,10 @@ const EntryForm = {
         h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Sloc'),
         h(VSelect, {
           modelValue: props.form.tank || null,
-          items: uniqueTanks.value.map(t => ({ value: t.id_sloc || t.id_tank, title: t.tank || t.description || t.id_tank })),
+          items: uniqueTanks.value.map(t => ({ value: t.id_sloc || t.tf_number, title: t.tank || t.description || t.tf_number })),
           density: 'comfortable', variant: 'outlined', hideDetails: true,
           placeholder: uniqueTanks.value?.length ? '-- Select Sloc --' : '-- No Sloc found for selected plant --',
+          loading: !uniqueTanks.value?.length && props.form.batchNo === 'Generating...',
           'onUpdate:modelValue': v => { props.form.tank = v ? Number(v) : null; emit('tank-change') },
         }),
       ]),
@@ -302,27 +315,33 @@ const EntryForm = {
             : !props.specificTanks?.length
               ? h('p', { class: 'py-2 text-center text-caption text-disabled' }, 'No Specific Sloc found')
               : h('div', { class: 'd-flex flex-wrap ga-2' },
-                  props.specificTanks.map(t => h('label', {
-                    class: 'd-flex align-center ga-2 px-2 py-1 rounded border text-caption font-weight-medium cursor-pointer',
-                  }, [
-                    h('input', {
-                      type: 'checkbox',
-                      value: t.id_sloc_tail || t.id_tank_tail,
-                      checked: props.form.tankNo?.includes(t.id_sloc_tail || t.id_tank_tail),
-                      onChange: e => {
-                        const val = t.id_sloc_tail || t.id_tank_tail
-                        if (e.target.checked) {
-                          if (!props.form.tankNo.includes(val)) {
-                            props.form.tankNo.push(val)
+                  props.specificTanks.map(t => {
+                    const isChecked = props.form.tankNo?.includes(t.id_sloc_tail || t.id_sloc_tail);
+                    return h('label', {
+                      class: `d-flex align-center ga-2 px-3 py-1 rounded-pill border text-caption font-weight-medium cursor-pointer transition-all ${
+                        isChecked ? 'bg-primary text-white border-primary' : 'bg-white text-medium-emphasis hover:bg-neutral-100'
+                      }`,
+                      style: 'user-select: none;'
+                    }, [
+                      h('input', {
+                        type: 'checkbox',
+                        value: t.id_sloc_tail || t.id_sloc_tail,
+                        checked: isChecked,
+                        onChange: e => {
+                          const val = t.id_sloc_tail || t.id_sloc_tail
+                          if (e.target.checked) {
+                            if (!props.form.tankNo.includes(val)) {
+                              props.form.tankNo.push(val)
+                            }
+                          } else {
+                            props.form.tankNo = props.form.tankNo.filter(v => v !== val)
                           }
-                        } else {
-                          props.form.tankNo = props.form.tankNo.filter(v => v !== val)
-                        }
-                      },
-                      class: '',
-                    }),
-                    h('span', t.tankNo),
-                  ]))
+                        },
+                        style: 'display: none;',
+                      }),
+                      h('span', t.tankName || t.tankNo || String(t.id_sloc_tail || t.id_sloc_tail || '')),
+                    ]);
+                  })
                 )
         ]),
       ]),
@@ -331,7 +350,15 @@ const EntryForm = {
           h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, `Current ${props.mode === 'feed' ? 'Feed' : 'Rundown'} (MT)`),
           h(VTextField, { modelValue: props.form.currQtf, type: 'number', step: '0.001', density: 'comfortable', variant: 'outlined', hideDetails: true, 'onUpdate:modelValue': v => { props.form.currQtf = v } }),
         ]),
-        h(VBtn, { color: 'primary', variant: 'outlined', onClick: () => emit('fetch-dcs') }, () => 'Fetch DCS Data'),
+        h('div', { class: 'd-flex align-center gap-2' }, [
+          h(VBtn, { color: 'primary', variant: 'outlined', onClick: () => emit('fetch-dcs'), loading: props.timerSyncing }, () => 'Fetch DCS Data'),
+          h('div', { class: 'd-flex align-center gap-1 text-caption text-medium-emphasis' }, [
+            h('span', { innerHTML: '&#xf017;' }, ''),
+            props.timerLastSync ? h('span', `Last: ${props.timerLastSync}`) : null,
+            h('span', { class: 'font-weight-bold text-primary', style: 'margin: 0 4px' }, '|'),
+            h('span', `Next: ${props.timerCountdown} (${props.timerNextSync})`),
+          ]),
+        ]),
       ]),
       h('div', { class: 'text-caption font-weight-semibold text-medium-emphasis' }, props.dcsStatus || 'DCS data has not been fetched.'),
     ])
@@ -349,11 +376,6 @@ const wipSectionsBase = [
     label('START OF SECTION 103'), feed('DA-OIL FEEDS (103 FT0101)', '002', '103_FT0101'), label('PROCESS OF SECTION 103'),
     rundown('CRUDE-ME RUNDOWNS (103 FT0329)', '012', '103_FT0329'), rundown('TREATED-GLY RUNDOWNS (103 FT0266)', '022', '103_FT0266'), label('END OF SECTION 103'),
   ]),
-  section('section104', 'Section 104', [
-    label('START OF SECTION 104'), feed('CRUDE-ME FEEDS (104 F0110)', '003', '104_F0110'), label('PROCESS OF SECTION 104'),
-    rundown('BDME RUNDOWNS', '023'), rundown('UME RUNDOWNS (104 F0110)', '033', '104_F0110'), rundown('ME28 RUNDOWNS (104 F0332)', '043', '104_F0332'),
-    rundown('ECONOATE 665 RUNDOWNS', '053'), rundown('ME80 RUNDOWNS', '063'), label('END OF SECTION 104'),
-  ]),
   section('section110', 'Section 110', [
     label('START OF SECTION 110'), feed('TREATED-GLY FEEDS (110 F0107)', '004', '110_F0107'), label('PROCESS OF SECTION 110'),
     rundown('CRUDE-GLY RUNDOWNS (110 F0108)', '014', '110_F0108'), label('END OF SECTION 110'),
@@ -368,10 +390,10 @@ const wipSectionsBase = [
   ]),
 ]
 
-function section(key, title, steps) { return { key, title, steps } }
+function section(key, title, steps, modeKey = null) { return { key, title, steps, modeKey } }
 function label(label) { return { type: 'label', key: label, label, icon: label.startsWith('END') ? 'ri-flag-checkered-line' : 'ri-arrow-down-line' } }
-function feed(title, id, tag = null) { return { type: 'feed', key: `feed-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
-function rundown(title, id, tag = null) { return { type: 'rundown', key: `rundown-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag } }
+function feed(title, id, tag = null, sectionMode = 1) { return { type: 'feed', key: `feed-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag, sectionMode } }
+function rundown(title, id, tag = null, sectionMode = 1) { return { type: 'rundown', key: `rundown-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag, sectionMode } }
 function modeSwitch(sectionKey, currentValue, options) {
   return {
     type: 'mode',
@@ -383,69 +405,106 @@ function modeSwitch(sectionKey, currentValue, options) {
   }
 }
 
-const selectedMode105 = ref('mode-105-1')
+const selectedMode104 = ref(1)
+const selectedMode105 = ref(1)
+const selectedChain105 = ref('me28')
+const selectedMode106Major = ref(1)
 const selectedMode106 = ref('mode-106-1')
 const selectedMode112 = ref('mode-112-1')
 
+const section104Steps = computed(() => {
+  const m = selectedMode104.value
+  const steps = [
+    label('START OF SECTION 104'),
+    feed('CRUDE-ME FEEDS (104 F0110)', '003', '104_F0110', m),
+    label('PROCESS OF SECTION 104'),
+    rundown('BDME RUNDOWNS', '023', null, m),
+    rundown('UME RUNDOWNS (104 F0110)', '033', '104_F0110', m),
+    rundown('ME28 RUNDOWNS (104 F0332)', '043', '104_F0332', m),
+    rundown('ECONOATE 665 RUNDOWNS', '053', null, m),
+    rundown('ME80 RUNDOWNS', '063', null, m),
+  ]
+  if (m === 1) {
+    steps.push(rundown('ME60 RUNDOWNS (104 FT0157)', '013', '104_FT0157', m))
+  }
+  steps.push(label('END OF SECTION 104'))
+  return steps
+})
+
 const section105Steps = computed(() => {
+  const m = selectedMode105.value
+  const c = selectedChain105.value
   const header = label('START OF SECTION 105')
   const process = label('PROCESS OF SECTION 105')
   const end = label('END OF SECTION 105')
-  const switcher = modeSwitch('105', selectedMode105.value, [
-    { value: 'mode-105-1', label: '- Mode LONG-CHAIN -' },
-    { value: 'mode-105-2', label: '- Mode SHORT-CHAIN -' },
-  ])
-  if (selectedMode105.value === 'mode-105-1') {
+  if (m === 1) {
+    const switch105 = modeSwitch('105-chain', selectedChain105.value, [
+      { value: 'me28', label: 'Short Chain (ME28)' },
+      { value: 'me80', label: 'Long Chain (ME80)' },
+    ])
+    if (c === 'me28') {
+      return [
+        header, switch105,
+        feed('ME28 FEEDS (105 FQ104)', '006-01', '105_FQ104', m),
+        process,
+        rundown('CFA28 RUNDOWNS (105 FQ808)', '016', '105_FQ808', m),
+        end,
+      ]
+    }
     return [
-      header,
-      switcher,
-      feed('ME28 FEEDS (105 FQ104)', '006-01', '105_FQ104'),
+      header, switch105,
+      feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104', m),
       process,
-      rundown('CFA28 RUNDOWNS (105 FQ808)', '016', '105_FQ808'),
+      rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808', m),
       end,
     ]
   }
-  return [
-    header,
-    switcher,
-    feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104'),
-    process,
-    rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808'),
-    end,
-  ]
+  return [header, feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104', m), process, rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808', m), end]
 })
 
 const section106Steps = computed(() => {
   const header = label('START OF SECTION 106/114')
   const process = label('PROCESS OF SECTION 106/114')
   const end = label('END OF SECTION 106/114')
+
+  const majorMode = selectedMode106Major.value
+  if (majorMode === 2) {
+    return [
+      header,
+      feed('CFA80 FEEDS (106 F0115)', '008-02', '106_F0115', majorMode),
+      process,
+      rundown('CFA28 RUNDOWNS (106 F0245)', '098', '106_F0245', majorMode),
+      rundown('LEFA RUNDOWNS (106 F0167)', '028', '106_F0167', majorMode),
+      rundown('FA8 RUNDOWNS (106 F0134)', '108', '106_F0134', majorMode),
+      rundown('FA10 RUNDOWNS (106 F0231)', '118', '106_F0231', majorMode),
+      end,
+    ]
+  }
+
   const switcher = modeSwitch('106', selectedMode106.value, [
     { value: 'mode-106-1', label: '- Mode ECOROL 24 -' },
     { value: 'mode-106-2', label: '- Mode ECOROL 12/14 -' },
   ])
   const common = [
-    feed('CFA28 FEEDS (106 F0115)', '008', '106_F0115'),
-    rundown('ECOROL-WAX RUNDOWNS (106 F0245)', '018', '106_F0245'),
-    rundown('LEFA RUNDOWNS (106 F0167)', '028', '106_F0167'),
+    feed('CFA28 FEEDS (106 F0115)', '008-01', '106_F0115', majorMode),
+    rundown('ECOROL-WAX RUNDOWNS (106 F0245)', '018', '106_F0245', majorMode),
+    rundown('LEFA RUNDOWNS (106 F0167)', '028', '106_F0167', majorMode),
   ]
   if (selectedMode106.value === 'mode-106-1') {
     return [
-      header,
-      switcher,
-      ...common,
-      rundown('FA24 RUNDOWNS (106 F0134)', '038', '106_F0134'),
-      rundown('FA16/99 RUNDOWNS (106 F0231)', '048', '106_F0231'),
-      rundown('FA18lrr RUNDOWNS (106 F0112)', '058', '106_F0112'),
-      end,
+      header, switcher, ...common,
+      rundown('FA24 RUNDOWNS (106 F0134)', '038', '106_F0134', majorMode),
+      rundown('FA16/99 RUNDOWNS (106 F0231)', '048', '106_F0231', majorMode),
+      rundown('FA18lrr RUNDOWNS (106 F0112)', '058', '106_F0112', majorMode),
+      rundown('FA26 RUNDOWNS (106 F0134)', '068', '106_F0134', majorMode),
+      process, end,
     ]
   }
   return [
-    header,
-    switcher,
-    ...common,
-    rundown('FA12/99 RUNDOWNS (106 F0134)', '078', '106_F0134'),
-    rundown('FA14/99 RUNDOWNS (106 F0231)', '088', '106_F0231'),
-    end,
+    header, switcher, ...common,
+    rundown('FA12/99 RUNDOWNS (106 F0134)', '078', '106_F0134', majorMode),
+    rundown('FA14/99 RUNDOWNS (106 F0231)', '088', '106_F0231', majorMode),
+    process, end,
   ]
 })
 
@@ -514,9 +573,12 @@ const section112Steps = computed(() => {
 
 const wipSections = computed(() => {
   const result = [...wipSectionsBase]
-  result.splice(3, 0, section('section105', 'Section 105', section105Steps.value))
-  result.splice(4, 0, section('section106', 'Section 106/114', section106Steps.value))
-  result.splice(7, 0, section('section112', 'Section 112/114', section112Steps.value))
+  result.splice(2, 0, section('section104', 'Section 104', section104Steps.value, 'section104'))
+  result.splice(3, 0, section('section105', 'Section 105', section105Steps.value, 'section105'))
+  result.splice(4, 0, section('section106', 'Section 106/114', section106Steps.value, 'section106'))
+  if (selectedMode106Major.value !== 2) {
+    result.splice(7, 0, section('section112', 'Section 112/114', section112Steps.value))
+  }
   return result
 })
 
@@ -533,14 +595,41 @@ const { feedLatest, rundownLatest, feedLogs, rundownLogs, balanceData, balanceMe
 const loading = ref(false)
 const storeLoading = ref(false)
 const selectedSection = ref('allSection')
+const syncing = ref(false)
+
+function formatLastSync(isoString) {
+  if (!isoString) return '-'
+  const d = new Date(isoString)
+  return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+async function doFetchFeedDcs() {
+  if (!activeFeedStep?.tag) return
+  await fetchFeedDcs()
+}
+
+async function doFetchRundownDcs() {
+  if (!activeRundownStep?.tag) return
+  await fetchRundownDcs()
+}
+
+const autoFetchFeed = useAutoFetchQty(doFetchFeedDcs)
+const autoFetchRundown = useAutoFetchQty(doFetchRundownDcs)
 
 const visibleSections = computed(() => selectedSection.value === 'allSection' ? wipSections.value : wipSections.value.filter(s => s.key === selectedSection.value))
 const runnableSteps = computed(() => wipSections.value.flatMap(s => s.steps).filter(s => s.type === 'feed' || s.type === 'rundown'))
 
+function onSectionModeChange(sectionKey, value) {
+  if (sectionKey === 'section104') selectedMode104.value = value
+  else if (sectionKey === 'section105') selectedMode105.value = value
+  else if (sectionKey === 'section106') selectedMode106Major.value = value
+  reloadStepsForSection(sectionKey)
+}
+
 function onModeChange(target, value) {
-  if (target === 'selectedMode105') selectedMode105.value = value
-  else if (target === 'selectedMode106') selectedMode106.value = value
+  if (target === 'selectedMode106') selectedMode106.value = value
   else if (target === 'selectedMode112') selectedMode112.value = value
+  else if (target === 'selectedMode105-chain') selectedChain105.value = value
 }
 
 async function reloadStepsForSection(sectionKey) {
@@ -553,7 +642,10 @@ async function reloadStepsForSection(sectionKey) {
   ))
 }
 
+watch(selectedMode104, () => reloadStepsForSection('section104'))
 watch(selectedMode105, () => reloadStepsForSection('section105'))
+watch(selectedChain105, () => reloadStepsForSection('section105'))
+watch(selectedMode106Major, () => reloadStepsForSection('section106'))
 watch(selectedMode106, () => reloadStepsForSection('section106'))
 watch(selectedMode112, () => reloadStepsForSection('section112'))
 
@@ -561,16 +653,19 @@ const feedColumns = [
   { key: 'plant_name', label: 'Plant' },
   { key: 'to_trace_no', label: 'Feed Trace No' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
   { key: 'sloc', label: 'Sloc' }, { key: 'out_qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Trace No / Supplier / Batch SAP / Out Qty' },
+  { key: 'created_at', label: 'Created At' }, { key: 'created_by', label: 'Created By' },
 ]
 const rundownColumns = [
   { key: 'plant_name', label: 'Plant' },
   { key: 'rundown_trace_no', label: 'WIP Trace No' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
   { key: 'sloc', label: 'Sloc' }, { key: 'in_qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Feed Trace No / Supplier / Batch SAP / In Qty' },
+  { key: 'created_at', label: 'Created At' }, { key: 'created_by', label: 'Created By' },
 ]
 const balanceColumns = [
   { key: 'plant_name', label: 'Plant' },
   { key: 'trace_no', label: 'Trace No' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
   { key: 'sloc', label: 'Sloc' }, { key: 'qty', label: 'Total Material (MT)' }, { key: 'balance_supplier', label: 'Total Supplier (MT)' }, { key: 'supplier', label: 'Supplier / Batch' },
+  { key: 'created_at', label: 'Created At' }, { key: 'created_by', label: 'Created By' },
 ]
 
 const itemsPerPageLog = 5
@@ -663,9 +758,9 @@ const rundownDcsStatus = ref('')
 const rundownForm = reactive(blankForm())
 let activeRundownStep = null
 
-function blankForm() { return { id: '', feature: '', batchNo: '', lastQtf: 0, currQtf: 0, entryDate: today(), tank: null, tankNo: [] } }
+function blankForm() { return { id: '', feature: '', batchNo: '', lastQtf: 0, currQtf: 0, entryDate: today(), tank: null, tankNo: [], wipMode: 1 } }
 function today() { return new Date().toISOString().slice(0, 10) }
-function resetForm(target, step) { Object.assign(target, blankForm(), { id: step.id, feature: step.title }) }
+function resetForm(target, step) { Object.assign(target, blankForm(), { id: step.id, feature: step.title, wipMode: step.sectionMode ?? 1 }) }
 
 async function openFeedModal(step) {
   activeFeedStep = step
@@ -680,6 +775,9 @@ async function openFeedModal(step) {
   feedDcsStatus.value = `${feedTanks.value.length} Feed Sloc found for plant ${resolvePlantCode()}. ${step.tag ? `DCS tag available: ${step.tag}` : 'No DCS tag configured for this entry.'}`
   const last = await store.fetchFeedLastBatch(step.id)
   applyLast(feedForm, last)
+  if (step.tag) await fetchFeedDcs()
+  autoFetchFeed.startCountdown()
+  autoFetchFeed.startAutoSync()
 }
 
 async function openRundownModal(step) {
@@ -695,6 +793,9 @@ async function openRundownModal(step) {
   rundownDcsStatus.value = `${rundownTanks.value.length} WIP Sloc found for plant ${resolvePlantCode()}. ${step.tag ? `DCS tag available: ${step.tag}` : 'No DCS tag configured for this entry.'}`
   const last = await store.fetchRundownLastBatch(step.id)
   applyLast(rundownForm, last)
+  if (step.tag) await fetchRundownDcs()
+  autoFetchRundown.startCountdown()
+  autoFetchRundown.startAutoSync()
 }
 
 function applyLast(form, rows) {
@@ -753,7 +854,7 @@ function findAdaptiveTank(tanks, mode) {
 
   const plantDesc = String(plantSelectionStore.selectedPlantName || '').toUpperCase()
   const keywords = []
-  const match = plantDesc.match(/(EOB|EOMB)[-\s]*([1-3])?/i)
+  const match = plantDesc.match(/(EOB|EOMB)[-\s]*([1-9])?/i)
   if (match) {
     const type = match[1].toUpperCase()
     const num = match[2] || ''
@@ -792,17 +893,14 @@ function findAdaptiveTank(tanks, mode) {
 function autoSelectTank(form, tanks, mode) {
   if (form.tank || !Array.isArray(tanks) || tanks.length === 0) return
   const selected = findAdaptiveTank(tanks, mode)
-  form.tank = selected ? Number(selected.id_sloc || selected.id_tank) : null
+  form.tank = selected ? Number(selected.id_sloc || selected.tf_number) : null
 }
 
 async function onFeedTankChange() {
   feedForm.tankNo = []
   feedSpecificTanks.value = feedForm.tank ? await fetchSpecificTanks(feedForm.tank) : []
-  if (feedSpecificTanks.value?.length) {
-    feedForm.tankNo = feedSpecificTanks.value.map(t => t.id_sloc_tail || t.id_tank_tail).filter(Boolean)
-  }
   if (feedModalOpen.value && activeFeedStep) {
-    const selectedTank = feedTanks.value.find(t => (t.id_sloc || t.id_tank) == feedForm.tank)
+    const selectedTank = feedTanks.value.find(t => (t.id_sloc || t.tf_number) == feedForm.tank)
     feedForm.batchNo = 'Generating...'
     feedForm.batchNo = normalizeTraceNo(await store.generateNewFeedNumber(activeFeedStep.id, selectedTank?.id_plant)) || buildTraceNo('3', activeFeedStep.id, selectedTank)
   }
@@ -810,11 +908,8 @@ async function onFeedTankChange() {
 async function onRundownTankChange() {
   rundownForm.tankNo = []
   rundownSpecificTanks.value = rundownForm.tank ? await fetchSpecificTanks(rundownForm.tank) : []
-  if (rundownSpecificTanks.value?.length) {
-    rundownForm.tankNo = rundownSpecificTanks.value.map(t => t.id_sloc_tail || t.id_tank_tail).filter(Boolean)
-  }
   if (rundownModalOpen.value && activeRundownStep) {
-    const selectedTank = rundownTanks.value.find(t => (t.id_sloc || t.id_tank) == rundownForm.tank)
+    const selectedTank = rundownTanks.value.find(t => (t.id_sloc || t.tf_number) == rundownForm.tank)
     rundownForm.batchNo = 'Generating...'
     rundownForm.batchNo = normalizeTraceNo(await store.generateNewRundownNumber(activeRundownStep.id, selectedTank?.id_plant)) || buildTraceNo('2', activeRundownStep.id, selectedTank)
   }
@@ -861,11 +956,11 @@ async function fetchDcs(step, form, statusRef) {
 }
 
 async function submitFeed() {
-  const res = await store.saveFeed({ feed_id: feedForm.id, tank: feedForm.tank, tankNo: feedForm.tankNo, curr_feed: feedForm.currQtf, last_feed: feedForm.lastQtf, curr_entryDate: feedForm.entryDate, batch_no: feedForm.batchNo, feature: feedForm.feature })
+  const res = await store.saveFeed({ feed_id: feedForm.id, tank: feedForm.tank, tankNo: feedForm.tankNo, curr_feed: feedForm.currQtf, last_feed: feedForm.lastQtf, curr_entryDate: feedForm.entryDate, batch_no: feedForm.batchNo, feature: feedForm.feature, wip_mode: feedForm.wipMode })
   if (res?.status === 1) { feedModalOpen.value = false; await reloadAll() }
 }
 async function submitRundown() {
-  const res = await store.saveRundown({ rundown_id: rundownForm.id, tank: rundownForm.tank, tankNo: rundownForm.tankNo, curr_rundown: rundownForm.currQtf, last_rundown: rundownForm.lastQtf, curr_entryDate: rundownForm.entryDate, batch_no: rundownForm.batchNo, feature: rundownForm.feature })
+  const res = await store.saveRundown({ rundown_id: rundownForm.id, tank: rundownForm.tank, tankNo: rundownForm.tankNo, curr_rundown: rundownForm.currQtf, last_rundown: rundownForm.lastQtf, curr_entryDate: rundownForm.entryDate, batch_no: rundownForm.batchNo, feature: rundownForm.feature, wip_mode: rundownForm.wipMode })
   if (res?.status === 1) { rundownModalOpen.value = false; await reloadAll() }
 }
 
@@ -938,6 +1033,22 @@ async function reloadAll() {
   }
 }
 
-onMounted(reloadAll)
+watch(feedModalOpen, (val) => {
+  if (!val) {
+    autoFetchFeed.stopCountdown()
+    autoFetchFeed.stopAutoSync()
+  }
+})
+
+watch(rundownModalOpen, (val) => {
+  if (!val) {
+    autoFetchRundown.stopCountdown()
+    autoFetchRundown.stopAutoSync()
+  }
+})
+
+onMounted(() => {
+  reloadAll()
+})
 </script>
 

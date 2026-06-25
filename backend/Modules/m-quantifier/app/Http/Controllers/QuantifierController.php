@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Quantifier\Http\Controllers;
 
 use App\Helpers\ApiResponse;

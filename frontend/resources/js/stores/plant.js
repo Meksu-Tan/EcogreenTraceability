@@ -52,13 +52,15 @@ export const useSetupPlantStore = defineStore('setupPlant', () => {
 export const usePlantSelectionStore = defineStore('plantSelection', () => {
   const selectedPlantId = ref(null)
   const selectedPlantName = ref('')
+  const selectedPlantCode = ref('')
   const hasUserSelected = ref(false)
 
   const hasSelectedPlant = computed(() => hasUserSelected.value)
 
-  function setPlant(id, name) {
+  function setPlant(id, name, code = '') {
     selectedPlantId.value = id
     selectedPlantName.value = name || 'All Plants'
+    selectedPlantCode.value = code || ''
     hasUserSelected.value = true
     // Trigger cache reset when plant changes
     if (cacheResetCallback) {
@@ -69,6 +71,7 @@ export const usePlantSelectionStore = defineStore('plantSelection', () => {
   function clearPlant() {
     selectedPlantId.value = null
     selectedPlantName.value = 'All Plants'
+    selectedPlantCode.value = ''
     hasUserSelected.value = false
     // Trigger cache reset when plant changes
     if (cacheResetCallback) {
@@ -79,6 +82,7 @@ export const usePlantSelectionStore = defineStore('plantSelection', () => {
   return {
     selectedPlantId,
     selectedPlantName,
+    selectedPlantCode,
     hasSelectedPlant,
     hasUserSelected,
     setPlant,

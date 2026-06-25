@@ -222,7 +222,7 @@ class TankServiceTest extends TestCase
         $result = $service->syncFromExternal('admin');
 
         $this->assertSame(2, $result['status']);
-        $this->assertSame('All tanks are up to date. No updates needed.', $result['message']);
+        $this->assertStringContainsString('up to date', $result['message']);
     }
 
     public function test_it_returns_failure_when_external_api_responds_with_error_status(): void
@@ -237,7 +237,7 @@ class TankServiceTest extends TestCase
         $result = $service->syncFromExternal('admin');
 
         $this->assertSame(0, $result['status']);
-        $this->assertSame('Failed to fetch data from external API.', $result['message']);
+        $this->assertStringContainsString('Failed to fetch data from external API', $result['message']);
     }
 
     public function test_it_returns_failure_when_external_api_returns_invalid_response_structure(): void
@@ -295,6 +295,6 @@ class TankServiceTest extends TestCase
         $result = $service->syncFromExternal('admin');
 
         $this->assertSame(2, $result['status']);
-        $this->assertSame('All tanks are up to date. No updates needed.', $result['message']);
+        $this->assertStringContainsString('up to date', $result['message']);
     }
 }

@@ -27,7 +27,7 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
   )
 
   async function fetchEntries(params = {}) {
-    return doFetchList({ plant: plantId.value, ...params })
+    return doFetchList({ id_plant: plantId.value, ...params })
   }
   const activeFgProducts = ref([])
   const wipBalance = ref(0)
@@ -167,11 +167,15 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     }
   }
 
-  async function fetchNewTraceNo(id_plant) {
+  async function fetchNewTraceNo(id_plant, id_material) {
     const activePlant = id_plant || plantId.value || plantStore.selectedPlantId
+    if (!id_material) {
+      newTraceNo.value = ''
+      return
+    }
     traceNoLoading.value = true
     try {
-      const res = await shipmentService.getNewTraceNo(activePlant)
+      const res = await shipmentService.getNewTraceNo(activePlant, id_material)
       if (res.data?.data && res.data.data.length > 0) {
         newTraceNo.value = res.data.data[0].traceNo || ''
       } else {
@@ -205,6 +209,7 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     setPage,
     hasEntries,
     entriesCount,
+    activeFgProducts,
     wipBalance,
     wipMaterialLabel,
     activeBatches,

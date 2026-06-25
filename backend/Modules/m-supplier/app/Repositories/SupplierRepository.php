@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Supplier\Repositories;
 
 use Modules\Supplier\Models\Supplier;
@@ -104,7 +104,7 @@ class SupplierRepository implements SupplierRepositoryInterface
 
     public function getActive(): array
     {
-        return Supplier::selectRaw('id_supplier, CONCAT(code, " / ", description) AS supplier')
+        return Supplier::selectRaw("id_supplier, CONCAT(code, ' / ', description) AS supplier")
             ->where('status', '1')
             ->orderBy('description')
             ->get()

@@ -82,9 +82,9 @@ import transferApi from '../services/index.js'
 const props = defineProps({
   isOpen: Boolean,
   idHead: { type: Number, default: null },
-  idTank: { type: Number, default: null },
+  idSloc: { type: Number, default: null },
   mainSloc: { type: String, default: '' },
-  idTankTail: { type: Array, default: () => [] },
+  idSlocTail: { type: Array, default: () => [] },
   isSource: { type: Boolean, default: false }
 })
 
@@ -100,10 +100,10 @@ const errorMsg = ref('')
 async function bootstrap() {
   errorMsg.value = ''
   loadingTanks.value = true
-  selectedTails.value = props.idTankTail.map(String)
+  selectedTails.value = props.idSlocTail.map(String)
 
   try {
-    const response = await transferApi.getSpecificTanksRundown({ sloc: props.idTank })
+    const response = await transferApi.getSpecificTanksRundown({ sloc: props.idSloc })
     availableTanks.value = response?.data || []
 
     if (availableTanks.value.length === 1) {

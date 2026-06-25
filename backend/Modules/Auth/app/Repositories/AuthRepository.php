@@ -1,4 +1,5 @@
-<?php declare(strict_types=1);
+<?php
+declare(strict_types=1);
 namespace Modules\Auth\Repositories;
 
 use App\Models\User;
@@ -18,12 +19,16 @@ class AuthRepository implements AuthRepositoryInterface
 
     public function createToken(object $user, string $name = 'auth-token'): string
     {
-        return $user->createToken($name)->plainTextToken;
+        return DbConnectionRetry::execute(
+            fn() => $user->createToken($name)->plainTextToken
+        );
     }
 
     public function revokeCurrentToken(object $user): void
     {
-        $user->currentAccessToken()->delete();
+        DbConnectionRetry::execute(
+            fn() => $user->currentAccessToken()?->delete()
+        );
     }
 
     public function getUserWithPermissions(object $user): object
@@ -36,11 +41,15 @@ class AuthRepository implements AuthRepositoryInterface
 
     public function getAllRoles(): array
     {
-        return Role::all()->toArray();
+        return DbConnectionRetry::execute(
+            fn() => Role::all()->toArray()
+        );
     }
 
     public function getAllPermissions(): array
     {
-        return Permission::all()->toArray();
+        return DbConnectionRetry::execute(
+            fn() => Permission::all()->toArray()
+        );
     }
 }

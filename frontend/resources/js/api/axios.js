@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getRouter } from '@/core/router/index.js'
 
 const apiBaseURL = import.meta.env.VITE_API_URL
 
@@ -9,7 +10,7 @@ if (!apiBaseURL) {
 const api = axios.create({
   baseURL: apiBaseURL,
   withCredentials: true,
-  timeout: 30000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -17,12 +18,23 @@ const api = axios.create({
   },
 })
 
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
   const token = localStorage.getItem('auth_token')
 
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`
   }
+
+  try {
+    const { usePlantSelectionStore } = await import('@/stores/plant.js')
+    const plantStore = usePlantSelectionStore()
+    if (plantStore.selectedPlantId) {
+      config.headers['X-Plant-Id'] = plantStore.selectedPlantId
+    }
+  } catch (e) {
+    // Pinia not initialized yet or store unavailable
+  }
+
   return config
 })
 
@@ -38,17 +50,12 @@ api.interceptors.response.use(
       return Promise.reject({ message, networkError: true })
     }
 
-    if (error.response?.status === 401 && window.location.pathname !== '/login') {
+    if (error.response?.status === 401) {
       localStorage.removeItem('auth_token')
-      import('@/router')
-        .then(({ default: router }) => {
-          if (router.currentRoute.value.name !== 'login') {
-            router.replace({ name: 'login' })
-          }
-        })
-        .catch(() => {
-          window.location.assign('/login')
-        })
+      const router = getRouter()
+      if (router && router.currentRoute.value.name !== 'login') {
+        router.replace({ name: 'login' })
+      }
     }
     return Promise.reject(error)
   }

@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,7 +14,7 @@ return new class extends Migration {
                 $table->integer('id_sloc')->primary();
                 $table->string('id_plant', 10);
                 $table->string('plant_name', 100);
-                $table->string('id_tank', 50);
+                $table->string('tf_number', 50);
                 $table->string('code', 50)->nullable();
                 $table->string('code_2', 50)->nullable();
                 $table->string('code_3', 50)->nullable();

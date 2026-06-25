@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsRaw\Repositories;
 
 use Modules\TsRaw\Repositories\Contracts\RmEntryRepositoryInterface;
@@ -21,7 +21,7 @@ class RmEntryRepository implements RmEntryRepositoryInterface
     protected $movType1 = '1';
     protected $movType2 = '9';
     protected $typeMaterial = 'RM';
-    protected $idTankSrc = "T000";
+    protected $idSlocSrc = "T000";
     protected $movSeqTransfer = '000';
     protected $typeTransfer = '7';
 }

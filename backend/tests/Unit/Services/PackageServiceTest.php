@@ -34,10 +34,10 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_get_dt_pck_entry_to_repository(): void
     {
-        $expected = collect([
+        $expected = ['data' => collect([
             (object)['id_pck' => 1, 'entry_no' => 'PCK-001'],
             (object)['id_pck' => 2, 'entry_no' => 'PCK-002'],
-        ]);
+        ]), 'total' => 2];
 
         $this->repoMock
             ->shouldReceive('getDtPckEntry')
@@ -46,7 +46,9 @@ class PackageServiceTest extends TestCase
 
         $result = $this->makeService()->getDtPckEntry();
 
-        $this->assertInstanceOf(Collection::class, $result);
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertArrayHasKey('total', $result);
         $this->assertEquals($expected, $result);
     }
 
@@ -55,12 +57,12 @@ class PackageServiceTest extends TestCase
         $this->repoMock
             ->shouldReceive('getDtPckEntry')
             ->once()
-            ->andReturn(collect());
+            ->andReturn(['data' => collect(), 'total' => 0]);
 
         $result = $this->makeService()->getDtPckEntry();
 
-        $this->assertInstanceOf(Collection::class, $result);
-        $this->assertTrue($result->isEmpty());
+        $this->assertIsArray($result);
+        $this->assertEmpty($result['data']);
     }
 
     // ——— getActiveFgProduct ———
@@ -121,7 +123,7 @@ class PackageServiceTest extends TestCase
     public function test_it_delegates_get_cmb_active_tank_pck_to_repository(): void
     {
         $data     = ['id_material' => 5];
-        $expected = collect([(object)['id_tank' => 3, 'tank_code' => 'T-03']]);
+        $expected = collect([(object)['id_sloc' => 3, 'tank_code' => 'T-03']]);
 
         $this->repoMock
             ->shouldReceive('getCmbActiveTankPck')
@@ -157,7 +159,7 @@ class PackageServiceTest extends TestCase
     public function test_it_delegates_get_cmb_active_specific_tank_to_repository(): void
     {
         $data     = ['id_material' => 5, 'sloc' => 'SL01'];
-        $expected = collect([(object)['id_tank' => 8, 'sloc' => 'SL01']]);
+        $expected = collect([(object)['id_sloc' => 8, 'sloc' => 'SL01']]);
 
         $this->repoMock
             ->shouldReceive('getCmbActiveSpecificTank')

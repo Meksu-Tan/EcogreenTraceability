@@ -131,39 +131,35 @@ class TraceForwardModuleTest extends TestCase
         $user = User::factory()->make();
 
         $mockData = [
-            'initial' => [
-                (object) [
-                    'prev_trace' => null,
-                    'curr_trace' => '100001-001',
-                    'batch_date' => '2026-01-01',
-                    'material' => 'CPO',
-                    'in_qty' => '10.000',
-                    'out_qty' => '8.000',
-                    'sloc' => 'T001',
-                    'supplier' => 'S001 / B001 / 10.000 MT',
-                    'material_document' => 'MD-001',
-                    'level' => 1,
-                    'path' => '1',
-                    'created_at' => '2026-01-01 08:00:00',
-                    'created_by' => 'admin',
-                ],
+            (object) [
+                'prev_trace' => null,
+                'curr_trace' => '100001-001',
+                'batch_date' => '2026-01-01',
+                'material' => 'CPO',
+                'in_qty' => '10.000',
+                'out_qty' => '8.000',
+                'sloc' => 'T001',
+                'supplier' => 'S001 / B001 / 10.000 MT',
+                'material_document' => 'MD-001',
+                'level' => 1,
+                'path' => '1',
+                'created_at' => '2026-01-01 08:00:00',
+                'created_by' => 'admin',
             ],
-            'chain' => [
-                (object) [
-                    'prev_trace' => '100001-001',
-                    'curr_trace' => '200002-001',
-                    'batch_date' => '2026-01-02',
-                    'material' => 'Refined',
-                    'in_qty' => '8.000',
-                    'out_qty' => '5.000',
-                    'sloc' => 'T002',
-                    'supplier' => 'internal / - / -',
-                    'material_document' => 'MD-002',
-                    'level' => 2,
-                    'path' => '1.01',
-                    'created_at' => '2026-01-02 09:00:00',
-                    'created_by' => 'admin',
-                ],
+            (object) [
+                'prev_trace' => '100001-001',
+                'curr_trace' => '200002-001',
+                'batch_date' => '2026-01-02',
+                'material' => 'Refined',
+                'in_qty' => '8.000',
+                'out_qty' => '5.000',
+                'sloc' => 'T002',
+                'supplier' => 'internal / - / -',
+                'material_document' => 'MD-002',
+                'level' => 2,
+                'path' => '1.01',
+                'created_at' => '2026-01-02 09:00:00',
+                'created_by' => 'admin',
             ],
         ];
 
@@ -173,7 +169,7 @@ class TraceForwardModuleTest extends TestCase
             ->andReturn($mockData);
         $this->app->instance(TraceForwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=100001-001&id_material=5');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=10000100001&id_material=5');
 
         $response->assertStatus(200)
             ->assertJsonPath('data.initial.0.curr_trace', '100001-001')
@@ -207,7 +203,7 @@ class TraceForwardModuleTest extends TestCase
             ->andThrow(new \RuntimeException('SQL syntax error'));
         $this->app->instance(TraceForwardServiceInterface::class, $serviceMock);
 
-        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=T001&id_material=5');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/trace/forward/detail?id_header=1&trace_no=10000100001&id_material=5');
 
         $response->assertStatus(500)
             ->assertJsonPath('status', 0)

@@ -9,6 +9,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   const loading = ref(false)
   const error = ref(null)
   const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
+  const periodMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
 
   // Lookup caches
   const activeMaterials = ref([])
@@ -142,11 +143,25 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     } catch { entryNo.value = null }
   }
 
-  async function fetchPeriodHeaders() {
+  async function fetchPeriodHeaders(params = {}) {
     try {
-      const res = await adjustmentApi.getPeriodHeaders()
-      periodHeaders.value = res.data?.data || []
-    } catch { periodHeaders.value = [] }
+      const res = await adjustmentApi.getPeriodHeaders(params)
+      const payload = res.data?.data || {}
+      periodHeaders.value = payload.data || (Array.isArray(payload) ? payload : [])
+      periodMeta.value = {
+        page: payload.page || params.page || 1,
+        perPage: payload.per_page || params.per_page || 10,
+        total: payload.total || periodHeaders.value.length,
+        lastPage: payload.last_page || 1,
+      }
+    } catch {
+      periodHeaders.value = []
+      periodMeta.value = { page: 1, perPage: 10, total: 0, lastPage: 1 }
+    }
+  }
+
+  function setPeriodPage(p) {
+    periodMeta.value = { ...periodMeta.value, page: p }
   }
 
   async function fetchPeriodViewData(params = {}) {
@@ -306,12 +321,16 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     adjustStatus.value = null
   }
 
+  function clearSpecificTanks() {
+    activeSpecificTanks.value = []
+  }
+
   return {
-    data, detail, loading, error, listMeta,
+    data, detail, loading, error, listMeta, periodMeta,
     activeMaterials, activeMaterialWhx, activeTanks, activeSpecificTanks, activeWhx,
     supplierList, searchSuppliersList, batches, lockStatus, entryNo,
     periodHeaders, periodViewData, adjustStatus,
-    fetchList, fetchDetail, setPage,
+    fetchList, fetchDetail, setPage, setPeriodPage,
     fetchActiveMaterials, fetchActiveMaterialWhx, fetchActiveTanks,
     fetchActiveSpecificTanks, fetchActiveWhx,
     fetchSupplierList, fetchSuppliers, fetchBatchBySupplier, fetchLockStatus, fetchEntryNo,
@@ -324,6 +343,6 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     periodHeadersUpload, periodViewOnHand, periodViewAdjustment,
     periodHeaderLock, destroyAdjustmentPeriod,
     generateBatchCode,
-    clearData,
+    clearData, clearSpecificTanks,
   }
 })

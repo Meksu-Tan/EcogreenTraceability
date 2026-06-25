@@ -1,5 +1,5 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\TsPackage\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -14,7 +14,8 @@ class GenerateTraceNoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'warehouse' => ['required', 'integer'],
+            'id_material' => ['required', 'integer'],
+            'warehouse' => ['sometimes', 'integer'],
         ];
     }
 }

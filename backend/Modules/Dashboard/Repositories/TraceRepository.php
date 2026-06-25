@@ -1,14 +1,16 @@
-<?php declare(strict_types=1);
-
+<?php
+declare(strict_types=1);
 namespace Modules\Dashboard\Repositories;
 
 use Modules\Dashboard\Repositories\Contracts\DashboardRepositoryInterface;
 use Modules\Shared\Repositories\Traits\PlantFilterTrait;
+use Modules\Shared\Traits\DbCompatTrait;
 use Illuminate\Support\Facades\DB;
 
 class TraceRepository
 {
     use PlantFilterTrait;
+    use DbCompatTrait;
 
     protected string $connection = 'eudr_ts';
 
@@ -20,13 +22,19 @@ class TraceRepository
     {
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
+        $supplierGrp = $this->dbGroupConcat(
+            "CONCAT(s.description, ' / ', td.batch_sap, ' / ', " . $this->dbNumberFormat('td.out_qty', 3) . ", ' MT')",
+            ' | ',
+            true
+        );
+
         $sql = "
             SELECT th.id_trace_head, th.from_trace_no, th.to_trace_no,
                    th.entry_date, th.in_qty, th.out_qty, th.id_material,
                    CONCAT(m.code, ' :: ', m.description) AS material,
                    sl.description AS from_sloc, sl2.description AS to_sloc,
                    md.material_document AS mat_doc,
-                   GROUP_CONCAT(DISTINCT CONCAT(s.description, ' / ', td.batch_sap, ' / ', FORMAT(td.out_qty,3), ' MT') SEPARATOR ' | ') AS supplier_trace,
+                   {$supplierGrp} AS supplier_trace,
                    th.id_plant
               FROM t_trace_header th
               LEFT JOIN m_material m ON th.id_material = m.id_material
@@ -54,13 +62,19 @@ class TraceRepository
     {
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
+        $supplierGrp = $this->dbGroupConcat(
+            "CONCAT(s.description, ' / ', bd.batch_sap, ' / ', " . $this->dbNumberFormat('bd.qty', 3) . ", ' MT')",
+            ' | ',
+            true
+        );
+
         $sql = "
             SELECT th.id_trace_head, th.from_trace_no, th.to_trace_no,
                    th.entry_date, th.in_qty, th.out_qty, th.id_material,
                    CONCAT(m.code, ' :: ', m.description) AS material,
                    bh.trace_no AS source_trace, bh.qty AS source_qty,
                    sl.description AS from_sloc, sl2.description AS to_sloc,
-                   GROUP_CONCAT(DISTINCT CONCAT(s.description, ' / ', bd.batch_sap, ' / ', FORMAT(bd.qty,3), ' MT') SEPARATOR ' | ') AS supplier_details,
+                   {$supplierGrp} AS supplier_details,
                    th.id_plant
               FROM t_trace_header th
               LEFT JOIN m_material m ON th.id_material = m.id_material
@@ -173,12 +187,18 @@ class TraceRepository
             $bindings[] = "%{$batchNo}%";
         }
 
+        $supplierGrp = $this->dbGroupConcat(
+            "CONCAT(s.description, ' / ', td.batch_sap, ' / ', " . $this->dbNumberFormat('td.out_qty', 3) . ", ' MT')",
+            ' | ',
+            true
+        );
+
         $sql = "
             SELECT th.id_trace_head, th.from_trace_no, th.to_trace_no,
                    th.entry_date, th.in_qty, th.out_qty, th.id_material,
                    CONCAT(m.code, ' :: ', m.description) AS material,
                    p.description AS plant_name,
-                   GROUP_CONCAT(DISTINCT CONCAT(s.description, ' / ', td.batch_sap, ' / ', FORMAT(td.out_qty,3), ' MT') SEPARATOR ' | ') AS supplier_trace,
+                   {$supplierGrp} AS supplier_trace,
                    th.id_plant
               FROM t_trace_header th
               LEFT JOIN m_material m ON th.id_material = m.id_material
