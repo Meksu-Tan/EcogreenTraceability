@@ -4,9 +4,11 @@ namespace Modules\Supplier\Repositories;
 
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Repositories\Contracts\SupplierRepositoryInterface;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class SupplierRepository implements SupplierRepositoryInterface
 {
+    use TransactionLoggerTrait;
     public function getAll(): array
     {
         return Supplier::select([
@@ -42,11 +44,9 @@ class SupplierRepository implements SupplierRepositoryInterface
         ]);
 
         if ($model) {
-            \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-                'M_SUPPLIER', 'ADD',
+            $this->logTransaction('M_SUPPLIER', 'ADD',
                 'ID: ' . $model->id_supplier . ' | CODE: ' . $data['code'] . ' / NAME: ' . $data['description'],
-                $data['created_by'],
-            ]);
+                $data['created_by']);
         }
 
         return (bool) $model;
@@ -59,11 +59,9 @@ class SupplierRepository implements SupplierRepositoryInterface
             return false;
         }
 
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_SUPPLIER', 'UPDATE',
+        $this->logTransaction('M_SUPPLIER', 'UPDATE',
             'ID: ' . $id . ' | CODE: ' . $model->code . ' >> ' . $data['code'] . ' / NAME: ' . $model->description . ' >> ' . $data['description'],
-            $data['updated_by'],
-        ]);
+            $data['updated_by']);
 
         return (bool) $model->update([
             'code' => $data['code'],
@@ -76,9 +74,7 @@ class SupplierRepository implements SupplierRepositoryInterface
 
     public function deactivate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_SUPPLIER', 'DE-ACTIVATE', 'ID: ' . $id . ' | Status: 1 >> 0', $user,
-        ]);
+        $this->logTransaction('M_SUPPLIER', 'DE-ACTIVATE', 'ID: ' . $id . ' | Status: 1 >> 0', $user);
 
         $model = Supplier::find($id);
         if (!$model) {
@@ -90,9 +86,7 @@ class SupplierRepository implements SupplierRepositoryInterface
 
     public function activate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_SUPPLIER', 'ACTIVATE', 'ID: ' . $id . ' | Status: 0 >> 1', $user,
-        ]);
+        $this->logTransaction('M_SUPPLIER', 'ACTIVATE', 'ID: ' . $id . ' | Status: 0 >> 1', $user);
 
         $model = Supplier::find($id);
         if (!$model) {

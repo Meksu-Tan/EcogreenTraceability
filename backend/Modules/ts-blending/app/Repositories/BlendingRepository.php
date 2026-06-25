@@ -10,11 +10,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Shared\Traits\TankNameFormatterTrait;
 use Modules\Shared\Traits\TransactionLoggerTrait;
-use Modules\Shared\Traits\TraceNumberGeneratorTrait;
 
 class BlendingRepository implements BlendingRepositoryInterface
 {
-    use TankNameFormatterTrait, TransactionLoggerTrait, DbCompatTrait, TraceNumberGeneratorTrait;
+    use TankNameFormatterTrait, TransactionLoggerTrait, DbCompatTrait;
 
     protected $connection = 'eudr_ts';
 
@@ -35,14 +34,11 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function generateBlendingEntryNo(int $materialId, int $plantId): ?string
     {
-        return $this->generateTraceNumberForMaterial(
-            '8',
-            $materialId,
-            $plantId,
-            't_balance_header',
-            'trace_no',
-            'id_balance_head'
-        );
+        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $date = date('ymd');
+        $plantCode = $svc->resolvePlantCode((string) $plantId);
+        $section = $svc->resolveSection('8', $materialId);
+        return $svc->generate('8', $date, $section, $plantCode, 't_balance_header', 'trace_no');
     }
 
     public function getTotalStockMaterial(int $materialId, int $plantId): float

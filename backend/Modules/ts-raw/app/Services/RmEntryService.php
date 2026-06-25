@@ -6,7 +6,7 @@ use Modules\TsRaw\Repositories\Contracts\RmEntryRepositoryInterface;
 use Modules\TsRaw\Models\BalanceHeader;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
-use Modules\Plant\Models\Plant;
+use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -414,65 +414,19 @@ class RmEntryService implements RmEntryServiceInterface
     }
 
     /**
-     * Enhanced deactivate with lock period check (matching reference)
+     * Delegate to TransactionCancellationService for consistent chain-of-custody handling.
+     * Bridge: converts id_trace_head → pipe format (idHead|idTraceHead) expected by TCS.
      */
     public function deactivateTransfer($id, $user): array
     {
-        $connection = app('db')->connection('eudr_ts');
-        $connection->beginTransaction();
-
-        try {
-            $traceHead = $this->rmEntryRepo->findTransferById($id);
-
-            if (!$traceHead) {
-                throw new Exception('Transfer not found');
-            }
-
-            if ($traceHead->status == 0) {
-                throw new Exception('Transfer already deactivated');
-            }
-
-            // Lock period check
-            $entryDate = $traceHead->entry_date ?? null;
-            if ($entryDate && $this->getLockStatus((string) $entryDate)) {
-                throw new Exception('Cannot deactivate: period is locked');
-            }
-
-            $toTraceNo = (string) ($traceHead->to_trace_no ?? '');
-            if (substr($toTraceNo, 0, 1) !== '7') {
-                throw new Exception('Only transfer entries (prefix 7) can be deactivated');
-            }
-
-            $sourceTraceNo = (string) ($traceHead->from_trace_no ?? '');
-            $sourceBalance = $this->rmEntryRepo->findBalanceByTraceNo($sourceTraceNo);
-
-            if ($sourceBalance) {
-                $this->rmEntryRepo->revertSourceBalance($sourceTraceNo, $traceHead->in_qty);
-
-                $sourceTrace = $this->rmEntryRepo->findTraceByBalanceHeadId($sourceBalance->id_balance_head);
-                if ($sourceTrace) {
-                    $this->rmEntryRepo->revertSourceTrace($sourceBalance->id_balance_head, $traceHead->in_qty);
-                }
-            }
-
-            $this->rmEntryRepo->deactivateBalance($traceHead->id_balance_head, $user);
-            $this->rmEntryRepo->deactivateTrace($id, $user);
-
-            $this->rmEntryRepo->logTransaction(
-                'TRANSFER_ENTRY',
-                'DEACTIVATE',
-                "ID: {$id} | Reverted From: {$traceHead->from_trace_no} | Qty: {$traceHead->in_qty}",
-                $user
-            );
-
-            $connection->commit();
-
-            return ['success' => true];
-
-        } catch (Exception $e) {
-            $connection->rollBack();
-            throw $e;
+        $idTraceHead = (int) $id;
+        $traceHead = $this->rmEntryRepo->findTransferById($idTraceHead);
+        if (!$traceHead) {
+            return ['response' => 0, 'message' => 'Transfer not found'];
         }
+        $pipeId = $traceHead->id_balance_head . '|' . $idTraceHead;
+        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+            ->deactivateTransfer($pipeId, $user);
     }
 
     public function getStorageTanks($plantId): array
@@ -552,15 +506,8 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function getDestTanksList($plantId): array
     {
-        $resolvedPlant = null;
-        if ($plantId) {
-            $plant = Plant::find($plantId);
-            if ($plant && $plant->code_3) {
-                $resolvedPlant = $plant->code_3;
-            } elseif ($plantId !== '0' && $plantId !== 0) {
-                $resolvedPlant = (string) $plantId;
-            }
-        }
+        $resolvedPlant = app(PlantContextServiceInterface::class)->resolvePlantId($plantId);
+        $resolvedPlant = $resolvedPlant && $resolvedPlant !== '0' ? $resolvedPlant : null;
 
         return app(\Modules\Shared\Repositories\TankQueryRepository::class)
             ->getActiveTanksByKeywords(['FEED'], $resolvedPlant)
@@ -583,13 +530,7 @@ class RmEntryService implements RmEntryServiceInterface
 
     protected function resolvePlantCode($plantId)
     {
-        if ($plantId) {
-            $plant = Plant::find($plantId);
-            if ($plant && $plant->code_3) {
-                return $plant->code_3;
-            }
-        }
-        return $plantId;
+        return app(PlantContextServiceInterface::class)->resolvePlantId($plantId) ?: (string) $plantId;
     }
 
     public function clearTempData($entryNo, $user): void

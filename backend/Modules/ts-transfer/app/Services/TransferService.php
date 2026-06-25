@@ -317,21 +317,38 @@ class TransferService implements TransferServiceInterface
         $isRaw = ($rundownRaw == '000');
         $feedRundown = $isRaw ? $rundownRaw : substr_replace($rundownRaw, '0', 1, 1);
 
-        // GAP 1&2: Generate sequence based on destination plant for entryNo
-        // and source plant for feedEntryNo, instead of context plant
-        $destSeq = $this->transferRepo->getNextSequence($ymd, $rundownRaw, $destPlantCode);
-        $feedSeq = $this->transferRepo->getNextSequence($ymd, $feedRundown, $feedPlantCode);
+        // Advisory lock: unique lock per sequence namespace (ymd + rundown + plant)
+        $lockKey1 = crc32("transfer_seq_{$ymd}_{$rundownRaw}_{$destPlantCode}");
+        $lockKey2 = crc32("transfer_seq_{$ymd}_{$feedRundown}_{$feedPlantCode}");
 
-        $entryNo = "7{$ymd}{$rundownRaw}{$destPlantCode}{$destSeq}";
-        $feedEntryNo = "7{$ymd}{$feedRundown}{$feedPlantCode}{$feedSeq}";
+        try {
+            DB::connection('eudr_ts')->statement("SELECT pg_advisory_lock(?)", [$lockKey1]);
+            DB::connection('eudr_ts')->statement("SELECT pg_advisory_lock(?)", [$lockKey2]);
 
-        $resolve = fn(string $no): string => $this->resolveTraceCollision($no);
+            // GAP 1&2: Generate sequence based on destination plant for entryNo
+            // and source plant for feedEntryNo, instead of context plant
+            $destSeq = $this->transferRepo->getNextSequence($ymd, $rundownRaw, $destPlantCode);
+            if ((int) $destSeq > 99) {
+                throw new \RuntimeException('Transfer sequence exhausted for destination plant');
+            }
+            $feedSeq = $this->transferRepo->getNextSequence($ymd, $feedRundown, $feedPlantCode);
+            if ((int) $feedSeq > 99) {
+                throw new \RuntimeException('Transfer sequence exhausted for source plant');
+            }
 
-        return ['rundown' => $resolve($entryNo), 'feed' => $resolve($feedEntryNo)];
+            $entryNo = "7{$ymd}{$rundownRaw}{$destPlantCode}{$destSeq}";
+            $feedEntryNo = "7{$ymd}{$feedRundown}{$feedPlantCode}{$feedSeq}";
+
+            return ['rundown' => $entryNo, 'feed' => $feedEntryNo];
+        } finally {
+            DB::connection('eudr_ts')->statement("SELECT pg_advisory_unlock_all()");
+        }
     }
 
     private function resolveTraceCollision(string $traceNo): string
     {
+        // Deprecated: advisory lock eliminates the race condition this was working around.
+        // Kept for backward compatibility but no longer called directly.
         while ($this->transferRepo->checkTraceNoExists($traceNo)) {
             $seq = (int) substr($traceNo, 12, 2) + 1;
             $traceNo = substr_replace($traceNo, str_pad((string)$seq, 2, '0', STR_PAD_LEFT), 12, 2);

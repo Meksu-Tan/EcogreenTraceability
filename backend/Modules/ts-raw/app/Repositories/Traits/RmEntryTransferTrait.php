@@ -18,61 +18,40 @@ trait RmEntryTransferTrait
      * @param string $warehouse 3-digit warehouse/section code
      * @param string $plantCode 2-digit plant suffix
      */
-    private function nextTraceSeq(string $prefix, string $warehouse, string $plantCode): int
+    /**
+     * Resolve 3-digit warehouse code from tank description.
+     * "Storage Tank X" → lookup "Feed Tank X" → extract code suffix.
+     */
+    private function resolveWarehouseCode(?string $tankDescOrId, string $default = '000'): string
     {
-        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
-        $castSeq = "CAST(SUBSTRING(CAST(to_trace_no AS TEXT), 13, 2) AS INTEGER)";
-        $result = DB::connection('eudr_ts')->select(
-            "SELECT MAX({$castSeq}) as max_seq
-               FROM t_trace_header
-              WHERE SUBSTRING(CAST(to_trace_no AS TEXT), 1, 1) = ?
-                AND SUBSTRING(CAST(to_trace_no AS TEXT), 2, 6) = {$dateFmt}
-                AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '=', $warehouse) . "
-                AND " . \Modules\Shared\Helpers\TraceHelper::plantCondition('to_trace_no', [$plantCode]) . "
-                AND status = 1",
-            [$prefix]
-        );
-        return ((int) ($result[0]->max_seq ?? 0)) + 1;
+        if ($tankDescOrId === null) return $default;
+
+        $desc = is_numeric($tankDescOrId)
+            ? optional(DB::connection('eudr_ts')->table('m_sloc')->where('id_sloc', (int) $tankDescOrId)->where('status', 1)->first())->description
+            : $tankDescOrId;
+
+        if (!$desc) return $default;
+
+        $target = str_ireplace('Storage', 'Feed', $desc);
+        $tank = DB::connection('eudr_ts')->table('m_sloc')
+            ->where('description', $target)->where('status', 1)->first();
+
+        return $tank && $tank->code
+            ? str_pad(substr($tank->code, -3), 3, '0', STR_PAD_LEFT)
+            : $default;
+    }
+
+    private function tns(): \Modules\Shared\Services\TraceNumberService
+    {
+        return app(\Modules\Shared\Services\TraceNumberService::class);
     }
 
     public function getTransferNumber($plantId, $tankDescOrId = null): ?string
     {
-        $resolvedPlantId = $this->resolvePlantCode($plantId);
-        $warehouse = '000';
-        $tankDesc = null;
-
-        if ($tankDescOrId !== null) {
-            if (is_numeric($tankDescOrId)) {
-                $srcTank = DB::connection('eudr_ts')->table('m_sloc')
-                    ->where('id_sloc', (int) $tankDescOrId)
-                    ->where('status', 1)
-                    ->first();
-                if ($srcTank) {
-                    $tankDesc = $srcTank->description;
-                }
-            } else {
-                $tankDesc = (string) $tankDescOrId;
-            }
-        }
-
-        if ($tankDesc) {
-            $targetDesc = str_ireplace('Storage', 'Feed', $tankDesc);
-            $tank = DB::connection('eudr_ts')->table('m_sloc')
-                ->where('description', $targetDesc)
-                ->where('status', 1)
-                ->first();
-            if ($tank && $tank->code) {
-                $warehouse = str_pad(substr($tank->code, -3), 3, '0', STR_PAD_LEFT);
-            }
-        }
-
-        $section       = '3';
-        $tracePlantCode = ($resolvedPlantId == 0 || $resolvedPlantId == '0')
-            ? '00' : str_pad(substr((string) $resolvedPlantId, -2), 2, '0', STR_PAD_LEFT);
-
-        return $this->buildTraceNo($section, date('ymd'), $warehouse, $tracePlantCode,
-            $this->nextTraceSeq($section, $warehouse, $tracePlantCode));
+        $svc = $this->tns();
+        $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
+        $warehouse = $this->resolveWarehouseCode($tankDescOrId);
+        return $svc->generate('3', date('ymd'), $warehouse, $plantCode);
     }
 
     public function getStorageLog($plantId): array
@@ -330,57 +309,24 @@ trait RmEntryTransferTrait
 
     public function generateTransferNumber($plantId, $tankDescOrId = null): ?string
     {
-        $plantId = $this->resolvePlantCode($plantId);
-        $movSeq  = '000';
-        $tankDesc = null;
+        $svc = $this->tns();
+        $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
+        return $svc->generate('7', date('ymd'), '000', $plantCode);
+    }
 
-        if ($tankDescOrId !== null) {
-            if (is_numeric($tankDescOrId)) {
-                $srcTank = DB::connection('eudr_ts')->table('m_sloc')
-                    ->where('id_sloc', (int) $tankDescOrId)
-                    ->where('status', 1)
-                    ->first();
-                if ($srcTank) {
-                    $tankDesc = $srcTank->description;
-                }
-            } else {
-                $tankDesc = (string) $tankDescOrId;
-            }
-        }
-
-        if ($tankDesc) {
-            $targetDesc = str_ireplace('Storage', 'Feed', $tankDesc);
-            $tank = DB::connection('eudr_ts')->table('m_sloc')
-                ->where('description', $targetDesc)
-                ->where('status', 1)
-                ->first();
-            if ($tank && $tank->code) {
-                $movSeq = str_pad(substr($tank->code, -3), 3, '0', STR_PAD_LEFT);
-            }
-        }
-
-        $tracePlantCode = ($plantId == 0 || $plantId == '0')
-            ? '00' : str_pad(substr((string) $plantId, -2), 2, '0', STR_PAD_LEFT);
-
-        return $this->buildTraceNo('7', date('ymd'), $movSeq, $tracePlantCode,
-            $this->nextTraceSeq('7', $movSeq, $tracePlantCode));
+    private function tbs(): \Modules\Shared\Services\TransferBalanceService
+    {
+        return app(\Modules\Shared\Services\TransferBalanceService::class);
     }
 
     public function findBalanceByTraceNo(string $traceNo): ?object
     {
-        $result = DB::connection('eudr_ts')->select(
-            'SELECT * FROM t_balance_header WHERE trace_no = ? AND status = 1 LIMIT 1',
-            [$traceNo]
-        );
-        return $result[0] ?? null;
+        return $this->tbs()->findBalanceByTraceNo($traceNo);
     }
 
     public function findTraceByBalanceHeadId(int $balanceHeadId): ?object
     {
-        return DB::connection('eudr_ts')->table('t_trace_header')
-            ->where('id_balance_head', $balanceHeadId)
-            ->where('status', 1)
-            ->first();
+        return $this->tbs()->findTraceByBalanceHeadId($balanceHeadId);
     }
 
     public function createTransferBalance(array $data): object
@@ -395,14 +341,13 @@ trait RmEntryTransferTrait
             $slocInt = (int) $idSloc;
         }
 
-        $result = DB::connection('eudr_ts')->table('t_balance_header')->insertGetId([
+        $id = $this->tbs()->createBalanceHeader([
             'entry_date' => $data['entry_date'],
             'trace_no' => $data['trace_no'],
             'id_material' => $data['id_material'],
             'id_sloc' => $slocInt,
             'id_sloc_tail' => $data['id_sloc_tail'] ?? null,
             'tf_number' => null,
-            'id_sloc_tail' => null,
             'id_plant' => $data['id_plant'],
             'qty' => $data['qty'],
             'in_qty' => $data['qty'],
@@ -410,125 +355,60 @@ trait RmEntryTransferTrait
             'init_qty' => $data['qty'],
             'status' => 1,
             'created_by' => $data['created_by'],
-        ], 'id_balance_head');
+        ]);
 
-        return (object) ['id_balance_head' => $result];
+        return (object) ['id_balance_head' => $id];
     }
 
     public function createTransferTrace(array $data): object
     {
-        $result = DB::connection('eudr_ts')->table('t_trace_header')->insertGetId([
-            'id_balance_head' => $data['id_balance_head'],
-            'entry_date' => $data['entry_date'],
-            'from_trace_no' => $data['from_trace_no'],
-            'to_trace_no' => $data['to_trace_no'],
-            'id_material' => $data['id_material'],
-            'id_sloc' => $data['id_sloc'],
-            'id_sloc_tail' => $data['id_sloc_tail'] ?? null,
-            'id_plant' => $data['id_plant'],
-            'in_qty' => $data['qty'],
-            'out_qty' => 0,
-            'status' => 1,
-            'created_by' => $data['created_by'],
-        ], 'id_trace_head');
-
-        return (object) ['id_trace_head' => $result];
+        $id = $this->tbs()->createTraceHeader($data);
+        return (object) ['id_trace_head' => $id];
     }
 
     public function updateSourceBalance(int $balanceId, float $qty): bool
     {
-        return (bool) DB::connection('eudr_ts')->table('t_balance_header')
-            ->where('id_balance_head', $balanceId)
-            ->update([
-                'qty' => DB::raw('qty - ' . $qty),
-                'out_qty' => DB::raw('out_qty + ' . $qty),
-            ]);
+        return $this->tbs()->deductSourceBalance($balanceId, $qty);
     }
 
     public function updateSourceTrace(int $balanceHeadId, float $qty): bool
     {
-        return (bool) DB::connection('eudr_ts')->table('t_trace_header')
-            ->where('id_balance_head', $balanceHeadId)
-            ->where('status', 1)
-            ->update([
-                'out_qty' => DB::raw('out_qty + ' . $qty),
-            ]);
+        return $this->tbs()->deductSourceTrace($balanceHeadId, $qty);
     }
 
     public function findTransferById(int $id): ?object
     {
-        return DB::connection('eudr_ts')->table('t_trace_header')
-            ->where('id_trace_head', $id)
-            ->where('status', 1)
-            ->first();
+        return $this->tbs()->findTraceById($id);
     }
 
     public function deactivateBalance(int $balanceId, string $user): bool
     {
-        return (bool) DB::connection('eudr_ts')->table('t_balance_header')
-            ->where('id_balance_head', $balanceId)
-            ->update(['status' => 0, 'updated_by' => $user]);
+        return $this->tbs()->deactivateBalance($balanceId, $user);
     }
 
     public function deactivateTrace(int $traceId, string $user): bool
     {
-        return (bool) DB::connection('eudr_ts')->table('t_trace_header')
-            ->where('id_trace_head', $traceId)
-            ->update(['status' => 0, 'updated_by' => $user]);
+        return $this->tbs()->deactivateTrace($traceId, $user);
     }
 
     public function revertSourceBalance(string $traceNo, float $qty): bool
     {
-        return (bool) DB::connection('eudr_ts')->table('t_balance_header')
-            ->where('trace_no', $traceNo)
-            ->where('status', 1)
-            ->update([
-                'qty' => DB::raw('qty + ' . $qty),
-                'out_qty' => DB::raw('out_qty - ' . $qty),
-            ]);
+        return $this->tbs()->revertSourceBalance($traceNo, $qty);
     }
 
     public function revertSourceTrace(int $balanceHeadId, float $qty): bool
     {
-        return (bool) DB::connection('eudr_ts')->table('t_trace_header')
-            ->where('id_balance_head', $balanceHeadId)
-            ->where('status', 1)
-            ->update([
-                'out_qty' => DB::raw('out_qty - ' . $qty),
-            ]);
+        return $this->tbs()->revertSourceTrace($balanceHeadId, $qty);
     }
 
     public function getSourceEntries(int $plantId): array
     {
-        $qtyFmt = $this->dbNumberFormat('bh.qty', 3);
-        return DB::connection('eudr_ts')->select(
-            "SELECT bh.id_balance_head, bh.trace_no, m.description AS material,
-                    sl.description AS tank, {$qtyFmt} AS qty
-               FROM t_balance_header bh
-               JOIN m_material m ON bh.id_material = m.id_material
-               JOIN m_sloc sl ON bh.id_sloc = sl.id_sloc
-              WHERE bh.status = 1
-                AND SUBSTRING(bh.trace_no, 1, 1) = '1'
-                AND bh.qty > 0
-                AND (bh.id_plant = ? OR ? = 0)
-                AND sl.description LIKE '%STORAGE%'
-              ORDER BY bh.id_balance_head DESC",
-            [$plantId, $plantId]
-        );
+        return $this->tbs()->getSourceEntries($plantId);
     }
 
     public function getDestTanks(int $plantId): array
     {
-        $plantId = $this->resolvePlantCode($plantId);
-        return DB::connection('eudr_ts')->select(
-            "SELECT DISTINCT description AS tank
-               FROM m_sloc
-              WHERE status = 1
-                AND description LIKE '%FEED%'
-                AND (CAST(? AS TEXT) = '0' OR CAST(id_plant AS TEXT) = CAST(? AS TEXT))
-              ORDER BY description",
-            [$plantId, $plantId]
-        );
+        return $this->tbs()->getDestTanks($plantId);
     }
 
     public function getTransferList($plantId): array
@@ -588,19 +468,10 @@ trait RmEntryTransferTrait
 
     public function generateTransferEntryNo(int $materialId, $plantId): ?string
     {
-        $plantId = $this->resolvePlantCode($plantId);
-
-        $mat = DB::connection('eudr_ts')->table('m_material')
-            ->where('id_material', $materialId)
-            ->where('status', 1)
-            ->first();
-        $idRundown = ($mat && $mat->id_rundown && $mat->id_rundown !== '-')
-            ? $mat->id_rundown : '000';
-        $tracePlantCode = ($plantId == 0 || $plantId == '0')
-            ? '00' : str_pad(substr((string) $plantId, -2), 2, '0', STR_PAD_LEFT);
-
-        return $this->buildTraceNo('7', date('ymd'), $idRundown, $tracePlantCode,
-            $this->nextTraceSeq('7', $idRundown, $tracePlantCode));
+        $svc = $this->tns();
+        $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
+        $section = $svc->resolveSection('7', $materialId);
+        return $svc->generate('7', date('ymd'), $section, $plantCode);
     }
 
     public function getActiveTanksForTransfer(?int $materialId, $plantId): array

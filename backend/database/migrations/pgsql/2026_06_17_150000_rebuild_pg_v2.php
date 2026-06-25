@@ -95,7 +95,7 @@ return new class extends Migration
             $table->integer('id_sloc')->primary();
             $table->string('id_plant', 10)->nullable();
             $table->string('plant_name', 100)->nullable();
-            $table->string('id_sloc', 50)->nullable();
+            $table->string('sloc_code', 50)->nullable();
             $table->string('code', 50)->nullable();
             $table->string('code_2', 50)->nullable();
             $table->string('code_3', 50)->nullable();
@@ -126,7 +126,7 @@ return new class extends Migration
         Schema::connection($this->connection)->create('t_balance_header', function (Blueprint $table) {
             $table->bigIncrements('id_balance_head');
             $table->date('entry_date')->nullable();
-            $table->unsignedBigInteger('trace_no')->nullable();
+            $table->string('trace_no', 20)->nullable();
             $table->unsignedBigInteger('id_material')->nullable();
             $table->text('id_sloc')->nullable();
             $table->string('id_plant', 10)->nullable();
@@ -169,8 +169,8 @@ return new class extends Migration
         Schema::connection($this->connection)->create('t_trace_header', function (Blueprint $table) {
             $table->bigIncrements('id_trace_head');
             $table->date('entry_date')->nullable();
-            $table->unsignedBigInteger('from_trace_no')->nullable();
-            $table->unsignedBigInteger('to_trace_no')->nullable();
+            $table->string('from_trace_no', 20)->nullable();
+            $table->string('to_trace_no', 20)->nullable();
             $table->unsignedBigInteger('id_balance_head')->nullable();
             $table->unsignedBigInteger('id_material')->nullable();
             $table->string('id_plant', 10)->nullable();
@@ -210,7 +210,7 @@ return new class extends Migration
         Schema::connection($this->connection)->create('t_adjustment_header', function (Blueprint $table) {
             $table->bigIncrements('id_adjust_head');
             $table->date('entry_date')->nullable();
-            $table->unsignedBigInteger('adjust_no')->nullable();
+            $table->string('adjust_no', 20)->nullable();
             $table->unsignedBigInteger('id_balance_head')->nullable();
             $table->unsignedBigInteger('id_material')->nullable();
             $table->text('id_sloc')->nullable();
@@ -230,8 +230,8 @@ return new class extends Migration
         Schema::connection($this->connection)->create('t_warehouse_header', function (Blueprint $table) {
             $table->bigIncrements('id_whx_head');
             $table->date('entry_date')->nullable();
-            $table->unsignedBigInteger('from_trace_no')->nullable();
-            $table->unsignedBigInteger('trace_no')->nullable();
+            $table->string('from_trace_no', 20)->nullable();
+            $table->string('trace_no', 20)->nullable();
             $table->unsignedBigInteger('id_material_feed')->nullable();
             $table->unsignedBigInteger('id_material_fg')->nullable();
             $table->text('id_sloc')->nullable();
@@ -275,8 +275,8 @@ return new class extends Migration
         Schema::connection($this->connection)->create('t_shipment_header', function (Blueprint $table) {
             $table->bigIncrements('id_ship_head');
             $table->date('entry_date')->nullable();
-            $table->unsignedBigInteger('from_trace_no')->nullable();
-            $table->unsignedBigInteger('trace_no')->nullable();
+            $table->string('from_trace_no', 20)->nullable();
+            $table->string('trace_no', 20)->nullable();
             $table->string('so_no', 20)->nullable();
             $table->unsignedBigInteger('id_material_fg')->nullable();
             $table->string('id_plant', 10)->nullable();
@@ -341,9 +341,19 @@ return new class extends Migration
             return;
         }
 
-        $conn->statement('DROP SCHEMA public CASCADE');
-        $conn->statement('CREATE SCHEMA public');
-        $conn->statement('GRANT ALL ON SCHEMA public TO eudr_app');
-        $conn->statement('GRANT ALL ON SCHEMA public TO public');
+        $tables = [
+            't_material_document', 't_shipment_detail', 't_shipment_header',
+            't_warehouse_detail', 't_warehouse_header',
+            't_adjustment_detail', 't_adjustment_header',
+            't_trace_detail', 't_trace_header',
+            't_balance_detail', 't_balance_header',
+            't_report_pspa_head',
+            'm_warehouse', 'm_sloc', 'm_supplier',
+            'm_material_pck', 'm_material', 'm_manufacturer',
+        ];
+
+        foreach ($tables as $table) {
+            Schema::connection($this->connection)->dropIfExists($table);
+        }
     }
 };

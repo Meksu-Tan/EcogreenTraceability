@@ -6,10 +6,12 @@ use Modules\Material\Models\Material;
 use Modules\Material\Models\MaterialPackaging;
 use Modules\Material\Repositories\Contracts\MaterialRepositoryInterface;
 use Modules\Shared\Traits\DbCompatTrait;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class MaterialRepository implements MaterialRepositoryInterface
 {
     use DbCompatTrait;
+    use TransactionLoggerTrait;
 
     protected $connection = 'eudr_ts';
 
@@ -58,11 +60,9 @@ class MaterialRepository implements MaterialRepositoryInterface
         ]);
 
         if ($model) {
-            \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-                'M_MATERIAL', 'ADD',
+            $this->logTransaction('M_MATERIAL', 'ADD',
                 'ID: ' . $model->id_material . ' | CODE: ' . $data['code'] . ' / NAME: ' . $data['description'],
-                $data['created_by'],
-            ]);
+                $data['created_by']);
         }
 
         return (bool) $model;
@@ -75,11 +75,9 @@ class MaterialRepository implements MaterialRepositoryInterface
             return false;
         }
 
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MATERIAL', 'UPDATE',
+        $this->logTransaction('M_MATERIAL', 'UPDATE',
             'ID: ' . $id . ' | CODE: ' . $model->code . ' >> ' . $data['code'],
-            $data['updated_by'],
-        ]);
+            $data['updated_by']);
 
         return (bool) $model->update([
             'code' => $data['code'],
@@ -97,9 +95,7 @@ class MaterialRepository implements MaterialRepositoryInterface
 
     public function deactivate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MATERIAL', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user,
-        ]);
+        $this->logTransaction('M_MATERIAL', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user);
 
         $model = Material::find($id);
         if (!$model) {
@@ -111,9 +107,7 @@ class MaterialRepository implements MaterialRepositoryInterface
 
     public function activate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MATERIAL', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user,
-        ]);
+        $this->logTransaction('M_MATERIAL', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user);
 
         $model = Material::find($id);
         if (!$model) {
@@ -163,9 +157,7 @@ class MaterialRepository implements MaterialRepositoryInterface
         ]);
 
         if ($model) {
-            \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-                'M_MATERIAL_PCK', 'ADD', 'ID: ' . $model->id_materialpck . ' | CODE: ' . $data['code'], $data['created_by'],
-            ]);
+            $this->logTransaction('M_MATERIAL_PCK', 'ADD', 'ID: ' . $model->id_materialpck . ' | CODE: ' . $data['code'], $data['created_by']);
         }
 
         return (bool) $model;
@@ -178,11 +170,9 @@ class MaterialRepository implements MaterialRepositoryInterface
             return false;
         }
 
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MATERIAL_PCK', 'UPDATE',
+        $this->logTransaction('M_MATERIAL_PCK', 'UPDATE',
             'ID: ' . $id . ' | CODE: ' . $model->code . ' >> ' . $data['code'],
-            $data['updated_by'],
-        ]);
+            $data['updated_by']);
 
         return (bool) $model->update([
             'code' => $data['code'],
@@ -195,9 +185,7 @@ class MaterialRepository implements MaterialRepositoryInterface
 
     public function deactivatePackaging(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MATERIAL_PCK', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user,
-        ]);
+        $this->logTransaction('M_MATERIAL_PCK', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user);
 
         $model = MaterialPackaging::find($id);
         if (!$model) {
@@ -209,9 +197,7 @@ class MaterialRepository implements MaterialRepositoryInterface
 
     public function activatePackaging(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MATERIAL_PCK', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user,
-        ]);
+        $this->logTransaction('M_MATERIAL_PCK', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user);
 
         $model = MaterialPackaging::find($id);
         if (!$model) {

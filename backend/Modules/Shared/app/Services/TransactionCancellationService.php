@@ -59,7 +59,7 @@ class TransactionCancellationService
 
                 // Revert stock on balance header
                 $balHead = DB::connection($this->connection)->selectOne(
-                    'SELECT qty, in_qty, out_qty FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
+                    'SELECT qty, in_qty, out_qty FROM t_balance_header WHERE id_balance_head = ? AND status = 1 FOR UPDATE',
                     [$idBalanceHead]
                 );
                 if ($balHead) {
@@ -94,7 +94,7 @@ class TransactionCancellationService
                     );
 
                     $balTail = DB::connection($this->connection)->selectOne(
-                        'SELECT qty, in_qty, out_qty FROM t_balance_detail WHERE id_balance_tail = ? AND status = 1',
+                        'SELECT qty, in_qty, out_qty FROM t_balance_detail WHERE id_balance_tail = ? AND status = 1 FOR UPDATE',
                         [$tail->id_balance_tail]
                     );
 
@@ -249,7 +249,7 @@ class TransactionCancellationService
             }
 
             $this->logTransaction('RM_ENTRY', 'DEACTIVATE', 'ID: ' . $id, $user);
-            return ['success' => true];
+            return ['response' => TransactionResponseCode::SUCCESS];
         });
     }
 
@@ -321,7 +321,7 @@ class TransactionCancellationService
             }
 
             $this->logTransaction('RMTRF_ENTRY', 'DEACTIVATE', 'ID: ' . $id . ' | Trace: ' . $traceNo, $user);
-            return ['success' => true];
+            return ['response' => TransactionResponseCode::SUCCESS];
         });
     }
 
@@ -394,7 +394,7 @@ class TransactionCancellationService
                 ->update(['status' => 0, 'updated_by' => $user]);
 
             $this->logTransaction('FEED_LOG', 'DEACTIVATE', 'ID: ' . $id . ' | Trace: ' . $toTraceNo, $user);
-            return ['success' => true];
+            return ['response' => TransactionResponseCode::SUCCESS];
         });
     }
 
@@ -407,207 +407,200 @@ class TransactionCancellationService
         $idHead = trim($idTmp[0]);
         $idTraceHead = trim($idTmp[1]);
 
-        try {
-            DB::connection($this->connection)->beginTransaction();
+        $entryDate = DB::connection($this->connection)->selectOne(
+            'SELECT entry_date FROM t_trace_header WHERE id_trace_head = ? AND status = 1',
+            [$idTraceHead]
+        );
 
-            $entryDate = DB::connection($this->connection)->select(
-                'SELECT entry_date FROM t_trace_header WHERE id_trace_head = ? AND status = 1',
-                [$idTraceHead]
+        if (!$entryDate) {
+            return ['response' => 98, 'message' => 'Entry data not found!'];
+        }
+
+        if (PeriodLockService::isLocked($entryDate->entry_date)) {
+            return ['response' => 99, 'message' => 'Period Locked!'];
+        }
+
+        try {
+            return DB::connection($this->connection)->transaction(function () use ($idHead, $idTraceHead, $user) {
+                $counter = 0;
+                $maxIterations = 100;
+                $currentIdHead = $idHead;
+                $currentIdTraceHead = $idTraceHead;
+
+                do {
+                    $this->logTransaction('TRANSFER_ENTRY', 'DE-ACTIVATE',
+                        'IdBalHead: ' . $currentIdHead . ' | Status: 1 >> 0', $user);
+
+                    AuditService::log('TRANSFER', 'DELETE',
+                        'Deactivating transfer | IdBalHead: ' . $currentIdHead . ' | IdTraceHead: ' . $currentIdTraceHead,
+                        $user, ['id_balance_head' => $currentIdHead, 'id_trace_head' => $currentIdTraceHead]);
+
+                    DB::connection($this->connection)->update(
+                        'UPDATE t_balance_detail SET status = 0, updated_by = ? WHERE id_balance_head = ?',
+                        [$user, $currentIdHead]
+                    );
+                    DB::connection($this->connection)->update(
+                        'UPDATE t_balance_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
+                        [$user, $currentIdHead]
+                    );
+
+                    $dateFmtCreatedAt = $this->dbDateFormat('a.created_at', '%Y-%m-%d %H:%i');
+                    $datTraceHead = DB::connection($this->connection)->select(
+                        "SELECT b.id_balance_head, b.out_qty, b.id_trace_head, a.id_material, a.in_qty,
+                                {$dateFmtCreatedAt} AS created_at
+                           FROM t_trace_header a
+                           LEFT JOIN t_trace_header b ON a.from_trace_no = b.to_trace_no AND b.status = 1
+                          WHERE a.id_balance_head = ? AND a.status = 1",
+                        [$currentIdHead]
+                    );
+
+                    if (empty($datTraceHead)) {
+                        break;
+                    }
+
+                    $createdAt = $datTraceHead[0]->created_at;
+                    $idMaterial = $datTraceHead[0]->id_material;
+                    $inQty = $datTraceHead[0]->in_qty;
+
+                    foreach ($datTraceHead as $row) {
+                        $this->restoreBalanceAndDetails($row, $user);
+                    }
+
+                    DB::connection($this->connection)->update(
+                        'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
+                        [$user, $currentIdHead]
+                    );
+                    DB::connection($this->connection)->update(
+                        'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?',
+                        [$user, $currentIdTraceHead]
+                    );
+
+                    /* DESTROYING AUTO ADJUSTMENT IN (prefix 9) */
+                    $datAdjustIn = DB::connection($this->connection)->select(
+                        "SELECT id_balance_head, id_trace_head
+                           FROM t_trace_header
+                          WHERE status = 1
+                            AND from_trace_no IS NULL
+                            AND SUBSTRING(to_trace_no,1,1) = 9
+                            AND {$dateFmtCreatedAt} = ?
+                            AND id_material = ?
+                            AND in_qty = ?",
+                        [$createdAt, $idMaterial, $inQty]
+                    );
+
+                    if (count($datAdjustIn) > 0) {
+                        DB::connection($this->connection)->update(
+                            'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE status = 1 AND id_trace_head = ?',
+                            [$user, $datAdjustIn[0]->id_trace_head]
+                        );
+                        DB::connection($this->connection)->update(
+                            'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE status = 1 AND id_trace_head = ?',
+                            [$user, $datAdjustIn[0]->id_trace_head]
+                        );
+                        DB::connection($this->connection)->update(
+                            'UPDATE t_balance_header SET status = 0, updated_by = ? WHERE status = 1 AND id_balance_head = ?',
+                            [$user, $datAdjustIn[0]->id_balance_head]
+                        );
+                        DB::connection($this->connection)->update(
+                            'UPDATE t_balance_detail SET status = 0, updated_by = ? WHERE status = 1 AND id_balance_head = ?',
+                            [$user, $datAdjustIn[0]->id_balance_head]
+                        );
+                    }
+
+                    /* DESTROYING AUTO TRF TO ADJUSTMENT OUT (prefix 7) */
+                    $datAdjustOut = DB::connection($this->connection)->select(
+                        "SELECT id_balance_head, id_trace_head
+                           FROM t_trace_header
+                          WHERE status = 1
+                            AND SUBSTRING(to_trace_no,1,1) = 7
+                            AND {$dateFmtCreatedAt} = ?
+                            AND id_material = ?
+                            AND in_qty = ?",
+                        [$createdAt, $idMaterial, $inQty]
+                    );
+
+                    if (count($datAdjustOut) > 0) {
+                        $currentIdHead = $datAdjustOut[0]->id_balance_head;
+                        $currentIdTraceHead = $datAdjustOut[0]->id_trace_head;
+                    } else {
+                        break;
+                    }
+
+                    if (++$counter >= $maxIterations) {
+                        throw new \Exception("Infinite loop detected in transfer_destroy");
+                    }
+                } while (true);
+
+                return ['response' => TransactionResponseCode::SUCCESS];
+            });
+        } catch (\Exception $e) {
+            return ['response' => 0, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Restore balance head and detail quantities during transfer deactivation.
+     */
+    private function restoreBalanceAndDetails(object $row, string $user): void
+    {
+        $datBalHeadSource = DB::connection($this->connection)->select(
+            'SELECT a.qty, a.out_qty FROM t_balance_header a WHERE a.status = 1 AND a.id_balance_head = ? FOR UPDATE',
+            [$row->id_balance_head]
+        );
+
+        if (!empty($datBalHeadSource)) {
+            $outQty = (float) $row->out_qty;
+            DB::connection($this->connection)->update(
+                'UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ?',
+                [(float)$datBalHeadSource[0]->qty + $outQty, (float)$datBalHeadSource[0]->out_qty - $outQty, $user, $row->id_balance_head]
             );
 
-            if (empty($entryDate)) {
-                DB::connection($this->connection)->rollBack();
-                return ['response' => 98];
+            $datAdjustHead = DB::connection($this->connection)->select(
+                'SELECT id_adjust_head FROM t_adjustment_header WHERE id_balance_head = ? AND status = 1',
+                [$row->id_balance_head]
+            );
+
+            foreach ($datAdjustHead as $adj) {
+                DB::connection($this->connection)->update(
+                    'UPDATE t_adjustment_header SET status = 0, updated_by = ? WHERE id_adjust_head = ?',
+                    [$user, $adj->id_adjust_head]
+                );
+                DB::connection($this->connection)->update(
+                    'UPDATE t_adjustment_detail SET status = 0, updated_by = ? WHERE id_adjust_head = ?',
+                    [$user, $adj->id_adjust_head]
+                );
             }
-
-            $currEntryDate = $entryDate[0]->entry_date;
-            if (PeriodLockService::isLocked($currEntryDate)) {
-                DB::connection($this->connection)->rollBack();
-                return ['response' => 99];
-            }
-
-            $counter = 0;
-            $maxIterations = 100;
-
-            do {
-                $this->logTransaction('TRANSFER_ENTRY', 'DE-ACTIVATE',
-                    'IdBalHead: ' . $idHead . ' | Status: 1 >> 0', $user);
-
-                AuditService::log('TRANSFER', 'DELETE',
-                    'Deactivating transfer | IdBalHead: ' . $idHead . ' | IdTraceHead: ' . $idTraceHead,
-                    $user, ['id_balance_head' => $idHead, 'id_trace_head' => $idTraceHead]);
-
-                DB::connection($this->connection)->update(
-                    'UPDATE t_balance_detail SET status = 0, updated_by = ? WHERE id_balance_head = ?',
-                    [$user, $idHead]
-                );
-                DB::connection($this->connection)->update(
-                    'UPDATE t_balance_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
-                    [$user, $idHead]
-                );
-
-                $dateFmtCreatedAt = $this->dbDateFormat('a.created_at', '%Y-%m-%d %H:%i');
-                $datTraceHead = DB::connection($this->connection)->select(
-                    "SELECT b.id_balance_head, b.out_qty, b.id_trace_head, a.id_material, a.in_qty,
-                            {$dateFmtCreatedAt} AS created_at
-                       FROM t_trace_header a
-                       LEFT JOIN t_trace_header b ON a.from_trace_no = b.to_trace_no AND b.status = 1
-                      WHERE a.id_balance_head = ? AND a.status = 1",
-                    [$idHead]
-                );
-
-                if (empty($datTraceHead)) {
-                    break;
-                }
-
-                $createdAt = $datTraceHead[0]->created_at;
-                $idMaterial = $datTraceHead[0]->id_material;
-                $inQty = $datTraceHead[0]->in_qty;
-
-                foreach ($datTraceHead as $row) {
-                    $idBalHead = $row->id_balance_head;
-                    $idTracHead = $row->id_trace_head;
-                    $outQtyHead = $row->out_qty;
-
-                    $datBalHeadSource = DB::connection($this->connection)->select(
-                        'SELECT a.qty, a.out_qty FROM t_balance_header a WHERE a.status = 1 AND a.id_balance_head = ?',
-                        [$idBalHead]
-                    );
-
-                    if (!empty($datBalHeadSource)) {
-                        $outQtyBalHeadSource = $datBalHeadSource[0]->out_qty - $outQtyHead;
-                        $onhandQtyBalHeadSource = $datBalHeadSource[0]->qty + $outQtyHead;
-
-                        DB::connection($this->connection)->update(
-                            'UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ?',
-                            [$onhandQtyBalHeadSource, $outQtyBalHeadSource, $user, $idBalHead]
-                        );
-
-                        $datAdjustHead = DB::connection($this->connection)->select(
-                            'SELECT id_adjust_head FROM t_adjustment_header WHERE id_balance_head = ? AND status = 1',
-                            [$idBalHead]
-                        );
-
-                        foreach ($datAdjustHead as $adj) {
-                            DB::connection($this->connection)->update(
-                                'UPDATE t_adjustment_header SET status = 0, updated_by = ? WHERE id_adjust_head = ?',
-                                [$user, $adj->id_adjust_head]
-                            );
-                            DB::connection($this->connection)->update(
-                                'UPDATE t_adjustment_detail SET status = 0, updated_by = ? WHERE id_adjust_head = ?',
-                                [$user, $adj->id_adjust_head]
-                            );
-                        }
-                    }
-
-                    $datTraceTail = DB::connection($this->connection)->select(
-                        'SELECT a.id_balance_tail, a.out_qty, a.id_trace_tail
-                           FROM t_trace_detail a WHERE a.id_trace_head = ? AND a.status = 1',
-                        [$idTracHead]
-                    );
-
-                    foreach ($datTraceTail as $tail) {
-                        $datBalTailSource = DB::connection($this->connection)->select(
-                            'SELECT a.qty, a.out_qty FROM t_balance_detail a WHERE a.status = 1 AND a.id_balance_tail = ?',
-                            [$tail->id_balance_tail]
-                        );
-
-                        if (!empty($datBalTailSource)) {
-                            $outQtyBalTailSource = $datBalTailSource[0]->out_qty - $tail->out_qty;
-                            $onhandQtyBalTailSource = $datBalTailSource[0]->qty + $tail->out_qty;
-
-                            DB::connection($this->connection)->update(
-                                'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
-                                [$onhandQtyBalTailSource, $outQtyBalTailSource, $user, $tail->id_balance_tail]
-                            );
-                        }
-
-                        DB::connection($this->connection)->update(
-                            'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ?',
-                            [$user, $tail->id_trace_tail]
-                        );
-                    }
-
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?',
-                        [$user, $idTracHead]
-                    );
-                }
-
-                DB::connection($this->connection)->update(
-                    'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
-                    [$user, $idHead]
-                );
-                DB::connection($this->connection)->update(
-                    'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?',
-                    [$user, $idTraceHead]
-                );
-
-                /* DESTROYING AUTO ADJUSTMENT IN (prefix 9) */
-                $datAdjustIn = DB::connection($this->connection)->select(
-                    "SELECT id_balance_head, id_trace_head
-                       FROM t_trace_header
-                      WHERE status = 1
-                        AND from_trace_no IS NULL
-                        AND SUBSTRING(to_trace_no,1,1) = 9
-                        AND {$dateFmtCreatedAt} = ?
-                        AND id_material = ?
-                        AND in_qty = ?",
-                    [$createdAt, $idMaterial, $inQty]
-                );
-
-                if (count($datAdjustIn) > 0) {
-                    $idBalHead = $datAdjustIn[0]->id_balance_head;
-                    $idTraceHead = $datAdjustIn[0]->id_trace_head;
-
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE status = 1 AND id_trace_head = ?',
-                        [$user, $idTraceHead]
-                    );
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE status = 1 AND id_trace_head = ?',
-                        [$user, $idTraceHead]
-                    );
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_balance_header SET status = 0, updated_by = ? WHERE status = 1 AND id_balance_head = ?',
-                        [$user, $idBalHead]
-                    );
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_balance_detail SET status = 0, updated_by = ? WHERE status = 1 AND id_balance_head = ?',
-                        [$user, $idBalHead]
-                    );
-                }
-
-                /* DESTROYING AUTO TRF TO ADJUSTMENT OUT (prefix 7) */
-                $datAdjustOut = DB::connection($this->connection)->select(
-                    "SELECT id_balance_head, id_trace_head
-                       FROM t_trace_header
-                      WHERE status = 1
-                        AND SUBSTRING(to_trace_no,1,1) = 7
-                        AND {$dateFmtCreatedAt} = ?
-                        AND id_material = ?
-                        AND in_qty = ?",
-                    [$createdAt, $idMaterial, $inQty]
-                );
-
-                if (count($datAdjustOut) > 0) {
-                    $idHead = $datAdjustOut[0]->id_balance_head;
-                    $idTraceHead = $datAdjustOut[0]->id_trace_head;
-                } else {
-                    break;
-                }
-
-                if (++$counter >= $maxIterations) {
-                    throw new \Exception("Infinite loop detected in transfer_destroy");
-                }
-            } while (true);
-
-            DB::connection($this->connection)->commit();
-            return ['response' => 1];
-        } catch (\Exception $e) {
-            DB::connection($this->connection)->rollBack();
-            return ['response' => 0, 'error' => $e->getMessage()];
         }
+
+        $datTraceTail = DB::connection($this->connection)->select(
+            'SELECT a.id_balance_tail, a.out_qty, a.id_trace_tail
+               FROM t_trace_detail a WHERE a.id_trace_head = ? AND a.status = 1',
+            [$row->id_trace_head]
+        );
+
+        foreach ($datTraceTail as $tail) {
+            $datBalTailSource = DB::connection($this->connection)->select(
+                'SELECT a.qty, a.out_qty FROM t_balance_detail a WHERE a.status = 1 AND a.id_balance_tail = ? FOR UPDATE',
+                [$tail->id_balance_tail]
+            );
+
+            if (!empty($datBalTailSource)) {
+                DB::connection($this->connection)->update(
+                    'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
+                    [(float)$datBalTailSource[0]->qty + (float)$tail->out_qty, (float)$datBalTailSource[0]->out_qty - (float)$tail->out_qty, $user, $tail->id_balance_tail]
+                );
+            }
+
+            DB::connection($this->connection)->update(
+                'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ?',
+                [$user, $tail->id_trace_tail]
+            );
+        }
+
+        DB::connection($this->connection)->update(
+            'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?',
+            [$user, $row->id_trace_head]
+        );
     }
 
     /**
@@ -619,109 +612,98 @@ class TransactionCancellationService
         $idHead = trim($idTmp[0]);
         $idTraceHead = trim($idTmp[1]);
 
+        $entryDate = DB::connection($this->connection)->selectOne(
+            'SELECT entry_date FROM t_trace_header WHERE id_trace_head = ? AND status = 1',
+            [$idTraceHead]
+        );
+
+        if (!$entryDate) {
+            return ['response' => 98, 'message' => 'Entry data not found!'];
+        }
+
+        if (PeriodLockService::isLocked($entryDate->entry_date)) {
+            return ['response' => 99, 'message' => 'Period Locked!'];
+        }
+
         try {
-            DB::connection($this->connection)->beginTransaction();
+            return DB::connection($this->connection)->transaction(function () use ($idHead, $idTraceHead, $user) {
+                $this->logTransaction('BLENDING_ENTRY', 'DE-ACTIVATE', 'IdBalHead: ' . $idHead . ' | Status: 1 >> 0', $user);
 
-            $entryDate = DB::connection($this->connection)->select(
-                'SELECT entry_date FROM t_trace_header WHERE id_trace_head = ? AND status = 1',
-                [$idTraceHead]
-            );
-
-            if (empty($entryDate)) {
-                DB::connection($this->connection)->rollBack();
-                return ['response' => 98];
-            }
-
-            $curr_entryDate = $entryDate[0]->entry_date;
-
-            if (PeriodLockService::isLocked($curr_entryDate)) {
-                DB::connection($this->connection)->rollBack();
-                return ['response' => 99];
-            }
-
-            $this->logTransaction('BLENDING_ENTRY', 'DE-ACTIVATE', 'IdBalHead: ' . $idHead . ' | Status: 1 >> 0', $user);
-
-            DB::connection($this->connection)->update(
-                'UPDATE t_balance_detail SET status = 0, updated_by = ? WHERE id_balance_head = ?',
-                [$user, $idHead]
-            );
-            DB::connection($this->connection)->update(
-                'UPDATE t_balance_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
-                [$user, $idHead]
-            );
-
-            $datTraceHead = DB::connection($this->connection)->select(
-                'SELECT b.id_balance_head, b.out_qty, b.id_trace_head
-                   FROM t_trace_header a
-                   LEFT JOIN t_trace_header b ON a.from_trace_no = b.to_trace_no AND b.status = 1
-                  WHERE a.id_balance_head = ? AND a.status = 1',
-                [$idHead]
-            );
-
-            foreach ($datTraceHead as $row) {
-                $datBalHeadSource = DB::connection($this->connection)->select(
-                    'SELECT a.qty, a.out_qty FROM t_balance_header a WHERE a.status = 1 AND a.id_balance_head = ?',
-                    [$row->id_balance_head]
+                DB::connection($this->connection)->update(
+                    'UPDATE t_balance_detail SET status = 0, updated_by = ? WHERE id_balance_head = ?',
+                    [$user, $idHead]
+                );
+                DB::connection($this->connection)->update(
+                    'UPDATE t_balance_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
+                    [$user, $idHead]
                 );
 
-                if (!empty($datBalHeadSource)) {
-                    $outQtyBalHeadSource = $datBalHeadSource[0]->out_qty - $row->out_qty;
-                    $onhandQtyBalHeadSource = $datBalHeadSource[0]->qty + $row->out_qty;
+                $datTraceHead = DB::connection($this->connection)->select(
+                    'SELECT b.id_balance_head, b.out_qty, b.id_trace_head
+                       FROM t_trace_header a
+                       LEFT JOIN t_trace_header b ON a.from_trace_no = b.to_trace_no AND b.status = 1
+                      WHERE a.id_balance_head = ? AND a.status = 1',
+                    [$idHead]
+                );
 
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ?',
-                        [$onhandQtyBalHeadSource, $outQtyBalHeadSource, $user, $row->id_balance_head]
+                foreach ($datTraceHead as $row) {
+                    $datBalHeadSource = DB::connection($this->connection)->select(
+                        'SELECT a.qty, a.out_qty FROM t_balance_header a WHERE a.status = 1 AND a.id_balance_head = ? FOR UPDATE',
+                        [$row->id_balance_head]
                     );
 
-                    $datTraceTail = DB::connection($this->connection)->select(
-                        'SELECT a.id_balance_tail, a.out_qty, a.id_trace_tail
-                           FROM t_trace_detail a WHERE a.id_trace_head = ? AND a.status = 1',
-                        [$row->id_trace_head]
-                    );
-
-                    foreach ($datTraceTail as $tail) {
-                        $datBalTailSource = DB::connection($this->connection)->select(
-                            'SELECT a.qty, a.out_qty FROM t_balance_detail a WHERE a.status = 1 AND a.id_balance_tail = ?',
-                            [$tail->id_balance_tail]
+                    if (!empty($datBalHeadSource)) {
+                        $outQty = (float) $row->out_qty;
+                        DB::connection($this->connection)->update(
+                            'UPDATE t_balance_header SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_head = ?',
+                            [(float)$datBalHeadSource[0]->qty + $outQty, (float)$datBalHeadSource[0]->out_qty - $outQty, $user, $row->id_balance_head]
                         );
 
-                        if (!empty($datBalTailSource)) {
-                            $outQtyBalTailSource = $datBalTailSource[0]->out_qty - $tail->out_qty;
-                            $onhandQtyBalTailSource = $datBalTailSource[0]->qty + $tail->out_qty;
+                        $datTraceTail = DB::connection($this->connection)->select(
+                            'SELECT a.id_balance_tail, a.out_qty, a.id_trace_tail
+                               FROM t_trace_detail a WHERE a.id_trace_head = ? AND a.status = 1',
+                            [$row->id_trace_head]
+                        );
+
+                        foreach ($datTraceTail as $tail) {
+                            $datBalTailSource = DB::connection($this->connection)->select(
+                                'SELECT a.qty, a.out_qty FROM t_balance_detail a WHERE a.status = 1 AND a.id_balance_tail = ? FOR UPDATE',
+                                [$tail->id_balance_tail]
+                            );
+
+                            if (!empty($datBalTailSource)) {
+                                DB::connection($this->connection)->update(
+                                    'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
+                                    [(float)$datBalTailSource[0]->qty + (float)$tail->out_qty, (float)$datBalTailSource[0]->out_qty - (float)$tail->out_qty, $user, $tail->id_balance_tail]
+                                );
+                            }
 
                             DB::connection($this->connection)->update(
-                                'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
-                                [$onhandQtyBalTailSource, $outQtyBalTailSource, $user, $tail->id_balance_tail]
+                                'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ?',
+                                [$user, $tail->id_trace_tail]
                             );
                         }
 
                         DB::connection($this->connection)->update(
-                            'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_tail = ?',
-                            [$user, $tail->id_trace_tail]
+                            'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?',
+                            [$user, $row->id_trace_head]
                         );
                     }
-
-                    DB::connection($this->connection)->update(
-                        'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?',
-                        [$user, $row->id_trace_head]
-                    );
                 }
-            }
 
-            DB::connection($this->connection)->update(
-                'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
-                [$user, $idHead]
-            );
-            DB::connection($this->connection)->update(
-                'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?',
-                [$user, $idTraceHead]
-            );
+                DB::connection($this->connection)->update(
+                    'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_balance_head = ?',
+                    [$user, $idHead]
+                );
+                DB::connection($this->connection)->update(
+                    'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?',
+                    [$user, $idTraceHead]
+                );
 
-            DB::connection($this->connection)->commit();
-            return ['response' => 1];
+                return ['response' => TransactionResponseCode::SUCCESS];
+            });
         } catch (\Exception $e) {
-            DB::connection($this->connection)->rollBack();
-            return ['response' => 0, 'error' => $e->getMessage()];
+            return ['response' => 0, 'message' => $e->getMessage()];
         }
     }
 
@@ -782,7 +764,7 @@ class TransactionCancellationService
                     if ($origin === 4) {
                         // Source = packaging warehouse (t_warehouse_header / t_warehouse_detail)
                         $datWhxHead = DB::connection($this->connection)->selectOne(
-                            'SELECT qty, out_qty FROM t_warehouse_header WHERE id_whx_head = ? AND status = 1',
+                            'SELECT qty, out_qty FROM t_warehouse_header WHERE id_whx_head = ? AND status = 1 FOR UPDATE',
                             [$idHead]
                         );
 
@@ -830,7 +812,7 @@ class TransactionCancellationService
                             $outQtyTail    = (float) $tailRow->out_qty;
 
                             $datWhxTail = DB::connection($this->connection)->selectOne(
-                                'SELECT qty, out_qty FROM t_warehouse_detail WHERE id_whx_tail = ?',
+                                'SELECT qty, out_qty FROM t_warehouse_detail WHERE id_whx_tail = ? FOR UPDATE',
                                 [$idTail]
                             );
 
@@ -858,7 +840,7 @@ class TransactionCancellationService
                         // Source = WIP/balance (t_balance_header / t_balance_detail)
                         $datWipHead = DB::connection($this->connection)->selectOne(
                             'SELECT qty, out_qty FROM t_balance_header
-                              WHERE id_balance_head = ? AND status = 1',
+                              WHERE id_balance_head = ? AND status = 1 FOR UPDATE',
                             [$idHead]
                         );
 
@@ -906,7 +888,7 @@ class TransactionCancellationService
                             $outQtyTail = (float) $tailRow->out_qty;
 
                             $datBalTail = DB::connection($this->connection)->selectOne(
-                                'SELECT qty, out_qty FROM t_balance_detail WHERE id_balance_tail = ?',
+                                'SELECT qty, out_qty FROM t_balance_detail WHERE id_balance_tail = ? FOR UPDATE',
                                 [$idTail]
                             );
 

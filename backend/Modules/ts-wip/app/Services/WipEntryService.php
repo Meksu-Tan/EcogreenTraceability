@@ -3,6 +3,7 @@ declare(strict_types=1);
 namespace Modules\TsWip\Services;
 
 use Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface;
+use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -201,7 +202,7 @@ class WipEntryService implements WipEntryServiceInterface
 
     protected function resolvePlant($plantId)
     {
-        return $plantId;
+        return app(PlantContextServiceInterface::class)->resolvePlantId($plantId) ?: (string) $plantId;
     }
 }
 

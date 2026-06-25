@@ -4,9 +4,11 @@ namespace Modules\Plant\Repositories;
 
 use Modules\Plant\Models\Plant;
 use Modules\Plant\Repositories\Contracts\PlantRepositoryInterface;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class PlantRepository implements PlantRepositoryInterface
 {
+    use TransactionLoggerTrait;
     public function getAll(): array
     {
         return Plant::select([
@@ -46,11 +48,9 @@ class PlantRepository implements PlantRepositoryInterface
         ]);
 
         if ($model) {
-            \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-                'M_PLANT', 'ADD',
+            $this->logTransaction('M_PLANT', 'ADD',
                 'ID: ' . $model->id_plant . ' | CODE: ' . $data['code_2'] . ' / ' . $data['code_3'] . ' | NAME: ' . $data['description'],
-                $data['created_by'],
-            ]);
+                $data['created_by']);
             return (int) $model->id_plant;
         }
 
@@ -64,11 +64,9 @@ class PlantRepository implements PlantRepositoryInterface
             return false;
         }
 
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_PLANT', 'UPDATE',
+        $this->logTransaction('M_PLANT', 'UPDATE',
             'ID: ' . $id . ' | CODE: ' . $model->code_2 . ' >> ' . $data['code_2'],
-            $data['updated_by'],
-        ]);
+            $data['updated_by']);
 
         return (bool) $model->update([
             'code' => $data['code'] ?? null,
@@ -81,9 +79,7 @@ class PlantRepository implements PlantRepositoryInterface
 
     public function deactivate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_PLANT', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user,
-        ]);
+        $this->logTransaction('M_PLANT', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user);
 
         $model = Plant::find($id);
         if (!$model) {
@@ -95,9 +91,7 @@ class PlantRepository implements PlantRepositoryInterface
 
     public function activate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_PLANT', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user,
-        ]);
+        $this->logTransaction('M_PLANT', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user);
 
         $model = Plant::find($id);
         if (!$model) {

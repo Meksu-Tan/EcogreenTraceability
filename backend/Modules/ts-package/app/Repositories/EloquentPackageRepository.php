@@ -5,7 +5,7 @@ namespace Modules\TsPackage\Repositories;
 use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
 use Modules\Shared\Services\PeriodLockService;
 use Modules\Shared\Traits\DbCompatTrait;
-use Modules\Shared\Traits\TraceNumberGeneratorTrait;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 use Modules\Shared\Helpers\Feed;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +19,7 @@ use Exception;
  */
 class EloquentPackageRepository implements PackageRepositoryInterface
 {
-    use DbCompatTrait, TraceNumberGeneratorTrait;
+    use DbCompatTrait, TransactionLoggerTrait;
 
     protected string $connection = 'eudr_ts';
     protected static string $movType1 = "4";
@@ -351,28 +351,13 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 return ['response' => 99, 'message' => 'Period is locked.'];
             }
 
+            $svc = app(\Modules\Shared\Services\TraceNumberService::class);
             $whID = str_pad((string)$idWarehouse, 3, "0", STR_PAD_LEFT);
-            $plantStr = str_pad((string)$idPlant, 2, "0", STR_PAD_LEFT);
+            $plantCode = $svc->resolvePlantCode((string) $idPlant);
+            $date = date('ymd');
 
-            // Generate batch/trace number
-            $fmtDate = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
-
-            $datPckBatch = DB::connection($this->connection)->select("
-                SELECT a.pck_batch
-                  FROM (SELECT CONCAT(CAST(? AS TEXT), {$fmtDate}, CAST(? AS TEXT), CAST(? AS TEXT), LPAD(CAST(CAST(SUBSTRING(a.to_trace_no,13,2) AS INTEGER) + 1 AS TEXT), 2, '0')) AS pck_batch
-                          FROM t_trace_header a
-                         WHERE " . \Modules\Shared\Helpers\TraceHelper::only14Digit('a.to_trace_no') . "
-                           AND SUBSTRING(a.to_trace_no,1,12) = CONCAT(CAST(? AS TEXT), {$fmtDate}, CAST(? AS TEXT), CAST(? AS TEXT))
-                           AND a.status = 1
-                         ORDER BY a.id_trace_head DESC
-                         LIMIT 1 ) a
-                 UNION ALL
-                 SELECT CONCAT(CAST(? AS TEXT), {$fmtDate}, CAST(? AS TEXT), CAST(? AS TEXT), '01') AS pck_batch
-                  LIMIT 1
-            ", [self::$movType1, $plantStr, $whID, self::$movType1, $plantStr, $whID, self::$movType1, $plantStr, $whID]);
-
-            $traceNoWhx = $datPckBatch[0]->pck_batch;
-            $traceNoTrf = substr_replace($traceNoWhx, '000', 7, 3);
+            $traceNoWhx = $svc->generate(self::$movType1, $date, $whID, $plantCode);
+            $traceNoTrf = $svc->companion($traceNoWhx, 7, 3, '000');
 
             // Get Material Feed
             $datMaterial = DB::connection($this->connection)->select('
@@ -616,10 +601,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                         ', [$newBalQty, $newBalOutQty, $user, $idBalHead]);
 
                         // Log
-                        DB::connection($this->connection)->insert('
-                            INSERT INTO log_transactions (log_module, log_type, log_description, created_by)
-                            VALUES (?, ?, ?, ?)
-                        ', ['T_BALANCE_HEAD', 'UPDATE', 'IDHEAD: ' . $idBalHead . ' | QTY: ' . $balQty . ' >>> ' . $newBalQty . ' / OUT_QTY: ' . $balOutQty . ' >>> ' . $newBalOutQty, $user]);
+                        $this->logTransaction('T_BALANCE_HEAD', 'UPDATE', 'IDHEAD: ' . $idBalHead . ' | QTY: ' . $balQty . ' >>> ' . $newBalQty . ' / OUT_QTY: ' . $balOutQty . ' >>> ' . $newBalOutQty, $user);
                     }
 
                     // Return Tail
@@ -654,10 +636,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                         ', [$newBalQtyTail, $newBalOutQtyTail, $user, $idBalTail]);
 
                         // Log
-                        DB::connection($this->connection)->insert('
-                            INSERT INTO log_transactions (log_module, log_type, log_description, created_by)
-                            VALUES (?, ?, ?, ?)
-                        ', ['T_BALANCE_TAIL', 'UPDATE', 'IDTAIL: ' . $idBalTail . ' | QTY: ' . $balQtyTail . ' >>> ' . $newBalQtyTail . ' / OUT_QTY: ' . $balOutQtyTail . ' >>> ' . $newBalOutQtyTail, $user]);
+                        $this->logTransaction('T_BALANCE_TAIL', 'UPDATE', 'IDTAIL: ' . $idBalTail . ' | QTY: ' . $balQtyTail . ' >>> ' . $newBalQtyTail . ' / OUT_QTY: ' . $balOutQtyTail . ' >>> ' . $newBalOutQtyTail, $user);
                     }
 
                     // Set header and detail status to 0
@@ -773,10 +752,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 ', [$jsonSlocs, $user, $idHead]);
 
                 // Log
-                DB::connection($this->connection)->insert('
-                    INSERT INTO log_transactions (log_module, log_type, log_description, created_by)
-                    VALUES (?, ?, ?, ?)
-                ', ['T_WAREHOUSE_HEAD', 'UPDATE_SUBTANK', 'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SLOCS: ' . implode(',', $slocs), $user]);
+                $this->logTransaction('T_WAREHOUSE_HEAD', 'UPDATE_SUBTANK', 'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SLOCS: ' . implode(',', $slocs), $user);
             });
 
             return ['response' => 1, 'message' => 'Sloc updated successfully.'];
@@ -787,13 +763,10 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
     public function generateTraceNo(int $materialId, int $plantId): string
     {
-        return $this->generateTraceNumberForMaterial(
-            self::$movType1,
-            $materialId,
-            $plantId,
-            't_trace_header',
-            'to_trace_no',
-            'id_trace_head'
-        );
+        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $date = date('ymd');
+        $plantCode = $svc->resolvePlantCode((string) $plantId);
+        $section = $svc->resolveSection(self::$movType1, $materialId);
+        return $svc->generate(self::$movType1, $date, $section, $plantCode, 't_trace_header', 'to_trace_no');
     }
 }

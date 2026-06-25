@@ -5,9 +5,11 @@ namespace Modules\Manufacturer\Repositories;
 use Illuminate\Support\Facades\DB;
 use Modules\Manufacturer\Models\Manufacturer;
 use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class ManufacturerRepository implements ManufacturerRepositoryInterface
 {
+    use TransactionLoggerTrait;
     public function getAll(): array
     {
         return Manufacturer::selectRaw("
@@ -48,11 +50,9 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
         ]);
 
         if ($model) {
-            \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-                'M_MANUFACTURER', 'ADD',
+            $this->logTransaction('M_MANUFACTURER', 'ADD',
                 'ID: ' . $model->id_manufacturer . ' | CODE: ' . $data['code'] . ' / NAME: ' . $data['description'],
-                $data['created_by'],
-            ]);
+                $data['created_by']);
         }
 
         return (bool) $model;
@@ -65,11 +65,9 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
             return false;
         }
 
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MANUFACTURER', 'UPDATE',
+        $this->logTransaction('M_MANUFACTURER', 'UPDATE',
             'ID: ' . $id . ' | CODE: ' . $model->code . ' >> ' . $data['code'] . ' / NAME: ' . $model->description . ' >> ' . $data['description'],
-            $data['updated_by'],
-        ]);
+            $data['updated_by']);
 
         return (bool) $model->update([
             'code' => $data['code'],
@@ -82,9 +80,7 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
 
     public function deactivate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MANUFACTURER', 'DE-ACTIVATE', 'ID: ' . $id . ' | Status: 1 >> 0', $user,
-        ]);
+        $this->logTransaction('M_MANUFACTURER', 'DE-ACTIVATE', 'ID: ' . $id . ' | Status: 1 >> 0', $user);
 
         $model = Manufacturer::find($id);
         if (!$model) {
@@ -96,9 +92,7 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
 
     public function activate(int $id, string $user): bool
     {
-        \DB::insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_MANUFACTURER', 'ACTIVATE', 'ID: ' . $id . ' | Status: 0 >> 1', $user,
-        ]);
+        $this->logTransaction('M_MANUFACTURER', 'ACTIVATE', 'ID: ' . $id . ' | Status: 0 >> 1', $user);
 
         $model = Manufacturer::find($id);
         if (!$model) {

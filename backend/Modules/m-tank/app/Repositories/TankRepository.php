@@ -4,9 +4,11 @@ namespace Modules\Tank\Repositories;
 
 use Modules\Tank\Models\Tank;
 use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class TankRepository implements TankRepositoryInterface
 {
+    use TransactionLoggerTrait;
     public function getAll(): array
     {
         return Tank::selectRaw('id_sloc as id, id_plant AS plant_code, plant_name, tf_number, tf_number AS tank_number, tank_height, description, status, created_at, created_by, updated_at, updated_by')
@@ -66,11 +68,9 @@ class TankRepository implements TankRepositoryInterface
         ]);
 
         if ($model) {
-            \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-                'M_SLOC', 'ADD',
+            $this->logTransaction('M_SLOC', 'ADD',
                 'ID: ' . $id . ' | TANK: ' . $data['tank_number'] . ' | PLANT: ' . $data['plant_code'] . ' | HEIGHT: ' . $data['tank_height'],
-                $data['created_by'] ?? 'System',
-            ]);
+                $data['created_by'] ?? 'System');
             return (int) $id;
         }
 
@@ -84,11 +84,9 @@ class TankRepository implements TankRepositoryInterface
             return false;
         }
 
-        \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_SLOC', 'UPDATE',
+        $this->logTransaction('M_SLOC', 'UPDATE',
             'ID: ' . $id . ' | TANK: ' . $model->tf_number . ' >> ' . $data['tank_number'],
-            $data['updated_by'] ?? 'System',
-        ]);
+            $data['updated_by'] ?? 'System');
 
         return (bool) $model->update([
             'id_plant' => $data['plant_code'],
@@ -102,9 +100,7 @@ class TankRepository implements TankRepositoryInterface
 
     public function deactivate(int $id, string $user): bool
     {
-        \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_SLOC', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user,
-        ]);
+        $this->logTransaction('M_SLOC', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user);
 
         $model = Tank::find($id);
         if (!$model) {
@@ -116,9 +112,7 @@ class TankRepository implements TankRepositoryInterface
 
     public function activate(int $id, string $user): bool
     {
-        \DB::connection('eudr_ts')->insert('INSERT INTO log_transactions (log_module, log_type, log_description, created_by) VALUES (?, ?, ?, ?)', [
-            'M_SLOC', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user,
-        ]);
+        $this->logTransaction('M_SLOC', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user);
 
         $model = Tank::find($id);
         if (!$model) {

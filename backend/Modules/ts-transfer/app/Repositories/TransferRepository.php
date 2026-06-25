@@ -9,30 +9,20 @@ use Illuminate\Support\Facades\DB;
 use Modules\Shared\Traits\TankNameFormatterTrait;
 use Modules\Shared\Traits\TransactionLoggerTrait;
 use Modules\Shared\Traits\DbCompatTrait;
-use Modules\Shared\Traits\TraceNumberGeneratorTrait;
 
 class TransferRepository implements TransferRepositoryInterface
 {
-    use TankNameFormatterTrait, TransactionLoggerTrait, DbCompatTrait, TraceNumberGeneratorTrait;
+    use TankNameFormatterTrait, TransactionLoggerTrait, DbCompatTrait;
 
     protected string $connection = 'eudr_ts';
 
-    protected function isPgsql(): bool
-    {
-        return DB::connection($this->connection)->getDriverName() === 'pgsql';
-    }
-
     public function getActiveMaterials(): Collection
     {
-        $whereIdRundown = $this->isPgsql()
-            ? 'CAST(a.id_rundown AS TEXT) <> \'-\''
-            : 'a.id_rundown <> "-"';
-
         return collect(DB::connection($this->connection)->select(
             "SELECT a.id_material, CONCAT(UPPER(a.description), ' (', a.code, ' - ', a.type, ')') AS material
                FROM m_material a
               WHERE a.status = 1
-                AND {$whereIdRundown}
+                AND CAST(a.id_rundown AS TEXT) <> '-'
               GROUP BY a.code, a.id_material, a.description, a.type
               ORDER BY a.description ASC"
         ));
@@ -40,59 +30,32 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function generateTransferEntryNo(int $materialId, int $plantId): ?string
     {
-        return $this->generateTraceNumberForMaterial(
-            '7',
-            $materialId,
-            $plantId,
-            't_trace_header',
-            'to_trace_no',
-            'id_trace_head'
-        );
+        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $date = date('ymd');
+        $plantCode = $svc->resolvePlantCode((string) $plantId);
+        $section = $svc->resolveSection('7', $materialId);
+        return $svc->generate('7', $date, $section, $plantCode);
     }
 
     public function getTotalStockMaterial(int $materialId, int $tankId, int $plantId): float
     {
-        if ($this->isPgsql()) {
-            $result = DB::connection($this->connection)->select(
-                "SELECT COALESCE(ROUND(CAST(SUM(c.qty) AS numeric), 3), 0) AS total
-                   FROM m_material a
-                   LEFT JOIN (SELECT b.code, b.id_material
-                                FROM m_material b
-                               WHERE b.status = 1) b
-                     ON a.code = b.code
-                   LEFT JOIN (SELECT c.id_material, c.qty
-                                FROM t_balance_header c
-                               WHERE c.status = 1
-                                 AND c.id_sloc = CAST(? AS INTEGER)
-                              ) c
-                     ON b.id_material = c.id_material
-                  WHERE a.status = 1
-                    AND a.id_material = ?",
-                [$tankId, $materialId]
-            );
-        } else {
-            $result = DB::connection($this->connection)->select(
-                'SELECT COALESCE(ROUND(SUM(c.qty), 3), 0) AS total
-                   FROM m_material a
-                   LEFT JOIN (SELECT b.code, b.id_material
-                                FROM m_material b
-                               WHERE b.status = 1) b
-                     ON a.code = b.code
-                   LEFT JOIN (SELECT c.id_material, c.qty
-                                FROM t_balance_header c
-                               WHERE c.status = 1
-                                 AND (c.id_sloc = ?
-                                      OR c.id_sloc LIKE CONCAT(\'%"\', ?, \'"%\')
-                                      OR c.id_sloc LIKE CONCAT(\'%[\', ?, \',%\')
-                                      OR c.id_sloc LIKE CONCAT(\'%, \', ?, \']%\')
-                                      OR c.id_sloc LIKE CONCAT(\'%[\', ?, \']%\'))
-                              ) c
-                     ON b.id_material = c.id_material
-                  WHERE a.status = 1
-                    AND a.id_material = ?',
-                [$tankId, $tankId, $tankId, $tankId, $tankId, $materialId]
-            );
-        }
+        $result = DB::connection($this->connection)->select(
+            "SELECT COALESCE(ROUND(CAST(SUM(c.qty) AS numeric), 3), 0) AS total
+               FROM m_material a
+               LEFT JOIN (SELECT b.code, b.id_material
+                            FROM m_material b
+                           WHERE b.status = 1) b
+                 ON a.code = b.code
+               LEFT JOIN (SELECT c.id_material, c.qty
+                            FROM t_balance_header c
+                           WHERE c.status = 1
+                             AND c.id_sloc = CAST(? AS INTEGER)
+                          ) c
+                 ON b.id_material = c.id_material
+              WHERE a.status = 1
+                AND a.id_material = ?",
+            [$tankId, $materialId]
+        );
 
         return (float) ($result[0]->total ?? 0);
     }
@@ -100,9 +63,7 @@ class TransferRepository implements TransferRepositoryInterface
     public function getTransferList(int $plantId, int $page = 1, int $perPage = 5): array
     {
         $offset = ($page - 1) * $perPage;
-        $slocJoin = $this->isPgsql()
-            ? "LEFT JOIN m_sloc t_from ON (th_from.id_sloc #>> '{}') = t_from.id_sloc::text"
-            : 'LEFT JOIN m_sloc t_from ON t_from.id_sloc = th_from.id_sloc';
+        $slocJoin = "LEFT JOIN m_sloc t_from ON (th_from.id_sloc #>> '{}') = t_from.id_sloc::text";
 
         $totalResult = DB::connection($this->connection)->select(
             "SELECT COUNT(DISTINCT a.trace_no) AS total
@@ -137,107 +98,39 @@ class TransferRepository implements TransferRepositoryInterface
 
         $traceNoList = array_map(function($row) { return $row->trace_no; }, $traceNoList);
 
-        $fmt3 = function($col) {
-            if ($this->isPgsql()) {
-                return "TO_CHAR(ROUND(CAST({$col} AS numeric), 3), 'FM999999999999990.000')";
-            }
-            return "FORMAT(ROUND({$col},3),3)";
-        };
-        $fmtOnly3 = function($col) {
-            if ($this->isPgsql()) {
-                return "TO_CHAR(ROUND(CAST({$col} AS numeric), 3), 'FM999999999999990.000')";
-            }
-            return "FORMAT({$col},3)";
-        };
-        $rnd3 = function($col) {
-            if ($this->isPgsql()) {
-                return "ROUND(CAST({$col} AS numeric),3)";
-            }
-            return "ROUND({$col},3)";
-        };
-        $castText = $this->isPgsql() ? 'CAST(a.trace_no AS TEXT)' : 'CAST(a.trace_no AS TEXT)';
+        $fmt3 = fn($col) => "TO_CHAR(ROUND(CAST({$col} AS numeric), 3), 'FM999999999999990.000')";
+        $fmtOnly3 = fn($col) => "TO_CHAR(ROUND(CAST({$col} AS numeric), 3), 'FM999999999999990.000')";
+        $rnd3 = fn($col) => "ROUND(CAST({$col} AS numeric),3)";
 
-        $selectSql = $this->isPgsql()
-            ? "a.entry_date, b.material_document,
-                th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_sloc,
-                {$castText} AS trace_no,
-                {$fmt3('a.qty')} AS qty, {$fmt3('a.init_qty')} AS init_qty,
-                a.id_balance_head AS idHead,
-                CONCAT(c.description, ' (', c.code, ')') AS material,
-                " . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . " AS plant_name,
-                COALESCE(p_from.code_2,
-                    CASE (CASE WHEN CHAR_LENGTH(CAST(b.from_trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(b.from_trace_no, 11, 2) ELSE SUBSTRING(b.from_trace_no, 8, 2) END)
-                        WHEN '01' THEN 'EOMB'
-                        WHEN '02' THEN 'EOB1'
-                        WHEN '03' THEN 'EOB2'
-                        WHEN '05' THEN 'EOB5'
-                        WHEN '07' THEN 'EOB3'
-                        ELSE ''
-                    END
-                ) AS from_plant_name,
-                (CASE WHEN CHAR_LENGTH(CAST(a.trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(a.trace_no, 11, 2) ELSE SUBSTRING(a.trace_no, 8, 2) END) AS plant_code_from_trace,
-                b.id_trace_head AS idTraceHead, b.is_last_row, b.next_process,
-                {$fmt3('a.in_qty')} AS in_qty, {$fmt3('a.out_qty')} AS out_qty,
-                sup_agg.supplier AS supplier,
-                CASE WHEN ABS(COALESCE(bs.init_qty,0) - a.init_qty) > 0.005 THEN {$fmtOnly3('COALESCE(bs.init_qty,0)')} ELSE {$fmtOnly3('a.init_qty')} END AS balance_supplier,
-                ' >>> ' AS raw_sloc,
-                a.id_sloc AS raw_id_sloc_to, th_from.id_sloc AS raw_id_sloc_from,
-                t_from.id_plant AS from_plant_id,
-                a.id_plant AS to_plant_id,
-                a.created_at, a.created_by"
-            : "a.entry_date, b.material_document,
-                th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_sloc,
-                CAST(a.trace_no AS TEXT) AS trace_no,
-                FORMAT(ROUND(a.qty,3),3) AS qty, FORMAT(ROUND(a.init_qty,3),3) AS init_qty,
-                a.id_balance_head AS idHead,
-                CONCAT(c.description, ' (', c.code, ')') AS material,
-                " . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . " AS plant_name,
-                COALESCE(p_from.code_2,
-                    CASE (CASE WHEN CHAR_LENGTH(CAST(b.from_trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(b.from_trace_no, 11, 2) ELSE SUBSTRING(b.from_trace_no, 8, 2) END)
-                        WHEN '01' THEN 'EOMB'
-                        WHEN '02' THEN 'EOB1'
-                        WHEN '03' THEN 'EOB2'
-                        WHEN '05' THEN 'EOB5'
-                        WHEN '07' THEN 'EOB3'
-                        ELSE ''
-                    END
-                ) AS from_plant_name,
-                (CASE WHEN CHAR_LENGTH(CAST(a.trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(a.trace_no, 11, 2) ELSE SUBSTRING(a.trace_no, 8, 2) END) AS plant_code_from_trace,
-                b.id_trace_head AS idTraceHead, b.is_last_row, b.next_process,
-                FORMAT(ROUND(a.in_qty,3),3) AS in_qty, FORMAT(ROUND(a.out_qty,3),3) AS out_qty,
-                sup_agg.supplier AS supplier,
-                IF(ABS(COALESCE(bs.init_qty,0) - a.init_qty) > 0.005, FORMAT(COALESCE(bs.init_qty,0),3), FORMAT(a.init_qty,3)) AS balance_supplier,
-                ' >>> ' AS raw_sloc,
-                a.id_sloc AS raw_id_sloc_to, th_from.id_sloc AS raw_id_sloc_from,
-                t_from.id_plant AS from_plant_id,
-                a.id_plant AS to_plant_id,
-                a.created_at, a.created_by";
+        $selectSql = "a.entry_date, b.material_document,
+            th_from.id_balance_head AS fromIdHead, th_from.id_sloc AS from_id_sloc,
+            CAST(a.trace_no AS TEXT) AS trace_no,
+            {$fmt3('a.qty')} AS qty, {$fmt3('a.init_qty')} AS init_qty,
+            a.id_balance_head AS idHead,
+            CONCAT(c.description, ' (', c.code, ')') AS material,
+            " . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . " AS plant_name,
+            " . \Modules\Shared\Helpers\TraceHelper::fromPlantNameExpression('b.from_trace_no') . " AS from_plant_name,
+            (CASE WHEN CHAR_LENGTH(CAST(a.trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(a.trace_no, 11, 2) ELSE SUBSTRING(a.trace_no, 8, 2) END) AS plant_code_from_trace,
+            b.id_trace_head AS idTraceHead, b.is_last_row, b.next_process,
+            {$fmt3('a.in_qty')} AS in_qty, {$fmt3('a.out_qty')} AS out_qty,
+            sup_agg.supplier AS supplier,
+            CASE WHEN ABS(COALESCE(bs.init_qty,0) - a.init_qty) > 0.005 THEN {$fmtOnly3('COALESCE(bs.init_qty,0)')} ELSE {$fmtOnly3('a.init_qty')} END AS balance_supplier,
+            ' >>> ' AS raw_sloc,
+            a.id_sloc AS raw_id_sloc_to, th_from.id_sloc AS raw_id_sloc_from,
+            t_from.id_plant AS from_plant_id,
+            a.id_plant AS to_plant_id,
+            a.created_at, a.created_by";
 
-        $bsSubquery = $this->isPgsql()
-            ? "(SELECT h.id_balance_head, ROUND(CAST(SUM(d.init_qty) AS numeric),3) AS init_qty, ROUND(CAST(SUM(d.qty) AS numeric),3) AS qty
-                FROM t_balance_header h
-                JOIN t_balance_detail d ON d.id_balance_head = h.id_balance_head
-               WHERE d.status = 1 AND d.init_qty > 0.0001
-               GROUP BY h.id_balance_head) bs"
-            : "(SELECT h.id_balance_head, ROUND(SUM(d.init_qty),3) AS init_qty, ROUND(SUM(d.qty),3) AS qty
+        $bsSubquery = "(SELECT h.id_balance_head, ROUND(CAST(SUM(d.init_qty) AS numeric),3) AS init_qty, ROUND(CAST(SUM(d.qty) AS numeric),3) AS qty
                 FROM t_balance_header h
                 JOIN t_balance_detail d ON d.id_balance_head = h.id_balance_head
                WHERE d.status = 1 AND d.init_qty > 0.0001
                GROUP BY h.id_balance_head) bs";
 
-        $supplierAggSubquery = $this->isPgsql()
-            ? "(SELECT e2.id_balance_head,
-                       STRING_AGG(DISTINCT CONCAT(f2.description, ' / ', e2.batch_sap,
-                           ' / Qty : ', ROUND(CAST(e2.init_qty AS numeric),3), ' MT / Qty : ', ROUND(CAST(e2.qty AS numeric),3), ' MT')
-                           , ' | ') AS supplier
-                  FROM t_balance_detail e2
-                  LEFT JOIN m_supplier f2 ON f2.id_supplier = e2.id_supplier
-                 WHERE e2.status = 1
-                 GROUP BY e2.id_balance_head) sup_agg"
-            : "(SELECT e2.id_balance_head,
-                       GROUP_CONCAT(DISTINCT CONCAT(f2.description, ' / ', e2.batch_sap,
-                           ' / Qty : ', ROUND(e2.init_qty,3), ' MT / Qty : ', ROUND(e2.qty,3), ' MT')
-                           SEPARATOR ' | ') AS supplier
+        $supplierAggSubquery = "(SELECT e2.id_balance_head,
+                   STRING_AGG(DISTINCT CONCAT(f2.description, ' / ', e2.batch_sap,
+                       ' / Qty : ', ROUND(CAST(e2.init_qty AS numeric),3), ' MT / Qty : ', ROUND(CAST(e2.qty AS numeric),3), ' MT')
+                       , ' | ') AS supplier
                   FROM t_balance_detail e2
                   LEFT JOIN m_supplier f2 ON f2.id_supplier = e2.id_supplier
                  WHERE e2.status = 1
@@ -260,19 +153,13 @@ class TransferRepository implements TransferRepositoryInterface
                 $join->on('th_from.to_trace_no', '=', 'b.from_trace_no')->where('th_from.status', 1);
             })
             ->leftJoin('m_plant as p', function($join) {
-                $onClauseRight = $this->isPgsql() ? 'RIGHT(p.code_3, 2)' : 'RIGHT(p.code_3, 2) COLLATE utf8mb4_unicode_ci';
-                $join->on(DB::raw('(CASE WHEN CHAR_LENGTH(CAST(a.trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(a.trace_no, 11, 2) ELSE SUBSTRING(a.trace_no, 8, 2) END)'), '=', DB::raw($onClauseRight))->where('p.status', 1);
+                $join->on(DB::raw('(CASE WHEN CHAR_LENGTH(CAST(a.trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(a.trace_no, 11, 2) ELSE SUBSTRING(a.trace_no, 8, 2) END)'), '=', DB::raw('RIGHT(p.code_3, 2)'))->where('p.status', 1);
             })
             ->leftJoin('m_sloc as t_from', function($join) {
-                if ($this->isPgsql()) {
-                    $join->whereRaw("(th_from.id_sloc #>> '{}') = t_from.id_sloc::text");
-                } else {
-                    $join->on('t_from.id_sloc', '=', 'th_from.id_sloc');
-                }
+                $join->whereRaw("(th_from.id_sloc #>> '{}') = t_from.id_sloc::text");
             })
             ->leftJoin('m_plant as p_from', function($join) {
-                $onClauseRight = $this->isPgsql() ? 'p_from.code_3' : 'p_from.code_3 COLLATE utf8mb4_unicode_ci';
-                $join->on(DB::raw('t_from.id_plant'), '=', DB::raw($onClauseRight))->where('p_from.status', 1);
+                $join->on(DB::raw('t_from.id_plant'), '=', DB::raw('p_from.code_3'))->where('p_from.status', 1);
             })
             ->leftJoin(DB::raw($supplierAggSubquery), 'sup_agg.id_balance_head', '=', 'a.id_balance_head')
             ->leftJoin(DB::raw($bsSubquery), 'bs.id_balance_head', '=', 'a.id_balance_head')
@@ -407,13 +294,12 @@ class TransferRepository implements TransferRepositoryInterface
                 $toPart .= ': [' . $item->to_tf_number . ']';
             }
 
-            if (($item->to_plant_id ?? 0) == 1001) {
-                $item->sloc = trim($fromPart) . " >>> EOMB";
-            } elseif (($item->from_plant_id ?? 0) == 1001) {
-                $item->sloc = "EOMB >>> " . trim($toPart);
-            } else {
-                $item->sloc = trim($fromPart) . " >>> " . trim($toPart);
-            }
+            static $plantNames = [1001 => 'EOMB', 1002 => 'EOB1', 1003 => 'EOB2', 1005 => 'EOB5', 1007 => 'EOB3'];
+            $fromPlant = $plantNames[(int)($item->from_plant_id ?? 0)] ?? '';
+            $toPlant   = $plantNames[(int)($item->to_plant_id ?? 0)] ?? '';
+            $fromLabel = $fromPlant ?: trim($fromPart);
+            $toLabel   = $toPlant   ?: trim($toPart);
+            $item->sloc = $fromLabel . " >>> " . $toLabel;
 
             return $item;
         });
@@ -440,18 +326,10 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function getUpdateSupplierMaterial(int $idMaterial, int $idSloc, int $plantId): ?object
     {
-        $castSeq = $this->isPgsql()
-            ? 'CAST(SUBSTRING(a.batch_sap,7,2) AS INTEGER)'
-            : 'CAST(SUBSTRING(a.batch_sap,7,2) AS UNSIGNED)';
-        $dateFmtSql = $this->isPgsql()
-            ? "TO_CHAR(NOW(), 'YYMMDD')"
-            : "DATE_FORMAT(NOW(), '%y%m%d')";
-        $traceNoCond = $this->isPgsql()
-            ? 'CAST(SUBSTRING(b.trace_no,1,1) AS INTEGER) = 7'
-            : 'SUBSTRING(b.trace_no,1,1) = 7';
-        $lpadExpr = $this->isPgsql()
-            ? "LPAD(CAST(COALESCE(MAX({$castSeq}) + 1, 1) AS TEXT), 2, '0')"
-            : "LPAD(COALESCE(MAX({$castSeq}) + 1, 1), 2, '0')";
+        $castSeq = 'CAST(SUBSTRING(a.batch_sap,7,2) AS INTEGER)';
+        $dateFmtSql = "TO_CHAR(NOW(), 'YYMMDD')";
+        $traceNoCond = 'CAST(SUBSTRING(b.trace_no,1,1) AS INTEGER) = 7';
+        $lpadExpr = "LPAD(CAST(COALESCE(MAX({$castSeq}) + 1, 1) AS TEXT), 2, '0')";
         $datSeq = DB::connection($this->connection)->select(
             "SELECT {$lpadExpr} AS seq_no
                FROM t_balance_detail a
@@ -464,12 +342,8 @@ class TransferRepository implements TransferRepositoryInterface
 
         $seqNo = $datSeq[0]->seq_no ?? '01';
 
-        $dateSql = $this->isPgsql()
-            ? "TO_CHAR(NOW(), 'YYMMDD')"
-            : "DATE_FORMAT(NOW(), '%y%m%d')";
-
         $result = DB::connection($this->connection)->select(
-            'SELECT CONCAT(' . $dateSql . ', CAST(? AS TEXT), b.code_4, UPPER(a.code_matl_supplier)) AS supplierCode,
+            'SELECT CONCAT(' . $dateFmtSql . ', CAST(? AS TEXT), b.code_4, UPPER(a.code_matl_supplier)) AS supplierCode,
                     COALESCE(c.id_supplier, 0) AS idSupplier
                FROM (SELECT a.code_matl_supplier FROM m_material a WHERE a.status = 1 AND a.id_material = ?) a
                CROSS JOIN (SELECT s.code_4 FROM m_sloc s WHERE s.status = 1 AND s.id_sloc = ?) b
@@ -524,15 +398,14 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function getNextSequence(string $ymd, string $rundownCode, string $plantCode): string
     {
-        $substrFn = $this->isPgsql() ? 'SUBSTRING' : 'SUBSTR';
-        $sql = "SELECT MAX(CAST({$substrFn}(to_trace_no, 13, 2) AS INTEGER)) AS max_seq
+        $sql = "SELECT MAX(CAST(SUBSTRING(to_trace_no, 13, 2) AS INTEGER)) AS max_seq
                   FROM t_trace_header
                  WHERE status = 1
                    AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                   AND CAST({$substrFn}(to_trace_no, 1, 1) AS INTEGER) = 7
-                   AND {$substrFn}(to_trace_no, 2, 6) = ?
-                   AND {$substrFn}(to_trace_no, 8, 3) = ?
-                   AND {$substrFn}(to_trace_no, 11, 2) = ?";
+                   AND CAST(SUBSTRING(to_trace_no, 1, 1) AS INTEGER) = 7
+                   AND SUBSTRING(to_trace_no, 2, 6) = ?
+                   AND SUBSTRING(to_trace_no, 8, 3) = ?
+                   AND SUBSTRING(to_trace_no, 11, 2) = ?";
         $result = DB::connection($this->connection)->select($sql, [$ymd, $rundownCode, $plantCode]);
         $maxSeq = (int) ($result[0]->max_seq ?? 0);
         return str_pad((string) ($maxSeq + 1), 2, '0', STR_PAD_LEFT);
@@ -548,7 +421,7 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function findOrphanHeads(int $idMaterial, int $sloc, int $plantId): array
     {
-        $jsonCond = 'bh.id_sloc = CAST(? AS INTEGER)';
+        $jsonCond = "(CASE WHEN bh.id_sloc::text LIKE '[%' THEN to_jsonb(CAST(? AS TEXT)) @> bh.id_sloc ELSE bh.id_sloc = CAST(? AS INTEGER) END)";
 
         return DB::connection($this->connection)->select(
             "SELECT bh.id_balance_head, bh.trace_no, bh.qty
@@ -563,7 +436,7 @@ class TransferRepository implements TransferRepositoryInterface
                 AND {$jsonCond}
                 AND bh.id_plant = ?
                 AND bd.id_balance_tail IS NULL",
-            [$idMaterial, $sloc, $plantId]
+            [$idMaterial, $sloc, $sloc, $plantId]
         );
     }
 
@@ -593,18 +466,7 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function createBalanceHeader(array $data): int
     {
-        if (isset($data['id_sloc'])) {
-            $idSloc = $data['id_sloc'];
-            $decoded = is_string($idSloc) ? json_decode($idSloc, true) : null;
-            if (is_array($decoded)) {
-                $data['id_sloc'] = (int) ($decoded[0] ?? 0);
-            } elseif (is_array($idSloc)) {
-                $data['id_sloc'] = (int) ($idSloc[0] ?? 0);
-            } else {
-                $data['id_sloc'] = (int) $idSloc;
-            }
-        }
-        return DB::connection($this->connection)->table('t_balance_header')->insertGetId($data, 'id_balance_head');
+        return app(\Modules\Shared\Services\TransferBalanceService::class)->createBalanceHeader($data);
     }
 
     public function createBalanceDetail(array $data): int

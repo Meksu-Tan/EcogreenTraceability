@@ -94,7 +94,9 @@ class TsReportRepository implements TsReportRepositoryInterface
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
 
         $condRmDirect = TraceHelper::plantCondition('a.to_trace_no', ['00']);
-        $condRmTransfer = TraceHelper::plantCondition('a.to_trace_no', ['01', '02']);
+        $condRmTransfer = !empty($plantId)
+            ? TraceHelper::plantCondition('a.to_trace_no', [$plantId])
+            : '1=1';
 
         $fmtInQty    = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
         $fmtOutQty   = $this->dbNumberFormat('SUM(DISTINCT a.out_qty)', 3);

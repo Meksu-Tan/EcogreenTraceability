@@ -5,7 +5,7 @@ namespace Modules\TsShipment\Repositories;
 use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
 use Modules\Shared\Helpers\QuantityDistributionHelper;
 use Modules\Shared\Traits\DbCompatTrait;
-use Modules\Shared\Traits\TraceNumberGeneratorTrait;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 use Modules\Shared\Services\PeriodLockService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Http;
  */
 class EloquentShipmentRepository implements ShipmentRepositoryInterface
 {
-    use DbCompatTrait, TraceNumberGeneratorTrait;
+    use DbCompatTrait, TransactionLoggerTrait;
 
     protected string $connection = 'eudr_ts';
 
@@ -391,48 +391,36 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             }
 
             $shID = '001';
-            $plantStr = str_pad(substr((string)$idPlant, -2), 2, "0", STR_PAD_LEFT);
 
-            $lpadExpr = "LPAD(CAST(CAST(SUBSTRING(a.to_trace_no,13,2) AS INTEGER) + 1 AS TEXT), 2, '0')";
+            // Generate shipment trace no via shared service
+            $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+            $plantCode = $svc->resolvePlantCode((string) $idPlant);
+            $traceNo = $svc->generate('5', date('ymd'), $shID, $plantCode);
 
-            // Create shipment batch trace no
-            $datPckBatch = DB::connection($this->connection)->select("
-                SELECT a.pck_batch
-                  FROM (SELECT CONCAT(CAST(5 AS TEXT), {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, CAST(? AS TEXT), CAST(? AS TEXT), {$lpadExpr}) AS pck_batch
-                          FROM t_trace_header a
-                         WHERE " . \Modules\Shared\Helpers\TraceHelper::only14Digit('a.to_trace_no') . "
-                           AND SUBSTRING(a.to_trace_no,1,12) = CONCAT(CAST(5 AS TEXT), {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, CAST(? AS TEXT), CAST(? AS TEXT))
-                           AND a.status = 1
-                         ORDER BY a.id_trace_head DESC
-                         LIMIT 1 ) a
-                 UNION ALL
-                 SELECT CONCAT(CAST(5 AS TEXT), {$this->dbDateFormat($this->dbCurDate(), '%y%m%d')}, CAST(? AS TEXT), CAST(? AS TEXT), '01') AS pck_batch
-                  LIMIT 1
-            ", [$shID, $plantStr, $shID, $plantStr, $shID, $plantStr]);
+            // Find stock headers — MOVED inside transaction below with FOR UPDATE
+            $outQty = (float)$data['qty'];
 
-            $traceNo = $datPckBatch[0]->pck_batch;
+            return DB::connection($this->connection)->transaction(function () use ($idMaterial, $batchNo, $idPlant, $outQty, $traceNo, $entryDate, $soNo, $fileName, $user) {
+                // Read warehouse stock WITH FOR UPDATE inside transaction
+                $datHead = DB::connection($this->connection)->select('
+                    SELECT a.id_whx_head, a.qty, a.out_qty, a.trace_no, a.init_qty, a.id_section
+                      FROM t_warehouse_header a
+                     WHERE a.status = 1
+                       AND a.qty > 0.0001
+                       AND a.id_material_fg = ?
+                       AND a.batch_no = ?
+                       AND a.id_plant = ?
+                     ORDER BY a.id_whx_head ASC
+                     FOR UPDATE
+                ', [$idMaterial, $batchNo, $idPlant]);
 
-            // Find stock headers
-            $datHead = DB::connection($this->connection)->select('
-                SELECT a.id_whx_head, a.qty, a.out_qty, a.trace_no, a.init_qty, a.id_section
-                  FROM t_warehouse_header a
-                 WHERE a.status = 1
-                   AND a.qty > 0.0001
-                   AND a.id_material_fg = ?
-                   AND a.batch_no = ?
-                   AND a.id_plant = ?
-                 ORDER BY a.id_whx_head ASC
-            ', [$idMaterial, $batchNo, $idPlant]);
+                $totalStock = array_sum(array_column($datHead, 'qty'));
+                if (($totalStock - $outQty) < -0.000001) {
+                    throw new \RuntimeException('Insufficient stock balance.');
+                }
 
-            $totalStock = array_sum(array_column($datHead, 'qty'));
-            if (($totalStock - $outQty) < -0.000001) {
-                return ['response' => 3, 'message' => 'Insufficient stock balance.'];
-            }
-
-            $lenHead = count($datHead);
-            $remainingOutQty = $outQty;
-
-            return DB::connection($this->connection)->transaction(function () use ($lenHead, $datHead, $remainingOutQty, $traceNo, $idMaterial, $entryDate, $idPlant, $soNo, $fileName, $user) {
+                $lenHead = count($datHead);
+                $remainingOutQty = $outQty;
                 for ($i = 0; $i < $lenHead; $i++) {
                     if ($remainingOutQty <= 0) break;
 
@@ -493,15 +481,11 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                     ], 'id_ship_head');
 
                     // Log transactions
-                    DB::connection($this->connection)->insert('
-                        INSERT INTO log_transactions (log_module, log_type, log_description, created_by)
-                        VALUES (?, ?, ?, ?)
-                    ', ['T_TRACE_HEAD', 'ADD SHIP', 'IDTRACEHEAD: ' . $idTraceHead . 'IDHEAD: ' . $idHead . ' | DATE: ' . $entryDate . ' / OUT_QTY: ' . $useQtyWh, $user]);
+                    $this->logTransaction('T_TRACE_HEAD', 'ADD SHIP',
+                        'IDTRACEHEAD: ' . $idTraceHead . 'IDHEAD: ' . $idHead . ' | DATE: ' . $entryDate . ' / OUT_QTY: ' . $useQtyWh, $user);
 
-                    DB::connection($this->connection)->insert('
-                        INSERT INTO log_transactions (log_module, log_type, log_description, created_by)
-                        VALUES (?, ?, ?, ?)
-                    ', ['T_WH_HEAD', 'ADD SHIP', 'IDSHIPHEAD: ' . $idShipHead . 'IDTRACEHEAD: ' . $idTraceHead . ' | DATE: ' . $entryDate . ' / IN_QTY: ' . $useQtyWh, $user]);
+                    $this->logTransaction('T_WH_HEAD', 'ADD SHIP',
+                        'IDSHIPHEAD: ' . $idShipHead . 'IDTRACEHEAD: ' . $idTraceHead . ' | DATE: ' . $entryDate . ' / IN_QTY: ' . $useQtyWh, $user);
 
                     // Deduct warehouse details
                     $datTail = DB::connection($this->connection)->select('
@@ -510,6 +494,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                          WHERE a.status = 1
                            AND a.id_whx_head = ?
                          ORDER BY a.id_whx_tail ASC
+                         FOR UPDATE
                     ', [$idHead]);
 
                     $qtyWhTail = $useQtyWh;
@@ -668,13 +653,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
     public function generateTraceNo(int $materialId, int $plantId): string
     {
-        return $this->generateTraceNumberForMaterial(
-            '5',
-            $materialId,
-            $plantId,
-            't_trace_header',
-            'to_trace_no',
-            'id_trace_head'
-        );
+        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        return $svc->generate('5', date('ymd'), '001', $svc->resolvePlantCode((string) $plantId));
     }
 }

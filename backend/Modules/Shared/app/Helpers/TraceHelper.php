@@ -93,6 +93,56 @@ class TraceHelper
     }
 
     /**
+     * Build a SQL expression resolving a from_trace_no to a readable plant name,
+     * using m_plant.code_2 when available (LEFT JOIN), with inline CASE fallback.
+     *
+     * 11-digit: plant at pos 8-9 → e.g. SUBSTRING(col, 8, 2)
+     * 14-digit: plant at pos 11-12 → e.g. SUBSTRING(col, 11, 2)
+     *
+     * Produces COALESCE(p_from.code_2, CASE ... END) AS alias.
+     * The caller must LEFT JOIN m_plant p_from on t_from.id_plant = p_from.code_3.
+     *
+     * @param string $col Column expression for the from_trace_no, e.g. "b.from_trace_no"
+     */
+    public static function fromPlantNameExpression(string $col): string
+    {
+        $plantCode = "(CASE WHEN CHAR_LENGTH(CAST({$col} AS VARCHAR)) >= 14 THEN SUBSTRING({$col}, 11, 2) ELSE SUBSTRING({$col}, 8, 2) END)";
+
+        return "COALESCE(p_from.code_2,
+            CASE {$plantCode}
+                WHEN '01' THEN 'EOMB'
+                WHEN '02' THEN 'EOB1'
+                WHEN '03' THEN 'EOB2'
+                WHEN '05' THEN 'EOB5'
+                WHEN '07' THEN 'EOB3'
+                ELSE ''
+            END
+        )";
+    }
+
+    /**
+     * Build a SQL condition comparing the warehouse/section field to an arbitrary value.
+     *
+     * Unlike warehouseCondition() which only accepts 3-digit values, this accepts
+     * any warehouse/section string (e.g. '012', '006-01') and correctly handles:
+     *   14-digit: pos 8-10 = warehouse/section (3 digits)
+     *   11-digit: no warehouse field → always false (legacy can't match)
+     *
+     * Use for next_process detection, latest trace matching, etc.
+     *
+     * @param string $col   Column expression, e.g. "from_trace_no"
+     * @param string $value 3-digit warehouse value to compare against
+     */
+    public static function warehouseConditionFor(string $col, string $value): string
+    {
+        $v3 = str_pad(substr($value, 0, 3), 3, '0', STR_PAD_LEFT);
+        return "(
+            CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14
+            AND SUBSTRING(CAST({$col} AS TEXT), 8, 3) = '{$v3}'
+        )";
+    }
+
+    /**
      * Build a SQL CASE expression that resolves a trace number's plant code
      * to a human-readable plant abbreviation, dual-format aware.
      *

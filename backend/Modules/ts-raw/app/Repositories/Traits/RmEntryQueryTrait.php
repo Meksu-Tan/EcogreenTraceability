@@ -179,28 +179,9 @@ trait RmEntryQueryTrait
 
     public function getNewNumber($plantId): ?string
     {
-        $resolvedPlantId = $this->resolvePlantCode($plantId);
-        $warehouse = '000';
-        $section = '1';
-        $tracePlantCode = ($resolvedPlantId == 0 || $resolvedPlantId == '0') ? '00' : str_pad(substr((string) $resolvedPlantId, -2), 2, '0', STR_PAD_LEFT);
-
-        $dateFmt = $this->dbDateFormat($this->dbCurDate(), '%y%m%d');
-        $castRight = "CAST(RIGHT(trace_no, 2) AS INTEGER)";
-        $result = DB::connection('eudr_ts')->select(
-            "SELECT MAX({$castRight}) as max_seq
-               FROM t_balance_header
-              WHERE SUBSTRING(trace_no,1,1) = ?
-                AND SUBSTRING(trace_no,2,6) = {$dateFmt}
-                AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('trace_no', '=', $warehouse) . "
-                AND " . \Modules\Shared\Helpers\TraceHelper::plantCondition('trace_no', ['?']) . "
-                AND status = 1",
-            [$section, $warehouse, $tracePlantCode]
-        );
-
-        $maxSeq = $result[0]->max_seq ?? 0;
-        $newSeq = $maxSeq + 1;
-
-        return $this->buildTraceNo($section, date("ymd"), $warehouse, $tracePlantCode, $newSeq);
+        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
+        return $svc->generate('1', date('ymd'), '000', $plantCode, 't_balance_header', 'trace_no');
     }
 
     public function getTanks($plantId): array
@@ -248,11 +229,7 @@ trait RmEntryQueryTrait
 
     public function getLockStatus(string $entryDate): bool
     {
-        $lock = DB::connection('eudr_ts')->table('m_plant')
-            ->where('status', 1)
-            ->whereNotNull('id_sloc')
-            ->first();
-        return false;
+        return \Modules\Shared\Services\PeriodLockService::isLocked($entryDate);
     }
 
     public function resolvePlantCode($plantId)

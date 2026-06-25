@@ -158,14 +158,13 @@ SQL;
 
             // Build bindings matching SQL `?` order:
             // is_last_row: feedPrefix, movType2 [, idPlant] [, idMaterial]
-            // next_process: movType2, movType2 [, idPlant] [, idMaterial]
+            // next_process: movType2 [, idPlant] [, idMaterial]
             // h subquery: [, idPlant]
             // Main WHERE: feedPrefix, movType2 [, idPlant] [, idMaterial]
             $bindings = [$feedPrefix, $this->movType2];
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
 
-            $bindings[] = $this->movType2;
             $bindings[] = $this->movType2;
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
@@ -206,7 +205,7 @@ SQL;
                                                     ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                         CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                     WHERE SUBSTRING(from_trace_no, 1, 1) = ?
-                                                      AND SUBSTRING(from_trace_no, 10, 1) = ?
+                                                      AND " . \Modules\Shared\Helpers\TraceHelper::warehouseConditionFor('from_trace_no', $feedPrefix) . "
                                                       AND status = 1 AND {$subPlantFilter} {$subMatFilter}
                                                     ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
                         MIN(a.id_plant) AS id_plant, MAX(p.description) AS plant_name
@@ -240,9 +239,8 @@ SQL;
             $bindings[] = $this->movType2;
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
-            
+
             $bindings[] = $this->movType2;
-            $bindings[] = substr($feedPrefix, 1, 1);
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
 
@@ -282,7 +280,7 @@ SQL;
                                                     ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                         CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
                                                     WHERE SUBSTRING(from_trace_no, 1, 1) = ?
-                                                      AND SUBSTRING(from_trace_no, 10, 1) = ?
+                                                      AND " . \Modules\Shared\Helpers\TraceHelper::warehouseConditionFor('from_trace_no', $feedPrefix) . "
                                                       AND status = 1 AND {$plantFilter} {$matFilter}
                                                     ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
                         a.id_plant, p.description AS plant_name
