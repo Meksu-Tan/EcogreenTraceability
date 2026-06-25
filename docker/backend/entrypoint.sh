@@ -1,9 +1,9 @@
 #!/bin/sh
 set -e
 
-# Wait for MySQL to be ready
+# Wait for PostgreSQL to be ready
 echo "Waiting for database connection..."
-until php -r "new PDO('mysql:host=${DB_HOST};port=${DB_PORT};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}');" 2>/dev/null; do
+until php -r "new PDO('pgsql:host=${DB_HOST};port=${DB_PORT:-5432};dbname=${DB_DATABASE}', '${DB_USERNAME}', '${DB_PASSWORD}');" 2>/dev/null; do
     sleep 2
 done
 echo "Database is ready!"
