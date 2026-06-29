@@ -14,6 +14,12 @@ ponytail/
 opencode.json
 skills-lock.json
 dev-agent.sh
+openspec/
+scripts/
+AGENTS.md
+azure-pipelines.yml
+package-lock.json
+start-servers.bat
 
 # ─── Environment Files (NEVER commit real credentials) ─────────────────────────
 .env
