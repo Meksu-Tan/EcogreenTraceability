@@ -67,9 +67,9 @@ class PackageService implements PackageServiceInterface
         return $this->packageRepo->updateSubTank($user, $data);
     }
 
-    public function generateTraceNo(int $materialId, int $plantId): string
+    public function generateTraceNo(int $materialId, int $plantId, ?int $warehouseId = null, ?string $batchNo = null): string
     {
-        return $this->packageRepo->generateTraceNo($materialId, $plantId);
+        return $this->packageRepo->generateTraceNo($materialId, $plantId, $warehouseId, $batchNo);
     }
 
     public function getAllWarehouses(): Collection

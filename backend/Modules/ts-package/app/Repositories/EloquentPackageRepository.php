@@ -6,6 +6,7 @@ use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
 use Modules\Shared\Services\PeriodLockService;
 use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Traits\TransactionLoggerTrait;
+use Modules\Shared\Traits\TankNameFormatterTrait;
 use Modules\Shared\Helpers\Feed;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ use Exception;
  */
 class EloquentPackageRepository implements PackageRepositoryInterface
 {
-    use DbCompatTrait, TransactionLoggerTrait;
+    use DbCompatTrait, TransactionLoggerTrait, TankNameFormatterTrait;
 
     protected string $connection = 'eudr_ts';
     protected static string $movType1 = "4";
@@ -299,18 +300,22 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
         $idMaterial = $wipMaterial[0]->id_material;
 
-        $plantExists = '';
+        $plantFilter = '';
         $bindings = [$idMaterial];
         if ($plantCode && $plantCode !== '0') {
-            $plantExists = 'AND bh.id_plant = ?';
-            $bindings[] = $plantCode;
+            $plantFilter = 'AND sl.id_plant = ?';
+            array_unshift($bindings, $plantCode);
         }
 
-        return collect(DB::connection($this->connection)->select(
-            "SELECT MIN(sl.id_sloc) AS id_sloc, sl.description AS tank, MIN(sl.tf_number) AS tf_number
+        $results = DB::connection($this->connection)->select(
+            "SELECT MIN(sl.id_sloc) AS id_sloc,
+                    COALESCE(MIN(NULLIF(sl.description,'')), MIN(sl.code_3)) AS description,
+                    COALESCE(MAX(NULLIF(sl.code_3,'')), '') AS code_3,
+                    sl.id_plant,
+                    MIN(sl.tf_number) AS tf_number
                FROM m_sloc sl
               WHERE sl.status = 1
-                AND sl.description != ''
+                {$plantFilter}
                 AND EXISTS (
                     SELECT 1 FROM t_balance_header bh
                      WHERE bh.status = 1 AND bh.qty > 0
@@ -319,12 +324,43 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                            SELECT sl2.id_sloc FROM m_sloc sl2
                             WHERE sl2.code_3 = sl.code_3 AND sl2.id_plant = sl.id_plant
                        )
-                       {$plantExists}
                 )
-              GROUP BY sl.description, sl.id_plant
-              ORDER BY sl.description ASC",
+              GROUP BY COALESCE(NULLIF(sl.code_3,''), sl.description), sl.id_plant
+              ORDER BY COALESCE(MIN(NULLIF(sl.description,'')), MIN(sl.code_3)) ASC",
             $bindings
-        ));
+        );
+
+        $plants = $this->loadPlantAbbreviations();
+
+        return collect($results)->map(function ($item) use ($plants) {
+            $desc = $item->description ?? '';
+            $code3 = strtoupper($item->code_3 ?? '');
+            
+            if (empty($desc) || $desc === $item->code_3) {
+                $label = ($code3 === 'PRD') ? 'PRODUCT' : $code3;
+                $abbr  = $plants[$item->id_plant ?? ''] ?? '';
+                $desc  = trim($label . ($abbr ? ' ' . $abbr : ''));
+            }
+            
+            $item->tank = $this->formatTankName($desc) ?? $desc;
+            $item->id_sloc = (int) $item->id_sloc;
+            $item->tf_number = $item->tf_number;
+            return $item;
+        });
+    }
+
+    private function loadPlantAbbreviations(): array
+    {
+        try {
+            return DB::connection($this->connection)
+                ->table('m_plant')
+                ->select('code_3', 'code_2')
+                ->get()
+                ->pluck('code_2', 'code_3')
+                ->toArray();
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 
     public function getCmbActiveWarehousePck(array $data): Collection
@@ -417,8 +453,13 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             }
 
             $svc = app(\Modules\Shared\Services\TraceNumberService::class);
-            $whID = str_pad((string)$idWarehouse, 3, "0", STR_PAD_LEFT);
             $plantCode = $svc->resolvePlantCode((string) $idPlant);
+
+            $whRow = DB::connection($this->connection)->selectOne(
+                'SELECT id_warehouse FROM m_warehouse WHERE id_batch = ? AND status = 1 LIMIT 1',
+                [$batchNo]
+            );
+            $whID = $whRow ? str_pad((string) $whRow->id_warehouse, 3, "0", STR_PAD_LEFT) : str_pad((string)$idWarehouse, 3, "0", STR_PAD_LEFT);
             $date = date('ymd');
 
             $traceNoWhx = $svc->generate(self::$movType1, $date, $whID, $plantCode);
@@ -826,12 +867,24 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         }
     }
 
-    public function generateTraceNo(int $materialId, int $plantId): string
+    public function generateTraceNo(int $materialId, int $plantId, ?int $warehouseId = null, ?string $batchNo = null): string
     {
         $svc = app(\Modules\Shared\Services\TraceNumberService::class);
         $date = date('ymd');
         $plantCode = $svc->resolvePlantCode((string) $plantId);
-        $section = $svc->resolveSection(self::$movType1, $materialId);
+
+        if ($batchNo) {
+            $whRow = DB::connection($this->connection)->selectOne(
+                'SELECT id_warehouse FROM m_warehouse WHERE id_batch = ? AND status = 1 LIMIT 1',
+                [$batchNo]
+            );
+            $section = $whRow ? str_pad((string) $whRow->id_warehouse, 3, '0', STR_PAD_LEFT) : '000';
+        } elseif ($warehouseId) {
+            $section = str_pad((string) $warehouseId, 3, '0', STR_PAD_LEFT);
+        } else {
+            $section = $svc->resolveSection(self::$movType1, $materialId);
+        }
+
         return $svc->generate(self::$movType1, $date, $section, $plantCode, 't_trace_header', 'to_trace_no');
     }
 }

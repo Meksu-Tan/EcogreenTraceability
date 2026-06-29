@@ -25,6 +25,25 @@
         <form @submit.prevent="save" class="d-flex flex-column ga-4">
           <VCard variant="outlined">
             <VCardText>
+              <VRow dense class="mb-2">
+                <VCol cols="12" md="3">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Plant</label>
+                  <VSelect
+                    v-model="selectedPlantForTransfer"
+                    :items="plantOptions"
+                    item-title="label"
+                    item-value="value"
+                    :loading="initLoading"
+                    :disabled="plantSelectionStore.selectedPlantId !== null"
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    :clearable="plantSelectionStore.selectedPlantId === null"
+                  />
+                </VCol>
+              </VRow>
               <VRow dense>
                 <VCol cols="12" sm="6" md="4">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Mode</label>
@@ -113,15 +132,20 @@
               <VRow dense class="mt-2">
                 <VCol cols="12" sm="6" md="4">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Source Sloc</label>
-                  <VTextField
-                    :model-value="selectedTankLabel"
-                    readonly
+                  <VSelect
+                    v-model="form.tank"
+                    :items="store.activeTanks"
+                    item-title="tank"
+                    item-value="id_sloc"
+                    required
                     rounded="md"
                     color="primary"
                     density="compact"
                     variant="outlined"
                     class="mt-1"
-                    :placeholder="form.fgProduct ? 'Auto-selecting...' : 'Select product first'"
+                    :disabled="!form.fgProduct"
+                    :placeholder="form.fgProduct ? 'Select Sloc' : 'Select product first'"
+                    @update:model-value="onTankChange"
                   />
                 </VCol>
 
@@ -213,9 +237,10 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePackageEntryStore } from '../stores/usePackageEntryStore'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true }
@@ -223,9 +248,31 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'saved'])
 
 const store = usePackageEntryStore()
+const plantSelectionStore = usePlantSelectionStore()
+const setupPlantStore = useSetupPlantStore()
 const { newTraceNo, traceNoLoading } = storeToRefs(store)
 const submitting = ref(false)
 const submitError = ref('')
+const selectedPlantForTransfer = ref(null)
+const selectedPlantForTransferName = ref('')
+const selectedPlantForTransferCode = ref('')
+const initLoading = ref(false)
+
+const effectivePlantId = computed(() => {
+  if (plantSelectionStore.selectedPlantId !== null) {
+    return plantSelectionStore.selectedPlantId
+  }
+  return selectedPlantForTransfer.value
+})
+
+const plantOptions = computed(() => {
+  return (setupPlantStore.plants || [])
+    .filter(p => p.status == 1)
+    .map(p => ({
+      value: p.id_plant,
+      label: p.description || p.name || `Plant ${p.id_plant}`
+    }))
+})
 
 const form = reactive({
   entryDate: '',
@@ -238,16 +285,20 @@ const form = reactive({
   warehouse: null
 })
 
-const selectedTankLabel = computed(() => {
-  if (!form.tank) return ''
-  const tank = store.activeTanks.find(t => t.id_sloc === form.tank)
-  return tank ? tank.tank : ''
-})
-
-watch(() => props.modelValue, (newVal) => {
+watch(() => props.modelValue, async (newVal) => {
   if (newVal) {
+    initLoading.value = true
+    if (setupPlantStore.plants.length === 0) {
+      await setupPlantStore.fetchPlants()
+    }
     resetForm()
-    initModal()
+    if (plantSelectionStore.selectedPlantId !== null) {
+      selectedPlantForTransfer.value = plantSelectionStore.selectedPlantId
+      selectedPlantForTransferName.value = plantSelectionStore.selectedPlantName || ''
+      selectedPlantForTransferCode.value = plantSelectionStore.selectedPlantCode || ''
+    }
+    await initModal()
+    initLoading.value = false
   }
 })
 
@@ -262,6 +313,15 @@ function resetForm() {
   form.qty = null
   form.warehouse = null
   store.resetState()
+  if (plantSelectionStore.selectedPlantId !== null) {
+    selectedPlantForTransfer.value = plantSelectionStore.selectedPlantId
+    selectedPlantForTransferName.value = plantSelectionStore.selectedPlantName || ''
+    selectedPlantForTransferCode.value = plantSelectionStore.selectedPlantCode || ''
+  } else {
+    selectedPlantForTransfer.value = null
+    selectedPlantForTransferName.value = ''
+    selectedPlantForTransferCode.value = ''
+  }
 }
 
 async function initModal() {
@@ -283,7 +343,7 @@ async function onProductChange(val) {
   if (val) {
     form.tank = null
     form.tankNo = []
-    await store.fetchWipMaterials(val)
+    await store.fetchWipMaterials(val, null, effectivePlantId.value)
 
     if (store.activeTanks.length > 0) {
       form.tank = store.activeTanks[0].id_sloc
@@ -301,19 +361,38 @@ async function onProductChange(val) {
   }
 }
 
+async function onTankChange(val) {
+  form.tankNo = []
+  if (val && form.fgProduct) {
+    await store.fetchSpecificTanks(val, form.fgProduct)
+  }
+}
+
 watch(() => form.fgProduct, async (newVal) => {
-  if (newVal) {
-    await store.fetchNewTraceNo(newVal, store.plantId)
-  } else {
+  if (!newVal) {
     store.clearTraceNo()
   }
 })
 
-watch(() => [store.plantId, form.entryDate], async ([newPlantId]) => {
-  if (form.fgProduct && newPlantId) {
-    await store.fetchNewTraceNo(form.fgProduct, newPlantId)
+watch(() => [effectivePlantId.value, form.warehouse, form.batchNo], async ([newPlantId, newWarehouse, newBatchNo]) => {
+  if (form.fgProduct && newPlantId && (newWarehouse || newBatchNo)) {
+    await store.fetchNewTraceNo(form.fgProduct, newPlantId, newWarehouse, newBatchNo)
+  } else {
+    store.clearTraceNo()
   }
 }, { deep: true })
+
+watch(effectivePlantId, async (newPlantId, oldPlantId) => {
+  if (newPlantId && newPlantId !== oldPlantId && form.fgProduct) {
+    form.tank = null
+    form.tankNo = []
+    await store.fetchWipMaterials(form.fgProduct, null, newPlantId)
+    if (store.activeTanks.length > 0) {
+      form.tank = store.activeTanks[0].id_sloc
+      await store.fetchSpecificTanks(form.tank, form.fgProduct)
+    }
+  }
+})
 
 async function save() {
   submitting.value = true

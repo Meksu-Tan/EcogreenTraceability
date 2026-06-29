@@ -17,6 +17,6 @@ interface PackageRepositoryInterface
     public function updatePo(string $user, array $data): array;
     public function updateBatch(string $user, array $data): array;
     public function updateSubTank(string $user, array $data): array;
-    public function generateTraceNo(int $materialId, int $plantId): string;
+    public function generateTraceNo(int $materialId, int $plantId, ?int $warehouseId = null, ?string $batchNo = null): string;
     public function getAllWarehouses(): Collection;
 }

@@ -7,8 +7,6 @@
           alt="Ecogreen Logo"
           class="loading-logo"
         />
-        <div class="pulse-glow"></div>
-        <div class="spinner-ring"></div>
       </div>
       <h2 class="text-h6 font-weight-black text-on-surface mt-6 text-pulse">EUDR-TS</h2>
       <p class="text-caption text-medium-emphasis mt-1 text-pulse-sub">Enterprise Operations Data System</p>
@@ -70,86 +68,16 @@ onMounted(() => {
   object-fit: contain;
   z-index: 2;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  animation: logo-bounce 2s infinite ease-in-out;
+  /* ponytail: removed refresh animation */
 }
 
-.pulse-glow {
-  position: absolute;
-  width: 80px;
-  height: 80px;
-  border-radius: 18px;
-  background-color: rgb(var(--v-theme-primary));
-  filter: blur(8px);
-  z-index: 1;
-  animation: pulse-glow-anim 2s ease-in-out infinite;
-}
-
-.spinner-ring {
-  position: absolute;
-  width: 96px;
-  height: 96px;
-  border-radius: 24px;
-  border: 3px solid transparent;
-  border-top-color: rgb(var(--v-theme-primary));
-  border-right-color: rgb(var(--v-theme-primary));
-  z-index: 3;
-  animation: spin-anim 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-}
 
 .text-pulse {
-  animation: text-glow 2s ease-in-out infinite alternate;
   letter-spacing: 1.5px;
 }
 
 .text-pulse-sub {
   opacity: 0.8;
-  animation: text-fade 2s ease-in-out infinite alternate;
 }
 
-@keyframes logo-bounce {
-  0%, 100% {
-    transform: translateY(0) scale(1);
-  }
-  50% {
-    transform: translateY(-4px) scale(1.02);
-  }
-}
-
-@keyframes pulse-glow-anim {
-  0%, 100% {
-    transform: scale(0.9);
-    opacity: 0.2;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.45;
-  }
-}
-
-@keyframes spin-anim {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes text-glow {
-  0% {
-    text-shadow: 0 0 0px rgba(var(--v-theme-primary), 0);
-  }
-  100% {
-    text-shadow: 0 0 10px rgba(var(--v-theme-primary), 0.3);
-  }
-}
-
-@keyframes text-fade {
-  0% {
-    opacity: 0.5;
-  }
-  100% {
-    opacity: 0.9;
-  }
-}
 </style>

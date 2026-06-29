@@ -237,7 +237,7 @@ class ShipmentServiceTest extends TestCase
     {
         $this->repoMock->shouldReceive('generateTraceNo')
             ->once()
-            ->with(1, 1)
+            ->with(1, 1, null)
             ->andReturn('5260603010101');
 
         $result = $this->service->generateTraceNo(1, 1);

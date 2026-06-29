@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import packageService from '../services/packageService'
 import { useToastStore } from '@/stores/toast.js'
-import { usePlantSelectionStore } from '@/stores/plant.js'
+import { usePlantSelectionStore, registerCacheResetCallback } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
 import { useTransactionAction } from '@/composables/useTransactionAction'
 
@@ -70,16 +70,16 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
   }
 
-  async function fetchWipMaterials(idMaterialPck, tank = null) {
+  async function fetchWipMaterials(idMaterialPck, tank = null, plantOverride = null) {
     try {
-      const res = await packageService.getWipMaterials(idMaterialPck, tank, plantId.value)
+      const res = await packageService.getWipMaterials(idMaterialPck, tank, plantOverride || plantId.value)
       if (res.data?.data && res.data.data.length > 0) {
         wipBalance.value = parseFloat(res.data.data[0].balance) || 0
         wipMaterialLabel.value = res.data.data[0].wip_material || ''
-        
+
         // Also fetch active tanks for the rundown id associated with the product
         if (res.data.data[0].id_rundown) {
-          await fetchActiveTanks(res.data.data[0].id_rundown)
+          await fetchActiveTanks(res.data.data[0].id_rundown, plantOverride || plantId.value)
         }
       } else {
         wipBalance.value = 0
@@ -90,9 +90,9 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
   }
 
-  async function fetchActiveTanks(rundownID) {
+  async function fetchActiveTanks(rundownID, plantOverride = null) {
     try {
-      const res = await packageService.getActiveTanks(rundownID)
+      const res = await packageService.getActiveTanks(rundownID, plantOverride || plantId.value)
       activeTanks.value = res.data?.data || []
     } catch (error) {
       toastStore.error('Failed to load active tanks')
@@ -178,7 +178,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
   }
 
-  async function fetchNewTraceNo(id_material, id_plant) {
+  async function fetchNewTraceNo(id_material, id_plant, warehouse, batchNo) {
     const activePlant = id_plant || plantId.value || plantStore.selectedPlantId
     if (!id_material) {
       newTraceNo.value = ''
@@ -186,7 +186,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
     traceNoLoading.value = true
     try {
-      const res = await packageService.getNewTraceNo({ id_material, id_plant: activePlant })
+      const res = await packageService.getNewTraceNo({ id_material, id_plant: activePlant, warehouse, batch_no: batchNo || '' })
       if (res.data?.data && res.data.data.length > 0) {
         newTraceNo.value = res.data.data[0].traceNo || ''
       } else {
@@ -216,9 +216,6 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     entries,
     loading,
     error,
-    pagination,
-    setPage,
-    hasEntries,
     pagination,
     setPage,
     hasEntries,

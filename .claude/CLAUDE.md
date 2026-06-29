@@ -446,7 +446,7 @@ Read **`.claude/.docs/TEMPLATE-ADAPTATION.md`** — understand what's automatic 
 - Ikuti component patterns dari `.claude/.template/`
 - Semua perubahan state Vuetify (theme, drawer, dll) WAJIB melalui Vuetify composables (`useTheme()`, `useLayout()`)
 - Logo assets WAJIB dicopy dari `.claude/.design/assets/` ke `frontend/public/` — akses via `/logo-*` path, jangan import via JS bundler
-  - `logo-symbol.jpg` → favicon
+  - `logo-symbol.svg` → favicon
   - `logo-stacked.jpg` → sidebar/login
   - `logo-horizontal.jpg` → app bar
 

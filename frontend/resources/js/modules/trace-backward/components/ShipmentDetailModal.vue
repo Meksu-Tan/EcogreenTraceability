@@ -26,10 +26,6 @@
           <div class="text-caption">Retrieving SAP shipment data...</div>
         </div>
 
-        <div v-else-if="!data" class="pa-8 text-center text-medium-emphasis">
-          Failed to fetch shipment details or empty response.
-        </div>
-
         <template v-else>
           <VRow>
             <VCol cols="12" md="6">
@@ -38,27 +34,27 @@
                 <div class="d-flex flex-column gap-2 text-body-2">
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Customer Code:</span>
-                    <span class="font-weight-bold">{{ data.CUSTOMER_CODE || '-' }}</span>
+                    <span class="font-weight-bold">{{ data?.CUSTOMER_CODE || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Customer Name:</span>
-                    <span class="font-weight-bold text-right">{{ data.CUSTOMER_NAME || '-' }}</span>
+                    <span class="font-weight-bold text-right">{{ data?.CUSTOMER_NAME || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">PO Number:</span>
-                    <span class="font-weight-bold font-mono">{{ data.PO_NUM || '-' }}</span>
+                    <span class="font-weight-bold font-mono">{{ data?.PO_NUM || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Pro Invoice:</span>
-                    <span class="font-weight-bold font-mono">{{ data.PRO_INVOICE || '-' }}</span>
+                    <span class="font-weight-bold font-mono">{{ data?.PRO_INVOICE || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Inco Term PTEO:</span>
-                    <span class="font-weight-bold">{{ data.INCO_PTEO || '-' }}</span>
+                    <span class="font-weight-bold">{{ data?.INCO_PTEO || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Inco Term EOS:</span>
-                    <span class="font-weight-bold">{{ data.INCO_EOS || '-' }}</span>
+                    <span class="font-weight-bold">{{ data?.INCO_EOS || '-' }}</span>
                   </div>
                 </div>
               </VCard>
@@ -70,27 +66,27 @@
                 <div class="d-flex flex-column gap-2 text-body-2">
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">ZBatch (SAP):</span>
-                    <span class="font-weight-bold font-mono">{{ data.ZBATCH || '-' }}</span>
+                    <span class="font-weight-bold font-mono">{{ data?.ZBATCH || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Net Weight (kg):</span>
-                    <span class="font-weight-bold">{{ data.NET_WEIGHT || '-' }}</span>
+                    <span class="font-weight-bold">{{ data?.NET_WEIGHT || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Depart Date:</span>
-                    <span class="font-weight-bold">{{ data.DATE_DEPART || '-' }}</span>
+                    <span class="font-weight-bold">{{ data?.DATE_DEPART || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Port Discharge:</span>
-                    <span class="font-weight-bold text-right text-uppercase">{{ data.PORT_DISCHARGE || '-' }}</span>
+                    <span class="font-weight-bold text-right text-uppercase">{{ data?.PORT_DISCHARGE || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Vessel:</span>
-                    <span class="font-weight-bold text-right text-uppercase">{{ data.VESSEL || '-' }}</span>
+                    <span class="font-weight-bold text-right text-uppercase">{{ data?.VESSEL || '-' }}</span>
                   </div>
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Ship To Location:</span>
-                    <span class="font-weight-bold text-right text-uppercase">{{ data.SHIP_TO_LOC || '-' }}</span>
+                    <span class="font-weight-bold text-right text-uppercase">{{ data?.SHIP_TO_LOC || '-' }}</span>
                   </div>
                 </div>
               </VCard>
@@ -101,7 +97,7 @@
             <VCard variant="outlined" class="pa-4">
               <div class="text-subtitle-2 font-weight-bold mb-2">Container Numbers</div>
               <div class="d-flex flex-wrap gap-2">
-                <template v-if="data.CONTAINER_NUMBER">
+                <template v-if="data?.CONTAINER_NUMBER">
                   <VChip
                     v-for="c in data.CONTAINER_NUMBER.split(';').map(x=>x.trim()).filter(x=>x)"
                     :key="c"
@@ -120,7 +116,7 @@
             <VCard variant="outlined" class="pa-4">
               <div class="text-subtitle-2 font-weight-bold mb-2">Shipment Lot Numbers</div>
               <div class="d-flex flex-wrap gap-2">
-                <template v-if="data.SHIP_LOT">
+                <template v-if="data?.SHIP_LOT">
                   <VChip
                     v-for="l in data.SHIP_LOT.split(';').map(x=>x.trim()).filter(x=>x)"
                     :key="l"
@@ -139,7 +135,7 @@
             <VCard variant="outlined" class="pa-4">
               <div class="text-subtitle-2 font-weight-bold mb-2">Batch Allocations</div>
               <div class="d-flex flex-wrap gap-2">
-                <template v-if="data.BATCH_ALLOC">
+                <template v-if="data?.BATCH_ALLOC">
                   <VChip
                     v-for="ba in data.BATCH_ALLOC.split(';').map(x=>x.trim()).filter(x=>x)"
                     :key="ba"

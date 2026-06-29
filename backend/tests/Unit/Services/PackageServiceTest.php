@@ -303,7 +303,7 @@ class PackageServiceTest extends TestCase
         $this->repoMock
             ->shouldReceive('generateTraceNo')
             ->once()
-            ->with(7, 3)
+            ->with(7, 3, null, null)
             ->andReturn($expected);
 
         $result = $this->makeService()->generateTraceNo(7, 3);
@@ -316,7 +316,7 @@ class PackageServiceTest extends TestCase
         $this->repoMock
             ->shouldReceive('generateTraceNo')
             ->once()
-            ->with(7, 3)
+            ->with(7, 3, null, null)
             ->andReturn('');
 
         $result = $this->makeService()->generateTraceNo(7, 3);

@@ -229,8 +229,9 @@ class ShipmentEntryController extends Controller
         $plantId = (int) (data_get($request->get('plant_context'), 'plant_code') ?: $request->validated('id_plant'));
         $materialStr = $request->validated('id_material');
         $materialId = (int) str_replace('PCK|', '', $materialStr);
+        $batchNo = $request->validated('batch_no');
         try {
-            $traceNo = $this->shipmentService->generateTraceNo($materialId, $plantId);
+            $traceNo = $this->shipmentService->generateTraceNo($materialId, $plantId, $batchNo);
             return ApiResponse::success([['traceNo' => $traceNo]]);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to generate trace number: ' . $e->getMessage(), 500);

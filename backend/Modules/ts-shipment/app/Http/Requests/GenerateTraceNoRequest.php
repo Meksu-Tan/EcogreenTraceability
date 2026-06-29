@@ -16,6 +16,7 @@ class GenerateTraceNoRequest extends FormRequest
         return [
             'id_plant' => ['required', 'integer', 'min:1'],
             'id_material' => ['required', 'string'],
+            'batch_no' => ['nullable', 'string'],
         ];
     }
 }

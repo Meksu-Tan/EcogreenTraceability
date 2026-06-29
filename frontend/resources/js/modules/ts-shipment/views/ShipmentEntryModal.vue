@@ -257,17 +257,15 @@ watch(() => props.modelValue, async (newVal) => {
         selectedPlantForTransferCode.value = plantSelectionStore.selectedPlantCode || ''
       }
       await store.fetchActiveFgProducts()
-      if (effectivePlantId.value && form.fgProduct) {
-        await store.fetchNewTraceNo(effectivePlantId.value, form.fgProduct)
-      }
+      store.newTraceNo = ''
       initLoading.value = false
     }
   })
 
-  // Regenerate trace number when plant, entry date, or fgProduct changes
-  watch(() => [effectivePlantId.value, form.entryDate, form.fgProduct], async ([newPlantId, newEntryDate, newFgProduct]) => {
-    if (newPlantId && newFgProduct) {
-      await store.fetchNewTraceNo(newPlantId, newFgProduct)
+  // Only generate trace number when batch_no is selected (with product and plant)
+  watch(() => [effectivePlantId.value, form.fgProduct, form.batch_no], async ([newPlantId, newFgProduct, newBatchNo]) => {
+    if (newPlantId && newFgProduct && newBatchNo) {
+      await store.fetchNewTraceNo(newPlantId, newFgProduct, newBatchNo)
     } else {
       store.newTraceNo = ''
     }

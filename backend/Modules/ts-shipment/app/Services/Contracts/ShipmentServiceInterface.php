@@ -13,7 +13,7 @@ interface ShipmentServiceInterface
     public function store(string $user, array $data): array;
     public function cancel(string $user, array $data): array;
     public function updateSo(string $user, array $data): array;
-    public function generateTraceNo(int $materialId, int $plantId): string;
+    public function generateTraceNo(int $materialId, int $plantId, ?string $batchNo = null): string;
     public function getShipmentBatchPackaging(array $data): Collection;
     public function getPreparationRecord(array $data): Collection;
     public function getLabel(array $data): Collection;

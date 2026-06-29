@@ -47,9 +47,9 @@ class ShipmentService implements ShipmentServiceInterface
         return $this->shipmentRepo->updateSo($user, $data);
     }
 
-    public function generateTraceNo(int $materialId, int $plantId): string
+    public function generateTraceNo(int $materialId, int $plantId, ?string $batchNo = null): string
     {
-        return $this->shipmentRepo->generateTraceNo($materialId, $plantId);
+        return $this->shipmentRepo->generateTraceNo($materialId, $plantId, $batchNo);
     }
 
     public function getShipmentBatchPackaging(array $data): Collection

@@ -47,15 +47,15 @@ class PackageEntryModuleTest extends TestCase
         $mockService = Mockery::mock(PackageServiceInterface::class);
         $mockService->shouldReceive('generateTraceNo')
             ->once()
-            ->with(1, 1)
-            ->andReturn('4' . date('ymd') . '0010101');
+            ->with(1, 1, 1, null)
+            ->andReturn('4' . date('ymd') . '0210101');
         $this->app->instance(PackageServiceInterface::class, $mockService);
 
         $response = $this->actingAs($user, 'sanctum')
             ->getJson('/api/v1/transactions/package-entries/new-trace-no?warehouse=1&id_plant=1&id_material=1');
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.0.traceNo', '4' . date('ymd') . '0010101');
+            ->assertJsonPath('data.0.traceNo', '4' . date('ymd') . '0210101');
     }
 
     public function test_new_trace_no_validates_required_parameters(): void

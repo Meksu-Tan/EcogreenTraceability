@@ -390,17 +390,10 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 return ['response' => 0, 'message' => 'Only packaging type is currently supported.'];
             }
 
-            $shID = '001';
-
-            // Generate shipment trace no via shared service
-            $svc = app(\Modules\Shared\Services\TraceNumberService::class);
-            $plantCode = $svc->resolvePlantCode((string) $idPlant);
-            $traceNo = $svc->generate('5', date('ymd'), $shID, $plantCode);
-
             // Find stock headers — MOVED inside transaction below with FOR UPDATE
             $outQty = (float)$data['qty'];
 
-            return DB::connection($this->connection)->transaction(function () use ($idMaterial, $batchNo, $idPlant, $outQty, $traceNo, $entryDate, $soNo, $fileName, $user) {
+            return DB::connection($this->connection)->transaction(function () use ($idMaterial, $batchNo, $idPlant, $outQty, $entryDate, $soNo, $fileName, $user) {
                 // Read warehouse stock WITH FOR UPDATE inside transaction
                 $datHead = DB::connection($this->connection)->select('
                     SELECT a.id_whx_head, a.qty, a.out_qty, a.trace_no, a.init_qty, a.id_section
@@ -418,6 +411,16 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 if (($totalStock - $outQty) < -0.000001) {
                     throw new \RuntimeException('Insufficient stock balance.');
                 }
+
+                // Generate shipment trace no using warehouse from batch (m_warehouse)
+                $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+                $plantCode = $svc->resolvePlantCode((string) $idPlant);
+                $whRow = DB::connection($this->connection)->selectOne(
+                    'SELECT id_warehouse FROM m_warehouse WHERE id_batch = ? AND status = 1 LIMIT 1',
+                    [$batchNo]
+                );
+                $whID = $whRow ? str_pad((string) $whRow->id_warehouse, 3, '0', STR_PAD_LEFT) : '001';
+                $traceNo = $svc->generate('5', date('ymd'), $whID, $plantCode);
 
                 $lenHead = count($datHead);
                 $remainingOutQty = $outQty;
@@ -651,9 +654,22 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
         $dataPerHead[0] = QuantityDistributionHelper::adjustToTotal($flat, (float) $targetTotal, 'qty');
     }
 
-    public function generateTraceNo(int $materialId, int $plantId): string
+    public function generateTraceNo(int $materialId, int $plantId, ?string $batchNo = null): string
     {
         $svc = app(\Modules\Shared\Services\TraceNumberService::class);
-        return $svc->generate('5', date('ymd'), '001', $svc->resolvePlantCode((string) $plantId));
+        $plantCode = $svc->resolvePlantCode((string) $plantId);
+
+        $whID = '001';
+        if ($batchNo) {
+            $row = DB::connection($this->connection)->selectOne(
+                'SELECT id_warehouse FROM m_warehouse WHERE id_batch = ? AND status = 1 ORDER BY id_warehouse ASC LIMIT 1',
+                [$batchNo]
+            );
+            if ($row) {
+                $whID = str_pad((string) $row->id_warehouse, 3, '0', STR_PAD_LEFT);
+            }
+        }
+
+        return $svc->generate('5', date('ymd'), $whID, $plantCode);
     }
 }

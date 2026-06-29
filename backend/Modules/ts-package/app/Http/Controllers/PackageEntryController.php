@@ -157,7 +157,7 @@ class PackageEntryController extends Controller
         try {
             $results = $this->packageService->getCmbActiveTankPck([
                 'rundownID'  => $request->input('rundownID'),
-                'plant_code' => $request->get('plant_context')['plant_code'] ?? null,
+                'plant_code' => $request->get('plant_context')['plant_code'] ?? $request->input('id_plant') ?? $request->input('plant_code'),
             ]);
             return ApiResponse::success($results, 'Active tanks retrieved successfully');
         } catch (\Exception $e) {
@@ -194,8 +194,10 @@ class PackageEntryController extends Controller
     {
         $materialId = (int) $request->validated('id_material');
         $plantId = (int) ($request->get('plant_context')['plant_code'] ?? $request->input('id_plant', 0));
+        $warehouseId = $request->validated('warehouse') ? (int) $request->validated('warehouse') : null;
+        $batchNo = $request->validated('batch_no');
         try {
-            $traceNo = $this->packageService->generateTraceNo($materialId, $plantId);
+            $traceNo = $this->packageService->generateTraceNo($materialId, $plantId, $warehouseId, $batchNo);
             return ApiResponse::success([['traceNo' => $traceNo]]);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to generate trace number: ' . $e->getMessage(), 500);

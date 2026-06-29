@@ -47,7 +47,7 @@ class ShipmentEntryModuleTest extends TestCase
         $mockService = Mockery::mock(ShipmentServiceInterface::class);
         $mockService->shouldReceive('generateTraceNo')
             ->once()
-            ->with(1, 1)
+            ->with(1, 1, null)
             ->andReturn('5' . date('ymd') . '0010101');
         $this->app->instance(ShipmentServiceInterface::class, $mockService);
 

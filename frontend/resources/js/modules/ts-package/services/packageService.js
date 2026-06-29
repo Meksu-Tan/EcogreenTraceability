@@ -27,9 +27,9 @@ export const packageService = {
       params: { idMaterialPck, tank, id_plant }
     })
   },
-  getActiveTanks(rundownID) {
+  getActiveTanks(rundownID, id_plant) {
     return api.get('/api/v1/transactions/package-entries/active-tanks', {
-      params: { rundownID }
+      params: { rundownID, id_plant }
     })
   },
   getActiveWarehouses(batchNo) {
@@ -42,9 +42,9 @@ export const packageService = {
       params: { sloc, fgProduct }
     })
   },
-  getNewTraceNo({ id_material, id_plant }) {
+  getNewTraceNo({ id_material, id_plant, warehouse, batch_no }) {
     return api.get('/api/v1/transactions/package-entries/new-trace-no', {
-      params: { id_material, id_plant }
+      params: { id_material, id_plant, warehouse, batch_no }
     })
   },
   getAllWarehouses() {

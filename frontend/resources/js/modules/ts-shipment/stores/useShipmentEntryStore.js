@@ -158,7 +158,7 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     }
   }
 
-  async function fetchNewTraceNo(id_plant, id_material) {
+  async function fetchNewTraceNo(id_plant, id_material, batchNo) {
     const activePlant = id_plant || plantId.value || plantStore.selectedPlantId
     if (!id_material) {
       newTraceNo.value = ''
@@ -166,7 +166,7 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     }
     traceNoLoading.value = true
     try {
-      const res = await shipmentService.getNewTraceNo({ id_material, id_plant: activePlant })
+      const res = await shipmentService.getNewTraceNo({ id_material, id_plant: activePlant, batch_no: batchNo || '' })
       if (res.data?.data && res.data.data.length > 0) {
         newTraceNo.value = res.data.data[0].traceNo || ''
       } else {

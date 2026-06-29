@@ -341,7 +341,7 @@ $feed_entry_no = substr_replace($entryNo, '0', 8, 1);
 |----------|--------|-------|------------|
 | Prefix | 1 | `4` | Packaging |
 | Date | 2–7 | `YYMMDD` | Tanggal entry |
-| Warehouse ID | 8–10 | `WHH` | 3 digit dari `m_warehouse.id_batch` (zero-padded) |
+| Warehouse ID | 8–10 | `WHH` | 3 digit dari `m_warehouse.id_batch` FB = 021, IS = 022, VS = 023 |
 | Plant | 11–12 | `PP` | 2 digit kode plant |
 | Sequence | 13–14 | `SS` | Auto-increment dari `01` |
 
@@ -368,21 +368,21 @@ $traceNoTrf = substr_replace($traceNoWhx, '000', 7, 3); // → '4YYMMDD000PPSS'
 
 **Prefix: `5`** · **Kode: SHIPMENT** · **Modul: `ts-shipment`**
 
-**Format:** `5 YYMMDD 001 PP SS` → 14 digit
+**Format:** `5 YYMMDD WHH PP SS` → 14 digit
 
 | Komponen | Posisi | Nilai | Keterangan |
 |----------|--------|-------|------------|
 | Prefix | 1 | `5` | Shipment |
 | Date | 2–7 | `YYMMDD` | Tanggal entry |
-| Warehouse | 8–10 | `001` | Hardcoded |
+| Warehouse | 8–10 | `WHH` | 3 digit dari `m_warehouse.id_batch` FB = 021, IS = 022, VS = 023 |
 | Plant | 11–12 | `PP` | 2 digit kode plant |
 | Sequence | 13–14 | `SS` | Auto-increment dari `01` |
 
-**Tampilan di UI:** `from_trace_no >>> trace_no` (contoh: `4260608001 0201 >>> 5260608001 0201`)
+**Tampilan di UI:** `from_trace_no >>> trace_no` (contoh: `4260608021 0201 >>> 5260608021 0201`)
 
 **File Generasi:**
-- `backend/Modules/ts-shipment/app/Repositories/EloquentShipmentRepository.php:295` — `addShipmentEntry()`
-- `reference-dont-change/app/Models/Shipment.php:381` — `$shID = '001'`
+- `backend/Modules/ts-shipment/app/Repositories/EloquentShipmentRepository.php:415` — `store()` (warehouse dari source packaging)
+- `reference-dont-change/app/Models/Shipment.php:381` — `$shID = '001'` (referensi lama)
 
 ---
 

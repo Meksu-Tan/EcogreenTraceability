@@ -12,36 +12,31 @@
           <span class="ms-3 text-caption text-medium-emphasis">Querying SAP General Module...</span>
         </div>
 
-        <div v-else-if="!store.sapShipment && !store.sapSoAllocation" class="text-center pa-8 text-medium-emphasis">
-          Could not query SAP data for SO No: {{ soNo }}, Batch: {{ batchNo }}
-        </div>
-
         <div v-else>
           <!-- SAP Shipment Info Card -->
-          <VCard variant="flat" border class="mb-5 pa-4" v-if="store.sapShipment">
+          <VCard variant="flat" border class="mb-5 pa-4">
             <VCardTitle class="px-0 pt-0 text-subtitle-1 font-weight-bold text-primary">
               <VIcon icon="ri-truck-line" class="me-2" /> SAP Shipment Detail
             </VCardTitle>
             <VDivider class="mb-4" />
-            <VRow class="text-body-2" v-if="sapShipmentData">
+            <VRow class="text-body-2">
               <VCol cols="12" sm="6">
-                <div class="mb-2"><strong>SO Number:</strong> {{ sapShipmentData.vbeln || '-' }}</div>
-                <div class="mb-2"><strong>SO Item:</strong> {{ sapShipmentData.posnr || '-' }}</div>
-                <div class="mb-2"><strong>Batch:</strong> {{ sapShipmentData.charg || '-' }}</div>
-                <div class="mb-2"><strong>Customer Name:</strong> {{ sapShipmentData.name1 || '-' }}</div>
+                <div class="mb-2"><strong>SO Number:</strong> {{ sapShipmentData?.vbeln || '-' }}</div>
+                <div class="mb-2"><strong>SO Item:</strong> {{ sapShipmentData?.posnr || '-' }}</div>
+                <div class="mb-2"><strong>Batch:</strong> {{ sapShipmentData?.charg || '-' }}</div>
+                <div class="mb-2"><strong>Customer Name:</strong> {{ sapShipmentData?.name1 || '-' }}</div>
               </VCol>
               <VCol cols="12" sm="6">
-                <div class="mb-2"><strong>Material:</strong> {{ sapShipmentData.arktx || '-' }}</div>
-                <div class="mb-2"><strong>Total Qty (MT):</strong> {{ sapShipmentData.lfimg || '-' }}</div>
-                <div class="mb-2"><strong>Shipment Document:</strong> {{ sapShipmentData.tknum || '-' }}</div>
-                <div class="mb-2"><strong>Container:</strong> {{ sapShipmentData.signi || '-' }}</div>
+                <div class="mb-2"><strong>Material:</strong> {{ sapShipmentData?.arktx || '-' }}</div>
+                <div class="mb-2"><strong>Total Qty (MT):</strong> {{ sapShipmentData?.lfimg || '-' }}</div>
+                <div class="mb-2"><strong>Shipment Document:</strong> {{ sapShipmentData?.tknum || '-' }}</div>
+                <div class="mb-2"><strong>Container:</strong> {{ sapShipmentData?.signi || '-' }}</div>
               </VCol>
             </VRow>
-            <div v-else class="text-caption text-medium-emphasis">No active shipment document allocated in SAP yet.</div>
           </VCard>
 
           <!-- SAP SO Allocation List Card -->
-          <VCard variant="flat" border class="pa-4" v-if="store.sapSoAllocation">
+          <VCard variant="flat" border class="pa-4">
             <VCardTitle class="px-0 pt-0 text-subtitle-1 font-weight-bold text-primary">
               <VIcon icon="ri-organization-chart" class="me-2" /> SO Allocation Breakdown (SAP ZFM_AD001)
             </VCardTitle>
