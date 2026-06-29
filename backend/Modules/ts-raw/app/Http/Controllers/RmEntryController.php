@@ -8,6 +8,7 @@ use Modules\TsRaw\Http\Requests\StoreRmEntryRequest;
 use Modules\TsRaw\Http\Requests\StoreSupplierTempRequest;
 use Modules\TsRaw\Http\Requests\TransferEntryRequest;
 use Modules\TsRaw\Http\Requests\UpdateRmEntryRequest;
+use Modules\TsRaw\Http\Resources\RmEntryResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Helpers\ApiResponse;
@@ -30,7 +31,7 @@ class RmEntryController extends Controller
         $data = is_array($result['data']) ? $result['data'] : $result['data']->toArray();
 
         return ApiResponse::paginated(
-            $data,
+            RmEntryResource::collection($data)->toArray($request),
             $result['total'],
             $page,
             $perPage,

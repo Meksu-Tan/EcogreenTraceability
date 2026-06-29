@@ -5,6 +5,7 @@ namespace Modules\TsWip\Http\Controllers;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\TsWip\Services\Contracts\WipEntryServiceInterface;
+use Modules\TsWip\Http\Resources\WipEntryResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -78,18 +79,29 @@ class WipEntryController extends Controller
         $page = max(1, (int) $request->input('page', 1));
         $perPage = max(1, (int) $request->input('per_page', 5));
         $res = $this->wipEntryService->getBalance((string)$request->input('rundownId'), $plantId, $request->input('subgroup'), $page, $perPage);
-        return ApiResponse::paginated($res['data'], $res['total'], $res['page'], $res['per_page']);
+        return ApiResponse::paginated(WipEntryResource::collection($res['data'])->toArray($request), $res['total'], $res['page'], $res['per_page']);
     }
 
     public function getFeed(Request $request): JsonResponse
     {
         $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
         $page = max(1, (int) $request->input('page', 1));
-        $perPage = max(1, (int) $request->input('per_page', 5));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 5)));
         $mode = $request->input('mode', 'LATEST');
         $res = $this->wipEntryService->getFeed($request->input('feedId'), $mode, $plantId, $page, $perPage);
         if ($mode !== 'LOG') return ApiResponse::success($res['data'] ?? $res, 'OK', 200);
-        return ApiResponse::paginated($res['data'], $res['total'], $res['page'], $res['per_page']);
+        return ApiResponse::paginated(WipEntryResource::collection($res['data'])->toArray($request), $res['total'], $res['page'], $res['per_page']);
+    }
+
+    public function getRundown(Request $request): JsonResponse
+    {
+        $plantId = $request->input('id_plant', Auth::user()->id_plant ?? 0);
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 5)));
+        $mode = $request->input('mode', 'LATEST');
+        $res = $this->wipEntryService->getRundown($request->input('rundownId'), $mode, $plantId, $page, $perPage);
+        if ($mode !== 'LOG') return ApiResponse::success($res['data'] ?? $res, 'OK', 200);
+        return ApiResponse::paginated(WipEntryResource::collection($res['data'])->toArray($request), $res['total'], $res['page'], $res['per_page']);
     }
 
     public function getRundown(Request $request): JsonResponse
@@ -100,7 +112,7 @@ class WipEntryController extends Controller
         $mode = $request->input('mode', 'LATEST');
         $res = $this->wipEntryService->getRundown($request->input('rundownId'), $mode, $plantId, $page, $perPage);
         if ($mode !== 'LOG') return ApiResponse::success($res['data'] ?? $res, 'OK', 200);
-        return ApiResponse::paginated($res['data'], $res['total'], $res['page'], $res['per_page']);
+        return ApiResponse::paginated(WipEntryResource::collection($res['data']), $res['total'], $res['page'], $res['per_page']);
     }
 
     public function getFeedNewBatchNumber(Request $request): JsonResponse

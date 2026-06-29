@@ -9,6 +9,7 @@ use Modules\TraceForward\Services\Contracts\TraceForwardServiceInterface;
 use Modules\TraceForward\Http\Requests\TraceForwardDetailRequest;
 use Modules\TraceForward\Http\Requests\TraceForwardListRequest;
 use Modules\TraceForward\Http\Requests\TraceForwardSearchRequest;
+use Modules\TraceForward\Http\Resources\TraceForwardResource;
 use Illuminate\Http\JsonResponse;
 
 class TraceForwardController extends Controller

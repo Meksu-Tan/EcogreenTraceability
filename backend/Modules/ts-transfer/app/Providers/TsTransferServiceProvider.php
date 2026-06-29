@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Modules\TsTransfer\Providers;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\TsTransfer\Repositories\Contracts\TransferApprovalRepositoryInterface;
 use Modules\TsTransfer\Repositories\Contracts\TransferRepositoryInterface;
@@ -24,5 +25,10 @@ class TsTransferServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+
+        Gate::define('transfer.create', [new \Modules\TsTransfer\Policies\TransferPolicy, 'create']);
+        Gate::define('transfer.approve', [new \Modules\TsTransfer\Policies\TransferPolicy, 'approve']);
+        Gate::define('transfer.reject', [new \Modules\TsTransfer\Policies\TransferPolicy, 'reject']);
+        Gate::define('transfer.cancel', [new \Modules\TsTransfer\Policies\TransferPolicy, 'cancel']);
     }
 }

@@ -24,11 +24,13 @@ class ProdLog extends Model
     protected $fillable = [
         'id_trace_head',
         'section',
+        'mode',
         'entry_date',
         'batch_no',
         'tank_id',
         'tank_tail',
         'id_material',
+        'id_manufacturer',
         'in_qty',
         'out_qty',
         'yield',
@@ -43,6 +45,7 @@ class ProdLog extends Model
         'in_qty' => 'decimal:4',
         'out_qty' => 'decimal:4',
         'yield' => 'decimal:4',
+        'mode' => 'integer',
         'status' => 'integer',
         'tank_tail' => 'array',
     ];

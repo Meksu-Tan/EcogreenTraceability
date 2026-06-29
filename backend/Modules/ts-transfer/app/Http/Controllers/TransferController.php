@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Modules\TsTransfer\Services\Contracts\TransferServiceInterface;
 use Modules\TsTransfer\Http\Requests\StoreTransferRequest;
 use Modules\TsTransfer\Http\Requests\ApprovalActionRequest;
+use Modules\TsTransfer\Http\Resources\TransferResource;
 use Modules\Shared\Services\AuditService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class TransferController extends Controller
             $data = is_array($result['data']) ? $result['data'] : $result['data']->toArray();
 
             return ApiResponse::paginated(
-                $data,
+                TransferResource::collection($data)->toArray($request),
                 $result['total'],
                 $page,
                 $perPage,

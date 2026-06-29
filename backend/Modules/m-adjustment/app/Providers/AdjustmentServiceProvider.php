@@ -2,6 +2,7 @@
 declare(strict_types=1);
 namespace Modules\Adjustment\Providers;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
 use Modules\Adjustment\Repositories\AdjustmentRepository;
@@ -37,5 +38,9 @@ class AdjustmentServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+
+        Gate::define('adjustment.create', [new \Modules\Adjustment\Policies\AdjustmentPolicy, 'create']);
+        Gate::define('adjustment.update', [new \Modules\Adjustment\Policies\AdjustmentPolicy, 'update']);
+        Gate::define('adjustment.delete', [new \Modules\Adjustment\Policies\AdjustmentPolicy, 'delete']);
     }
 }

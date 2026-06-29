@@ -3,7 +3,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\TsRmreport\Http\Controllers\RmReportController;
 
-Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
+Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
     Route::prefix('transactions/rm-report')->group(function () {
         Route::get('/', [RmReportController::class, 'index']);
         Route::get('summary', [RmReportController::class, 'summary']);

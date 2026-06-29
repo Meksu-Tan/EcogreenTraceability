@@ -5,6 +5,7 @@ namespace Modules\TsStock\Http\Controllers;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\TsStock\Services\Contracts\StockServiceInterface;
+use Modules\TsStock\Http\Resources\StockResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,7 +27,7 @@ class StockController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
-            return ApiResponse::success($result['data'] ?? $result);
+            return ApiResponse::success(StockResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve stock list: ' . $e->getMessage(), 500);
         }
@@ -39,7 +40,7 @@ class StockController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
-            return ApiResponse::success($result['data'] ?? $result);
+            return ApiResponse::success(new StockResource($result['data'] ?? $result));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve stock detail: ' . $e->getMessage(), 500);
         }
@@ -54,7 +55,7 @@ class StockController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
-            return ApiResponse::success($result['data'] ?? $result);
+            return ApiResponse::success(StockResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve active materials: ' . $e->getMessage(), 500);
         }
@@ -69,7 +70,7 @@ class StockController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
-            return ApiResponse::success($result['data'] ?? $result);
+            return ApiResponse::success(StockResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve stock movements: ' . $e->getMessage(), 500);
         }
@@ -82,7 +83,7 @@ class StockController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
-            return ApiResponse::success($result['data'] ?? $result);
+            return ApiResponse::success(StockResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve active slocs: ' . $e->getMessage(), 500);
         }

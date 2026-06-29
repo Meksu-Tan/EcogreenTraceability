@@ -9,6 +9,7 @@ use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
 use Modules\TraceBackward\Http\Requests\TraceBackwardDetailRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardListRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardSearchRequest;
+use Modules\TraceBackward\Http\Resources\TraceBackwardResource;
 use Illuminate\Http\JsonResponse;
 
 class TraceBackwardController extends Controller

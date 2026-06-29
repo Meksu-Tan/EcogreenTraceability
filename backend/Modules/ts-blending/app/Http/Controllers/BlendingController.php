@@ -6,6 +6,7 @@ use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Modules\TsBlending\Services\Contracts\BlendingServiceInterface;
 use Modules\TsBlending\Http\Requests\StoreBlendingRequest;
+use Modules\TsBlending\Http\Resources\BlendingResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,7 +31,7 @@ class BlendingController extends Controller
             $data = is_array($result['data']) ? $result['data'] : $result['data']->toArray();
 
             return ApiResponse::paginated(
-                $data,
+                BlendingResource::collection($data)->toArray($request),
                 $result['total'],
                 $page,
                 $perPage,
