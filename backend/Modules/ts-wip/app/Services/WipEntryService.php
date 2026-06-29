@@ -12,7 +12,8 @@ use Modules\TsWip\Services\Contracts\WipEntryServiceInterface;
 class WipEntryService implements WipEntryServiceInterface
 {
     public function __construct(
-        protected WipEntryRepositoryInterface $wipEntryRepo
+        protected WipEntryRepositoryInterface $wipEntryRepo,
+        protected WipTreeService $wipTreeService
     ) {}
 
     public function index($plantId): array
@@ -78,10 +79,10 @@ class WipEntryService implements WipEntryServiceInterface
         return $this->wipEntryRepo->getQuantifierData($date, $tagNumber);
     }
 
-    // B8: WIP Tree/Dashboard
     public function getWipTree($plantId): array
     {
-        return $this->wipEntryRepo->getWipTree($plantId);
+        $idPlant = app(PlantContextServiceInterface::class)->resolvePlantId($plantId);
+        return $this->wipTreeService->getTree($idPlant);
     }
 
     // Auto Number Generation - Per Section

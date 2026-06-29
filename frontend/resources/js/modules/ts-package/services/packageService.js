@@ -42,7 +42,7 @@ export const packageService = {
       params: { sloc, fgProduct }
     })
   },
-  getNewTraceNo(id_material, id_plant) {
+  getNewTraceNo({ id_material, id_plant }) {
     return api.get('/api/v1/transactions/package-entries/new-trace-no', {
       params: { id_material, id_plant }
     })

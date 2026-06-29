@@ -197,6 +197,7 @@ class Feed
                     'curr_qtf' => $feedData['qty'],
                     'id_plant' => $feedData['id_plant'],
                     'created_by' => $feedData['user'],
+                    'created_at' => now(),
                 ], 'id_trace_head');
 
                 $traceHeadIds[] = $traceHeadId;
@@ -239,6 +240,7 @@ class Feed
                         'out_qty' => 0,
                         'status' => 1,
                         'created_by' => $feedData['user'],
+                        'created_at' => now(),
                     ], 'id_balance_tail');
 
                     // Re-fetch the synthetic tail

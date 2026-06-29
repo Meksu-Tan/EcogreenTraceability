@@ -23,6 +23,26 @@
         <form @submit.prevent="handleSubmit" class="d-flex flex-column gap-4">
           <VCard variant="outlined">
             <VCardText>
+              <VRow dense class="mb-2">
+                <VCol cols="12" md="3">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">SLOC Plant</label>
+                  <VSelect
+                    v-model="selectedPlantForTransfer"
+                    :items="plantOptions"
+                    item-title="label"
+                    item-value="value"
+                    :loading="initLoading"
+                    :disabled="plantSelectionStore.selectedPlantId !== null"
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                    :clearable="plantSelectionStore.selectedPlantId === null"
+                    @update:model-value="onPlantForTransferChange"
+                  />
+                </VCol>
+              </VRow>
               <VRow dense>
                 <VCol cols="12" sm="6" md="3">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Mode</label>
@@ -41,6 +61,7 @@
                   <VTextField
                     :model-value="form.entry_no"
                     :loading="initLoading && !form.entry_no"
+                    placeholder="AUTO GENERATE"
                     readonly
                     rounded="md"
                     color="primary"
@@ -77,7 +98,7 @@
             </VCardText>
           </VCard>
 
-          <VCard variant="outlined">
+          <VCard v-if="showStep2" variant="outlined">
             <VCardText>
               <VRow dense>
                 <VCol cols="12" md="6">
@@ -119,7 +140,7 @@
             </VCardText>
           </VCard>
 
-          <VCard v-if="showSloc" variant="outlined">
+          <VCard v-if="showStep3" variant="outlined">
             <VCardText>
               <VRow dense>
                 <VCol cols="12" md="4">
@@ -192,7 +213,7 @@
             </VCardText>
           </VCard>
 
-          <VCard v-if="showSpecificSlocRow" variant="outlined">
+          <VCard v-if="showStep3 && showSpecificSlocRow" variant="outlined">
             <VCardText>
               <VRow dense>
                 <VCol v-if="showSpecificSourceSloc" cols="12" md="6">
@@ -231,7 +252,7 @@
             </VCardText>
           </VCard>
 
-          <div v-if="showSloc" class="d-flex align-center gap-3">
+          <div v-if="showStep3" class="d-flex align-center gap-3">
             <VBtn
               type="submit"
               color="primary"
@@ -249,7 +270,7 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
-import { usePlantSelectionStore } from '@/stores/plant.js'
+import { usePlantSelectionStore, useSetupPlantStore } from '@/stores/plant.js'
 import { useTsTransferStore } from '../stores'
 import { useToastStore } from '@/stores/toast.js'
 import { useAutoFetchQty } from '@/composables/useAutoFetchQty'
@@ -261,6 +282,7 @@ const props = defineProps({
 const emit = defineEmits(['update:isOpen', 'success'])
 
 const plantSelectionStore = usePlantSelectionStore()
+const setupPlantStore = useSetupPlantStore()
 const store = useTsTransferStore()
 const toastStore = useToastStore()
 
@@ -270,6 +292,10 @@ async function doFetchQty() {
 }
 
 const autoFetch = useAutoFetchQty(doFetchQty)
+
+const selectedPlantForTransfer = ref(null)
+const selectedPlantForTransferName = ref('')
+const selectedPlantForTransferCode = ref('')
 
 const mode = 'ADD'
 const initLoading = ref(false)
@@ -298,15 +324,43 @@ const form = reactive({
   idHead: null
 })
 
-const plantId = computed(() => plantSelectionStore.selectedPlantId)
+const plantId = computed(() => {
+  if (plantSelectionStore.selectedPlantId !== null) {
+    return plantSelectionStore.selectedPlantId
+  }
+  return selectedPlantForTransfer.value
+})
+
+const displayPlantName = computed(() => {
+  if (plantSelectionStore.selectedPlantId !== null) {
+    return plantSelectionStore.selectedPlantName || 'EOMB'
+  }
+  return selectedPlantForTransferName.value || 'selected plant'
+})
+
+const plantCode = computed(() => {
+  if (plantSelectionStore.selectedPlantId !== null) {
+    return plantSelectionStore.selectedPlantCode
+  }
+  return selectedPlantForTransferCode.value
+})
+
+const plantOptions = computed(() => {
+  return (setupPlantStore.plants || [])
+    .filter(p => p.status == 1)
+    .map(p => ({
+      value: p.id_plant,
+      label: p.description || p.name || `Plant ${p.id_plant}`
+    }))
+})
 
 const trfInLabel = computed(() => {
-  const name = String(plantSelectionStore.selectedPlantName || 'EOMB').replace('-', ' ')
+  const name = String(displayPlantName.value).replace('-', ' ')
   return `- Trf IN to ${name} -`
 })
 
 const trfOutLabel = computed(() => {
-  const name = String(plantSelectionStore.selectedPlantName || 'EOMB').replace('-', ' ')
+  const name = String(displayPlantName.value).replace('-', ' ')
   return `- Trf OUT from ${name} -`
 })
 
@@ -361,16 +415,20 @@ const destTankOptions = computed(() => {
     })
 })
 
-const showSloc = computed(() => {
-  return form.id_material && form.trf_type
+const showStep2 = computed(() => {
+  return (plantSelectionStore.selectedPlantId !== null || selectedPlantForTransfer.value) && !!form.entry_date
+})
+
+const showStep3 = computed(() => {
+  return showStep2.value && form.id_material && form.trf_type
 })
 
 const showSpecificSourceSloc = computed(() => {
-  return showSloc.value && form.source_sloc && (form.trf_type === 'in' || form.trf_type === 'all')
+  return showStep3.value && form.source_sloc && (form.trf_type === 'in' || form.trf_type === 'all')
 })
 
 const showSpecificDestSloc = computed(() => {
-  return showSloc.value && form.trf_sloc && (form.trf_type === 'out' || form.trf_type === 'all')
+  return showStep3.value && form.trf_sloc && (form.trf_type === 'out' || form.trf_type === 'all')
 })
 
 const showSpecificSlocRow = computed(() => {
@@ -395,6 +453,14 @@ async function bootstrap() {
   initLoading.value = true
   try {
     await store.fetchActiveMaterials()
+    if (setupPlantStore.plants.length === 0) {
+      await setupPlantStore.fetchPlants()
+    }
+    if (plantSelectionStore.selectedPlantId !== null) {
+      selectedPlantForTransfer.value = plantSelectionStore.selectedPlantId
+      selectedPlantForTransferName.value = plantSelectionStore.selectedPlantName || ''
+      selectedPlantForTransferCode.value = plantSelectionStore.selectedPlantCode || ''
+    }
     resetForm()
     autoFetch.startCountdown()
     autoFetch.startAutoSync()
@@ -422,20 +488,37 @@ function resetForm() {
   selectedDestTails.value = []
   sourceStockLabel.value = 'Stock (MT): N/A'
   destStockLabel.value = 'Stock (MT): N/A'
+  if (plantSelectionStore.selectedPlantId !== null) {
+    selectedPlantForTransfer.value = plantSelectionStore.selectedPlantId
+    selectedPlantForTransferName.value = plantSelectionStore.selectedPlantName || ''
+    selectedPlantForTransferCode.value = plantSelectionStore.selectedPlantCode || ''
+  } else {
+    selectedPlantForTransfer.value = null
+    selectedPlantForTransferName.value = ''
+    selectedPlantForTransferCode.value = ''
+  }
+}
+
+function onPlantForTransferChange(val) {
+  if (val) {
+    const plant = setupPlantStore.plants.find(p => p.id_plant === val)
+    if (plant) {
+      selectedPlantForTransferName.value = plant.description || ''
+      selectedPlantForTransferCode.value = plant.code_3 || ''
+    }
+  } else {
+    selectedPlantForTransferName.value = ''
+    selectedPlantForTransferCode.value = ''
+    form.entry_no = ''
+  }
 }
 
 async function onMaterialChange() {
   if (!form.id_material) return
 
-  try {
-    form.entry_no = ''
-
-    if (form.trf_type) {
-      await populateTanks()
-    }
-    await fetchTransferQty()
-  } catch (err) {
-    toastStore.error(err.message)
+  form.entry_no = ''
+  if (showStep3.value && form.trf_type) {
+    await populateTanks()
   }
 }
 
@@ -456,7 +539,9 @@ async function onTrfTypeChange() {
     return
   }
 
-  await populateTanks()
+  if (showStep3.value) {
+    await populateTanks()
+  }
 }
 
 async function populateTanks() {
@@ -491,7 +576,7 @@ async function populateTanks() {
       destTanks.value = destRes?.data || []
     }
 
-    const currentPlantCode = plantSelectionStore.selectedPlantCode
+    const currentPlantCode = plantCode.value
 
     if (trfType === 'out') {
       const findWip = (tanks) => {
@@ -678,6 +763,11 @@ async function updateStock(type) {
 }
 
 async function handleSubmit() {
+  if (plantSelectionStore.selectedPlantId === null && !selectedPlantForTransfer.value) {
+    toastStore.error('Please select a SLOC Plant')
+    return
+  }
+
   if (!form.trf_qty || parseFloat(form.trf_qty) <= 0) {
     toastStore.error('Entry Qty must be greater than 0')
     return

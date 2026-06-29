@@ -86,6 +86,7 @@ class Rundown
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
                     'id_plant' => $data['id_plant'],
                     'created_by' => $data['user'],
+                    'created_at' => now(),
                 ], 'id_trace_head');
             } else {
                 // INSERT NEW BALANCE HEADER
@@ -100,6 +101,7 @@ class Rundown
                     'init_qty' => $data['in_qty'],
                     'id_plant' => $data['id_plant'],
                     'created_by' => $data['user'],
+                    'created_at' => now(),
                 ], 'id_balance_head');
 
                 // INSERT TRACE HEADER
@@ -115,6 +117,7 @@ class Rundown
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
                     'id_plant' => $data['id_plant'],
                     'created_by' => $data['user'],
+                    'created_at' => now(),
                 ], 'id_trace_head');
             }
 
@@ -153,6 +156,7 @@ class Rundown
                         'batch_sap' => $batchSap,
                         'id_plant' => $data['id_plant'],
                         'created_by' => $data['user'],
+                        'created_at' => now(),
                     ], 'id_balance_tail');
 
                     // INSERT TRACE DETAIL

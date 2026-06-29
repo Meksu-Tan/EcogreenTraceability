@@ -107,7 +107,7 @@ async function save() {
   submitting.value = true
   try {
     const res = await store.updateSubTank(form.id, form.idSlocTail)
-    if (res.response == 1) {
+    if (res?.status == 1) {
       emit('saved')
       close()
     }

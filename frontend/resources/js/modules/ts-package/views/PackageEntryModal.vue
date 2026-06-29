@@ -113,19 +113,15 @@
               <VRow dense class="mt-2">
                 <VCol cols="12" sm="6" md="4">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Source Sloc</label>
-                  <VSelect
-                    v-model="form.tank"
-                    :items="store.activeTanks"
-                    item-title="tank"
-                    item-value="id_sloc"
-                    required
+                  <VTextField
+                    :model-value="selectedTankLabel"
+                    readonly
                     rounded="md"
                     color="primary"
                     density="compact"
                     variant="outlined"
                     class="mt-1"
-                    :disabled="!form.fgProduct"
-                    @update:model-value="onTankChange"
+                    :placeholder="form.fgProduct ? 'Auto-selecting...' : 'Select product first'"
                   />
                 </VCol>
 
@@ -167,13 +163,15 @@
               <VRow dense class="mt-2">
                 <VCol cols="12" sm="6">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Packaging Batch No</label>
-                  <VTextField
+                  <VSelect
                     v-model="form.batchNo"
+                    :items="['FB', 'IS', 'VS']"
                     rounded="md"
                     color="primary"
                     density="compact"
                     variant="outlined"
                     class="mt-1"
+                    placeholder="Select Batch Type"
                   />
                   <div class="mt-1 text-caption text-medium-emphasis">
                     FB = Flexi bag | IS = Isotank | VS = Vessel
@@ -215,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { usePackageEntryStore } from '../stores/usePackageEntryStore'
 
@@ -238,6 +236,12 @@ const form = reactive({
   batchNo: '',
   qty: null,
   warehouse: null
+})
+
+const selectedTankLabel = computed(() => {
+  if (!form.tank) return ''
+  const tank = store.activeTanks.find(t => t.id_sloc === form.tank)
+  return tank ? tank.tank : ''
 })
 
 watch(() => props.modelValue, (newVal) => {
@@ -281,6 +285,11 @@ async function onProductChange(val) {
     form.tankNo = []
     await store.fetchWipMaterials(val)
 
+    if (store.activeTanks.length > 0) {
+      form.tank = store.activeTanks[0].id_sloc
+      await store.fetchSpecificTanks(form.tank, form.fgProduct)
+    }
+
     const selectedProduct = store.activeFgProducts.find(p => p.id_materialpck === val)
     form.batchNo = ''
     if (selectedProduct?.batch_prefix) {
@@ -288,17 +297,6 @@ async function onProductChange(val) {
       if (store.activeWarehouses.length > 0) {
         form.warehouse = store.activeWarehouses[0].id_warehouse
       }
-    }
-  }
-}
-
-async function onTankChange(val) {
-  if (val) {
-    form.tankNo = []
-    // val is already id_sloc (from the function item-value)
-    await store.fetchSpecificTanks(val, form.fgProduct)
-    if (form.fgProduct) {
-      await store.fetchWipMaterials(form.fgProduct, val)
     }
   }
 }
@@ -321,7 +319,7 @@ async function save() {
   submitting.value = true
   try {
     const res = await store.storeEntry(form)
-    if (res.response == 1) {
+    if (res?.status == 1) {
       emit('saved')
       close()
     }

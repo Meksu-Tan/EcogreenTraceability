@@ -63,21 +63,22 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                    MIN(f.id_trace_head) AS id_trace_head,
                    MIN(f.id_balance_head) AS id_balance_head,
                    {$gcSloc} AS sloc,
-                   {$fmtInitQty} AS init_qty, {$fmtQty} AS balance,
-                   MIN(a.status) AS status,
-                   MIN(a.created_by) AS created_by,
-                   MIN(a.created_at) AS created_at,
-                   MIN(a.updated_by) AS updated_by,
-                   MIN(a.updated_at) AS updated_at,
-                   MIN(UPPER(b.description)) AS feed,
-                   MIN(UPPER(c.description)) AS fg,
-                   a.trace_no,
-                   MIN(a.po_no) AS po_no,
-                   MIN(wh.code) AS whx,
-                   MIN(a.id_section) AS id_section,
-                   {$gcSupplier} AS supplier,
-                   {$fmtBalSup} AS balance_supplier,
-                   MIN(" . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . ") AS plant_name,
+                    MIN(a.id_sloc::text) AS raw_sloc,
+                    {$fmtInitQty} AS init_qty, {$fmtQty} AS balance,
+                    MIN(a.status) AS status,
+                    MIN(a.created_by) AS created_by,
+                    MIN(a.created_at) AS created_at,
+                    MIN(a.updated_by) AS updated_by,
+                    MIN(a.updated_at) AS updated_at,
+                    MIN(UPPER(b.description)) AS feed,
+                    MIN(UPPER(c.description)) AS fg,
+                    a.trace_no,
+                    MIN(a.po_no) AS po_no,
+                    MIN(wh.code) AS whx,
+                    MIN(a.id_section) AS id_section,
+                    {$gcSupplier} AS supplier,
+                    {$fmtBalSup} AS balance_supplier,
+                    MIN(" . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . ") AS plant_name,
                     MAX(CASE
                        WHEN a.trace_no = (SELECT tth.to_trace_no
                                             FROM t_trace_header tth
@@ -96,10 +97,10 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                    a.id_whx_head, a.entry_date,
                    CONCAT(wh_sub.from_trace_no, ' >>> ', a.trace_no) AS fromto_trace_no,
                    a.id_material_feed, a.id_material_fg, a.batch_no, f.id_trace_head, f.id_balance_head,
-                   {$gcSloc} AS sloc,
-                   {$fmtInitQty} AS init_qty, {$fmtQty} AS balance, a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
-                   UPPER(b.description) AS feed, UPPER(c.description) AS fg, a.trace_no, a.po_no, wh.code AS whx, a.id_section,
-                   {$gcSupplier} AS supplier,
+                    {$gcSloc} AS sloc, a.id_sloc AS raw_sloc,
+                    {$fmtInitQty} AS init_qty, {$fmtQty} AS balance, a.status, a.created_by, a.created_at, a.updated_by, a.updated_at,
+                    UPPER(b.description) AS feed, UPPER(c.description) AS fg, a.trace_no, a.po_no, wh.code AS whx, a.id_section,
+                    {$gcSupplier} AS supplier,
                    {$fmtBalSup} AS balance_supplier,
                    " . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . " AS plant_name,
                    CASE
@@ -153,6 +154,32 @@ class EloquentPackageRepository implements PackageRepositoryInterface
       ORDER BY " . ($this->isPgsql() ? 'MIN(a.entry_date) DESC, MIN(a.id_whx_head) DESC' : 'a.entry_date DESC, a.id_whx_head DESC') . "
       LIMIT ? OFFSET ?
         ", $bindings);
+
+        $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
+            ->table('m_sloc')
+            ->select('id_sloc', 'tf_number')
+            ->get()
+            ->keyBy('id_sloc');
+
+        foreach ($results as $row) {
+            $row->sloc = '';
+            $raw = $row->raw_sloc ?? null;
+            if ($raw === null || $raw === '' || $raw === 'null') continue;
+            $decoded = json_decode($raw, true);
+            $ids = (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) ? $decoded : [$raw];
+            $tanks = [];
+            foreach ($ids as $id) {
+                $id = trim((string)$id);
+                if (isset($slocs[$id]) && $slocs[$id]->tf_number) {
+                    $tanks[] = $slocs[$id]->tf_number;
+                }
+            }
+            if (!empty($tanks)) {
+                $tanks = array_unique($tanks);
+                sort($tanks);
+                $row->sloc = implode(' | ', $tanks);
+            }
+        }
 
         $countBindings = $plantId > 0 ? [$plantId] : [];
         $countResult = DB::connection($this->connection)->select("
@@ -215,7 +242,17 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
         $balanceFmt = $this->dbNumberFormat('SUM(c.qty)', 3);
 
-        $bindings = [$idMaterialPck, (string)$idPlant];
+        $plantCondition = '';
+        $slocCondition = '';
+        $bindings = [$idMaterialPck];
+        if ($idPlant) {
+            $plantCondition = 'AND c.id_plant = ?';
+            $bindings[] = (string)$idPlant;
+        }
+        if ($idSloc) {
+            $slocCondition = 'AND c.id_sloc = CAST(? AS INTEGER)';
+            $bindings[] = $idSloc;
+        }
 
         $results = DB::connection($this->connection)->select("
              SELECT COALESCE(CONCAT(a.description, ' (', a.code, ') || Balance : ', COALESCE(a.balance, '0'), ' MT'), CONCAT(a.description, ' (', a.code, ') || Balance : 0.0 MT')) AS wip_material,
@@ -229,9 +266,11 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                            WHERE a.id_materialpck = ?
                           ) b
                     LEFT JOIN (
-                          SELECT c.id_material, c.qty
+                          SELECT c.id_material, c.qty, c.id_sloc
                             FROM t_balance_header c
-                           WHERE c.status = 1 AND c.id_plant = ?
+                           WHERE c.status = 1
+                           {$plantCondition}
+                           {$slocCondition}
                           ) c ON b.id_material = c.id_material
                     GROUP BY b.code, b.description, b.id_rundown
               ) a
@@ -242,22 +281,48 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
     public function getCmbActiveTankPck(array $data): Collection
     {
+        $rundownID = $data['rundownID'] ?? null;
         $plantCode  = $data['plant_code'] ?? null;
-        $plantWhere = ($plantCode && $plantCode !== '0') ? 'AND id_plant = ?' : '';
-        $bindings   = ($plantCode && $plantCode !== '0') ? [$plantCode] : [];
+
+        if (!$rundownID) {
+            return collect([]);
+        }
+
+        $wipMaterial = DB::connection($this->connection)->select(
+            'SELECT id_material FROM m_material WHERE status = 1 AND id_rundown = ? LIMIT 1',
+            [$rundownID]
+        );
+
+        if (empty($wipMaterial)) {
+            return collect([]);
+        }
+
+        $idMaterial = $wipMaterial[0]->id_material;
+
+        $plantExists = '';
+        $bindings = [$idMaterial];
+        if ($plantCode && $plantCode !== '0') {
+            $plantExists = 'AND bh.id_plant = ?';
+            $bindings[] = $plantCode;
+        }
 
         return collect(DB::connection($this->connection)->select(
-            "SELECT MIN(id_sloc) AS id_sloc,
-                    COALESCE(MIN(NULLIF(description,'')), 'PRD') AS tank,
-                    code_3,
-                    id_plant
-               FROM m_sloc
-              WHERE status = 1
-                AND code_2 = 'PRD'
-                AND code_3 = 'PRD'
-                {$plantWhere}
-              GROUP BY code_3, id_plant
-              ORDER BY id_plant ASC",
+            "SELECT MIN(sl.id_sloc) AS id_sloc, sl.description AS tank, MIN(sl.tf_number) AS tf_number
+               FROM m_sloc sl
+              WHERE sl.status = 1
+                AND sl.description != ''
+                AND EXISTS (
+                    SELECT 1 FROM t_balance_header bh
+                     WHERE bh.status = 1 AND bh.qty > 0
+                       AND bh.id_material = ?
+                       AND bh.id_sloc IN (
+                           SELECT sl2.id_sloc FROM m_sloc sl2
+                            WHERE sl2.code_3 = sl.code_3 AND sl2.id_plant = sl.id_plant
+                       )
+                       {$plantExists}
+                )
+              GROUP BY sl.description, sl.id_plant
+              ORDER BY sl.description ASC",
             $bindings
         ));
     }

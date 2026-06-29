@@ -1,41 +1,30 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useLoadingState } from '@/composables/useLoadingState'
 import rmReportApi from '@/modules/ts-rmreport/services/index.js'
 
 export const useRmReportStore = defineStore('rmReport', () => {
+  const { loading, error, withLoading } = useLoadingState()
   const rmReportData = ref([])
   const rmReportSummary = ref([])
-  const loading = ref(false)
-  const error = ref(null)
 
   async function fetchRmReport(params = {}) {
-    loading.value = true
-    error.value = null
-    try {
+    await withLoading(async () => {
       const res = await rmReportApi.getRmReport(params)
       rmReportData.value = res.data?.data || res.data || []
-    } catch (err) {
-      error.value = err.message || 'Failed to fetch RM report'
-      rmReportData.value = []
-    } finally {
-      loading.value = false
-    }
+    })
+    if (error.value) rmReportData.value = []
   }
 
   async function fetchRmReportSummary(params = {}) {
-    loading.value = true
-    error.value = null
-    try {
+    let result = []
+    await withLoading(async () => {
       const res = await rmReportApi.getRmReportSummary(params)
       rmReportSummary.value = res.data?.data || res.data || []
-      return rmReportSummary.value
-    } catch (err) {
-      error.value = err.message || 'Failed to fetch RM report summary'
-      rmReportSummary.value = []
-      return []
-    } finally {
-      loading.value = false
-    }
+      result = rmReportSummary.value
+    })
+    if (error.value) rmReportSummary.value = []
+    return result
   }
 
   async function fetchDetailOnTank(params) {

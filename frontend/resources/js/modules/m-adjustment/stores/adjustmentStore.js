@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useLoadingState } from '@/composables/useLoadingState'
 import adjustmentApi from '@/modules/m-adjustment/services'
 
 export const useAdjustmentStore = defineStore('adjustment', () => {
+  const { loading, error, withLoading } = useLoadingState()
   // ——— State ———
   const data = ref([])
   const detail = ref(null)
-  const loading = ref(false)
-  const error = ref(null)
   const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
   const periodMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
 
@@ -30,9 +30,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
 
   // ——— List / Detail ———
   async function fetchList(params = {}) {
-    loading.value = true
-    error.value = null
-    try {
+    await withLoading(async () => {
       const res = await adjustmentApi.getAdjustmentList(params)
       const payload = res.data?.data || {}
       data.value = payload.data || (Array.isArray(payload) ? payload : [])
@@ -42,12 +40,8 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
         total: payload.total || data.value.length,
         lastPage: payload.last_page || 1,
       }
-    } catch (err) {
-      error.value = err.message || 'Failed to fetch adjustment list'
-      data.value = []
-    } finally {
-      loading.value = false
-    }
+    })
+    if (error.value) data.value = []
   }
 
   function setPage(p) {
@@ -55,17 +49,11 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   }
 
   async function fetchDetail(id) {
-    loading.value = true
-    error.value = null
-    try {
+    await withLoading(async () => {
       const res = await adjustmentApi.getAdjustmentDetail(id)
       detail.value = res.data?.data || res.data || null
-    } catch (err) {
-      error.value = err.message || 'Failed to fetch detail'
-      detail.value = null
-    } finally {
-      loading.value = false
-    }
+    })
+    if (error.value) detail.value = null
   }
 
   // ——— Lookups ———

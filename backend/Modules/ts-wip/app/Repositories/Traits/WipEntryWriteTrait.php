@@ -37,7 +37,7 @@ trait WipEntryWriteTrait
             }
 
             $wipMode = (int)($data['wip_mode'] ?? 1);
-            $feedId = $this->mapFrontendSectionToDbFeedId($data['feed_id'], null, $wipMode);
+            $feedId = $this->mapFrontendSectionToDbFeedId($data['feed_id'], $wipMode);
             $idSloc = $data['tank'];
             $idSlocTail = !empty($data['tankNo']) ? json_encode($data['tankNo']) : '[]';
             

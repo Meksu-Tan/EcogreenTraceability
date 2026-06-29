@@ -66,7 +66,7 @@ async function save() {
   submitting.value = true
   try {
     const res = await store.updatePo(form.id, form.poNo)
-    if (res.response == 1) {
+    if (res?.status == 1) {
       emit('saved')
       close()
     }

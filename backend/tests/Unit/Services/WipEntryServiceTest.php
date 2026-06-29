@@ -4,6 +4,7 @@ namespace Tests\Unit\Services;
 
 use Tests\TestCase;
 use Modules\TsWip\Services\WipEntryService;
+use Modules\TsWip\Services\WipTreeService;
 use Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface;
 use Mockery;
 
@@ -25,7 +26,9 @@ class WipEntryServiceTest extends TestCase
             ->with('101', 1002, null, 1, 5)
             ->andReturn($expectedBalance);
 
-        $service = new WipEntryService($repoMock);
+        $treeMock = Mockery::mock(WipTreeService::class);
+
+        $service = new WipEntryService($repoMock, $treeMock);
         $result = $service->getBalance('101', 1002);
 
         $this->assertEquals($expectedBalance, $result);
@@ -41,7 +44,9 @@ class WipEntryServiceTest extends TestCase
             ->with('101', 1002)
             ->andReturn($expectedNumber);
 
-        $service = new WipEntryService($repoMock);
+        $treeMock = Mockery::mock(WipTreeService::class);
+
+        $service = new WipEntryService($repoMock, $treeMock);
         $result = $service->generateNewFeedNumber('101', 1002);
 
         $this->assertEquals($expectedNumber, $result);

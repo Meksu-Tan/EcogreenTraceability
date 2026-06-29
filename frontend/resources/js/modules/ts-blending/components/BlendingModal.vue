@@ -46,7 +46,8 @@
                 <VCol cols="12" sm="6" md="3">
                   <VTextField
                     :model-value="form.entry_no"
-                    label="Entry Number (Auto)"
+                    label="Entry Number"
+                    placeholder="AUTO GENERATE"
                     readonly
                     density="compact"
                     variant="outlined"

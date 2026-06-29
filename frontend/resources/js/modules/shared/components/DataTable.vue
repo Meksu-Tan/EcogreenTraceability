@@ -79,6 +79,9 @@
                   {{ row.status == 1 ? 'Active' : 'Inactive' }}
                 </VChip>
               </span>
+              <span v-else-if="col.key.endsWith('_at')" class="text-body-2">
+                {{ row[col.key] ? new Date(row[col.key]).toLocaleString() : '—' }}
+              </span>
               <span v-else class="text-body-2">{{ row[col.key] ?? '—' }}</span>
             </slot>
           </td>

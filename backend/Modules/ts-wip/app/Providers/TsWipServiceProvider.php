@@ -16,6 +16,9 @@ class TsWipServiceProvider extends ServiceProvider
             \Modules\TsWip\Services\Contracts\WipEntryServiceInterface::class,
             \Modules\TsWip\Services\WipEntryService::class
         );
+        $this->app->singleton(
+            \Modules\TsWip\Services\WipTreeService::class
+        );
     }
 
     public function boot(): void

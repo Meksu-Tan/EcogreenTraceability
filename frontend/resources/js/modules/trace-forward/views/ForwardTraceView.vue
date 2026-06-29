@@ -89,6 +89,9 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="white-space:nowrap">
                   Matl Doc
                 </th>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis" style="white-space:nowrap">
+                  PO/SO
+                </th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material')">
                   Material
                   <VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" />
@@ -121,6 +124,7 @@
                 <td class="font-weight-medium font-mono text-caption">{{ row.trace_no }}</td>
                 <td class="text-caption text-medium-emphasis">{{ row.entry_date }}</td>
                 <td class="font-weight-medium font-mono text-caption">{{ row.material_document || '-' }}</td>
+                <td class="font-weight-medium font-mono text-caption">{{ row.po_so || '-' }}</td>
                 <td class="font-weight-medium text-caption" style="max-width:240px" :title="row.material">
                   <div class="text-truncate">{{ row.material }}</div>
                 </td>
@@ -132,7 +136,7 @@
                 <td class="text-right font-weight-bold font-mono text-caption">{{ row.qty }}</td>
                 <td style="max-width:320px; white-space: normal;" class="text-caption">
                   <div v-if="row.supplier">
-                    <div v-for="(item, idx) in formatSupplier(row.supplier)" :key="idx" class="mb-1 pa-1.5 rounded border bg-grey-lighten-4">
+                    <div v-for="(item, idx) in formatSupplierList(row.supplier, { withStatus: true })" :key="idx" class="mb-1 pa-1.5 rounded border bg-grey-lighten-4">
                       <div class="font-weight-bold text-primary" style="font-size: 11px;">{{ item.supplier }}</div>
                       <div class="d-flex justify-space-between align-center mt-1" style="font-size: 11px;">
                         <span>Batch SAP: <span class="font-weight-bold font-mono">{{ item.batch || '-' }}</span></span>
@@ -201,6 +205,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTraceForwardStore } from '../stores/traceForwardStore'
+import { formatSupplierList } from '@/utils/formatSupplier'
 import TraceDetailModal from '@/modules/shared/components/TraceDetailModal.vue'
 
 const store = useTraceForwardStore()
@@ -218,19 +223,6 @@ const perPage = ref(10)
 const SORTABLE = new Set(['entry_date', 'trace_no', 'material', 'supplier'])
 
 const allTraceRows = computed(() => [...(detail.value.initial || []), ...(detail.value.chain || [])])
-
-function formatSupplier(val) {
-  if (!val) return []
-  return val.split(' | ').map(item => {
-    const parts = item.split(' / ')
-    return {
-      supplier: parts[0] || '',
-      batch: parts[1] || '',
-      qty: (parts[2] || '').replace('Qty : ', '').replace('Qty: ', ''),
-      status: parts[3] || '',
-    }
-  })
-}
 
 function toggleSort(key) {
   if (!SORTABLE.has(key)) return

@@ -2,8 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import packageService from '../services/packageService'
 import { useToastStore } from '@/stores/toast.js'
-import { usePlantSelectionStore, registerCacheResetCallback } from '@/stores/plant.js'
+import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
+import { useTransactionAction } from '@/composables/useTransactionAction'
 
 export const usePackageEntryStore = defineStore('packageEntry', () => {
   const toastStore = useToastStore()
@@ -135,21 +136,11 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
   }
 
-  async function cancelEntry(id, traceNo) {
-    loading.value = true
-    try {
-      const res = await packageService.cancel(id, traceNo)
-      toastStore.success(res.data?.message || 'Packaging entry cancelled')
-      await fetchEntries()
-      return res.data
-    } catch (error) {
-      const errMsg = error.response?.data?.message || 'Failed to cancel packaging entry'
-      toastStore.error(errMsg)
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
+  const { execute: cancelEntry } = useTransactionAction(
+    (id, traceNo) => packageService.cancel(id, traceNo),
+    fetchEntries,
+    'Packaging entry cancelled'
+  )
 
   async function updatePo(data) {
     try {
@@ -195,7 +186,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
     }
     traceNoLoading.value = true
     try {
-      const res = await packageService.getNewTraceNo(id_material, activePlant)
+      const res = await packageService.getNewTraceNo({ id_material, id_plant: activePlant })
       if (res.data?.data && res.data.data.length > 0) {
         newTraceNo.value = res.data.data[0].traceNo || ''
       } else {

@@ -26,7 +26,6 @@ interface WipEntryRepositoryInterface
 
     // External Data
     public function getQuantifierData(string $date, string $tagNumber): array;
-    public function getWipTree($plantId): array;
 
     // Write Operations
     public function postMaterialDocument(string $mode, int $idTraceHead, string $materialDoc, string $user): array;

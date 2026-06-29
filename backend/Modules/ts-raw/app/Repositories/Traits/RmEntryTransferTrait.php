@@ -86,7 +86,7 @@ trait RmEntryTransferTrait
                     FROM t_balance_header a
                     LEFT JOIN t_balance_detail b ON a.id_balance_head = b.id_balance_head AND b.status = 1
                     JOIN m_material c ON a.id_material = c.id_material
-                    LEFT JOIN m_sloc d ON a.id_sloc = d.id_sloc AND d.status = 1 AND d.code_3 = 'STORAGE'
+                    JOIN m_sloc d ON a.id_sloc = d.id_sloc AND d.status = 1 AND d.code_3 = 'STORAGE'
                     LEFT JOIN m_supplier e ON e.id_supplier = b.id_supplier
                     LEFT JOIN (SELECT f.id_balance_head,
                                       MAX(g.material_document) AS material_document,
@@ -281,7 +281,7 @@ trait RmEntryTransferTrait
                     WHERE a.status = 1
                       AND (? = '0' OR CAST(a.id_plant AS TEXT) = CAST(? AS TEXT))
                       AND (
-                          (? = 'FEED' AND SUBSTRING(a.to_trace_no,1,1) = '3')
+                          (? = 'FEED' AND SUBSTRING(a.to_trace_no,1,1) = '3' AND COALESCE(a.out_qty, 0) > 0)
                           OR (? <> 'FEED' AND SUBSTRING(a.to_trace_no,1,1) <> '7')
                       )
                     GROUP BY a.to_trace_no, a.id_balance_head, c.code, md.material_document, md.po_so, p.code, a.id_sloc::text

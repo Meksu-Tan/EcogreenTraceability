@@ -54,8 +54,7 @@ class TransferBalanceService
      */
     public function createBalanceHeader(array $data): int
     {
-        // id_sloc is stored as-is: JSON array string or scalar.
-        // Caller must ensure correct format.
+        $data['created_at'] ??= now();
         return DB::connection($this->connection)->table('t_balance_header')->insertGetId($data, 'id_balance_head');
     }
 
@@ -64,6 +63,7 @@ class TransferBalanceService
      */
     public function createTraceHeader(array $data): int
     {
+        $data['created_at'] ??= now();
         return DB::connection($this->connection)->table('t_trace_header')->insertGetId($data, 'id_trace_head');
     }
 

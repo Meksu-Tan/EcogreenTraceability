@@ -3,7 +3,6 @@ declare(strict_types=1);
 namespace Modules\TsWip\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Plant\Models\Plant;
 use Modules\Shared\Traits\DbCompatTrait;
 
 trait WipEntryQueryTrait
@@ -157,11 +156,12 @@ SQL;
             $subMatFilter = $idMaterial ? 'AND id_material = ?' : '';
 
             // Build bindings matching SQL `?` order:
-            // is_last_row: feedPrefix, movType2 [, idPlant] [, idMaterial]
+            // warehouseCondition embeds feedPrefix directly — no `?`
+            // is_last_row: movType2 [, idPlant] [, idMaterial]
             // next_process: movType2 [, idPlant] [, idMaterial]
             // h subquery: [, idPlant]
-            // Main WHERE: feedPrefix, movType2 [, idPlant] [, idMaterial]
-            $bindings = [$feedPrefix, $this->movType2];
+            // Main WHERE: movType2 [, idPlant] [, idMaterial]
+            $bindings = [$this->movType2];
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
 
@@ -171,7 +171,6 @@ SQL;
 
             if ($hasPlant) $bindings[] = $idPlant;
 
-            $bindings[] = $feedPrefix;
             $bindings[] = $this->movType2;
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
@@ -235,7 +234,6 @@ SQL;
 
             $hasPlant = !($idPlant === '0' || $idPlant === null);
             $bindings = [];
-            $bindings[] = $feedPrefix;
             $bindings[] = $this->movType2;
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
@@ -246,7 +244,6 @@ SQL;
 
             if ($hasPlant) $bindings[] = $idPlant;
 
-            $bindings[] = $feedPrefix;
             $bindings[] = $this->movType2;
             if ($hasPlant) $bindings[] = $idPlant;
             if ($idMaterial) $bindings[] = $idMaterial;
@@ -351,15 +348,14 @@ SQL;
                     if (!empty($tanks)) {
                         sort($tanks);
                         $tanks = array_unique($tanks);
-                        $row->{$slocField} = $firstDesc . ' | ' . implode(' & ', $tanks);
+                        $row->{$slocField} = implode(' | ', $tanks);
                     } elseif ($firstDesc) {
                         $row->{$slocField} = $firstDesc;
                     }
                 } else {
                     if (isset($slocs[$slocVal])) {
                         $s = $slocs[$slocVal];
-                        $label = $this->buildSlocLabel($s, $plants);
-                        $row->{$slocField} = $s->tf_number ? ($label . ' | ' . $s->tf_number) : $label;
+                        $row->{$slocField} = $s->tf_number ?: ($this->buildSlocLabel($s, $plants) ?: '-');
                     }
                 }
             }
@@ -456,7 +452,7 @@ SQL;
                  ORDER BY a.to_trace_no DESC
                  LIMIT 1
             ";
-            $params = array_merge([$idPlant, $feedId, $this->movType2], $matlParams, [$idPlant]);
+            $params = array_merge([$idPlant, $this->movType2], $matlParams, [$idPlant]);
         } else {
             $bsFmtSum = $this->dbNumberFormat('ROUND(SUM(b.out_qty),3)', 3);
 
@@ -478,10 +474,10 @@ SQL;
                                                       AND status = 1 AND {$subPlantFilter}
                                                     ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                        CASE WHEN a.to_trace_no = (SELECT from_trace_no FROM t_trace_header
-                                                   WHERE from_trace_no = a.to_trace_no
-                                                     AND {$subMatlWhere}
-                                                     AND status = 1 AND {$subPlantFilter}
-                                                   ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
+                                                    WHERE from_trace_no = a.to_trace_no
+                                                      AND {$subMatlWhere}
+                                                      AND status = 1 AND {$subPlantFilter}
+                                                    ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process,
                        a.id_plant, p.description AS plant_name
                   FROM t_trace_header a
                   LEFT JOIN t_trace_detail b ON a.id_trace_head = b.id_trace_head
@@ -501,9 +497,9 @@ SQL;
                  ORDER BY a.id_trace_head DESC
             ";
             $params = array_merge(
-                [$feedId, $this->movType2], $matlParams, [$idPlant],
+                [$this->movType2], $matlParams, [$idPlant],
                 $matlParams, [$idPlant],
-                [$idPlant, $feedId, $this->movType2], $matlParams, [$idPlant]
+                [$idPlant, $this->movType2], $matlParams, [$idPlant]
             );
         }
 
@@ -539,12 +535,10 @@ SQL;
         $offset = 0;
 
         if ($mode === 'LATEST') {
-            // Handle "all plants" case
             $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
-            $subPlantFilter = str_replace('a.', '', $plantFilter);
             $bindings = ($idPlant === '0' || $idPlant === null)
-                ? [$rundownId, $this->movType1]
-                : [$rundownId, $this->movType1, $idPlant];
+                ? [$this->movType1]
+                : [$this->movType1, $idPlant];
 
             $qtyFmt = $this->dbNumberFormat('ROUND(MAX(h.in_qty),3)', 3);
             $lastFmt = $this->dbNumberFormat('MAX(a.last_qtf)', 3);
@@ -580,7 +574,7 @@ SQL;
                  WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('a.to_trace_no', '=', $rundownId) . "
                    AND a.in_qty > 0 AND b.in_qty > 0
                    AND SUBSTRING(a.to_trace_no, 1, 1) = ?
-                   AND a.status = 1 AND {$subPlantFilter}
+                   AND a.status = 1 AND {$plantFilter}
                  GROUP BY a.to_trace_no
                  ORDER BY a.to_trace_no DESC
                  LIMIT 1
@@ -590,8 +584,8 @@ SQL;
             $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'a.id_plant = ?';
             $subPlantFilter = str_replace('a.', '', $plantFilter);
             $bindings = ($idPlant === '0' || $idPlant === null)
-                ? [$this->movType1, $this->movType2, $rundownId, $rundownId, $this->movType1]
-                : [$this->movType1, $this->movType2, $rundownId, $idPlant, $idPlant, $rundownId, $this->movType1, $idPlant];
+                ? [$this->movType1, $this->movType2, $this->movType1]
+                : [$this->movType1, $this->movType2, $idPlant, $idPlant, $this->movType1, $idPlant];
 
             $qtyFmt = $this->dbNumberFormat('ROUND(h.in_qty,3)', 3);
             $lastFmt = $this->dbNumberFormat('MAX(a.last_qtf)', 3);
@@ -701,63 +695,8 @@ SQL;
     public function getWipTree($plantId): array
     {
         $idPlant = $this->resolvePlantId($plantId);
-
-        // Handle "all plants" case
-        $plantFilter = ($idPlant === '0' || $idPlant === null) ? '1=1' : 'id_plant = ?';
-        $bindings = ($idPlant === '0' || $idPlant === null)
-            ? []
-            : [$idPlant, $idPlant, $idPlant, $idPlant, $idPlant, $idPlant, $idPlant];
-
-        $sections = DB::connection('eudr_ts')->select("
-            SELECT
-                m.id_rundown AS section_id,
-                m.code AS section_code,
-                m.description AS section_name,
-                (SELECT to_trace_no FROM t_trace_header
-                 WHERE SUBSTRING(to_trace_no,1,1) = '3'
-                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                   AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND {$plantFilter}
-                 ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_trace,
-                (SELECT entry_date FROM t_trace_header
-                 WHERE SUBSTRING(to_trace_no,1,1) = '3'
-                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                   AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND {$plantFilter}
-                 ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_date,
-                (SELECT curr_qtf FROM t_trace_header
-                 WHERE SUBSTRING(to_trace_no,1,1) = '3'
-                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                   AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND {$plantFilter}
-                 ORDER BY id_trace_head DESC LIMIT 1) AS latest_feed_qty,
-                (SELECT to_trace_no FROM t_trace_header
-                 WHERE SUBSTRING(to_trace_no,1,1) = '2'
-                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                   AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND {$plantFilter}
-                 ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_trace,
-                (SELECT entry_date FROM t_trace_header
-                 WHERE SUBSTRING(to_trace_no,1,1) = '2'
-                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                   AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND {$plantFilter}
-                 ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_date,
-                (SELECT curr_qtf FROM t_trace_header
-                 WHERE SUBSTRING(to_trace_no,1,1) = '2'
-                   AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . "
-                   AND SUBSTRING(to_trace_no,8,3) = m.id_rundown
-                   AND status = 1 AND {$plantFilter}
-                 ORDER BY id_trace_head DESC LIMIT 1) AS latest_rundown_qty
-            FROM m_material m
-            WHERE m.status = 1
-              AND m.type IN ('WIP', 'RM')
-            ORDER BY m.id_rundown
-        ", $bindings);
-
-        return $sections;
+        return app(\Modules\TsWip\Services\WipTreeService::class)->getTree($idPlant);
     }
-
     public function getUserPlants(int $userId): array
     {
         return DB::connection('eudr_ts')->select('
@@ -775,156 +714,118 @@ SQL;
         );
     }
 
-    protected function checkPeriodLock(string $date): bool
+    public function checkPeriodLock(string $date): bool
     {
         return \Modules\Shared\Services\PeriodLockService::isLocked($date);
     }
 
-    protected function mapSectionToMaterialId(string $sectionId, string $type = 'feed'): ?int
+    protected function resolveStepFeedId(string $sectionCode, int $wipMode = 1): ?string
     {
-        $sectionMap = [
-            'feed_101' => 1,
-            'feed_102' => 2,
-            'feed_103' => 3,
-            'feed_104' => 4,
-            'feed_105' => 5,
-            'feed_111' => 11,
-            'feed_112' => 12,
-            'feed_114' => 14,
-            'rundown_101' => 1,
-            'rundown_102' => 11,
-            'rundown_103' => 12,
-            'rundown_104' => 13,
-            'rundown_110' => 21,
-            'rundown_111' => 22,
-            'rundown_114' => 24,
-        ];
-
-        $key = $type . '_' . ltrim($sectionId, '0');
-        return $sectionMap[$key] ?? null;
+        $step = $this->getFeedStepBySectionCode($sectionCode, $wipMode);
+        return $step->feed_id ?? null;
     }
 
-    protected function mapFrontendSectionToDbFeedId(string $sectionId, ?string $subgroup = null, int $mode = 1): string
+    protected function resolveStepRundownId(string $sectionCode, ?string $subgroup = null): ?string
     {
-        if ($sectionId === '105') {
-            return $subgroup === 'short' ? '006-01' : '006-02';
+        $step = $this->getRundownStepBySectionCode($sectionCode, $subgroup);
+        return $step->rundown_id ?? null;
+    }
+
+    protected function getFeedStepBySectionCode(string $sectionCode, int $wipMode = 1): ?object
+    {
+        $steps = DB::connection('eudr_ts')->select("
+            SELECT ps.* FROM m_wip_process_step ps
+            JOIN m_wip_section s ON ps.section_id = s.id
+            WHERE s.code = ? AND ps.step_type = 'feed' AND ps.status = 1
+            ORDER BY ps.sort_order
+        ", [$sectionCode]);
+
+        if (empty($steps)) return null;
+        if (count($steps) === 1) return $steps[0];
+
+        $modeStr = (string) $wipMode;
+        foreach ($steps as $step) {
+            if (!$step->conditions) continue;
+            $conds = json_decode((string) $step->conditions, true);
+            if (!is_array($conds)) continue;
+            if (in_array($modeStr, $conds, true)) return $step;
         }
-        if ($sectionId === '106' || $sectionId === '114') {
-            return $mode === 2 ? '008-02' : '008-01';
-        }
-        $map = [
-            '101' => '001',
-            '102' => '001',
-            '103' => '002',
-            '104' => '003',
-            '110' => '004',
-            '111' => '007',
-            '116' => '007',
-            '112' => '009-01',
-            '302' => '005',
-        ];
-        return $map[$sectionId] ?? $sectionId;
+
+        return $steps[0];
+    }
+
+    protected function getRundownStepBySectionCode(string $sectionCode, ?string $subgroup = null): ?object
+    {
+        $steps = DB::connection('eudr_ts')->select("
+            SELECT ps.* FROM m_wip_process_step ps
+            JOIN m_wip_section s ON ps.section_id = s.id
+            WHERE s.code = ? AND ps.step_type = 'rundown' AND ps.status = 1
+            ORDER BY ps.sort_order
+        ", [$sectionCode]);
+
+        if (empty($steps)) return null;
+        if (count($steps) === 1) return $steps[0];
+
+        return $steps[0];
+    }
+
+    protected function mapFrontendSectionToDbFeedId(string $sectionId, int $mode = 1): string
+    {
+        return $this->resolveStepFeedId($sectionId, $mode) ?? $sectionId;
     }
 
     protected function mapFrontendSectionToDbRundownId(string $sectionId, ?string $subgroup = null): string
     {
-        $map = [
-            '102' => [
-                'daoil' => '011',
-                'pkfad' => '021',
-            ],
-            '103' => [
-                'crudeme' => '012',
-                'treatedgly' => '022',
-            ],
-            '104' => [
-                'ume' => '033',
-                'bdme' => '023',
-                'me28' => '043',
-                'econoate665' => '053',
-                'me80' => '063',
-            ],
-            '105' => [
-                'cfa28' => '016',
-                'cfa80' => '026',
-            ],
-            '106' => [
-                'fa1299' => '078',
-                'fa1499' => '088',
-            ],
-            '110' => [
-                'crudegly' => '014',
-            ],
-            '111' => [
-                'glycerine' => '017',
-            ],
-            '112' => [
-                'cfa28' => '069',
-                'fa12' => '039',
-                'fa14lrr' => '079',
-                'fa14' => '059',
-                'fa18' => '029',
-                'fa18lrr' => '049',
-                'ecowax' => '019',
-            ],
-            '114' => [
-                'ecowax' => '018',
-                'lefa' => '028',
-                'fa24' => '038',
-                'fa16' => '048',
-                'fa18lrr' => '058',
-                'fa26' => '068',
-            ],
-            '302' => [
-                'wme' => '015',
-                'me28' => '025',
-            ],
-        ];
-
-        if (isset($map[$sectionId])) {
-            if ($subgroup && isset($map[$sectionId][$subgroup])) {
-                return $map[$sectionId][$subgroup];
-            }
-            return reset($map[$sectionId]);
-        }
-
-        return $sectionId;
+        return $this->resolveStepRundownId($sectionId, $subgroup) ?? $sectionId;
     }
 
     protected function mapRundownToFeedSectionId(string $rundownId, int $mode = 1): string
     {
-        // Rundown '028' (LEFA) is ambiguous: Mode 1 → section 112 feed (009), Mode 2 → CFA80 feed (008-02)
+        $feedId = $this->resolveFeedSectionFromRundownId($rundownId);
+        if ($feedId !== null) return $feedId;
+
+        // ponytail: 028 (LEFA) mode 2 → CFA80 feed (008), different from section default
         if ($mode === 2 && $rundownId === '028') {
             return '008';
         }
-        /** @var array<string, string> $rundownToFeedMap */
-        $rundownToFeedMap = config('wip_material_mapping.rundown_to_feed_map', []);
-        $feedId = $rundownToFeedMap[$rundownId] ?? $rundownId;
 
-        // Normalize to 3-digit trace position (positions 8-10 of trace number)
-        return substr($feedId, 0, 3);
+        return substr($rundownId, 0, 3);
+    }
+
+    protected function resolveFeedSectionFromRundownId(string $rundownId): ?string
+    {
+        $row = DB::connection('eudr_ts')->selectOne("
+            SELECT ps.feed_id FROM m_wip_process_step ps
+            JOIN m_wip_section s ON ps.section_id = s.id
+            WHERE s.code = (SELECT s2.code FROM m_wip_process_step ps2
+                            JOIN m_wip_section s2 ON ps2.section_id = s2.id
+                            WHERE ps2.rundown_id = ? AND ps2.step_type = 'rundown' AND ps2.status = 1
+                            LIMIT 1)
+              AND ps.step_type = 'feed' AND ps.status = 1
+            ORDER BY ps.sort_order LIMIT 1
+        ", [$rundownId]);
+
+        if ($row && $row->feed_id) {
+            return substr($row->feed_id, 0, 3);
+        }
+        return null;
     }
 
     protected function getMaterialIdBySection(string $sectionId, string $type = 'feed', ?string $subgroup = null): ?int
     {
-        $dbId = ($type === 'feed')
-            ? $this->mapFrontendSectionToDbFeedId($sectionId)
-            : $this->mapFrontendSectionToDbRundownId($sectionId, $subgroup);
+        $dbId = $sectionId;
 
-        // Long feedIds (e.g. '006-01', '008-02') → look up via feed_material_map for precision.
         if ($type === 'feed' && strlen($dbId) >= 6) {
             $prefix = substr($dbId, 0, 3);
             $sign   = substr($dbId, 4, 2);
             $feedMaterialMap = config('wip_material_mapping.feed_material_map', []);
             if (isset($feedMaterialMap[$prefix][$sign])) {
                 $entry = $feedMaterialMap[$prefix][$sign];
-                // Prefer id_material; fall back to id_material1 for dual entries.
                 $matId = $entry['id_material'] ?? $entry['id_material1'] ?? null;
                 return $matId !== null ? (int) $matId : null;
             }
         }
 
-        // DB stores numeric IDs without leading zeros ('8' not '008'); strip them for match.
         $dbIdStripped = ltrim(substr($dbId, 0, 3), '0') ?: $dbId;
 
         $column = ($type === 'feed') ? 'id_feed' : 'id_rundown';

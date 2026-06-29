@@ -97,7 +97,7 @@ class StockRepository implements StockRepositoryInterface
                     t.description AS sloc, th.id_plant
                FROM t_trace_header th
                LEFT JOIN m_material m ON th.id_material = m.id_material
-               LEFT JOIN m_sloc t ON th.id_sloc = t.id_sloc
+               LEFT JOIN m_sloc t ON CAST(th.id_sloc AS integer) = t.id_sloc
               WHERE " . implode(' AND ', $where) . "
               ORDER BY th.entry_date DESC, th.id_trace_head DESC
               LIMIT 500",
@@ -153,14 +153,14 @@ class StockRepository implements StockRepositoryInterface
                                         ON z.code = a.code
                                      WHERE z.id_material = ?
                                     ),
-                                    bh_filtered AS (
+bh_filtered AS (
                                         SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no
                                           FROM t_balance_header bb
                                           JOIN requested_material rm
-                                            ON bb.id_material = rm.id_material
-                                         WHERE bb.status = 1
-                                           AND (CASE WHEN bb.id_sloc::text LIKE '[%' THEN (bb.id_sloc->>0)::int ELSE bb.id_sloc::int END) <> 4
-                                           AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
+                                             ON bb.id_material = rm.id_material
+                                          WHERE bb.status = 1
+                                            AND bb.id_sloc <> 4
+                                            AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
                                     ),
                                     th_grouped AS (
                                         SELECT
@@ -169,7 +169,7 @@ class StockRepository implements StockRepositoryInterface
                                               STRING_AGG(DISTINCT mt.description, \'|\') AS sloc
                                          FROM t_trace_header b
                                          LEFT JOIN m_sloc mt
-                                           ON (CASE WHEN b.id_sloc::text LIKE '[%' THEN (b.id_sloc->>0)::int ELSE b.id_sloc::int END) = mt.id_sloc
+                                           ON (CASE WHEN jsonb_typeof(b.id_sloc) = \'array\' THEN COALESCE((b.id_sloc->>0)::int, 0) ELSE (b.id_sloc#>>\'{}\')::int END) = mt.id_sloc
                                           AND mt.id_plant = ?
                                         WHERE b.status = 1
                                           AND b.entry_date <= ?
@@ -304,10 +304,10 @@ class StockRepository implements StockRepositoryInterface
                 $db = DB::connection($this->connection)->select('SELECT SUBSTRING(?,1,10) AS entry_date, bgn."description", bgn."in" AS "in", bgn."out" AS "out",
                                          TO_CHAR(ROUND(CAST(bgn."balance" AS numeric), 3), \'FM999999999999990.000\') AS balance, bgn."supplier", bgn."sloc", bgn."balance" AS balances,
                                          CASE WHEN ABS(bgn.balance_supplier - bgn."balance") > 0.009 THEN  TO_CHAR(ROUND(CAST(bgn.balance_supplier AS numeric), 3), \'FM999999999999990.000\') ELSE  TO_CHAR(ROUND(CAST(bgn."balance" AS numeric), 3), \'FM999999999999990.000\') END AS balance_supplier
-                                    FROM (SELECT STRING_AGG(DISTINCT b."description", \'|\') AS description,
-                                                 TO_CHAR(ROUND(CAST(SUM(b.in) AS numeric), 3), \'FM999999999999990.000\') AS "in", TO_CHAR(ROUND(CAST(SUM(b.out) AS numeric), 3), \'FM999999999999990.000\') AS "out", SUM(b."balance") AS "balance",
-                                                 b.sloc, STRING_AGG(DISTINCT c.supplier, \'|\') AS supplier,
-                                                 c."balance_supplier" AS balance_supplier
+                                     FROM (SELECT STRING_AGG(DISTINCT b."description", \'|\') AS description,
+                                                  TO_CHAR(ROUND(CAST(SUM(b.in) AS numeric), 3), \'FM999999999999990.000\') AS "in", TO_CHAR(ROUND(CAST(SUM(b.out) AS numeric), 3), \'FM999999999999990.000\') AS "out", SUM(b."balance") AS "balance",
+                                                  MAX(b.sloc) AS sloc, STRING_AGG(DISTINCT c.supplier, \'|\') AS supplier,
+                                                  MAX(c."balance_supplier") AS balance_supplier
                                             FROM m_material z
                                             LEFT JOIN (SELECT a.code, a.id_material
                                                          FROM m_material a
@@ -388,7 +388,7 @@ class StockRepository implements StockRepositoryInterface
                                            WHERE b."entry_date" IS NOT NULL
                                              AND z.id_material = ?
                                            UNION ALL
-                                          SELECT \'Beginning Balance\' AS "description", \'0\' AS "in", \'0\' AS "out", 0 AS "balance", \'|\' AS supplier, 0 AS "balance_supplier", \'-\' AS sloc
+                                           SELECT \'Beginning Balance\' AS "description", \'0\' AS "in", \'0\' AS "out", 0::numeric AS "balance", \'-\' AS sloc, \'|\' AS supplier, 0::numeric AS "balance_supplier"
                                            LIMIT 1) bgn
                                   WHERE bgn."description" IS NOT NULL', [$startDateVal, $startDateVal, $idSloc, $startDateVal, $idSloc, $idMaterialFix]);
             }
@@ -413,13 +413,13 @@ class StockRepository implements StockRepositoryInterface
                                                                  WHERE bb.status = 1
                                                                    AND bb.id_material_fg = ?
                                                                    AND (SUBSTRING(bb.trace_no,1,1) = \'5\' OR SUBSTRING(bb.trace_no,1,1) = \'4\' OR SUBSTRING(bb.trace_no,1,1) = \'6\')
-                                                                   AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . " ) bb
+                                                                   AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . ' ) bb
                                                          ON b.id_balance_head = bb.id_whx_head
                                                       WHERE b.entry_date <= ?
                                                         AND b.id_material = ?
                                                         AND b."status" = 1
                                                         AND (SUBSTRING(b.to_trace_no,1,1) = \'5\' OR SUBSTRING(b.to_trace_no,1,1) = \'4\' OR SUBSTRING(b.to_trace_no,1,1) = \'6\')
-                                                        AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . "
+                                                        AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . '
                                                       GROUP BY b.id_material) b
                                            ON a.id_materialpck = b.id_material
                                         LEFT JOIN (SELECT c.id_material, STRING_AGG(DISTINCT CONCAT(c.id_trace_tail, \' / \', c."description", \' / \', c."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(c."balance" AS numeric) AS numeric),1), \'FM999999999999990.0\'), \' MT\'), \' | \') AS supplier,
@@ -440,7 +440,7 @@ class StockRepository implements StockRepositoryInterface
                                                                AND c.id_material = ?
                                                                AND c."status" = 1
                                                                AND (SUBSTRING(c.to_trace_no,1,1) = \'5\' OR SUBSTRING(c.to_trace_no,1,1) = \'4\' OR SUBSTRING(c.to_trace_no,1,1) = \'6\')
-                                                               AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . "
+                                                               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . '
                                                              GROUP BY ccc.id_supplier, cc.batch_sap) c
                                                      GROUP BY c.id_material) c
                                            ON a.id_materialpck = c.id_material
@@ -473,14 +473,14 @@ class StockRepository implements StockRepositoryInterface
                                         ON z.code = a.code
                                      WHERE z.id_material = ?
                                     ),
-                                    bh_filtered AS (
+bh_filtered AS (
                                         SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no
                                           FROM t_balance_header bb
                                           JOIN requested_material rm
-                                            ON bb.id_material = rm.id_material
-                                         WHERE bb.status = 1
-                                           AND (CASE WHEN bb.id_sloc::text LIKE '[%' THEN (bb.id_sloc->>0)::int ELSE bb.id_sloc::int END) <> 4
-                                           AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
+                                             ON bb.id_material = rm.id_material
+                                          WHERE bb.status = 1
+                                            AND bb.id_sloc <> 4
+                                            AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
                                     ),
                                     th_grouped AS (
                                         SELECT
@@ -489,7 +489,7 @@ class StockRepository implements StockRepositoryInterface
                                               STRING_AGG(DISTINCT mt.description, \'|\') AS sloc, b.to_trace_no
                                          FROM t_trace_header b
                                          LEFT JOIN m_sloc mt
-                                           ON (CASE WHEN b.id_sloc::text LIKE '[%' THEN (b.id_sloc->>0)::int ELSE b.id_sloc::int END) = mt.id_sloc
+                                           ON (CASE WHEN jsonb_typeof(b.id_sloc) = \'array\' THEN COALESCE((b.id_sloc->>0)::int, 0) ELSE (b.id_sloc#>>\'{}\')::int END) = mt.id_sloc
                                           AND mt.id_plant = ?
                                         WHERE b.status = 1
                                           AND b.entry_date > ?
@@ -707,7 +707,7 @@ class StockRepository implements StockRepositoryInterface
                                                 GROUP BY a.id_material
                                                 UNION ALL
                                                SELECT \'-\' AS "description", \'0\' AS "in", \'0\' AS "balance_supplier", \'0\' AS "out", 0 AS "balance", \'|\' AS supplier, \'-\' AS sloc
-                                                LIMIT 1) bgn', [$nextDateStr, $stock, $stock, $stock, $stock, $currDateStr, $nextDateStr, $idSloc, $nextDateStr, $idSloc, $idMaterialFix]);
+                                                LIMIT 1) bgn', [$nextDateStr, $stock, $stock, $currDateStr, $nextDateStr, $idSloc, $nextDateStr, $idSloc, $idMaterialFix]);
                 }
             } elseif ($type === 'WH') {
                 $db1 = DB::connection($this->connection)->select('SELECT SUBSTRING(?,1,10) AS entry_date, bgn."description", bgn."in", bgn."out", bgn."balance", bgn."supplier", bgn."sloc",
@@ -726,14 +726,14 @@ class StockRepository implements StockRepositoryInterface
                                                                      WHERE bb.status = 1
                                                                        AND bb.id_material_fg = ?
                                                                        AND (SUBSTRING(bb.trace_no,1,1) = \'5\' OR SUBSTRING(bb.trace_no,1,1) = \'4\' OR SUBSTRING(bb.trace_no,1,1) = \'6\')
-                                                                       AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . " ) bb
+                                                                       AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . ' ) bb
                                                            ON b.id_balance_head = bb.id_whx_head
                                                         WHERE b.entry_date > ?
                                                           AND b.entry_date <= ?
                                                           AND b.id_material = ?
                                                           AND b."status" = 1
                                                           AND (SUBSTRING(b.to_trace_no,1,1) = \'5\' OR SUBSTRING(b.to_trace_no,1,1) = \'4\' OR SUBSTRING(b.to_trace_no,1,1) = \'6\')
-                                                          AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . "
+                                                          AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . '
                                                         GROUP BY b.id_material) d
                                               ON a.id_materialpck = d.id_material
                                             LEFT JOIN (SELECT c.id_material, STRING_AGG(DISTINCT CONCAT(c.id_trace_tail, \' / \', c."description", \' / \', c."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(c."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\'), \' MT\'), \' | \') AS supplier,
@@ -753,7 +753,7 @@ class StockRepository implements StockRepositoryInterface
                                                                   AND c.id_material = ?
                                                                   AND c."status" = 1
                                                                   AND (SUBSTRING(c.to_trace_no,1,1) = \'5\' OR SUBSTRING(c.to_trace_no,1,1) = \'4\' OR SUBSTRING(c.to_trace_no,1,1) = \'6\')
-                                                                  AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . "
+                                                                  AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . '
                                                                 GROUP BY ccc.id_supplier) c
                                                          GROUP BY c.id_material) c
                                               ON a.id_materialpck = c.id_material
@@ -941,12 +941,12 @@ class StockRepository implements StockRepositoryInterface
                                                                     ON bb.id_section = bbb.id_warehouse
                                                                  WHERE bb.status = 1
                                                                    AND (SUBSTRING(bb.trace_no,1,1) = \'5\' OR SUBSTRING(bb.trace_no,1,1) = \'4\' OR SUBSTRING(bb.trace_no,1,1) = \'6\')
-                                                                   AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . " ) bb
+                                                                   AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . ' ) bb
                                                          ON b.id_balance_head = bb.id_whx_head
                                                       WHERE b.entry_date > ? AND b.entry_date <= ?
                                                         AND b."status" = 1
                                                         AND (SUBSTRING(b.to_trace_no,1,1) = \'5\' OR SUBSTRING(b.to_trace_no,1,1) = \'4\' OR SUBSTRING(b.to_trace_no,1,1) = \'6\')
-                                                        AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . "
+                                                        AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . '
                                                       GROUP BY b.id_material) b
                                            ON a.id_materialpck = b.id_material
                                         LEFT JOIN (SELECT c.id_material, STRING_AGG(DISTINCT CONCAT(c.id_trace_tail, \' / \', c."description", \' / \', c."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(c."balance" AS numeric) AS numeric),1), \'FM999999999999990.0\'), \' MT\'), \' | \') AS supplier,
@@ -965,7 +965,7 @@ class StockRepository implements StockRepositoryInterface
                                                              WHERE c.entry_date <= ?
                                                                AND c."status" = 1
                                                                AND (SUBSTRING(c.to_trace_no,1,1) = \'5\' OR SUBSTRING(c.to_trace_no,1,1) = \'4\' OR SUBSTRING(c.to_trace_no,1,1) = \'6\')
-                                                               AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . "
+                                                               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . '
                                                              GROUP BY ccc.id_supplier, cc.batch_sap) c
                                                      GROUP BY c.id_material) c
                                            ON a.id_materialpck = c.id_material

@@ -4,6 +4,7 @@ import transferApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
 import { registerCacheResetCallback } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
+import { useTransactionAction } from '@/composables/useTransactionAction'
 
 export const useTsTransferStore = defineStore('transactionTransfer', () => {
   const toastStore = useToastStore()
@@ -181,25 +182,11 @@ async function fetchTotalStockMaterial(params = {}) {
     }
   }
 
-  async function deleteTransfer(id) {
-    loading.value = true
-    try {
-      const response = await transferApi.deactivateTransfer(id)
-      if (response?.status === 1) {
-        toastStore.success('Transfer deactivated successfully')
-        await fetchTransferList()
-      } else {
-        toastStore.error(response?.message || 'Failed to deactivate transfer')
-      }
-      return response
-    } catch (err) {
-      error.value = err.response?.data?.message || err.message
-      toastStore.error(err.message || 'Failed to deactivate transfer')
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+  const { execute: deleteTransfer } = useTransactionAction(
+    (id) => transferApi.deactivateTransfer(id),
+    fetchTransferList,
+    'Transfer deactivated successfully'
+  )
 
   return {
     transferList,

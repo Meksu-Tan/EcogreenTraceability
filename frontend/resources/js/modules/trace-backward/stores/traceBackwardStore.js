@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useLoadingState } from '@/composables/useLoadingState'
 import traceApi from '@/modules/trace-backward/services/index.js'
 import shipmentService from '@/modules/ts-shipment/services/shipmentService'
 
 export const useTraceBackwardStore = defineStore('traceBackward', () => {
+  const { loading, error, withLoading } = useLoadingState()
+  const { loading: loadingDetail } = useLoadingState()
   const list = ref([])
   const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
   const detail = ref({ initial: [], chain: [] })
@@ -11,16 +14,11 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
   const batchData = ref(null)
   const preparationRecords = ref([])
   const sapAllocations = ref([])
-  const loading = ref(false)
-  const loadingDetail = ref(false)
   const loadingShipment = ref(false)
   const loadingBatch = ref(false)
-  const error = ref(null)
 
   async function fetchList(params = {}) {
-    loading.value = true
-    error.value = null
-    try {
+    await withLoading(async () => {
       const res = await traceApi.getBackwardList(params)
       const payload = res.data?.data || {}
       list.value = payload.data || (Array.isArray(payload) ? payload : [])
@@ -30,12 +28,8 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
         total: payload.total || list.value.length,
         lastPage: payload.last_page || 1,
       }
-    } catch (err) {
-      error.value = err.message || 'Failed to load backward list'
-      list.value = []
-    } finally {
-      loading.value = false
-    }
+    })
+    if (error.value) list.value = []
   }
 
   async function fetchDetail(payload) {
@@ -61,7 +55,6 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     error.value = null
     try {
       const res = await shipmentService.getDatShipment(params)
-      // ApiResponse::success() wraps in data.data (2 levels deep)
       const payload = res.data?.data
       shipmentData.value = (Array.isArray(payload) ? payload[0] : payload) || null
     } catch (err) {
@@ -76,16 +69,13 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     loadingBatch.value = true
     error.value = null
     try {
-      // Get batch packaging data
       const batchRes = await shipmentService.getShipmentBatchPackaging(params)
       const batchRecords = batchRes.data?.data || []
       batchData.value = batchRecords.length > 0 ? batchRecords[0] : null
 
-      // Get preparation records
       const prepRes = await shipmentService.getPreparationRecord(params)
       preparationRecords.value = prepRes.data?.data || []
 
-      // Get SAP allocations — IT_EXPORT is nested inside data.data.IT_EXPORT
       const allocRes = await shipmentService.getDatSoAllocation(params)
       const allocPayload = allocRes.data?.data
       sapAllocations.value = Array.isArray(allocPayload?.IT_EXPORT)

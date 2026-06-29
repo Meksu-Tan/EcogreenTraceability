@@ -93,7 +93,7 @@ class TsReportRepository implements TsReportRepositoryInterface
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
 
-        $condRmDirect = TraceHelper::plantCondition('a.to_trace_no', ['00']);
+        $condRmDirect = TraceHelper::warehouseCondition('a.to_trace_no', '=', '000');
         $condRmTransfer = !empty($plantId)
             ? TraceHelper::plantCondition('a.to_trace_no', [$plantId])
             : '1=1';
@@ -335,12 +335,12 @@ class TsReportRepository implements TsReportRepositoryInterface
                     aa.wip_in, aa.wip_out, aa.section, aa.from_trace_no,
                     aa.material, aa.supplier, aa.balance_supplier
                FROM (
-                     SELECT a.entry_date, a.id_trace_head, a.to_trace_no,
+                     SELECT MAX(a.entry_date) AS entry_date, MAX(a.id_trace_head) AS id_trace_head, a.to_trace_no,
                             {$fmtInQty} AS wip_in,
                             {$fmtOutQty} AS wip_out,
-                            CASE WHEN SUM(DISTINCT a.in_qty) = 0 THEN SUBSTRING(c.qtf_feed,1,3) ELSE SUBSTRING(c.qtf_rundown,1,3) END AS section,
-                            a.from_trace_no,
-                            CONCAT(c.description,' (',c.code,')') AS material,
+                            CASE WHEN SUM(DISTINCT a.in_qty) = 0 THEN MAX(SUBSTRING(c.qtf_feed,1,3)) ELSE MAX(SUBSTRING(c.qtf_rundown,1,3)) END AS section,
+                            MAX(a.from_trace_no) AS from_trace_no,
+                            MAX(CONCAT(c.description,' (',c.code,')')) AS material,
                             {$gcSupp} AS supplier,
                             {$fmtBalSup} AS balance_supplier
                        FROM t_trace_header a

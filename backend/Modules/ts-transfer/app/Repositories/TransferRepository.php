@@ -110,7 +110,7 @@ class TransferRepository implements TransferRepositoryInterface
             CONCAT(c.description, ' (', c.code, ')') AS material,
             " . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . " AS plant_name,
             " . \Modules\Shared\Helpers\TraceHelper::fromPlantNameExpression('b.from_trace_no') . " AS from_plant_name,
-            (CASE WHEN CHAR_LENGTH(CAST(a.trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(a.trace_no, 11, 2) ELSE SUBSTRING(a.trace_no, 8, 2) END) AS plant_code_from_trace,
+            " . \Modules\Shared\Helpers\TraceHelper::plantCodeExpression('a.trace_no') . " AS plant_code_from_trace,
             b.id_trace_head AS idTraceHead, b.is_last_row, b.next_process,
             {$fmt3('a.in_qty')} AS in_qty, {$fmt3('a.out_qty')} AS out_qty,
             sup_agg.supplier AS supplier,
@@ -153,7 +153,7 @@ class TransferRepository implements TransferRepositoryInterface
                 $join->on('th_from.to_trace_no', '=', 'b.from_trace_no')->where('th_from.status', 1);
             })
             ->leftJoin('m_plant as p', function($join) {
-                $join->on(DB::raw('(CASE WHEN CHAR_LENGTH(CAST(a.trace_no AS VARCHAR)) >= 14 THEN SUBSTRING(a.trace_no, 11, 2) ELSE SUBSTRING(a.trace_no, 8, 2) END)'), '=', DB::raw('RIGHT(p.code_3, 2)'))->where('p.status', 1);
+                $join->on(DB::raw(\Modules\Shared\Helpers\TraceHelper::plantCodeExpression('a.trace_no')), '=', DB::raw('RIGHT(p.code_3, 2)'))->where('p.status', 1);
             })
             ->leftJoin('m_sloc as t_from', function($join) {
                 $join->whereRaw("(th_from.id_sloc #>> '{}') = t_from.id_sloc::text");
@@ -281,25 +281,9 @@ class TransferRepository implements TransferRepositoryInterface
                 }
             }
 
-            $fromFormatted = $this->formatTankName($item->raw_from_desc);
-            $toFormatted = $this->formatTankName($item->raw_to_desc);
-
-            $fromPart = $fromFormatted ?? '';
-            if (!empty($item->from_tf_number)) {
-                $fromPart .= ': [' . $item->from_tf_number . ']';
-            }
-
-            $toPart = $toFormatted ?? '';
-            if (!empty($item->to_tf_number)) {
-                $toPart .= ': [' . $item->to_tf_number . ']';
-            }
-
-            static $plantNames = [1001 => 'EOMB', 1002 => 'EOB1', 1003 => 'EOB2', 1005 => 'EOB5', 1007 => 'EOB3'];
-            $fromPlant = $plantNames[(int)($item->from_plant_id ?? 0)] ?? '';
-            $toPlant   = $plantNames[(int)($item->to_plant_id ?? 0)] ?? '';
-            $fromLabel = $fromPlant ?: trim($fromPart);
-            $toLabel   = $toPlant   ?: trim($toPart);
-            $item->sloc = $fromLabel . " >>> " . $toLabel;
+            $fromTf = !empty($item->from_tf_number) ? $item->from_tf_number : ($item->raw_from_desc ?: '-');
+            $toTf   = !empty($item->to_tf_number)   ? $item->to_tf_number   : ($item->raw_to_desc ?: '-');
+            $item->sloc = $fromTf . " >>> " . $toTf;
 
             return $item;
         });
@@ -421,7 +405,7 @@ class TransferRepository implements TransferRepositoryInterface
 
     public function findOrphanHeads(int $idMaterial, int $sloc, int $plantId): array
     {
-        $jsonCond = "(CASE WHEN bh.id_sloc::text LIKE '[%' THEN to_jsonb(CAST(? AS TEXT)) @> bh.id_sloc ELSE bh.id_sloc = CAST(? AS INTEGER) END)";
+        $jsonCond = "(CASE WHEN bh.id_sloc::text LIKE '[%' THEN bh.id_sloc::text::jsonb @> to_jsonb(CAST(? AS INTEGER)) ELSE bh.id_sloc = CAST(? AS INTEGER) END)";
 
         return DB::connection($this->connection)->select(
             "SELECT bh.id_balance_head, bh.trace_no, bh.qty

@@ -56,7 +56,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                 $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(d.id_sloc AS TEXT)'))->where('d.status', 1);
             })
             ->leftJoin('m_supplier as e', 'e.id_supplier', '=', 'b.id_supplier')
-            ->leftJoin(DB::raw("(SELECT DISTINCT ON (f.id_balance_head) f.id_balance_head, g.material_document, g.po_so, f.id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 ORDER BY f.id_balance_head, f.id_trace_head DESC) as f"
+            ->leftJoin(DB::raw("(SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so, MAX(f.id_trace_head) AS id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 GROUP BY f.id_balance_head) as f"
             ), 'f.id_balance_head', '=', 'a.id_balance_head')
             ->leftJoin(DB::raw("(SELECT id_balance_head,SUM(init_qty) AS supplier_qty FROM t_balance_detail WHERE status=1 GROUP BY id_balance_head) as bs"), 'bs.id_balance_head', '=', 'a.id_balance_head')
             ->where('c.type', 'RM')
@@ -81,8 +81,6 @@ class RmReportRepository implements RmReportRepositoryInterface
                 'c.code',
                 'c.description',
                 'a.entry_date',
-                'f.material_document',
-                'f.po_so',
                 'bs.supplier_qty'
             );
         $result = $query->orderByDesc('a.id_balance_head')->get();
@@ -126,7 +124,7 @@ class RmReportRepository implements RmReportRepositoryInterface
                 $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(d.id_sloc AS TEXT)'))->where('d.status', 1);
             })
             ->leftJoin('m_supplier as e', 'e.id_supplier', '=', 'b.id_supplier')
-            ->leftJoin(DB::raw("(SELECT DISTINCT ON (f.id_balance_head) f.id_balance_head, g.material_document, g.po_so, f.id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 ORDER BY f.id_balance_head, f.id_trace_head DESC) as f"
+            ->leftJoin(DB::raw("(SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so, MAX(f.id_trace_head) AS id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 GROUP BY f.id_balance_head) as f"
             ), 'f.id_balance_head', '=', 'a.id_balance_head')
             ->leftJoin(DB::raw("(SELECT id_balance_head,SUM(init_qty) AS supplier_qty FROM t_balance_detail WHERE status=1 GROUP BY id_balance_head) as bs"), 'bs.id_balance_head', '=', 'a.id_balance_head')
             ->where('c.type', 'RM')
@@ -150,8 +148,6 @@ class RmReportRepository implements RmReportRepositoryInterface
                 'c.code',
                 'c.description',
                 'a.entry_date',
-                'f.material_document',
-                'f.po_so',
                 'bs.supplier_qty'
             );
         $result = $query->orderByDesc('a.id_balance_head')->get();
@@ -171,13 +167,13 @@ class RmReportRepository implements RmReportRepositoryInterface
         $adjSlocFilter = '';
 
         if ($plantCode3) {
-                $storageSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms WHERE ms.status = 1 AND ms.code_3 = 'STORAGE' AND ms.id_plant = '{$plantCode3}' AND a.id_sloc = ms.id_sloc)";
-                $wipFeedSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms2 WHERE ms2.status = 1 AND ms2.code_3 IN ('WIP','FEED','STORAGE') AND ms2.id_plant = '{$plantCode3}' AND b.id_sloc = ms2.id_sloc)";
-                $adjSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms3 WHERE ms3.status = 1 AND ms3.code_3 = 'ADJUSTMENT OUT' AND ms3.id_plant = '{$plantCode3}' AND b.id_sloc = ms3.id_sloc)";
+                $storageSlocFilter = "(EXISTS (SELECT 1 FROM m_sloc ms WHERE ms.status = 1 AND ms.code_3 = 'STORAGE' AND ms.id_plant = '{$plantCode3}' AND CAST(a.id_sloc AS TEXT) = CAST(ms.id_sloc AS TEXT)) OR CAST(a.id_sloc AS TEXT) = '4')";
+                $wipFeedSlocFilter = "AND (EXISTS (SELECT 1 FROM m_sloc ms2 WHERE ms2.status = 1 AND ms2.code_3 IN ('WIP','FEED','STORAGE') AND ms2.id_plant = '{$plantCode3}' AND CAST(b.id_sloc AS TEXT) = CAST(ms2.id_sloc AS TEXT)) OR CAST(b.id_sloc AS TEXT) = '4')";
+                $adjSlocFilter = "AND (EXISTS (SELECT 1 FROM m_sloc ms3 WHERE ms3.status = 1 AND ms3.code_3 = 'ADJUSTMENT OUT' AND ms3.id_plant = '{$plantCode3}' AND CAST(b.id_sloc AS TEXT) = CAST(ms3.id_sloc AS TEXT)) OR CAST(b.id_sloc AS TEXT) = '4')";
             } else {
-                $storageSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms WHERE ms.status = 1 AND ms.code_3 = 'STORAGE' AND a.id_sloc = ms.id_sloc)";
-                $wipFeedSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms2 WHERE ms2.status = 1 AND ms2.code_3 IN ('WIP','FEED','STORAGE') AND b.id_sloc = ms2.id_sloc)";
-                $adjSlocFilter = "AND EXISTS (SELECT 1 FROM m_sloc ms3 WHERE ms3.status = 1 AND ms3.code_3 = 'ADJUSTMENT OUT' AND b.id_sloc = ms3.id_sloc)";
+                $storageSlocFilter = "(EXISTS (SELECT 1 FROM m_sloc ms WHERE ms.status = 1 AND ms.code_3 = 'STORAGE' AND CAST(a.id_sloc AS TEXT) = CAST(ms.id_sloc AS TEXT)) OR CAST(a.id_sloc AS TEXT) = '4')";
+                $wipFeedSlocFilter = "AND (EXISTS (SELECT 1 FROM m_sloc ms2 WHERE ms2.status = 1 AND ms2.code_3 IN ('WIP','FEED','STORAGE') AND CAST(b.id_sloc AS TEXT) = CAST(ms2.id_sloc AS TEXT)) OR CAST(b.id_sloc AS TEXT) = '4')";
+                $adjSlocFilter = "AND (EXISTS (SELECT 1 FROM m_sloc ms3 WHERE ms3.status = 1 AND ms3.code_3 = 'ADJUSTMENT OUT' AND CAST(b.id_sloc AS TEXT) = CAST(ms3.id_sloc AS TEXT)) OR CAST(b.id_sloc AS TEXT) = '4')";
             }
 
         $fmtSumQty = $this->dbNumberFormat('SUM(DISTINCT a.qty)', 3);
@@ -226,7 +222,7 @@ class RmReportRepository implements RmReportRepositoryInterface
             })
             ->whereRaw(\Modules\Shared\Helpers\TraceHelper::isStorageOrLegacy('a.trace_no'))
             ->whereRaw($this->dbDateFormat('a.entry_date', '%Y') . " = ?", [$selectedYear])
-            ->where('a.id_sloc', 4);
+            ->whereRaw($storageSlocFilter);
 
         if ($plantCode3) {
             $aggSubquery->where('a.id_plant', $plantCode3);
@@ -248,7 +244,7 @@ class RmReportRepository implements RmReportRepositoryInterface
             })
             ->leftJoin('m_plant as p2', \DB::raw('d.id_plant'), '=', \DB::raw('p2.code_3'))
             ->leftJoin('m_supplier as e', 'e.id_supplier', '=', 'b.id_supplier')
-            ->leftJoin(DB::raw("(SELECT DISTINCT ON (f.id_balance_head) f.id_balance_head, g.material_document, g.po_so, f.id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 ORDER BY f.id_balance_head, f.id_trace_head DESC) as f"
+            ->leftJoin(DB::raw("(SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so, MAX(f.id_trace_head) AS id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 GROUP BY f.id_balance_head) as f"
             ), 'f.id_balance_head', '=', 'a.id_balance_head')
             ->leftJoin(DB::raw($gSubquery), 'g.batch_sap', '=', 'b.batch_sap')
             ->leftJoin(DB::raw($hSubquery), 'h.batch_sap', '=', 'b.batch_sap')

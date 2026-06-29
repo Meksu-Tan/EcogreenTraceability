@@ -314,7 +314,7 @@ class BlendingService implements BlendingServiceInterface
                    AND status = 1 AND out_qty > 0.0001
                    AND (id_plant = ? OR ? = 0)
                  ORDER BY id_trace_head DESC";
-        $bind = [$feedId, $batchSeq, $plantId, $plantId];
+        $bind = [$batchSeq, $plantId, $plantId];
 
         $checkTrace = DB::connection('eudr_ts')->select($sql . ' LIMIT 1', $bind);
         if (!isset($checkTrace[0]->id_trace_head)) {

@@ -1,19 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { useLoadingState } from '@/composables/useLoadingState'
 import traceApi from '@/modules/trace-forward/services/index.js'
 
 export const useTraceForwardStore = defineStore('traceForward', () => {
+  const { loading, error, withLoading } = useLoadingState()
+  const { loading: loadingDetail } = useLoadingState()
   const list = ref([])
   const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
   const detail = ref({ initial: [], chain: [] })
-  const loading = ref(false)
-  const loadingDetail = ref(false)
-  const error = ref(null)
 
   async function fetchList(params = {}) {
-    loading.value = true
-    error.value = null
-    try {
+    await withLoading(async () => {
       const res = await traceApi.getForwardList(params)
       const payload = res.data?.data || {}
       list.value = payload.data || (Array.isArray(payload) ? payload : [])
@@ -23,12 +21,8 @@ export const useTraceForwardStore = defineStore('traceForward', () => {
         total: payload.total || list.value.length,
         lastPage: payload.last_page || 1,
       }
-    } catch (err) {
-      error.value = err.message || 'Failed to load forward list'
-      list.value = []
-    } finally {
-      loading.value = false
-    }
+    })
+    if (error.value) list.value = []
   }
 
   async function fetchDetail(payload) {

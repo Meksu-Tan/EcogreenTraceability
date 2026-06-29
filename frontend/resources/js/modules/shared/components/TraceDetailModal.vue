@@ -121,6 +121,7 @@
   
   <script setup>
   import { ref, computed, watch } from 'vue'
+  import { formatDetailSupplier } from '@/utils/formatSupplier'
   
   const props = defineProps({
     modelValue: { type: Boolean, default: false },
@@ -167,17 +168,6 @@ function badgeColor(idx) {
   return idx === 0 ? 'error' : 'default'
 }
 
-function formatDetailSupplier(val) {
-  if (!val) return []
-  return val.split(' || ').map(item => {
-    const parts = item.split(' / ')
-    return {
-      supplier: parts[0] || '',
-      batch: parts[1] || '',
-      qty: parts[2] || ''
-    }
-  })
-}
 </script>
 
 <style scoped>

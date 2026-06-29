@@ -79,7 +79,7 @@ final class ForwardDetailQuery
                 {$inQtyFmt} AS in_qty,
                 CASE WHEN SUBSTRING(c.from_trace_no,1,1) = '4' THEN UPPER(i.description)
                      WHEN SUBSTRING(c.from_trace_no,1,1) = '5' THEN UPPER(i.description)
-                     ELSE CASE WHEN CAST(TRIM(BOTH '[]\"' FROM SPLIT_PART(COALESCE(c.id_sloc::text, '0'), ',', 1)) AS INTEGER) < 7 THEN CONCAT('EOB1 ', h.description) ELSE h.description END
+                     ELSE CASE WHEN CAST(CASE WHEN jsonb_typeof(c.id_sloc) = 'array' THEN (c.id_sloc->>0)::text ELSE c.id_sloc::text END AS INTEGER) < 7 THEN CONCAT('EOB1 ', h.description) ELSE h.description END
                 END AS sloc,
                 {$outQtyFmt} AS out_qty,
                 CASE WHEN COALESCE(e.sum_in, 0) <> 0
@@ -88,12 +88,14 @@ final class ForwardDetailQuery
                 c.material_document,
                 c.level,
                 c.path,
+                COALESCE(e.detail_status, 0) AS status,
                 e.created_at,
                 e.created_by
             FROM ForwardBOM c
             LEFT JOIN m_material d ON c.id_material = d.id_material
             LEFT JOIN (SELECT td.id_trace_head,
                               SUM(td.in_qty) AS sum_in,
+                              MAX(td.status) AS detail_status,
                               MAX(td.created_at) AS created_at,
                               MAX(td.created_by) AS created_by,
                               {$supplierConcat} AS supplier_in,
@@ -104,8 +106,8 @@ final class ForwardDetailQuery
                          GROUP BY td.id_trace_head
                         ) e ON c.id_trace_head = e.id_trace_head
             LEFT JOIN m_material_pck g ON c.id_material = g.id_materialpck
-            LEFT JOIN m_sloc h ON {$this->dbSlocColumnClause('c.id_sloc', 'h.id_sloc')}
-            LEFT JOIN m_warehouse i ON {$this->dbSlocColumnClause('c.id_sloc', 'i.id_warehouse')}
+            LEFT JOIN m_sloc h ON CAST(h.id_sloc AS TEXT) = CASE WHEN jsonb_typeof(c.id_sloc) = 'array' THEN (c.id_sloc->>0)::text ELSE c.id_sloc::text END
+            LEFT JOIN m_warehouse i ON CAST(i.id_warehouse AS TEXT) = CASE WHEN jsonb_typeof(c.id_sloc) = 'array' THEN (c.id_sloc->>0)::text ELSE c.id_sloc::text END
             ORDER BY path
         ";
 

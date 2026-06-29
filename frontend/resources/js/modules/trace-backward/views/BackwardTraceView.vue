@@ -106,7 +106,7 @@
                 <td class="text-right font-weight-bold font-mono text-caption">{{ row.qty }}</td>
                 <td style="max-width:320px; white-space: normal;" class="text-caption">
                   <div v-if="row.supplier">
-                    <div v-for="(item, idx) in formatSupplier(row.supplier)" :key="idx" class="mb-1 pa-1.5 rounded border bg-grey-lighten-4">
+                    <div v-for="(item, idx) in formatSupplierList(row.supplier)" :key="idx" class="mb-1 pa-1.5 rounded border bg-grey-lighten-4">
                       <div class="font-weight-bold text-primary" style="font-size: 11px;">{{ item.supplier }}</div>
                       <div class="d-flex justify-space-between align-center mt-1" style="font-size: 11px;">
                         <span>Batch SAP: <span class="font-weight-bold font-mono">{{ item.batch || '-' }}</span></span>
@@ -128,7 +128,7 @@
                   </div>
                   <span v-else>-</span>
                 </td>
-                <td class="text-caption text-medium-emphasis">{{ row.created_at || '-' }}</td>
+                <td class="text-caption text-medium-emphasis">{{ row.created_at ? new Date(row.created_at.replace(' ', 'T')).toLocaleString() : '-' }}</td>
                 <td class="text-caption text-medium-emphasis">{{ row.created_by || '-' }}</td>
                 <td class="text-center">
                   <div class="d-flex justify-center gap-1">
@@ -222,6 +222,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTraceBackwardStore } from '../stores/traceBackwardStore'
 import { parseSoNo } from '../utils/parseSoNo'
+import { formatSupplierList } from '@/utils/formatSupplier'
 import TraceDetailModal from '@/modules/shared/components/TraceDetailModal.vue'
 import ShipmentDetailModal from '../components/ShipmentDetailModal.vue'
 import BatchPackagingModal from '../components/BatchPackagingModal.vue'
@@ -246,18 +247,6 @@ const perPage = ref(meta.value.perPage)
 const SORTABLE = new Set(['entry_date', 'trace_no', 'so_no', 'material', 'batch_no', 'supplier'])
 
 onMounted(() => loadData())
-
-function formatSupplier(val) {
-  if (!val) return []
-  return val.split(' | ').map(item => {
-    const parts = item.split(' / ')
-    return {
-      supplier: parts[0] || '',
-      batch: parts[1] || '',
-      qty: (parts[2] || '').replace('Qty : ', '').replace('Qty: ', ''),
-    }
-  })
-}
 
 function formatSource(val) {
   if (!val) return []

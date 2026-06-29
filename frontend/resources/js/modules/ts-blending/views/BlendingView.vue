@@ -151,7 +151,7 @@
                     </VChip>
                   </template>
                 </td>
-                <td class="text-caption text-medium-emphasis">{{ item.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ item.created_at ? new Date(item.created_at).toLocaleString() : '-' }}</td>
                 <td class="text-caption text-medium-emphasis">{{ item.created_by }}</td>
                 <td class="text-center">
                   <VBtn

@@ -102,7 +102,7 @@
                   </td>
                   <td class="text-body-2">{{ rec.description }}</td>
                   <td class="text-caption">{{ rec.created_by }}</td>
-                  <td class="text-caption">{{ rec.created_at }}</td>
+                  <td class="text-caption">{{ rec.created_at ? new Date(rec.created_at).toLocaleString() : '-' }}</td>
                 </tr>
               </tbody>
             </VTable>

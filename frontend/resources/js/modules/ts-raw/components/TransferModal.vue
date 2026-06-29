@@ -56,9 +56,9 @@
                 <VCol cols="12" sm="6" md="4">
                   <VTextField
                     :model-value="form.entry_no"
-                    :label="initLoading && !form.entry_no ? 'Generating entry number...' : 'Entry number (auto)'"
+                    label="Entry number"
+                    placeholder="AUTO GENERATE"
                     :loading="initLoading && !form.entry_no"
-                    :placeholder="entryNoPlaceholder"
                     readonly
                     density="compact"
                     variant="outlined"

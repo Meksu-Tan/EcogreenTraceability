@@ -227,7 +227,7 @@
           color="primary"
           prepend-icon="ri-save-line"
           :loading="loading"
-          :disabled="!canSubmit"
+          :disabled="!canSubmit || loading"
           @click="handleSubmit"
         >
           {{ loading ? 'Saving...' : (form.mode === 'EDIT' ? 'Update RM Entry' : 'Save RM Entry') }}
@@ -271,7 +271,8 @@
             <VCol cols="12" sm="6">
               <VTextField
                 v-model="supplierForm.batch_sap"
-                label="Batch SAP (auto)"
+                label="Batch SAP"
+                placeholder="AUTO GENERATE"
                 readonly
                 density="compact"
                 variant="outlined"
@@ -595,7 +596,6 @@ async function handleSubmit() {
         toastStore.error('Failed to clear temp list on submit error:', e)
       }
     }
-    await bootstrap()
   }
 }
 

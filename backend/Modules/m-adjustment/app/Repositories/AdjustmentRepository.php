@@ -1180,6 +1180,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $idSlocTailJson = is_array($idSlocTail) ? json_encode($idSlocTail) : (string) $idSlocTail;
         $idSlocVal = !empty($data['tankNo']) ? (is_array($data['tankNo']) ? $data['tankNo'] : [$data['tankNo']]) : [$data['tank'] ?? $idSloc];
         $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
+        $idSlocInt  = (int) ($idSlocVal[0] ?? $idSloc); // ponytail: t_balance_header.id_sloc is integer; use first element
 
         $suppliers = DB::connection($this->connection)->select(
             'SELECT id_supplier, qty AS qty_tail, batch_sap FROM t_balance_temporary WHERE entry_no = ?',
@@ -1203,7 +1204,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             $idHead = DB::connection($this->connection)->table('t_balance_header')->insertGetId([
                 'trace_no' => $newEntryNo,
                 'id_material' => $idMaterial,
-                'id_sloc' => $idSlocJson,
+                'id_sloc' => $idSlocInt,
                 'id_sloc_tail' => $idSlocTailJson,
                 'entry_date' => $entryDate,
                 'qty' => $qty,

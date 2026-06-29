@@ -90,7 +90,7 @@ class TsReportController extends Controller
         try {
             $filters = $request->only(['entry_date', 'plant_id', 'id_plant']);
             $filters['user_id'] = $request->user()?->id;
-            return ApiResponse::success($this->tsReportService->getTsReport($filters));
+            return ApiResponse::success($this->tsReportService->getTsReportWip($filters));
         } catch (\Exception $e) {
             return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
         }
@@ -111,7 +111,7 @@ class TsReportController extends Controller
                 'pck'       => $this->tsReportService->getTsReportPck($filters)['data'] ?? [],
                 'shipment'  => $this->tsReportService->getTsReportShipment($filters)['data'] ?? [],
                 'transfer'  => $this->tsReportService->getTsReportTransfer($filters)['data'] ?? [],
-                'wip'       => $this->tsReportService->getTsReport($filters)['data'] ?? [],
+                'wip'       => $this->tsReportService->getTsReportWip($filters)['data'] ?? [],
             ], 'All TS Report sections retrieved', 200);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed: ' . $e->getMessage(), 500);

@@ -4,6 +4,7 @@ import blendingApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
 import { registerCacheResetCallback } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
+import { useTransactionAction } from '@/composables/useTransactionAction'
 
 export const useTsBlendingStore = defineStore('transactionBlending', () => {
   const toastStore = useToastStore()
@@ -241,23 +242,11 @@ export const useTsBlendingStore = defineStore('transactionBlending', () => {
     }
   }
 
-  async function deactivateBlending(id) {
-    loading.value = true
-    error.value = null
-    try {
-      const response = await blendingApi.deactivate(id)
-      if (response?.status === 1) {
-        toastStore.success('Blending deactivated')
-        await fetchBlendingList()
-      }
-      return response
-    } catch (err) { const msg = err.response?.data?.message || err.message; error.value = msg; throw new Error(msg); /*
-      
-      */
-    } finally {
-      loading.value = false
-    }
-  }
+  const { execute: deactivateBlending } = useTransactionAction(
+    (id) => blendingApi.deactivate(id),
+    fetchBlendingList,
+    'Blending deactivated'
+  )
 
   async function updateMaterialDoc(data) {
     loading.value = true

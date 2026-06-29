@@ -5,6 +5,7 @@ import transactionRmEntryApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
 import { registerCacheResetCallback } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
+import { useTransactionAction } from '@/composables/useTransactionAction'
 
 export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
   const toastStore = useToastStore()
@@ -111,20 +112,11 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     }
   }
 
-  async function deactivateEntry(id) {
-    loading.value = true
-    try {
-      const response = await rmEntryRepo.deactivate(id)
-      toastStore.success('RM Entry deactivated successfully')
-      _cache.entries = 0
-      return response
-    } catch (error) {
-      toastStore.error('Failed to deactivate RM entry:')
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
+  const { execute: deactivateEntry } = useTransactionAction(
+    (id) => rmEntryRepo.deactivate(id),
+    () => { _cache.entries = 0 },
+    'RM Entry deactivated successfully'
+  )
 
   async function updateEntry(id, data) {
     loading.value = true
@@ -411,18 +403,11 @@ export const useTsRawRmEntryStore = defineStore('transactionRmEntry', () => {
     }
   }
 
-  async function deleteTransfer(id) {
-    loading.value = true
-    try {
-      const response = await transactionRmEntryApi.deactivateTransfer(id)
-      return response
-    } catch (err) {
-      toastStore.error('Failed to delete transfer:')
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
+  const { execute: deleteTransfer } = useTransactionAction(
+    (id) => transactionRmEntryApi.deactivateTransfer(id),
+    () => {},
+    'Transfer deleted successfully'
+  )
 
   async function deleteFeedLog(id) {
     loading.value = true

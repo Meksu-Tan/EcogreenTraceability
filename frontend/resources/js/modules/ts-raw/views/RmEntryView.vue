@@ -124,7 +124,7 @@
                     size="small"
                   />
                 </td>
-                <td class="text-caption text-medium-emphasis">{{ entry.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ entry.created_at ? new Date(entry.created_at).toLocaleString() : '-' }}</td>
                 <td class="text-caption text-medium-emphasis">{{ entry.created_by }}</td>
                 <td class="text-center">
                   <VBtn
@@ -236,7 +236,7 @@
                 <td class="text-center">
                   <VIcon icon="ri-check-line" color="success" size="small" />
                 </td>
-                <td class="text-caption text-medium-emphasis">{{ log.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ log.created_at ? new Date(log.created_at).toLocaleString() : '-' }}</td>
                 <td class="text-caption text-medium-emphasis">{{ log.created_by }}</td>
                 <td class="text-center">
                   <VBtn

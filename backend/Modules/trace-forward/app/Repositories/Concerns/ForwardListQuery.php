@@ -29,7 +29,7 @@ final class ForwardListQuery
 
         $plantFilter = $this->buildTablePlantFilter('bh', $plantId, $userId);
 
-        $where    = ['bh.status = 1', "bh.id_sloc IN (SELECT id_sloc FROM m_sloc WHERE code_3 = 'STORAGE' AND status = 1)", $plantFilter['sql']];
+        $where    = ['bh.status = 1', "bh.id_sloc IN (SELECT id_sloc FROM m_sloc WHERE code_3 IN ('STORAGE', 'WIP') AND status = 1)", $plantFilter['sql']];
         $bindings = $plantFilter['bindings'];
         $where[]  = "(SUBSTRING(bh.trace_no,1,1)='1' OR SUBSTRING(bh.trace_no,1,1)='9')";
         $where[]  = \Modules\Shared\Helpers\TraceHelper::isStorageOrLegacy('bh.trace_no');
@@ -48,7 +48,7 @@ final class ForwardListQuery
             "DISTINCT CONCAT(s.code, ' :: ', s.description, ' / ', bd.batch_sap, ' / Qty: ', {$bdInitQtyFmt}, ' MT')",
             ' | '
         );
-        $mdSubquery = 'SELECT DISTINCT ON (f.id_balance_head) f.id_balance_head, g.material_document, g.po_so FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 ORDER BY f.id_balance_head, f.id_trace_head DESC';
+        $mdSubquery = 'SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 GROUP BY f.id_balance_head';
 
         $sql = "
             SELECT bh.id_balance_head, CAST(bh.trace_no AS TEXT) AS trace_no,

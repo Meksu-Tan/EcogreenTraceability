@@ -67,6 +67,20 @@ class TraceHelper
      *
      * @param string $col Column expression, e.g. "a.to_trace_no"
      */
+    /**
+     * Build a SQL expression returning the 2-digit plant code from a trace number.
+     * Returns SUBSTRING(col,11,2) for 14-digit, SUBSTRING(col,8,2) for 11-digit.
+     * Use when you need the raw plant code value (not a human-readable name).
+     *
+     * @param string $col Column expression, e.g. "a.trace_no"
+     */
+    public static function plantCodeExpression(string $col): string
+    {
+        return "(CASE WHEN CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14
+                      THEN SUBSTRING(CAST({$col} AS TEXT), 11, 2)
+                      ELSE SUBSTRING(CAST({$col} AS TEXT), 8, 2) END)";
+    }
+
     public static function only14Digit(string $col): string
     {
         return "CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14";

@@ -396,10 +396,12 @@ trait RmEntryTransactionTrait
 
                 Rundown::adjustRundownToTotal($supplierRowsFormatted, $out_qty);
 
+                $destTraceNo = $entry_no;
+
                 $rundownResult = Rundown::generalRundown([
                     'user' => $user,
                     'entry_date' => $curr_entryDate,
-                    'trace_no' => $this->traceNoToInt($entry_no),
+                    'trace_no' => $this->traceNoToInt($destTraceNo),
                     'from_trace_no' => $this->traceNoToInt($entryTrfNo_in),
                     'id_material' => $id_material,
                     'id_sloc' => $id_sloc_json,

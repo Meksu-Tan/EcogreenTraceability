@@ -207,8 +207,6 @@ class BlendingRepository implements BlendingRepositoryInterface
             true
         );
 
-        $slocExpr = $this->buildSlocExpression();
-
         $castTrace = 'CAST(a.trace_no AS TEXT)';
         $castFromTrace = 'CAST(b.from_trace_no AS TEXT)';
 
@@ -220,7 +218,7 @@ class BlendingRepository implements BlendingRepositoryInterface
             {$supplierConcat} AS supplier,
             MAX({$castFromTrace}) AS from_trace_no, MAX(b.id_trace_head) AS idTraceHead,
             MAX(b.is_last_row) AS is_last_row, MAX(b.next_process) AS next_process,
-            {$slocExpr} AS sloc,
+            CAST(a.id_sloc AS TEXT) AS raw_id_sloc,
             {$this->dbNumberFormat('ROUND(ee.init_qty,4)', 3)} as balance_supplier,
             a.created_at, a.created_by";
 
@@ -273,10 +271,6 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->select(DB::raw($selectFields))
             ->leftJoin(DB::raw($traceSubquery), 'a.id_balance_head', '=', 'b.id_balance_head')
             ->leftJoin('m_material as c', 'c.id_material', '=', 'a.id_material')
-            ->leftJoin('m_sloc as d', function($join) {
-                $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(d.id_sloc AS TEXT)'))
-                     ->on('d.id_plant', '=', 'a.id_plant');
-            })
             ->leftJoin('m_plant as p', function($join) {
                 $join->on('a.id_plant', '=', 'p.code_3')
                      ->where('p.status', 1);
@@ -284,12 +278,6 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->leftJoin('t_balance_detail as e', 'a.id_balance_head', '=', 'e.id_balance_head')
             ->leftJoin(DB::raw('(SELECT ee1.trace_no, SUM(ee2.init_qty) AS init_qty FROM t_balance_header ee1 LEFT JOIN t_balance_detail ee2 ON ee1.id_balance_head = ee2.id_balance_head WHERE ee1.status = 1 GROUP BY ee1.trace_no) ee'), 'a.trace_no', '=', 'ee.trace_no')
             ->leftJoin('m_supplier as f', 'e.id_supplier', '=', 'f.id_supplier')
-            ->leftJoin('m_sloc as h', function($join) {
-                $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(h.id_sloc AS TEXT)'));
-            })
-            ->leftJoin('m_sloc as h_sloc', function($join) {
-                $join->on(DB::raw('CAST(a.id_sloc AS TEXT)'), '=', DB::raw('CAST(h_sloc.id_sloc AS TEXT)'));
-            })
             ->where('a.status', 1)
             ->whereRaw("SUBSTRING(a.trace_no FROM 1 FOR 1) = '8'");
 
@@ -301,12 +289,36 @@ class BlendingRepository implements BlendingRepositoryInterface
                 'a.qty', 'a.init_qty', 'a.id_balance_head',
                 'c.description', 'c.code', 'p.code_2',
                 'ee.init_qty',
-                'd.description',
                 'a.created_at', 'a.created_by',
             ];
         $query->groupBy($groupByCols)->orderByDesc('a.trace_no');
 
         $sliced = $query->get();
+
+        $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
+            ->table('m_sloc')
+            ->select('id_sloc', 'tf_number')
+            ->get()
+            ->keyBy('id_sloc');
+
+        foreach ($sliced as $row) {
+            $row->sloc = '';
+            $raw = $row->raw_id_sloc ?? null;
+            if ($raw === null || $raw === '' || $raw === 'null') continue;
+            $decoded = json_decode($raw, true);
+            $ids = (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) ? $decoded : [$raw];
+            $tanks = [];
+            foreach ($ids as $id) {
+                if (isset($slocs[$id]) && $slocs[$id]->tf_number) {
+                    $tanks[] = $slocs[$id]->tf_number;
+                }
+            }
+            if (!empty($tanks)) {
+                $tanks = array_unique($tanks);
+                sort($tanks);
+                $row->sloc = implode(' | ', $tanks);
+            }
+        }
 
         return ['data' => $sliced, 'total' => $total];
     }
@@ -451,8 +463,4 @@ class BlendingRepository implements BlendingRepositoryInterface
         ));
     }
 
-    private function buildSlocExpression(): string
-    {
-        return "CONCAT(COALESCE(d.description, ''), COALESCE(' | ' || STRING_AGG(DISTINCT COALESCE(h_sloc.description, h.description), ' & ' ORDER BY COALESCE(h_sloc.description, h.description)), ''))";
-    }
 }

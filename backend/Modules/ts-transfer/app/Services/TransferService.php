@@ -381,9 +381,11 @@ class TransferService implements TransferServiceInterface
 
     private function writeAdjustmentRecords(string $user, string $adjEntryNo, int $idSupplier, int $idMaterial, float $shortQty, string $supplierCode, int $plantId, int $trfSource, string $entryDate, string $slocJson): void
     {
+        // ponytail: t_balance_header.id_sloc is integer; extract first element from the JSON array
+        $slocInt = (int) (json_decode($slocJson, true)[0] ?? 0);
         $this->transferRepo->postAdjEntrySupplier($user, $adjEntryNo, $idSupplier, $idMaterial, $shortQty, $supplierCode, $plantId);
         $idHead = $this->transferRepo->createBalanceHeader(
-            $this->adjustmentRecord($adjEntryNo, $idMaterial, $slocJson, $plantId, $shortQty, $entryDate, $user)
+            $this->adjustmentRecord($adjEntryNo, $idMaterial, $slocInt, $plantId, $shortQty, $entryDate, $user)
         );
         $idTail = $this->transferRepo->createBalanceDetail(
             $this->adjustmentDetailRecord($idHead, $idSupplier, $supplierCode, $idMaterial, $slocJson, $plantId, $shortQty, $user)
@@ -405,9 +407,9 @@ class TransferService implements TransferServiceInterface
         return ['response' => 0, 'message' => 'Adjustment failed: ' . $e->getMessage()];
     }
 
-    private function adjustmentRecord(string $traceNo, int $idMaterial, string $slocJson, int $plantId, float $qty, string $entryDate, string $user): array
+    private function adjustmentRecord(string $traceNo, int $idMaterial, int $slocInt, int $plantId, float $qty, string $entryDate, string $user): array
     {
-        return ['trace_no' => $traceNo, 'id_material' => $idMaterial, 'id_sloc' => $slocJson,
+        return ['trace_no' => $traceNo, 'id_material' => $idMaterial, 'id_sloc' => $slocInt,
             'id_plant' => $plantId, 'qty' => $qty, 'in_qty' => $qty, 'out_qty' => 0,
             'init_qty' => $qty, 'entry_date' => $entryDate, 'created_by' => $user, 'status' => 1];
     }

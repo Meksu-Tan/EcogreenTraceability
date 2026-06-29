@@ -4,6 +4,7 @@ import shipmentService from '../services/shipmentService'
 import { useToastStore } from '@/stores/toast.js'
 import { usePlantSelectionStore } from '@/stores/plant.js'
 import { useTransactionList } from '@/composables/useTransactionList.js'
+import { useTransactionAction } from '@/composables/useTransactionAction'
 
 export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
   const toastStore = useToastStore()
@@ -57,9 +58,9 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     }
   }
 
-  async function fetchWipMaterials(idMaterial) {
+  async function fetchWipMaterials(idMaterial, id_plant) {
     try {
-      const res = await shipmentService.getWipMaterials(idMaterial, plantId.value)
+      const res = await shipmentService.getWipMaterials(idMaterial, id_plant || plantId.value)
       if (res.data?.data && res.data.data.length > 0) {
         wipBalance.value = parseFloat(res.data.data[0].balance) || 0
         wipMaterialLabel.value = res.data.data[0].wip_material || ''
@@ -72,9 +73,9 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     }
   }
 
-  async function fetchActiveBatches(idMaterial) {
+  async function fetchActiveBatches(idMaterial, id_plant) {
     try {
-      const res = await shipmentService.getActiveBatches(idMaterial, plantId.value)
+      const res = await shipmentService.getActiveBatches(idMaterial, id_plant || plantId.value)
       activeBatches.value = res.data?.data || []
     } catch (error) {
       toastStore.error('Failed to load active product batches')
@@ -139,21 +140,11 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     }
   }
 
-  async function cancelEntry(id, traceNo) {
-    loading.value = true
-    try {
-      const res = await shipmentService.cancel(id, traceNo)
-      toastStore.success(res.data?.message || 'Shipment entry cancelled')
-      await fetchEntries()
-      return res.data
-    } catch (error) {
-      const errMsg = error.response?.data?.message || 'Failed to cancel shipment'
-      toastStore.error(errMsg)
-      throw error
-    } finally {
-      loading.value = false
-    }
-  }
+  const { execute: cancelEntry } = useTransactionAction(
+    (id, traceNo) => shipmentService.cancel(id, traceNo),
+    fetchEntries,
+    'Shipment entry cancelled'
+  )
 
   async function updateSo(data) {
     try {
@@ -175,7 +166,7 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
     }
     traceNoLoading.value = true
     try {
-      const res = await shipmentService.getNewTraceNo(activePlant, id_material)
+      const res = await shipmentService.getNewTraceNo({ id_material, id_plant: activePlant })
       if (res.data?.data && res.data.data.length > 0) {
         newTraceNo.value = res.data.data[0].traceNo || ''
       } else {

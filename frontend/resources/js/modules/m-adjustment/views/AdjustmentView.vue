@@ -364,7 +364,7 @@
                     />
                   </VCol>
                   <VCol cols="12" sm="6" md="4">
-                    <VTextField v-model="initSupplierForm.batchSap" label="Batch SAP (auto)" readonly density="compact" variant="outlined" />
+                    <VTextField v-model="initSupplierForm.batchSap" label="Batch SAP" placeholder="AUTO GENERATE" readonly density="compact" variant="outlined" />
                   </VCol>
                   <VCol cols="12" sm="6" md="4">
                     <VTextField v-model.number="initSupplierForm.qty" label="Qty (MT)" type="number" step="0.001" density="compact" variant="outlined" />
@@ -517,7 +517,7 @@
                         </VChip>
                       </td>
                       <td class="text-caption">{{ row.created_by }}</td>
-                      <td class="text-caption text-medium-emphasis">{{ row.created_at }}</td>
+                      <td class="text-caption text-medium-emphasis">{{ row.created_at ? new Date(row.created_at.replace(' ', 'T')).toLocaleString() : '-' }}</td>
                     </tr>
                   </tbody>
                 </VTable>
