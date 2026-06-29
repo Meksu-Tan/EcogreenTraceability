@@ -22,7 +22,7 @@
           </VCol>
         </VRow>
       </VCol>
-      <VCol cols="auto" v-if="plantSelectionStore.selectedPlantId !== null">
+      <VCol cols="auto">
         <VBtn
           color="primary"
           prepend-icon="ri-add-line"
@@ -129,7 +129,7 @@
                     {{ sup }}
                   </VChip>
                 </td>
-                <td class="text-caption text-medium-emphasis">{{ trf.created_at }}</td>
+                <td class="text-caption text-medium-emphasis">{{ trf.created_at ? new Date(trf.created_at).toLocaleString() : '-' }}</td>
                 <td class="text-caption text-medium-emphasis">{{ trf.created_by }}</td>
                 <td class="text-center">
                   <VBtn

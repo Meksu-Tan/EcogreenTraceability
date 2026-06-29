@@ -14,6 +14,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
   const loading = ref(false)
   const plants = ref([])
   const selectedPlant = ref(null)
+  const wipTree = ref({ sections: [], modeConfigs: {} })
 
   // Feed state per section
   const feedLatest = ref({})
@@ -80,6 +81,21 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     } catch (error) {
       toastStore.error('Failed to load WIP page')
       return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchWipTree() {
+    loading.value = true
+    try {
+      const data = await wipApi.getTsWipTree({ id_plant: plantId.value || 0 })
+      wipTree.value = { sections: data.sections || [], modeConfigs: data.modeConfigs || {} }
+      return wipTree.value
+    } catch (error) {
+      toastStore.error('Failed to load WIP tree')
+      wipTree.value = { sections: [], modeConfigs: {} }
+      return wipTree.value
     } finally {
       loading.value = false
     }
@@ -433,6 +449,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     loading,
     plants,
     selectedPlant,
+    wipTree,
     feedLatest,
     feedLogs,
     rundownLatest,
@@ -455,6 +472,7 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
 
     // Actions
     fetchIndex,
+    fetchWipTree,
     fetchFeed,
     fetchRundown,
     fetchBalance,

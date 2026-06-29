@@ -1,98 +1,101 @@
-# Memory system — every developer has own junction
-.context/
+# ─── Template / Reference (tidak perlu di repo) ────────────────────────────────
+.template/
+reference-dont-change/
 
-# Environment Files (Local Configuration)
-.env
-.env.backup
-*.env.local
-*.env.*.local
+# ─── AI Agent & Dev Tools ──────────────────────────────────────────────────────
+.context/
+.claude/
+.opencode/
+.agents/
+graphify-out/
+ponytail/
 .env.claude
 .env.claude.*.local
+opencode.json
+skills-lock.json
+dev-agent.sh
 
-# Azure DevOps Credentials
-.env.claude
+# ─── Environment Files (NEVER commit real credentials) ─────────────────────────
+.env
+.env.backup
+.env.local
+.env.*.local
+*.env.local
+backend/.env
+backend/.env.backup
+backend/.env.production
+backend/.env.postgres
+frontend/.env
+frontend/.env.local
 
-# Logs
-logs/
+# ─── Dependency Directories ────────────────────────────────────────────────────
+backend/vendor/
+frontend/node_modules/
+node_modules/
+
+# ─── Build Outputs ─────────────────────────────────────────────────────────────
+frontend/dist/
+frontend/dist-ssr/
+backend/public/build/
+backend/public/hot/
+backend/public/storage/
+/build/
+/dist/
+
+# ─── Laravel Storage & Cache ───────────────────────────────────────────────────
+backend/storage/app/
+backend/storage/framework/cache/data/
+backend/storage/framework/sessions/
+backend/storage/framework/views/
+backend/storage/logs/*.log
+backend/storage/*.key
+backend/storage/pail/
+backend/bootstrap/cache/*.php
+backend/.phpunit.result.cache
+backend/.deptrac.cache
+backend/auth.json
+
+# ─── Frontend Cache ────────────────────────────────────────────────────────────
+frontend/.vite/
+frontend/coverage/
+frontend/.eslintcache
+frontend/*.tsbuildinfo
+frontend/*.timestamp-*-*.mjs
+
+# ─── Database ──────────────────────────────────────────────────────────────────
+*.sqlite
+*.sqlite3
+*.sql
+
+# ─── Logs ──────────────────────────────────────────────────────────────────────
 *.log
+logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
 pnpm-debug.log*
 
-# Editor Directories and Files
+# ─── Editor / IDE ──────────────────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Build outputs
-/build
-/dist
-/vendor/
-/node_modules/
- backend/vendor/
- frontend/node_modules/
- reference-dont-change/vendor/
-
-# Database
-*.sqlite
-*.sqlite3
-database/*.sqlite
-database/*.sqlite3
-
-# Storage
-storage/app/
-storage/framework/cache/data/
-storage/framework/sessions/
-storage/framework/views/
-storage/logs/*.key
-
-# Test coverage
-coverage/
-.html-report/
-
-# Temporary files
+# ─── Temporary / Misc ──────────────────────────────────────────────────────────
 *.tmp
 *.temp
 .tmp/
 temp/
-
-# Compiled files
-*.class
-*.pyc
-*.pyo
-*.rej
-*.orig
-
-# Cache
 .cache/
-.phpactor/
-.phpunit.result.cache
-
-# Local development overrides
+.scratch/
+.nyc_output/
+coverage/
+.html-report/
 HOMESTEAD.json
 HOMESTEAD.yaml
-
-# IDE
-.swift-package
-.project
-.classpath
-.settings/
-caches/
-output/
-bin/
-
-# Misc
-.expo/
-.exporc/
-.nyc_output/
-.perfetto/
-.perfetto-tracing
-.scratch/

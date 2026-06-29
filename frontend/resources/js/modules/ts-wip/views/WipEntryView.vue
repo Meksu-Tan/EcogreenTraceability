@@ -47,18 +47,7 @@
         <VCardTitle class="pa-5 pb-3 bg-neutral-50">
           <div class="d-flex align-center ga-3">
             <h2 class="text-h6 font-weight-bold">{{ section.title }}</h2>
-            <VBtnToggle
-              v-if="section.modeKey"
-              :model-value="section.modeKey === 'section104' ? selectedMode104 : section.modeKey === 'section105' ? selectedMode105 : selectedMode106Major"
-              mandatory
-              rounded="md"
-              density="compact"
-              color="primary"
-              @update:model-value="onSectionModeChange(section.modeKey, $event)"
-            >
-              <VBtn :value="1" size="small">Mode 1</VBtn>
-              <VBtn :value="2" size="small">Mode 2</VBtn>
-            </VBtnToggle>
+
           </div>
         </VCardTitle>
         <VCardText class="pa-4">
@@ -75,12 +64,12 @@
                 <VIcon :icon="step.icon" size="16" color="on-primary" />
               </VSheet>
 
-              <div v-else-if="step.type === 'mode'" class="d-flex justify-start px-2 py-2">
+              <div v-else-if="step.type === 'mode_switch'" class="d-flex justify-start px-2 py-2">
                 <div class="d-flex align-center ga-3 bg-surface px-4 py-2 rounded-lg border">
                   <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Mode</span>
                   <VSelect
-                    :model-value="step.currentValue"
-                    :items="step.options"
+                    :model-value="modes[step.modeGroup]"
+                    :items="step.config.options || []"
                     item-title="label"
                     item-value="value"
                     density="compact"
@@ -89,7 +78,7 @@
                     rounded="md"
                     color="primary"
                     style="min-width: 240px;"
-                    @update:model-value="onModeChange(`selectedMode${step.sectionKey}`, $event)"
+                    @update:model-value="onModeChange(step.modeGroup, $event)"
                   />
                 </div>
               </div>
@@ -156,7 +145,7 @@
               </VCard>
 
               <div
-                v-if="index < section.steps.length - 1 && step.type !== 'label' && step.type !== 'mode'"
+                v-if="index < section.steps.length - 1 && step.type !== 'label' && step.type !== 'mode_switch'"
                 class="d-flex align-center justify-center text-medium-emphasis"
               >
                 <VIcon icon="ri-arrow-down-line" size="20" />
@@ -289,7 +278,7 @@ const EntryForm = {
       h('div', { class: 'd-flex ga-4' }, [
         h('div', { class: 'flex-grow-1' }, [
           h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Trace No'),
-          h(VTextField, { modelValue: props.form.batchNo, readonly: true, density: 'comfortable', variant: 'outlined', hideDetails: true, loading: props.form.batchNo === 'Generating...' }),
+          h(VTextField, { modelValue: props.form.batchNo, placeholder: 'AUTO GENERATE', readonly: true, density: 'comfortable', variant: 'outlined', hideDetails: true, loading: props.form.batchNo === 'Generating...' }),
         ]),
         h('div', { class: 'flex-grow-1' }, [
           h('label', { class: 'd-block text-caption font-weight-bold text-medium-emphasis mb-1' }, 'Entry Date'),
@@ -367,236 +356,57 @@ const EntryForm = {
 
 const MODE_WARNING = 'WARNING: DO NOT ENTRY SEVERAL MODES AT THE SAME TIME! ( MUST FINISH FEED & RUNDOWN ENTRY PER ONE MODE )'
 
-const wipSectionsBase = [
-  section('section101', 'Section 101/102', [
-    label('START OF SECTION 101/102'), feed('CPKO FEEDS (101 FT0113)', '001', '101_FT0113'), label('PROCESS OF SECTION 101/102'),
-    rundown('DA-OIL RUNDOWNS (102 FT0109)', '011', '102_FT0109'), rundown('PKFAD RUNDOWNS (102 FT0129)', '021', '102_FT0129'), label('END OF SECTION 101/102'),
-  ]),
-  section('section103', 'Section 103', [
-    label('START OF SECTION 103'), feed('DA-OIL FEEDS (103 FT0101)', '002', '103_FT0101'), label('PROCESS OF SECTION 103'),
-    rundown('CRUDE-ME RUNDOWNS (103 FT0329)', '012', '103_FT0329'), rundown('TREATED-GLY RUNDOWNS (103 FT0266)', '022', '103_FT0266'), label('END OF SECTION 103'),
-  ]),
-  section('section110', 'Section 110', [
-    label('START OF SECTION 110'), feed('TREATED-GLY FEEDS (110 F0107)', '004', '110_F0107'), label('PROCESS OF SECTION 110'),
-    rundown('CRUDE-GLY RUNDOWNS (110 F0108)', '014', '110_F0108'), label('END OF SECTION 110'),
-  ]),
-  section('section111', 'Section 111/116', [
-    label('START OF SECTION 111/116'), feed('CRUDE-GLY FEEDS (111 F0118 + 116 FC01)', '007', '111_F0118_116_FC01'), label('PROCESS OF SECTION 111/116'),
-    rundown('GLYCERINE RUNDOWNS', '017'), label('END OF SECTION 111/116'),
-  ]),
+const plantSelectionStore = usePlantSelectionStore()
+const plantStore = useSetupPlantStore()
+const store = useTsWipEntryStore()
+const toastStore = useToastStore()
+const { feedLatest, rundownLatest, feedLogs, rundownLogs, balanceData, balanceMeta, feedLogMeta, rundownLogMeta, wipTree } = storeToRefs(store)
+const loading = ref(false)
+const storeLoading = ref(false)
+const selectedSection = ref('allSection')
+const syncing = ref(false)
+const modes = reactive({})
 
-  section('section302', 'Section 302', [
-    label('START OF SECTION 302'), rundown('WME RUNDOWNS', '015'), label('PROCESS OF SECTION 302'), rundown('ME28-302 RUNDOWNS (302V04)', '025'), label('END OF SECTION 302'),
-  ]),
-]
-
-function section(key, title, steps, modeKey = null) { return { key, title, steps, modeKey } }
-function label(label) { return { type: 'label', key: label, label, icon: label.startsWith('END') ? 'ri-flag-checkered-line' : 'ri-arrow-down-line' } }
-function feed(title, id, tag = null, sectionMode = 1) { return { type: 'feed', key: `feed-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag, sectionMode } }
-function rundown(title, id, tag = null, sectionMode = 1) { return { type: 'rundown', key: `rundown-${id}-${title}`, id, title, button: title.replace(/S$/, ''), tag, sectionMode } }
-function modeSwitch(sectionKey, currentValue, options) {
-  return {
-    type: 'mode',
-    key: `mode-switch-${sectionKey}`,
-    sectionKey,
-    currentValue,
-    options,
-    warning: MODE_WARNING,
-  }
-}
-
-const selectedMode104 = ref(1)
-const selectedMode105 = ref(1)
-const selectedChain105 = ref('me28')
-const selectedMode106Major = ref(1)
-const selectedMode106 = ref('mode-106-1')
-const selectedMode112 = ref('mode-112-1')
-
-const section104Steps = computed(() => {
-  const m = selectedMode104.value
-  const steps = [
-    label('START OF SECTION 104'),
-    feed('CRUDE-ME FEEDS (104 F0110)', '003', '104_F0110', m),
-    label('PROCESS OF SECTION 104'),
-    rundown('BDME RUNDOWNS', '023', null, m),
-    rundown('UME RUNDOWNS (104 F0110)', '033', '104_F0110', m),
-    rundown('ME28 RUNDOWNS (104 F0332)', '043', '104_F0332', m),
-    rundown('ECONOATE 665 RUNDOWNS', '053', null, m),
-    rundown('ME80 RUNDOWNS', '063', null, m),
-  ]
-  if (m === 1) {
-    steps.push(rundown('ME60 RUNDOWNS (104 FT0157)', '013', '104_FT0157', m))
-  }
-  steps.push(label('END OF SECTION 104'))
-  return steps
-})
-
-const section105Steps = computed(() => {
-  const m = selectedMode105.value
-  const c = selectedChain105.value
-  const header = label('START OF SECTION 105')
-  const process = label('PROCESS OF SECTION 105')
-  const end = label('END OF SECTION 105')
-  if (m === 1) {
-    const switch105 = modeSwitch('105-chain', selectedChain105.value, [
-      { value: 'me28', label: 'Short Chain (ME28)' },
-      { value: 'me80', label: 'Long Chain (ME80)' },
-    ])
-    if (c === 'me28') {
-      return [
-        header, switch105,
-        feed('ME28 FEEDS (105 FQ104)', '006-01', '105_FQ104', m),
-        process,
-        rundown('CFA28 RUNDOWNS (105 FQ808)', '016', '105_FQ808', m),
-        end,
-      ]
-    }
-    return [
-      header, switch105,
-      feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104', m),
-      process,
-      rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808', m),
-      end,
-    ]
-  }
-  return [header, feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104', m), process, rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808', m), end]
-})
-
-const section106Steps = computed(() => {
-  const header = label('START OF SECTION 106/114')
-  const process = label('PROCESS OF SECTION 106/114')
-  const end = label('END OF SECTION 106/114')
-
-  const majorMode = selectedMode106Major.value
-  if (majorMode === 2) {
-    return [
-      header,
-      feed('CFA80 FEEDS (106 F0115)', '008-02', '106_F0115', majorMode),
-      process,
-      rundown('CFA28 RUNDOWNS (106 F0245)', '098', '106_F0245', majorMode),
-      rundown('LEFA RUNDOWNS (106 F0167)', '028', '106_F0167', majorMode),
-      rundown('FA8 RUNDOWNS (106 F0134)', '108', '106_F0134', majorMode),
-      rundown('FA10 RUNDOWNS (106 F0231)', '118', '106_F0231', majorMode),
-      end,
-    ]
-  }
-
-  const switcher = modeSwitch('106', selectedMode106.value, [
-    { value: 'mode-106-1', label: '- Mode ECOROL 24 -' },
-    { value: 'mode-106-2', label: '- Mode ECOROL 12/14 -' },
-  ])
-  const common = [
-    feed('CFA28 FEEDS (106 F0115)', '008-01', '106_F0115', majorMode),
-    rundown('ECOROL-WAX RUNDOWNS (106 F0245)', '018', '106_F0245', majorMode),
-    rundown('LEFA RUNDOWNS (106 F0167)', '028', '106_F0167', majorMode),
-  ]
-  if (selectedMode106.value === 'mode-106-1') {
-    return [
-      header, switcher, ...common,
-      rundown('FA24 RUNDOWNS (106 F0134)', '038', '106_F0134', majorMode),
-      rundown('FA16/99 RUNDOWNS (106 F0231)', '048', '106_F0231', majorMode),
-      rundown('FA18lrr RUNDOWNS (106 F0112)', '058', '106_F0112', majorMode),
-      rundown('FA26 RUNDOWNS (106 F0134)', '068', '106_F0134', majorMode),
-      process, end,
-    ]
-  }
-  return [
-    header, switcher, ...common,
-    rundown('FA12/99 RUNDOWNS (106 F0134)', '078', '106_F0134', majorMode),
-    rundown('FA14/99 RUNDOWNS (106 F0231)', '088', '106_F0231', majorMode),
-    process, end,
-  ]
-})
-
-const section112Steps = computed(() => {
-  const header = label('START OF SECTION 112/114')
-  const process = label('PROCESS OF SECTION 112/114')
-  const end = label('END OF SECTION 112/114')
-  const switcher = modeSwitch('112', selectedMode112.value, [
-    { value: 'mode-112-1', label: '- Mode ECOROL WAX 106/114 -' },
-    { value: 'mode-112-2', label: '- Mode FA24 106/114 -' },
-    { value: 'mode-112-3', label: '- Mode FA18lrr 106/114 -' },
-    { value: 'mode-112-4', label: '- Mode FA14lrr 112/114 -' },
-    { value: 'mode-112-5', label: '- Mode FA18lrr 112/114 -' },
-  ])
-
-  if (selectedMode112.value === 'mode-112-1') {
-    return [
-      header,
-      switcher,
-      feed('ECOROL WAX FEEDS (112 F0109)', '009-04', '112_F0109'),
-      process,
-      rundown('ECOROL-WAX RUNDOWNS (106 F0245)', '018', '106_F0245'),
-      end,
-    ]
-  } else if (selectedMode112.value === 'mode-112-2') {
-    return [
-      header,
-      switcher,
-      feed('FA24 FEEDS (112 F0109)', '009-01', '112_F0109'),
-      process,
-      rundown('FA24 RUNDOWNS (106 F0134)', '038', '106_F0134'),
-      end,
-    ]
-  } else if (selectedMode112.value === 'mode-112-3') {
-    return [
-      header,
-      switcher,
-      feed('FA18lrr FEEDS (112 F0109)', '009-03', '112_F0109'),
-      process,
-      rundown('FA18lrr RUNDOWNS (106 F0112)', '058', '106_F0112'),
-      end,
-    ]
-  } else if (selectedMode112.value === 'mode-112-4') {
-    return [
-      header,
-      switcher,
-      feed('FA14lrr FEEDS (112 F0109)', '009-02', '112_F0109'),
-      process,
-      rundown('CFA28 RUNDOWNS (112 F0139)', '069', '112_F0139'),
-      rundown('FA14/99 RUNDOWNS (112 F0224)', '059', '112_F0224'),
-      end,
-    ]
-  } else {
-    return [
-      header,
-      switcher,
-      feed('FA18lrr FEEDS (112 F0109)', '009-03', '112_F0109'),
-      process,
-      rundown('CFA28 RUNDOWNS (112 F0139)', '069', '112_F0139'),
-      rundown('FA18/99 RUNDOWNS (112 F0235)', '029', '112_F0235'),
-      rundown('ECOROL WAX RUNDOWNS (112 F0224)', '019', '112_F0224'),
-      end,
-    ]
-  }
-})
-
-const wipSections = computed(() => {
-  const result = [...wipSectionsBase]
-  result.splice(2, 0, section('section104', 'Section 104', section104Steps.value, 'section104'))
-  result.splice(3, 0, section('section105', 'Section 105', section105Steps.value, 'section105'))
-  result.splice(4, 0, section('section106', 'Section 106/114', section106Steps.value, 'section106'))
-  if (selectedMode106Major.value !== 2) {
-    result.splice(7, 0, section('section112', 'Section 112/114', section112Steps.value))
-  }
-  return result
-})
+const wipSections = computed(() => (wipTree.value.sections || []).map(section => ({
+  ...section,
+  key: section.key || `section${section.code}`,
+  title: section.title || section.name,
+  steps: (section.steps || []).filter(isStepVisible),
+})))
 
 const sectionSelectItems = computed(() => [
   { value: 'allSection', title: '- All Section -' },
   ...wipSections.value.map(s => ({ value: s.key, title: `- ${s.title} -` })),
 ])
 
-const plantSelectionStore = usePlantSelectionStore()
-const plantStore = useSetupPlantStore()
-const store = useTsWipEntryStore()
-const toastStore = useToastStore()
-const { feedLatest, rundownLatest, feedLogs, rundownLogs, balanceData, balanceMeta, feedLogMeta, rundownLogMeta } = storeToRefs(store)
-const loading = ref(false)
-const storeLoading = ref(false)
-const selectedSection = ref('allSection')
-const syncing = ref(false)
+const visibleSections = computed(() => selectedSection.value === 'allSection' ? wipSections.value : wipSections.value.filter(s => s.key === selectedSection.value))
+const runnableSteps = computed(() => wipSections.value.flatMap(s => s.steps).filter(s => s.type === 'feed' || s.type === 'rundown'))
 
+function isStepVisible(step) {
+  const conditions = step.conditions || {}
+  return Object.entries(conditions).every(([group, expected]) => {
+    const actual = modes[group]
+    return Array.isArray(expected) ? expected.map(String).includes(String(actual)) : String(actual) === String(expected)
+  })
+}
+
+function initializeModes(configs = {}) {
+  for (const [group, config] of Object.entries(configs)) {
+    if (modes[group] === undefined) {
+      modes[group] = String(config.default ?? config.options?.[0]?.value ?? '')
+    }
+  }
+}
+
+function onSectionModeChange(sectionKey, value) {
+  modes[sectionKey] = String(value)
+  reloadAll()
+}
+
+function onModeChange(group, value) {
+  modes[group] = String(value)
+  reloadAll()
+}
 function formatLastSync(isoString) {
   if (!isoString) return '-'
   const d = new Date(isoString)
@@ -615,40 +425,6 @@ async function doFetchRundownDcs() {
 
 const autoFetchFeed = useAutoFetchQty(doFetchFeedDcs)
 const autoFetchRundown = useAutoFetchQty(doFetchRundownDcs)
-
-const visibleSections = computed(() => selectedSection.value === 'allSection' ? wipSections.value : wipSections.value.filter(s => s.key === selectedSection.value))
-const runnableSteps = computed(() => wipSections.value.flatMap(s => s.steps).filter(s => s.type === 'feed' || s.type === 'rundown'))
-
-function onSectionModeChange(sectionKey, value) {
-  if (sectionKey === 'section104') selectedMode104.value = value
-  else if (sectionKey === 'section105') selectedMode105.value = value
-  else if (sectionKey === 'section106') selectedMode106Major.value = value
-  reloadStepsForSection(sectionKey)
-}
-
-function onModeChange(target, value) {
-  if (target === 'selectedMode106') selectedMode106.value = value
-  else if (target === 'selectedMode112') selectedMode112.value = value
-  else if (target === 'selectedMode105-chain') selectedChain105.value = value
-}
-
-async function reloadStepsForSection(sectionKey) {
-  const target = wipSections.value.find(s => s.key === sectionKey)
-  if (!target) return
-  const steps = target.steps.filter(s => s.type === 'feed' || s.type === 'rundown')
-  await Promise.all(steps.map(step => step.type === 'feed'
-    ? store.fetchFeed(step.id, 'LATEST')
-    : store.fetchRundown(step.id, 'LATEST'),
-  ))
-}
-
-watch(selectedMode104, () => reloadStepsForSection('section104'))
-watch(selectedMode105, () => reloadStepsForSection('section105'))
-watch(selectedChain105, () => reloadStepsForSection('section105'))
-watch(selectedMode106Major, () => reloadStepsForSection('section106'))
-watch(selectedMode106, () => reloadStepsForSection('section106'))
-watch(selectedMode112, () => reloadStepsForSection('section112'))
-
 const feedColumns = [
   { key: 'plant_name', label: 'Plant' },
   { key: 'to_trace_no', label: 'Feed Trace No' }, { key: 'entry_date', label: 'Entry Date' }, { key: 'material_document', label: 'Matl Doc' },
@@ -1020,10 +796,12 @@ async function reloadAll() {
   store.clearLogs()
   loading.value = true
   try {
+    const tree = await store.fetchWipTree()
+    initializeModes(tree.modeConfigs || {})
     for (const section of visibleSections.value) {
       const steps = section.steps.filter(s => s.type === 'feed' || s.type === 'rundown')
       if (steps.length > 0) {
-        await Promise.all(steps.map(step => 
+        await Promise.all(steps.map(step =>
           step.type === 'feed' ? store.fetchFeed(step.id, 'LATEST') : store.fetchRundown(step.id, 'LATEST')
         ))
       }
