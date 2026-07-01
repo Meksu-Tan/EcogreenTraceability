@@ -5,7 +5,9 @@ namespace Modules\TraceBackward\Http\Controllers;
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
+use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
 use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
+use Modules\TraceBackward\Http\Requests\ShipmentTraceVerificationRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardDetailRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardListRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardSearchRequest;
@@ -15,7 +17,8 @@ use Illuminate\Http\JsonResponse;
 class TraceBackwardController extends Controller
 {
     public function __construct(
-        protected TraceBackwardServiceInterface $traceBackwardService
+        protected TraceBackwardServiceInterface $traceBackwardService,
+        protected ShipmentTraceVerificationServiceInterface $verificationService,
     ) {}
 
     public function index(TraceBackwardListRequest $request): JsonResponse
@@ -69,5 +72,19 @@ class TraceBackwardController extends Controller
     public function show(string $traceNo): JsonResponse
     {
         return ApiResponse::success(['trace_no' => $traceNo], 'Trace found', 200);
+    }
+
+    public function verify(ShipmentTraceVerificationRequest $request): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+            $result = isset($data['so_no'])
+                ? $this->verificationService->verifyBySoNo($data['so_no'])
+                : $this->verificationService->verifyByTraceNo($data['trace_no']);
+            return ApiResponse::success($result, 'Backward trace verification retrieved', 200);
+        } catch (\Exception $e) {
+            Log::error('TraceBackward verify failed', ['exception' => $e]);
+            return ApiResponse::error('Failed to verify backward trace', 500);
+        }
     }
 }

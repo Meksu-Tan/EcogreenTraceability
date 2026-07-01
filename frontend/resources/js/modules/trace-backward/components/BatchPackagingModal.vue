@@ -27,75 +27,122 @@
         </div>
 
         <template v-else>
-          <!-- Batch Info Section -->
-          <VRow>
-            <VCol cols="12" md="4">
-              <VCard variant="outlined" class="pa-3 h-100">
-                <div class="d-flex flex-column gap-2 text-body-2">
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Product Date:</span>
-                    <span class="font-weight-bold">{{ displayData.entry_date || '-' }}</span>
+          <!-- Batch Info Section — one set per real production batch (dispatch types FB/IS/VS expand to multiple) -->
+          <div v-if="dataList.length === 0" class="pa-4 text-center text-medium-emphasis">
+            No packaging execution record found.
+          </div>
+          <div v-for="(batch, bi) in dataList" :key="bi" class="mb-4">
+            <div v-if="isMultiBatch" class="text-caption font-weight-bold text-medium-emphasis mb-1">
+              Real Batch: {{ batch.batch_no || '-' }}
+            </div>
+            <VRow>
+              <VCol cols="12" md="4">
+                <VCard variant="outlined" class="pa-3 h-100">
+                  <div class="d-flex flex-column gap-2 text-body-2">
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Product Date:</span>
+                      <span class="font-weight-bold">{{ batch.entry_date || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Production Order:</span>
+                      <span class="font-weight-bold font-mono">{{ batch.production_order || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Product Desc:</span>
+                      <span class="font-weight-bold">{{ batch.product || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Customer:</span>
+                      <span class="font-weight-bold" style="font-size: 11px;">{{ batch.customer || '-' }}</span>
+                    </div>
                   </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Production Order:</span>
-                    <span class="font-weight-bold font-mono">{{ displayData.production_order || '-' }}</span>
+                </VCard>
+              </VCol>
+              <VCol cols="12" md="4">
+                <VCard variant="outlined" class="pa-3 h-100">
+                  <div class="d-flex flex-column gap-2 text-body-2">
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Spec:</span>
+                      <span class="font-weight-bold">{{ batch.spec || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Batch Qty:</span>
+                      <span class="font-weight-bold">{{ batch.qty || '-' }} {{ batch.uom || 'KG' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Process:</span>
+                      <span class="font-weight-bold" style="font-size: 11px;">{{ batch.process || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Packing Material:</span>
+                      <span class="font-weight-bold" style="font-size: 11px;">{{ batch.packing || '-' }}</span>
+                    </div>
                   </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Product Desc:</span>
-                    <span class="font-weight-bold">{{ displayData.product || '-' }}</span>
+                </VCard>
+              </VCol>
+              <VCol cols="12" md="4">
+                <VCard variant="outlined" class="pa-3 h-100">
+                  <div class="d-flex flex-column gap-2 text-body-2">
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Tank Source:</span>
+                      <span class="font-weight-bold font-mono">{{ batch.tf_number || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Pallet:</span>
+                      <span class="font-weight-bold">{{ batch.pallet || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Catalog Label:</span>
+                      <span class="font-weight-bold" style="font-size: 11px;">{{ batch.label || '-' }}</span>
+                    </div>
+                    <div class="d-flex justify-space-between">
+                      <span class="text-medium-emphasis">Special Label:</span>
+                      <span class="font-weight-bold" style="font-size: 11px;">{{ batch.splabel || '-' }}</span>
+                    </div>
                   </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Customer:</span>
-                    <span class="font-weight-bold" style="font-size: 11px;">{{ displayData.customer || '-' }}</span>
+                </VCard>
+              </VCol>
+            </VRow>
+
+            <!-- Labels & Images -->
+            <VRow class="mt-2">
+              <VCol cols="12" md="4">
+                <VCard variant="outlined" class="pa-4 d-flex flex-column align-center">
+                  <div class="text-caption font-weight-bold mb-2">Printed Packaging Label</div>
+                  <div class="w-100 border bg-surface rounded d-flex align-center justify-center overflow-hidden" style="aspect-ratio: 16/9;">
+                    <v-img v-if="batch.p_label_link" :src="`${labelBaseUrl}/${encodeURIComponent(batch.p_label_link)}`" contain />
+                    <span v-else class="text-caption text-medium-emphasis">No label image printed</span>
                   </div>
-                </div>
-              </VCard>
-            </VCol>
-            <VCol cols="12" md="4">
-              <VCard variant="outlined" class="pa-3 h-100">
-                <div class="d-flex flex-column gap-2 text-body-2">
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Spec:</span>
-                    <span class="font-weight-bold">{{ displayData.spec || '-' }}</span>
+                </VCard>
+              </VCol>
+              <VCol cols="12" md="4">
+                <VCard variant="outlined" class="pa-4 d-flex flex-column align-center">
+                  <div class="text-caption font-weight-bold mb-2">Special Label</div>
+                  <div class="w-100 border bg-surface rounded d-flex align-center justify-center overflow-hidden" style="aspect-ratio: 16/9;">
+                    <v-img v-if="batch.p_splabel_link" :src="`${labelBaseUrl}/${encodeURIComponent(batch.p_splabel_link)}`" contain />
+                    <span v-else class="text-caption text-medium-emphasis">No special label image</span>
                   </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Batch Qty:</span>
-                    <span class="font-weight-bold">{{ displayData.qty || '-' }} {{ displayData.uom || 'KG' }}</span>
+                </VCard>
+              </VCol>
+              <VCol cols="12" md="4">
+                <VCard variant="outlined" class="pa-4 d-flex flex-column align-center">
+                  <div class="text-caption font-weight-bold mb-2">Customer Mark</div>
+                  <div class="w-100 border bg-surface rounded d-flex align-center justify-center overflow-hidden" style="aspect-ratio: 16/9;">
+                    <v-img v-if="batch.p_csmark_link" :src="`${labelBaseUrl}/${encodeURIComponent(batch.p_csmark_link)}`" contain />
+                    <span v-else class="text-caption text-medium-emphasis">No customer mark image</span>
                   </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Process:</span>
-                    <span class="font-weight-bold" style="font-size: 11px;">{{ displayData.process || '-' }}</span>
-                  </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Packing Material:</span>
-                    <span class="font-weight-bold" style="font-size: 11px;">{{ displayData.packing || '-' }}</span>
-                  </div>
-                </div>
-              </VCard>
-            </VCol>
-            <VCol cols="12" md="4">
-              <VCard variant="outlined" class="pa-3 h-100">
-                <div class="d-flex flex-column gap-2 text-body-2">
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Tank Source:</span>
-                    <span class="font-weight-bold font-mono">{{ displayData.tf_number || '-' }}</span>
-                  </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Pallet:</span>
-                    <span class="font-weight-bold">{{ displayData.pallet || '-' }}</span>
-                  </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Catalog Label:</span>
-                    <span class="font-weight-bold" style="font-size: 11px;">{{ displayData.label || '-' }}</span>
-                  </div>
-                  <div class="d-flex justify-space-between">
-                    <span class="text-medium-emphasis">Special Label:</span>
-                    <span class="font-weight-bold" style="font-size: 11px;">{{ displayData.splabel || '-' }}</span>
-                  </div>
-                </div>
-              </VCard>
-            </VCol>
-          </VRow>
+                </VCard>
+              </VCol>
+            </VRow>
+
+            <VRow class="text-caption text-medium-emphasis">
+              <VCol cols="6" md="3">Approved By: <span class="font-weight-medium">{{ batch.approved_by || '-' }}</span></VCol>
+              <VCol cols="6" md="3">Approved At: <span class="font-weight-medium">{{ batch.approved_at || '-' }}</span></VCol>
+              <VCol cols="6" md="3">Started By: <span class="font-weight-medium">{{ batch.started_by || '-' }}</span></VCol>
+              <VCol cols="6" md="3">Started At: <span class="font-weight-medium">{{ batch.started_at || '-' }}</span></VCol>
+            </VRow>
+            <VDivider v-if="bi < dataList.length - 1" class="my-4" />
+          </div>
 
           <!-- Preparation Records -->
           <VCard variant="outlined" class="mt-4 pa-4">
@@ -180,46 +227,6 @@
               <div v-else class="text-caption text-medium-emphasis">No active SAP allocations found.</div>
             </div>
           </VCard>
-
-          <!-- Labels & Images -->
-          <VRow class="mt-2">
-            <VCol cols="12" md="4">
-              <VCard variant="outlined" class="pa-4 d-flex flex-column align-center">
-                <div class="text-caption font-weight-bold mb-2">Printed Packaging Label</div>
-                <div class="w-100 border bg-surface rounded d-flex align-center justify-center overflow-hidden" style="aspect-ratio: 16/9;">
-                  <v-img v-if="displayData.p_label_link" :src="`${labelBaseUrl}/${encodeURIComponent(displayData.p_label_link)}`" contain />
-                  <span v-else class="text-caption text-medium-emphasis">No label image printed</span>
-                </div>
-              </VCard>
-            </VCol>
-            <VCol cols="12" md="4">
-              <VCard variant="outlined" class="pa-4 d-flex flex-column align-center">
-                <div class="text-caption font-weight-bold mb-2">Special Label</div>
-                <div class="w-100 border bg-surface rounded d-flex align-center justify-center overflow-hidden" style="aspect-ratio: 16/9;">
-                  <v-img v-if="displayData.p_splabel_link" :src="`${labelBaseUrl}/${encodeURIComponent(displayData.p_splabel_link)}`" contain />
-                  <span v-else class="text-caption text-medium-emphasis">No special label image</span>
-                </div>
-              </VCard>
-            </VCol>
-            <VCol cols="12" md="4">
-              <VCard variant="outlined" class="pa-4 d-flex flex-column align-center">
-                <div class="text-caption font-weight-bold mb-2">Customer Mark</div>
-                <div class="w-100 border bg-surface rounded d-flex align-center justify-center overflow-hidden" style="aspect-ratio: 16/9;">
-                  <v-img v-if="displayData.p_csmark_link" :src="`${labelBaseUrl}/${encodeURIComponent(displayData.p_csmark_link)}`" contain />
-                  <span v-else class="text-caption text-medium-emphasis">No customer mark image</span>
-                </div>
-              </VCard>
-            </VCol>
-          </VRow>
-
-          <VDivider class="my-4" />
-          
-          <VRow class="text-caption text-medium-emphasis">
-            <VCol cols="6" md="3">Approved By: <span class="font-weight-medium">{{ displayData.approved_by || '-' }}</span></VCol>
-            <VCol cols="6" md="3">Approved At: <span class="font-weight-medium">{{ displayData.approved_at || '-' }}</span></VCol>
-            <VCol cols="6" md="3">Started By: <span class="font-weight-medium">{{ displayData.started_by || '-' }}</span></VCol>
-            <VCol cols="6" md="3">Started At: <span class="font-weight-medium">{{ displayData.started_at || '-' }}</span></VCol>
-          </VRow>
         </template>
       </VCardText>
     </VCard>
@@ -234,7 +241,7 @@ const labelBaseUrl = import.meta.env.VITE_LABEL_BASE_URL || ''
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   batchNo: String,
-  data: { type: Object, default: null },
+  dataList: { type: Array, default: () => [] },
   prepRecords: { type: Array, default: () => [] },
   sapAllocs: { type: Array, default: () => [] },
   loading: Boolean
@@ -242,7 +249,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-const displayData = computed(() => props.data || {})
+const isMultiBatch = computed(() => props.dataList.length > 1)
 
 const close = () => {
   emit('update:modelValue', false)

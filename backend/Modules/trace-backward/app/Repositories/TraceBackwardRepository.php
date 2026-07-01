@@ -7,6 +7,7 @@ use Modules\TraceBackward\Repositories\Concerns\BackwardDetailQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardListQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardSearchQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardTraceQuery;
+use Modules\TraceBackward\Repositories\Concerns\ShipmentLookupQuery;
 use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterface;
 
 /**
@@ -24,6 +25,7 @@ class TraceBackwardRepository implements TraceBackwardRepositoryInterface
         private readonly BackwardDetailQuery $detailQuery,
         private readonly BackwardTraceQuery $traceQuery,
         private readonly BackwardSearchQuery $searchQuery,
+        private readonly ShipmentLookupQuery $shipmentLookupQuery,
     ) {}
 
     public function backwardTrace(string $traceNo, ?int $idMaterial = null): array
@@ -44,5 +46,15 @@ class TraceBackwardRepository implements TraceBackwardRepositoryInterface
     public function searchTraces(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null): array
     {
         return $this->searchQuery->execute($materialId, $batchNo, $plantId, $userId);
+    }
+
+    public function findShipmentBySo(string $soNo): ?object
+    {
+        return $this->shipmentLookupQuery->findBySoNo($soNo);
+    }
+
+    public function findShipmentByTraceNo(string $traceNo): ?object
+    {
+        return $this->shipmentLookupQuery->findByTraceNo($traceNo);
     }
 }

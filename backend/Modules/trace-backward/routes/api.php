@@ -8,6 +8,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::get('backward', [TraceBackwardController::class, 'index']);
         Route::get('backward/detail', [TraceBackwardController::class, 'traceDetail']);
         Route::get('backward/search', [TraceBackwardController::class, 'search']);
+        Route::get('backward/verify', [TraceBackwardController::class, 'verify']);
         Route::get('backward/{traceNo}', [TraceBackwardController::class, 'show']);
     });
 });

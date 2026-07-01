@@ -8,9 +8,12 @@ use Modules\TraceBackward\Repositories\Concerns\BackwardDetailQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardListQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardSearchQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardTraceQuery;
+use Modules\TraceBackward\Repositories\Concerns\ShipmentLookupQuery;
 use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterface;
 use Modules\TraceBackward\Repositories\TraceBackwardRepository;
+use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
 use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
+use Modules\TraceBackward\Services\ShipmentTraceVerificationService;
 use Modules\TraceBackward\Services\TraceBackwardService;
 
 class TraceBackwardServiceProvider extends ServiceProvider
@@ -18,6 +21,7 @@ class TraceBackwardServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(TraceBackwardServiceInterface::class, TraceBackwardService::class);
+        $this->app->bind(ShipmentTraceVerificationServiceInterface::class, ShipmentTraceVerificationService::class);
 
         $this->app->bind(TraceBackwardRepositoryInterface::class, function ($app) {
             $conn = $app['db']->connection('eudr_ts');
@@ -27,6 +31,7 @@ class TraceBackwardServiceProvider extends ServiceProvider
                 new BackwardDetailQuery($conn),
                 new BackwardTraceQuery($conn),
                 new BackwardSearchQuery($conn),
+                new ShipmentLookupQuery($conn),
             );
         });
 
@@ -35,6 +40,7 @@ class TraceBackwardServiceProvider extends ServiceProvider
             BackwardDetailQuery::class,
             BackwardTraceQuery::class,
             BackwardSearchQuery::class,
+            ShipmentLookupQuery::class,
         ])
         ->needs(Connection::class)
         ->give(fn ($app) => $app['db']->connection('eudr_ts'));

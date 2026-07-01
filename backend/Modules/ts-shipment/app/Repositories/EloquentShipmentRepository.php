@@ -3,19 +3,21 @@
 namespace Modules\TsShipment\Repositories;
 
 use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
+use Modules\Shared\Constants\TransactionResponseCode;
 use Modules\Shared\Helpers\QuantityDistributionHelper;
 use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Traits\TransactionLoggerTrait;
 use Modules\Shared\Services\PeriodLockService;
+use Modules\TsShipment\Support\DispatchType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
- * @todo Technical Debt: This class is 834 lines (limit: 200). Requires refactoring into smaller, focused classes.
+ * @todo Technical Debt: This class is 675 lines (limit: 200). Requires refactoring into smaller, focused classes.
  * - Split into: ShipmentQueryRepository (getDtShipEntry, getActiveFgProduct, getWipMaterialByFgProduct, getActiveBatchProduct, lookup methods),
- *   ShipmentTransactionRepository (store, cancel, updateSo, adjustQtyToTotal, generateTraceNo),
- *   ShipmentExternalIntegration (getDatShipment, getDatSoAllocation, getShipmentBatchPackaging, getPreparationRecord, label lookups via SAP/OEE)
+ *   ShipmentTransactionRepository (store, cancel, updateSo, adjustQtyToTotal, generateTraceNo)
+ *   -- SAP/OEE HTTP calls already moved to ShipmentService
  */
 class EloquentShipmentRepository implements ShipmentRepositoryInterface
 {
@@ -63,15 +65,16 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                       ELSE NULL
                    END) AS is_last_row,
                    MAX(CASE
-                       WHEN a.trace_no = (SELECT from_trace_no
-                                            FROM t_trace_header
-                                           WHERE SUBSTRING(from_trace_no, 1, 1) = '4'
-                                             AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('from_trace_no', '<>', '000') . "
-                                             AND status = 1
-                                           ORDER BY from_trace_no DESC LIMIT 1) THEN 1
-                      ELSE NULL
-                   END) AS next_process
-              FROM t_shipment_header a
+                        WHEN a.trace_no = (SELECT from_trace_no
+                                             FROM t_trace_header
+                                            WHERE SUBSTRING(from_trace_no, 1, 1) = '4'
+                                              AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('from_trace_no', '<>', '000') . "
+                                              AND status = 1
+                                            ORDER BY from_trace_no DESC LIMIT 1) THEN 1
+                       ELSE NULL
+                    END) AS next_process,
+                   MIN(d.batch_sap) AS batch_sap
+               FROM t_shipment_header a
               LEFT JOIN m_material_pck c ON a.id_material_fg = c.id_materialpck
                LEFT JOIN (SELECT dd.trace_no, e.description, d.batch_sap, {$rndD} AS qty
                            FROM t_shipment_header dd
@@ -189,17 +192,45 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
     public function getShipmentBatchPackaging(array $data): Collection
     {
-        $batchNo = trim((string) ($data['batchNo'] ?? ''));
+        return $this->resolveBatches($data)
+            ->flatMap(fn (string $batch) => $this->queryPrdExecution($batch));
+    }
 
-        if ($batchNo === '') {
-            return collect([]);
+    public function getPreparationRecord(array $data): Collection
+    {
+        return $this->resolveBatches($data)
+            ->flatMap(fn (string $batch) => $this->queryPrepEntry($batch));
+    }
+
+    public function getRealBatchList(int $idShipHead): array
+    {
+        return DB::connection($this->connection)
+            ->table('t_shipment_detail')
+            ->where('id_ship_head', $idShipHead)
+            ->where('status', 1)
+            ->whereNotNull('batch_sap')
+            ->distinct()
+            ->pluck('batch_sap')
+            ->all();
+    }
+
+    private function resolveBatches(array $data): Collection
+    {
+        $batchNo = trim((string) ($data['batchNo'] ?? ''));
+        $idShipHead = (int) ($data['idShipHead'] ?? 0);
+
+        if ($batchNo !== '' && DispatchType::isDispatch($batchNo) && $idShipHead > 0) {
+            return collect($this->getRealBatchList($idShipHead));
         }
 
-        // OEE queries â€” use dedicated oee connection (fails silently until OEE server is configured)
-        $conn = 'oee';
+        return $batchNo === '' ? collect([]) : collect([$batchNo]);
+    }
 
+    private function queryPrdExecution(string $batchNo): Collection
+    {
+        // OEE queries â€” use dedicated oee connection (fails silently until OEE server is configured)
         try {
-            $results = DB::connection($conn)->select('
+            $results = DB::connection('oee')->select('
                 SELECT a.entry_date, a.tf_number, a.batch_no, a.spec, a.production_order,
                        a.lot_qty, a.qty, a.product, b.id_process, c.id_packing, d.id_pallet,
                        CONCAT(b.id_process, \' , \', b.code, \' , \', b.description) AS process,
@@ -229,21 +260,18 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                  LIMIT 1
             ', [$batchNo]);
         } catch (\Throwable $e) {
+            Log::warning('OEE t_prd_execution query failed', ['batchNo' => $batchNo, 'error' => $e->getMessage()]);
             $results = [];
         }
 
         return collect($results);
     }
 
-    public function getPreparationRecord(array $data): Collection
+    private function queryPrepEntry(string $batchNo): Collection
     {
-        $batchNo = $data['batchNo'] ?? '';
-
         // OEE queries â€” use dedicated oee connection (fails silently until OEE server is configured)
-        $conn = 'oee';
-
         try {
-            $results = DB::connection($conn)->select('
+            $results = DB::connection('oee')->select('
                 SELECT a.id_prepentry, a.id_prdexecution, a.batch_no, a.type,
                        a.description, a.created_by, a.created_at, a.updated_at, a.status
                   FROM oee_756.t_prep_entry a
@@ -251,6 +279,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                  ORDER BY a.type ASC, a.created_at ASC
             ', [$batchNo]);
         } catch (\Throwable $e) {
+            Log::warning('OEE t_prep_entry query failed', ['batchNo' => $batchNo, 'error' => $e->getMessage()]);
             $results = [];
         }
 
@@ -302,71 +331,6 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
         return collect($results);
     }
 
-    public function getDatShipment(array $data): array
-    {
-        $batchNo = trim((string) ($data['batchNo'] ?? ''));
-        $soNo = trim((string) ($data['soNo'] ?? ''));
-        $soItem = trim((string) ($data['soItem'] ?? ''));
-
-        if ($soNo === '') {
-            return [];
-        }
-        if (strcasecmp($soItem, 'No Doc') === 0) {
-            $soItem = '';
-        }
-
-        $sapClient = config('eudr.sap_client');
-        $sapReqUrl = config('eudr.sap_url');
-        $sapFm     = '&FM=ZFM_EUDR_SHIPMENT';
-        $input1    = '&SO_NUM=' . urlencode($soNo);
-        $input2    = '&SO_ITEM=' . urlencode($soItem);
-        $input3    = '&BATCH=' . urlencode($batchNo);
-
-        if ($batchNo == "FB" || $batchNo == "IS" || $batchNo == "VS") {
-            $eobUrl = $sapReqUrl . $sapClient . $sapFm . $input1 . $input2;
-        } else {
-            $eobUrl = $sapReqUrl . $sapClient . $sapFm . $input1 . $input2 . $input3;
-        }
-
-        try {
-            $response = Http::timeout(10)->get($eobUrl);
-            if ($response->failed()) {
-                return [];
-            }
-
-            return $response->json() ?? [];
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-
-    public function getDatSoAllocation(array $data): array
-    {
-        $batchNo = trim((string) ($data['batchNo'] ?? ''));
-
-        if ($batchNo === '') {
-            return [];
-        }
-
-        $sapClient = config('eudr.sap_client');
-        $sapReqUrl = config('eudr.sap_url');
-        $sapFm     = '&FM=ZFM_AD001';
-        $input1    = '&BATCH_NO=' . urlencode($batchNo);
-
-        $eobUrl = $sapReqUrl . $sapClient . $sapFm . $input1;
-
-        try {
-            $response = Http::timeout(10)->get($eobUrl);
-            if ($response->failed()) {
-                return [];
-            }
-
-            return $response->json() ?? [];
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-
     public function store(string $user, array $data): array
     {
         try {
@@ -383,11 +347,11 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             $idMaterial = $parts[1] ?? 0;
 
             if (PeriodLockService::isLocked($entryDate)) {
-                return ['response' => 99, 'message' => 'Period is locked.'];
+                return ['response' => TransactionResponseCode::PERIOD_LOCKED, 'message' => 'Period is locked.'];
             }
 
             if ($type !== 'PCK') {
-                return ['response' => 0, 'message' => 'Only packaging type is currently supported.'];
+                return ['response' => TransactionResponseCode::GENERIC_FAILURE, 'message' => 'Only packaging type is currently supported.'];
             }
 
             // Find stock headers — MOVED inside transaction below with FOR UPDATE
@@ -409,7 +373,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
                 $totalStock = array_sum(array_column($datHead, 'qty'));
                 if (($totalStock - $outQty) < -0.000001) {
-                    throw new \RuntimeException('Insufficient stock balance.');
+                    throw new \RuntimeException('Insufficient stock balance.', TransactionResponseCode::INSUFFICIENT_STOCK);
                 }
 
                 // Generate shipment trace no using warehouse from batch (m_warehouse)
@@ -609,11 +573,12 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                     }
                 }
 
-                return ['response' => 1, 'message' => 'Shipment stored successfully.'];
+                return ['response' => TransactionResponseCode::SUCCESS, 'message' => 'Shipment stored successfully.'];
             });
 
         } catch (\Throwable $e) {
-            return ['response' => 0, 'message' => 'Store failed: ' . $e->getMessage()];
+            $code = $e->getCode() ?: TransactionResponseCode::GENERIC_FAILURE;
+            return ['response' => $code, 'message' => 'Store failed: ' . $e->getMessage()];
         }
     }
 
@@ -621,7 +586,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
     {
         $traceNo = $data['traceNo'] ?? null;
         if (!$traceNo) {
-            return ['response' => 0, 'message' => 'Trace number is required.'];
+            return ['response' => TransactionResponseCode::GENERIC_FAILURE, 'message' => 'Trace number is required.'];
         }
 
         return app(\Modules\Shared\Services\TransactionCancellationService::class)
@@ -641,9 +606,9 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                  WHERE id_ship_head = ?
             ', [$soNo, $user, $id]);
 
-            return ['response' => 1, 'message' => 'SO updated successfully.'];
+            return ['response' => TransactionResponseCode::SUCCESS, 'message' => 'SO updated successfully.'];
         } catch (\Throwable $e) {
-            return ['response' => 0, 'message' => 'Failed to update SO: ' . $e->getMessage()];
+            return ['response' => TransactionResponseCode::GENERIC_FAILURE, 'message' => 'Failed to update SO: ' . $e->getMessage()];
         }
     }
 

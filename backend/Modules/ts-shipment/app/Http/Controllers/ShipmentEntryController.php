@@ -10,7 +10,10 @@ use Modules\TsShipment\Services\Contracts\ShipmentServiceInterface;
 use Modules\TsShipment\Http\Requests\StoreShipmentEntryRequest;
 use Modules\TsShipment\Http\Requests\GenerateTraceNoRequest;
 use Modules\TsShipment\Http\Requests\UpdateShipmentSoRequest;
+use Modules\TsShipment\Http\Requests\SapShipmentRequest;
+use Modules\TsShipment\Http\Requests\SapSoAllocationRequest;
 use Modules\TsShipment\Http\Resources\ShipmentEntryResource;
+use Modules\Shared\Constants\TransactionResponseCode;
 use Modules\Shared\Helpers\ResponseCode;
 
 class ShipmentEntryController extends Controller
@@ -50,7 +53,7 @@ class ShipmentEntryController extends Controller
             if ($res['response'] == ResponseCode::PERIOD_LOCKED) {
                 return ApiResponse::error($res['message'] ?? 'Period is locked.', 422);
             }
-            if ($res['response'] != 1) {
+            if ($res['response'] != TransactionResponseCode::SUCCESS) {
                 return ApiResponse::error($res['message'] ?? 'Failed to store shipment.', 400);
             }
 
@@ -73,7 +76,7 @@ class ShipmentEntryController extends Controller
             if ($res['response'] == ResponseCode::PERIOD_LOCKED) {
                 return ApiResponse::error($res['message'] ?? 'Period is locked.', 422);
             }
-            if ($res['response'] != 1) {
+            if ($res['response'] != TransactionResponseCode::SUCCESS) {
                 return ApiResponse::error($res['message'] ?? 'Failed to cancel shipment.', 400);
             }
 
@@ -128,6 +131,7 @@ class ShipmentEntryController extends Controller
         try {
             $res = $this->shipmentService->getShipmentBatchPackaging([
                 'batchNo' => $request->input('batchNo'),
+                'idShipHead' => $request->input('idShipHead'),
             ]);
             return ApiResponse::success($res, 'Batch packaging data retrieved');
         } catch (\Exception $e) {
@@ -140,6 +144,7 @@ class ShipmentEntryController extends Controller
         try {
             $res = $this->shipmentService->getPreparationRecord([
                 'batchNo' => $request->input('batchNo'),
+                'idShipHead' => $request->input('idShipHead'),
             ]);
             return ApiResponse::success($res, 'Preparation record retrieved');
         } catch (\Exception $e) {
@@ -183,30 +188,35 @@ class ShipmentEntryController extends Controller
         }
     }
 
-    public function getSapShipment(Request $request): JsonResponse
+    public function getSapShipment(SapShipmentRequest $request): JsonResponse
     {
-        try {
-            $res = $this->shipmentService->getDatShipment([
-                'batchNo' => $request->input('batchNo', ''),
-                'soNo' => $request->input('soNo', ''),
-                'soItem' => $request->input('soItem', ''),
-            ]);
-            return ApiResponse::success($res, 'SAP shipment data retrieved');
-        } catch (\Exception $e) {
-            return ApiResponse::error('Failed to get SAP shipment: ' . $e->getMessage(), 500);
+        $validated = $request->validated();
+        $res = $this->shipmentService->getDatShipment([
+            'batchNo' => $validated['batchNo'] ?? '',
+            'soNo' => $validated['soNo'],
+            'soItem' => $validated['soItem'] ?? '',
+        ]);
+
+        if (($res['response'] ?? TransactionResponseCode::GENERIC_FAILURE) !== TransactionResponseCode::SUCCESS) {
+            return ApiResponse::error($res['message'] ?? 'Failed to get SAP shipment.', 400);
         }
+
+        return ApiResponse::success($res['data'] ?? [], 'SAP shipment data retrieved');
     }
 
-    public function getSapSoAllocation(Request $request): JsonResponse
+    public function getSapSoAllocation(SapSoAllocationRequest $request): JsonResponse
     {
-        try {
-            $res = $this->shipmentService->getDatSoAllocation([
-                'batchNo' => $request->input('batchNo', ''),
-            ]);
-            return ApiResponse::success($res, 'SAP SO allocation data retrieved');
-        } catch (\Exception $e) {
-            return ApiResponse::error('Failed to get SAP SO allocation: ' . $e->getMessage(), 500);
+        $validated = $request->validated();
+        $res = $this->shipmentService->getDatSoAllocation([
+            'batchNo' => $validated['batchNo'],
+            'idShipHead' => $validated['idShipHead'] ?? null,
+        ]);
+
+        if (($res['response'] ?? TransactionResponseCode::GENERIC_FAILURE) !== TransactionResponseCode::SUCCESS) {
+            return ApiResponse::error($res['message'] ?? 'Failed to get SAP SO allocation.', 400);
         }
+
+        return ApiResponse::success($res['data'] ?? [], 'SAP SO allocation data retrieved');
     }
 
     public function updateSo(UpdateShipmentSoRequest $request): JsonResponse
@@ -214,7 +224,7 @@ class ShipmentEntryController extends Controller
         try {
             $user = $request->user()->name ?? 'System';
             $res = $this->shipmentService->updateSo($user, $request->validated());
-            if ($res['response'] != 1) {
+            if ($res['response'] != TransactionResponseCode::SUCCESS) {
                 return ApiResponse::error($res['message'] ?? 'Failed to update SO.', 400);
             }
 

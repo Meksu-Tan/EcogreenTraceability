@@ -209,7 +209,7 @@
     <BatchPackagingModal
       v-model="showBatchModal"
       :batch-no="selectedRow?.batch_no || ''"
-      :data="batchData"
+      :data-list="batchList"
       :prep-records="preparationRecords"
       :sap-allocs="sapAllocations"
       :loading="loadingBatch"
@@ -228,7 +228,7 @@ import ShipmentDetailModal from '../components/ShipmentDetailModal.vue'
 import BatchPackagingModal from '../components/BatchPackagingModal.vue'
 
 const store = useTraceBackwardStore()
-const { listMeta: meta, list, detail, shipmentData, batchData, preparationRecords, sapAllocations, loading, loadingDetail, loadingShipment, loadingBatch, error } = storeToRefs(store)
+const { listMeta: meta, list, detail, shipmentData, batchList, preparationRecords, sapAllocations, loading, loadingDetail, loadingShipment, loadingBatch, error } = storeToRefs(store)
 
 const allTraceRows = computed(() => [...(detail.value.initial || []), ...(detail.value.chain || [])])
 
@@ -328,7 +328,7 @@ async function openShipmentDetailModal(row) {
 async function openBatchPackagingModal(row) {
   selectedRow.value = row
   showBatchModal.value = true
-  await store.fetchBatchPackaging({ batchNo: row.batch_no || '' })
+  await store.fetchBatchPackaging({ batchNo: row.batch_no || '', idShipHead: row.id_shipment_head })
 }
 </script>
 

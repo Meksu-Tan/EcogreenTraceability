@@ -11,7 +11,7 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
   const listMeta = ref({ page: 1, perPage: 10, total: 0, lastPage: 1 })
   const detail = ref({ initial: [], chain: [] })
   const shipmentData = ref(null)
-  const batchData = ref(null)
+  const batchList = ref([])
   const preparationRecords = ref([])
   const sapAllocations = ref([])
   const loadingShipment = ref(false)
@@ -70,20 +70,17 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     error.value = null
     try {
       const batchRes = await shipmentService.getShipmentBatchPackaging(params)
-      const batchRecords = batchRes.data?.data || []
-      batchData.value = batchRecords.length > 0 ? batchRecords[0] : null
+      batchList.value = batchRes.data?.data || []
 
       const prepRes = await shipmentService.getPreparationRecord(params)
       preparationRecords.value = prepRes.data?.data || []
 
       const allocRes = await shipmentService.getDatSoAllocation(params)
       const allocPayload = allocRes.data?.data
-      sapAllocations.value = Array.isArray(allocPayload?.IT_EXPORT)
-        ? allocPayload.IT_EXPORT
-        : []
+      sapAllocations.value = Array.isArray(allocPayload) ? allocPayload : []
     } catch (err) {
       error.value = err.message || 'Failed to load batch packaging data'
-      batchData.value = null
+      batchList.value = []
       preparationRecords.value = []
       sapAllocations.value = []
     } finally {
@@ -95,7 +92,7 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     list.value = []
     detail.value = { initial: [], chain: [] }
     shipmentData.value = null
-    batchData.value = null
+    batchList.value = []
     preparationRecords.value = []
     sapAllocations.value = []
     listMeta.value = { page: 1, perPage: 10, total: 0, lastPage: 1 }
@@ -111,7 +108,7 @@ export const useTraceBackwardStore = defineStore('traceBackward', () => {
     listMeta,
     detail,
     shipmentData,
-    batchData,
+    batchList,
     preparationRecords,
     sapAllocations,
     loading,

@@ -116,13 +116,13 @@ describe('useTraceBackwardStore', () => {
         data: { data: [{ prep_no: 'P-001' }, { prep_no: 'P-002' }] },
       })
       shipmentService.getDatSoAllocation.mockResolvedValue({
-        data: { data: { IT_EXPORT: [{ so_item: '00010' }, { so_item: '00020' }] } },
+        data: { data: [{ so_item: '00010' }, { so_item: '00020' }] },
       })
 
       const store = useTraceBackwardStore()
       await store.fetchBatchPackaging({ batchNo: 'B-001' })
 
-      expect(store.batchData).toEqual({ batch_no: 'B-001', packaging: 'drum' })
+      expect(store.batchList).toEqual([{ batch_no: 'B-001', packaging: 'drum' }])
       expect(store.preparationRecords).toHaveLength(2)
       expect(store.sapAllocations).toHaveLength(2)
       expect(store.loadingBatch).toBe(false)
@@ -132,13 +132,13 @@ describe('useTraceBackwardStore', () => {
       shipmentService.getShipmentBatchPackaging.mockResolvedValue({ data: { data: [] } })
       shipmentService.getPreparationRecord.mockResolvedValue({ data: { data: [] } })
       shipmentService.getDatSoAllocation.mockResolvedValue({
-        data: { data: { IT_EXPORT: [] } },
+        data: { data: [] },
       })
 
       const store = useTraceBackwardStore()
       await store.fetchBatchPackaging({ batchNo: 'X' })
 
-      expect(store.batchData).toBeNull()
+      expect(store.batchList).toEqual([])
       expect(store.preparationRecords).toEqual([])
       expect(store.sapAllocations).toEqual([])
     })
@@ -158,7 +158,7 @@ describe('useTraceBackwardStore', () => {
       expect(store.list).toEqual([])
       expect(store.detail).toEqual([])
       expect(store.shipmentData).toBeNull()
-      expect(store.batchData).toBeNull()
+      expect(store.batchList).toEqual([])
       expect(store.preparationRecords).toEqual([])
       expect(store.sapAllocations).toEqual([])
       expect(store.error).toBeNull()

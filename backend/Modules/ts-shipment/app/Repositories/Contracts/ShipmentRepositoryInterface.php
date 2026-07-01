@@ -16,9 +16,8 @@ interface ShipmentRepositoryInterface
     public function generateTraceNo(int $materialId, int $plantId, ?string $batchNo = null): string;
     public function getShipmentBatchPackaging(array $data): Collection;
     public function getPreparationRecord(array $data): Collection;
+    public function getRealBatchList(int $idShipHead): array;
     public function getLabel(array $data): Collection;
     public function getSpecialLabel(array $data): Collection;
     public function getCustomerMark(array $data): Collection;
-    public function getDatShipment(array $data): array;
-    public function getDatSoAllocation(array $data): array;
 }
