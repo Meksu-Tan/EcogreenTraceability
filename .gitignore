@@ -1,107 +1,19 @@
-# ─── Template / Reference (tidak perlu di repo) ────────────────────────────────
-.template/
-reference-dont-change/
-
-# ─── AI Agent & Dev Tools ──────────────────────────────────────────────────────
-.context/
-.claude/
-.opencode/
-.agents/
-graphify-out/
-ponytail/
-.env.claude
-.env.claude.*.local
-opencode.json
-skills-lock.json
-dev-agent.sh
-openspec/
-scripts/
-AGENTS.md
-azure-pipelines.yml
-package-lock.json
-start-servers.bat
-
-# ─── Environment Files (NEVER commit real credentials) ─────────────────────────
-.env
-.env.backup
-.env.local
-.env.*.local
-*.env.local
-backend/.env
-backend/.env.backup
-backend/.env.production
-backend/.env.postgres
-frontend/.env
-frontend/.env.local
-
-# ─── Dependency Directories ────────────────────────────────────────────────────
-backend/vendor/
-frontend/node_modules/
-node_modules/
-
-# ─── Build Outputs ─────────────────────────────────────────────────────────────
-frontend/dist/
-frontend/dist-ssr/
-backend/public/build/
-backend/public/hot/
-backend/public/storage/
-/build/
-/dist/
-
-# ─── Laravel Storage & Cache ───────────────────────────────────────────────────
-backend/storage/app/
-backend/storage/framework/cache/data/
-backend/storage/framework/sessions/
-backend/storage/framework/views/
-backend/storage/logs/*.log
-backend/storage/*.key
-backend/storage/pail/
-backend/bootstrap/cache/*.php
-backend/.phpunit.result.cache
-backend/.deptrac.cache
-backend/auth.json
-
-# ─── Frontend Cache ────────────────────────────────────────────────────────────
-frontend/.vite/
-frontend/coverage/
-frontend/.eslintcache
-frontend/*.tsbuildinfo
-frontend/*.timestamp-*-*.mjs
-
-# ─── Database ──────────────────────────────────────────────────────────────────
-*.sqlite
-*.sqlite3
-*.sql
-
-# ─── Logs ──────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+.guardian/
+guardian-result.json
+bundle.json
 *.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# ─── Editor / IDE ──────────────────────────────────────────────────────────────
-.vscode/*
-!.vscode/extensions.json
-.idea/
+.env
+.env.*
 .DS_Store
-Thumbs.db
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# ─── Temporary / Misc ──────────────────────────────────────────────────────────
-*.tmp
-*.temp
-.tmp/
-temp/
-.cache/
-.scratch/
-.nyc_output/
-coverage/
-.html-report/
-HOMESTEAD.json
-HOMESTEAD.yaml
+.idea/
+.vscode/
+backend/.deptrac.cache
+backend/storage/framework/cache/phpstan/
+backend/public/vendor/
+backend/resources/views/vendor/
