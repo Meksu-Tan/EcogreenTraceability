@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TsTsreport\Services\TsReportService;
-use Modules\TsTsreport\Repositories\Contracts\TsReportRepositoryInterface;
 use Mockery;
+use Modules\TsTsreport\Repositories\Contracts\TsReportRepositoryInterface;
+use Modules\TsTsreport\Services\TsReportService;
+use Tests\TestCase;
 
 class TsReportServiceTest extends TestCase
 {
@@ -23,8 +25,8 @@ class TsReportServiceTest extends TestCase
     {
         $repoMock = Mockery::mock(TsReportRepositoryInterface::class);
         $expected = [
-            (object)['id_balance_head' => 1, 'entry_date' => '2026-06-01', 'description' => 'RBDPO', 'qty' => '500.000'],
-            (object)['id_balance_head' => 2, 'entry_date' => '2026-06-01', 'description' => 'PKO',   'qty' => '250.000'],
+            (object) ['id_balance_head' => 1, 'entry_date' => '2026-06-01', 'description' => 'RBDPO', 'qty' => '500.000'],
+            (object) ['id_balance_head' => 2, 'entry_date' => '2026-06-01', 'description' => 'PKO',   'qty' => '250.000'],
         ];
 
         $repoMock->shouldReceive('getTsReport')
@@ -33,7 +35,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn($expected);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReport(['entry_date' => '2026-06-01']);
+        $result = $service->getTsReport(['entry_date' => '2026-06-01']);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame($expected, $result['data']);
@@ -50,7 +52,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn([]);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReport([]);
+        $result = $service->getTsReport([]);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame([], $result['data']);
@@ -63,9 +65,9 @@ class TsReportServiceTest extends TestCase
     public function test_it_returns_ts_report_rm_section(): void
     {
         $repoMock = Mockery::mock(TsReportRepositoryInterface::class);
-        $filters  = ['entry_date' => '2026-06-01', 'plant_id' => 'EG1'];
-        $rows     = [
-            (object)['id_material' => 3, 'description' => 'CPO', 'recv_qty' => '100.000'],
+        $filters = ['entry_date' => '2026-06-01', 'plant_id' => 'EG1'];
+        $rows = [
+            (object) ['id_material' => 3, 'description' => 'CPO', 'recv_qty' => '100.000'],
         ];
 
         $repoMock->shouldReceive('getTsReportRm')
@@ -74,7 +76,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn($rows);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportRm($filters);
+        $result = $service->getTsReportRm($filters);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame($rows, $result['data']);
@@ -88,9 +90,9 @@ class TsReportServiceTest extends TestCase
     public function test_it_returns_ts_report_pck_section(): void
     {
         $repoMock = Mockery::mock(TsReportRepositoryInterface::class);
-        $filters  = ['entry_date' => '2026-06-01'];
-        $rows     = [
-            (object)['id_material' => 5, 'description' => 'PKG-A', 'qty' => '200.000'],
+        $filters = ['entry_date' => '2026-06-01'];
+        $rows = [
+            (object) ['id_material' => 5, 'description' => 'PKG-A', 'qty' => '200.000'],
         ];
 
         $repoMock->shouldReceive('getTsReportPck')
@@ -99,7 +101,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn($rows);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportPck($filters);
+        $result = $service->getTsReportPck($filters);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame($rows, $result['data']);
@@ -116,7 +118,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn([]);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportPck([]);
+        $result = $service->getTsReportPck([]);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame([], $result['data']);
@@ -129,9 +131,9 @@ class TsReportServiceTest extends TestCase
     public function test_it_returns_ts_report_shipment_section(): void
     {
         $repoMock = Mockery::mock(TsReportRepositoryInterface::class);
-        $filters  = ['entry_date' => '2026-06-01', 'plant_id' => 'EG2'];
-        $rows     = [
-            (object)['trace_no' => 'SHIP-001', 'qty' => '1000.000'],
+        $filters = ['entry_date' => '2026-06-01', 'plant_id' => 'EG2'];
+        $rows = [
+            (object) ['trace_no' => 'SHIP-001', 'qty' => '1000.000'],
         ];
 
         $repoMock->shouldReceive('getTsReportShipment')
@@ -140,7 +142,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn($rows);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportShipment($filters);
+        $result = $service->getTsReportShipment($filters);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame($rows, $result['data']);
@@ -154,9 +156,9 @@ class TsReportServiceTest extends TestCase
     public function test_it_returns_ts_report_transfer_section(): void
     {
         $repoMock = Mockery::mock(TsReportRepositoryInterface::class);
-        $filters  = ['entry_date' => '2026-06-01'];
-        $rows     = [
-            (object)['trace_no' => 'TRF-001', 'source' => 'SL01', 'destination' => 'SL02', 'qty' => '300.000'],
+        $filters = ['entry_date' => '2026-06-01'];
+        $rows = [
+            (object) ['trace_no' => 'TRF-001', 'source' => 'SL01', 'destination' => 'SL02', 'qty' => '300.000'],
         ];
 
         $repoMock->shouldReceive('getTsReportTransfer')
@@ -165,7 +167,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn($rows);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportTransfer($filters);
+        $result = $service->getTsReportTransfer($filters);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame($rows, $result['data']);
@@ -179,9 +181,9 @@ class TsReportServiceTest extends TestCase
     public function test_it_returns_ts_report_wip_section(): void
     {
         $repoMock = Mockery::mock(TsReportRepositoryInterface::class);
-        $filters  = ['entry_date' => '2026-06-01', 'plant_id' => 'EG1'];
-        $rows     = [
-            (object)['entry_no' => 'WIP-2606001', 'section_id' => 1, 'qty' => '150.000'],
+        $filters = ['entry_date' => '2026-06-01', 'plant_id' => 'EG1'];
+        $rows = [
+            (object) ['entry_no' => 'WIP-2606001', 'section_id' => 1, 'qty' => '150.000'],
         ];
 
         $repoMock->shouldReceive('getTsReportWip')
@@ -190,7 +192,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn($rows);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportWip($filters);
+        $result = $service->getTsReportWip($filters);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame($rows, $result['data']);
@@ -207,7 +209,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn([]);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportWip(['entry_date' => '2026-01-01']);
+        $result = $service->getTsReportWip(['entry_date' => '2026-01-01']);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame([], $result['data']);
@@ -220,17 +222,17 @@ class TsReportServiceTest extends TestCase
     public function test_it_calls_repository_with_exact_filters_passed(): void
     {
         $repoMock = Mockery::mock(TsReportRepositoryInterface::class);
-        $filters  = ['entry_date' => '2026-05-15', 'plant_id' => 'EG3', 'user_id' => 7];
+        $filters = ['entry_date' => '2026-05-15', 'plant_id' => 'EG3', 'user_id' => 7];
 
         $repoMock->shouldReceive('getTsReport')
             ->once()
             ->with($filters)
             ->andReturn([
-                (object)['id_balance_head' => 99, 'qty' => '999.000'],
+                (object) ['id_balance_head' => 99, 'qty' => '999.000'],
             ]);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReport($filters);
+        $result = $service->getTsReport($filters);
 
         $this->assertCount(1, $result['data']);
     }
@@ -245,7 +247,7 @@ class TsReportServiceTest extends TestCase
             ->andReturn([]);
 
         $service = new TsReportService($repoMock);
-        $result  = $service->getTsReportRm(['plant_id' => 'EG9']);
+        $result = $service->getTsReportRm(['plant_id' => 'EG9']);
 
         $this->assertSame(1, $result['status']);
         $this->assertSame([], $result['data']);

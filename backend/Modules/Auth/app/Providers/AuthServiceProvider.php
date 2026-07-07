@@ -1,21 +1,25 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Auth\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Auth\Repositories\Contracts\AuthRepositoryInterface;
-use Modules\Auth\Repositories\AuthRepository;
+use Modules\Auth\Repositories\AuthRepositoryInterface;
+use Modules\Auth\Repositories\EloquentAuthRepository;
+use Modules\Auth\Services\AuthService;
+use Modules\Auth\Services\Contracts\AuthServiceInterface;
 
 class AuthServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->bind(AuthRepositoryInterface::class, AuthRepository::class);
-        $this->app->singleton(\Modules\Auth\Services\Contracts\AuthServiceInterface::class, \Modules\Auth\Services\AuthService::class);
+        $this->app->bind(AuthRepositoryInterface::class, EloquentAuthRepository::class);
+        $this->app->singleton(AuthServiceInterface::class, AuthService::class);
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }

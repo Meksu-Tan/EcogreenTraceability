@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Admin\Services\AdminService;
-use Modules\Admin\Repositories\Contracts\AdminRepositoryInterface;
 use Mockery;
+use Modules\Admin\Repositories\Contracts\AdminRepositoryInterface;
+use Modules\Admin\Services\AdminService;
+use Tests\TestCase;
 
 class AdminServiceTest extends TestCase
 {
@@ -18,7 +20,7 @@ class AdminServiceTest extends TestCase
     public function test_it_can_list_users(): void
     {
         $repoMock = Mockery::mock(AdminRepositoryInterface::class);
-        $expectedUsers = [(object)['id' => 1, 'name' => 'John']];
+        $expectedUsers = [(object) ['id' => 1, 'name' => 'John']];
 
         $repoMock->shouldReceive('getAllUsers')
             ->once()
@@ -34,7 +36,7 @@ class AdminServiceTest extends TestCase
     {
         $repoMock = Mockery::mock(AdminRepositoryInterface::class);
         $data = ['name' => 'Alice', 'email' => 'alice@test.com'];
-        $expectedUser = (object)['id' => 2, 'name' => 'Alice'];
+        $expectedUser = (object) ['id' => 2, 'name' => 'Alice'];
 
         $repoMock->shouldReceive('createUser')
             ->once()

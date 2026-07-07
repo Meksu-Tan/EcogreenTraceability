@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Auth\Services;
 
-use Modules\Auth\Repositories\Contracts\AuthRepositoryInterface;
-use Modules\Auth\Services\Contracts\AuthServiceInterface;
 use Illuminate\Support\Facades\Hash;
+use Modules\Auth\Repositories\AuthRepositoryInterface;
+use Modules\Auth\Services\Contracts\AuthServiceInterface;
 
 class AuthService implements AuthServiceInterface
 {
@@ -16,9 +18,9 @@ class AuthService implements AuthServiceInterface
     {
         $user = $this->authRepository->findByEmail($credentials['email']);
 
-        if (!$user || !Hash::check($credentials['password'], $user->password) || !$user->isActive) {
+        if (! $user || ! Hash::check($credentials['password'], $user->password) || ! $user->isActive) {
             return [
-                'status'  => 0,
+                'status' => 0,
                 'message' => 'Invalid email or password, or your account is inactive.',
             ];
         }
@@ -28,8 +30,8 @@ class AuthService implements AuthServiceInterface
 
         return [
             'status' => 1,
-            'token'  => $token,
-            'data'   => $this->buildUserPayload($userData),
+            'token' => $token,
+            'data' => $this->buildUserPayload($userData),
         ];
     }
 
@@ -44,7 +46,7 @@ class AuthService implements AuthServiceInterface
 
         return [
             'status' => 1,
-            'data'   => $this->buildUserPayload($userData),
+            'data' => $this->buildUserPayload($userData),
         ];
     }
 
@@ -67,13 +69,13 @@ class AuthService implements AuthServiceInterface
             ->values();
 
         return [
-            'id'          => $user->id,
-            'name'        => $user->name,
-            'email'       => $user->email,
-            'id_plant'    => $user->id_plant,
-            'roles'       => $roles,
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'id_plant' => $user->id_plant,
+            'roles' => $roles,
             'permissions' => $user->getAllPermissions()->pluck('name'),
-            'plants'      => $user->plants()->get(['m_plant.id_plant', 'm_plant.code_3', 'm_plant.description'])->toArray(),
+            'plants' => $user->plants()->get(['m_plant.id_plant', 'm_plant.code_3', 'm_plant.description'])->toArray(),
         ];
     }
 }

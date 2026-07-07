@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;

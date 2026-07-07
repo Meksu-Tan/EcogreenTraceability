@@ -1,17 +1,5 @@
 <template>
-  <div v-if="authStore.initializing" class="loading-overlay">
-    <div class="text-center loading-content">
-      <div class="logo-wrapper">
-        <img
-          src="/logo-stacked.jpg"
-          alt="Ecogreen Logo"
-          class="loading-logo"
-        />
-      </div>
-      <h2 class="text-h6 font-weight-black text-on-surface mt-6 text-pulse">EUDR-TS</h2>
-      <p class="text-caption text-medium-emphasis mt-1 text-pulse-sub">Enterprise Operations Data System</p>
-    </div>
-  </div>
+  <div v-if="authStore.initializing" class="loading-overlay"></div>
   <RouterView v-else />
 </template>
 

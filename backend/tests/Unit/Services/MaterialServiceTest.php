@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Material\Services\MaterialService;
-use Modules\Material\Repositories\Contracts\MaterialRepositoryInterface;
 use Mockery;
+use Modules\Material\Repositories\Contracts\MaterialRepositoryInterface;
+use Modules\Material\Services\MaterialService;
+use Tests\TestCase;
 
 class MaterialServiceTest extends TestCase
 {

@@ -90,5 +90,12 @@ export default {
   async getApprovalHistory(params = {}) {
     const response = await api.get(`${BASE_URL}/approval/history`, { params })
     return response.data
+  },
+
+  async getPendingHistory(page = 1, perPage = 5) {
+    const response = await api.get(`${BASE_URL}/approval/pending-history`, {
+      params: { page, per_page: perPage }
+    })
+    return response.data
   }
 }

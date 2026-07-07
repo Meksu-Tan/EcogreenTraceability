@@ -1,17 +1,25 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Material\Models\Material;
+use Modules\Tank\Models\Tank;
 
 class BalanceHeader extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_balance_header';
+
     protected $primaryKey = 'id_balance_head';
+
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
@@ -43,23 +51,23 @@ class BalanceHeader extends Model
 
     public function material()
     {
-        return $this->belongsTo(\Modules\Material\Models\Material::class, 'id_material', 'id_material');
+        return $this->belongsTo(Material::class, 'id_material', 'id_material');
     }
 
     public function tank()
     {
-        return $this->belongsTo(\Modules\Tank\Models\Tank::class, 'id_sloc', 'id_sloc');
+        return $this->belongsTo(Tank::class, 'id_sloc', 'id_sloc');
     }
 
     public function details()
     {
-        return $this->hasMany(\Modules\TsRaw\Models\BalanceDetail::class, 'id_balance_head', 'id_balance_head')
-                    ->where('status', 1);
+        return $this->hasMany(BalanceDetail::class, 'id_balance_head', 'id_balance_head')
+            ->where('status', 1);
     }
 
     public function traceHeaders()
     {
-        return $this->hasMany(\Modules\TsRaw\Models\TraceHeader::class, 'id_balance_head', 'id_balance_head');
+        return $this->hasMany(TraceHeader::class, 'id_balance_head', 'id_balance_head');
     }
 
     public function scopeActive($query)

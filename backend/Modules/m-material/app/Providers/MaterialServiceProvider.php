@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Material\Providers;
 
 use Illuminate\Support\ServiceProvider;
@@ -18,6 +20,6 @@ class MaterialServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }

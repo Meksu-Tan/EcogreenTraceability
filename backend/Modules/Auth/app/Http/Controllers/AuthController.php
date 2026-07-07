@@ -1,13 +1,15 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Auth\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use Modules\Auth\Http\Requests\LoginRequest;
-use Modules\Auth\Services\Contracts\AuthServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Auth\Http\Requests\LoginRequest;
+use Modules\Auth\Services\Contracts\AuthServiceInterface;
 
 class AuthController extends Controller
 {
@@ -22,7 +24,7 @@ class AuthController extends Controller
     {
         $result = $this->authService->login($request->validated());
 
-        if (!$result['status']) {
+        if (! $result['status']) {
             return ApiResponse::error($result['message'], 401);
         }
 

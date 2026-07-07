@@ -1,49 +1,63 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Adjustment\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use Modules\Adjustment\Services\Contracts\AdjustmentServiceInterface;
-use Modules\Adjustment\Http\Resources\AdjustmentResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-
-use Modules\Adjustment\Http\Requests\StoreAdjustmentHeaderRequest;
-use Modules\Adjustment\Http\Requests\StoreAdjustmentDetailRequest;
-use Modules\Adjustment\Http\Requests\StoreAdjustmentWhxRequest;
-use Modules\Adjustment\Http\Requests\InitAdjustmentWhxRequest;
+use Illuminate\Support\Facades\Gate;
+use Modules\Adjustment\Http\Requests\AdjustmentActionRequest;
 use Modules\Adjustment\Http\Requests\AdjustStatusRequest;
 use Modules\Adjustment\Http\Requests\DestroyAdjustmentRequest;
-use Modules\Adjustment\Http\Requests\AdjustmentActionRequest;
+use Modules\Adjustment\Http\Requests\InitAdjustmentWhxRequest;
+use Modules\Adjustment\Http\Requests\StoreAdjustmentDetailRequest;
+use Modules\Adjustment\Http\Requests\StoreAdjustmentHeaderRequest;
+use Modules\Adjustment\Http\Requests\StoreAdjustmentWhxRequest;
+use Modules\Adjustment\Http\Resources\AdjustmentResource;
+use Modules\Adjustment\Services\Contracts\AdjustmentServiceInterface;
 use Modules\Shared\Helpers\ResponseCode;
 
 class AdjustmentController extends Controller
 {
-   const APPROVED_MSG = 'Adjustment approved';
-   const REJECTED_MSG = 'Adjustment rejected';
+    const APPROVED_MSG = 'Adjustment approved';
+
+    const REJECTED_MSG = 'Adjustment rejected';
 
     public function __construct(
         protected AdjustmentServiceInterface $adjustmentService
     ) {}
 
-
     public function index(Request $request): JsonResponse
     {
+        if (Gate::denies('adjustment.view')) {
+            return ApiResponse::error('Unauthorized', 403);
+        }
+
         try {
             $plantId = $request->input('id_plant');
             $userId = $request->user()?->id;
             $adjType = $request->input('adj_type', 'wip');
-            
+
             $filters = [
                 'page' => (int) $request->input('page', 1),
                 'per_page' => (int) $request->input('per_page', 10),
+                'status' => $request->input('status'),
             ];
 
             $data = $this->adjustmentService->getAdjustmentList($plantId, $userId, $adjType, $filters);
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Adjustment list retrieved', 200);
+
+            return ApiResponse::paginated(
+                $data['data'] ?? [],
+                $data['total'] ?? 0,
+                $data['page'] ?? 1,
+                $data['per_page'] ?? 10,
+                'Adjustment list retrieved'
+            );
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -51,12 +65,13 @@ class AdjustmentController extends Controller
     {
         try {
             $data = $this->adjustmentService->getAdjustmentDetail((int) $id);
-            if (!$data) {
+            if (! $data) {
                 return ApiResponse::error('Adjustment not found', 404);
             }
+
             return ApiResponse::success(new AdjustmentResource($data), 'Adjustment detail retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -69,9 +84,10 @@ class AdjustmentController extends Controller
                 'number' => $request->input('number'),
                 'id_balance_head' => $request->input('id_balance_head'),
             ], $userId);
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Supplier list retrieved', 200);
+
+            return ApiResponse::success($data, 'Supplier list retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -84,9 +100,10 @@ class AdjustmentController extends Controller
                 'number' => $request->input('number'),
                 'id_balance_head' => $request->input('id_balance_head'),
             ], $userId);
+
             return ApiResponse::success(new AdjustmentResource(['total' => $total]), 'Total quantity retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -96,9 +113,10 @@ class AdjustmentController extends Controller
             $userId = $request->user()?->id;
             $search = (string) $request->input('supplier', '');
             $data = $this->adjustmentService->getActiveSuppliers($search, $userId);
+
             return ApiResponse::success(new AdjustmentResource($data), 'Suppliers retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -108,14 +126,19 @@ class AdjustmentController extends Controller
             $entryDate = $request->input('entry_date');
             $plantId = $request->input('id_plant');
             $entryNo = $this->adjustmentService->generateEntryNo($entryDate, $plantId);
+
             return ApiResponse::success(new AdjustmentResource(['entry_no' => $entryNo]), 'Entry number generated', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
     public function store(StoreAdjustmentHeaderRequest $request): JsonResponse
     {
+        if (Gate::denies('adjustment.create')) {
+            return ApiResponse::error('Unauthorized', 403);
+        }
+
         try {
             $user = $request->user()->name ?? 'system';
             $data = $request->validated();
@@ -127,9 +150,10 @@ class AdjustmentController extends Controller
             if ($result['response'] == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment header created', 200);
             }
+
             return ApiResponse::error('Failed to create adjustment', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -143,9 +167,10 @@ class AdjustmentController extends Controller
             if ($result['response'] == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment detail created', 200);
             }
+
             return ApiResponse::error('Failed to create detail', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -159,11 +184,13 @@ class AdjustmentController extends Controller
 
             if ($result['response'] == 1) {
                 $message = $status == 2 ? self::APPROVED_MSG : self::REJECTED_MSG;
+
                 return ApiResponse::success(new AdjustmentResource($result), $message, 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to process', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -175,9 +202,10 @@ class AdjustmentController extends Controller
             if ($result['response'] == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment executed', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to execute', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -191,9 +219,10 @@ class AdjustmentController extends Controller
             if ($result['response'] == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment cancelled', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to cancel', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -203,9 +232,10 @@ class AdjustmentController extends Controller
     {
         try {
             $data = $this->adjustmentService->getActiveMaterials();
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Active materials retrieved', 200);
+
+            return ApiResponse::success($data, 'Active materials retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -213,9 +243,10 @@ class AdjustmentController extends Controller
     {
         try {
             $data = $this->adjustmentService->getActiveMaterialWhx();
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Active material WHX retrieved', 200);
+
+            return ApiResponse::success($data, 'Active material WHX retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -224,9 +255,10 @@ class AdjustmentController extends Controller
         try {
             $plantId = $request->input('id_plant');
             $data = $this->adjustmentService->getActiveTanks($plantId);
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Active tanks retrieved', 200);
+
+            return ApiResponse::success($data, 'Active tanks retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -234,9 +266,10 @@ class AdjustmentController extends Controller
     {
         try {
             $data = $this->adjustmentService->getActiveSpecificTanks((int) $sloc);
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Active specific tanks retrieved', 200);
+
+            return ApiResponse::success($data, 'Active specific tanks retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -244,9 +277,10 @@ class AdjustmentController extends Controller
     {
         try {
             $data = $this->adjustmentService->getActiveWhx();
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Active WHX retrieved', 200);
+
+            return ApiResponse::success($data, 'Active WHX retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -255,9 +289,10 @@ class AdjustmentController extends Controller
         try {
             $entryDate = $request->input('entry_date', date('Y-m-d'));
             $data = $this->adjustmentService->getLockStatus($entryDate);
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Lock status retrieved', 200);
+
+            return ApiResponse::success($data, 'Lock status retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -268,9 +303,10 @@ class AdjustmentController extends Controller
                 (int) $request->input('id_material'),
                 (int) $request->input('tf_number')
             );
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Suppliers retrieved', 200);
+
+            return ApiResponse::success($data, 'Suppliers retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -282,9 +318,10 @@ class AdjustmentController extends Controller
                 (int) $request->input('tf_number'),
                 (int) $request->input('id_supplier')
             );
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Batches retrieved', 200);
+
+            return ApiResponse::success($data, 'Batches retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -299,23 +336,48 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment stored', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to store adjustment', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
     public function destroyAdjustment(DestroyAdjustmentRequest $request, string $id): JsonResponse
     {
+        if (Gate::denies('adjustment.delete')) {
+            return ApiResponse::error('Unauthorized', 403);
+        }
+
         try {
             $user = $request->user()->name ?? 'system';
             $result = $this->adjustmentService->destroyAdjustment((int) $id, $user);
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment draft destroyed', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to destroy', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
+        }
+    }
+
+    public function destroyAdjustmentWhx(DestroyAdjustmentRequest $request, string $id): JsonResponse
+    {
+        if (Gate::denies('adjustment.delete')) {
+            return ApiResponse::error('Unauthorized', 403);
+        }
+
+        try {
+            $user = $request->user()->name ?? 'system';
+            $result = $this->adjustmentService->destroyAdjustmentWhx((int) $id, $user);
+            if (($result['response'] ?? 0) == 1) {
+                return ApiResponse::success(new AdjustmentResource($result), 'Warehouse adjustment draft destroyed', 200);
+            }
+
+            return ApiResponse::error($result['message'] ?? 'Failed to destroy warehouse adjustment', 422);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -328,9 +390,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Supplier entry added', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to add supplier entry', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -341,9 +404,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Supplier temp deleted', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to delete', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -356,9 +420,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Init adjustment stored', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to init', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -371,9 +436,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Supplier adjustment stored', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to adjust supplier', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -386,9 +452,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Material document updated', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to update document', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -403,9 +470,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'WHX adjustment stored', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to store WHX adjustment', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -418,9 +486,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'WHX init adjustment stored', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to init WHX adjustment', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -434,9 +503,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment status retrieved', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Not found', 404);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -450,9 +520,16 @@ class AdjustmentController extends Controller
                 'per_page' => (int) $request->input('per_page', 10),
             ];
             $data = $this->adjustmentService->getPeriodHeaders($filters);
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Period headers retrieved', 200);
+
+            return ApiResponse::paginated(
+                $data['data'] ?? [],
+                $data['total'] ?? 0,
+                $data['page'] ?? 1,
+                $data['per_page'] ?? 10,
+                'Period headers retrieved'
+            );
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -461,9 +538,10 @@ class AdjustmentController extends Controller
         try {
             $idHead = (int) $request->input('id_head');
             $data = $this->adjustmentService->getPeriodViewData($idHead);
-            return ApiResponse::success(AdjustmentResource::collection($data), 'Period view data retrieved', 200);
+
+            return ApiResponse::success($data, 'Period view data retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -477,9 +555,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Period header uploaded', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to upload', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -489,9 +568,10 @@ class AdjustmentController extends Controller
             $user = $request->user()->name ?? 'system';
             $idHead = (int) $request->input('id_head');
             $result = $this->adjustmentService->periodViewOnHand($user, $idHead);
-            return ApiResponse::success(AdjustmentResource::collection($result), 'Period on-hand retrieved', 200);
+
+            return ApiResponse::success($result, 'Period on-hand retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -502,11 +582,12 @@ class AdjustmentController extends Controller
             $idHead = (int) $request->input('id_head');
             $result = $this->adjustmentService->periodViewAdjustment($user, $idHead);
             if (($result['response'] ?? 0) == 1) {
-                return ApiResponse::success(AdjustmentResource::collection($result), 'Period adjustment calculated', 200);
+                return ApiResponse::success($result, 'Period adjustment calculated', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -519,9 +600,26 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Period locked', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to lock', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
+        }
+    }
+
+    public function periodHeaderUnlock(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user()->name ?? 'system';
+            $idHead = (int) $request->input('id_head');
+            $result = $this->adjustmentService->periodHeaderUnlock($user, $idHead);
+            if (($result['response'] ?? 0) == 1) {
+                return ApiResponse::success(new AdjustmentResource($result), 'Period unlocked', 200);
+            }
+
+            return ApiResponse::error($result['message'] ?? 'Failed to unlock', 422);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -533,9 +631,10 @@ class AdjustmentController extends Controller
             if (($result['response'] ?? 0) == 1) {
                 return ApiResponse::success(new AdjustmentResource($result), 'Adjustment period deleted', 200);
             }
+
             return ApiResponse::error($result['message'] ?? 'Failed to delete', 422);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 
@@ -544,9 +643,10 @@ class AdjustmentController extends Controller
         try {
             $plantId = $request->input('id_plant');
             $data = $this->adjustmentService->getLastAdjustmentRecord($plantId);
+
             return ApiResponse::success(new AdjustmentResource($data), 'Last record retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            return ApiResponse::error('Failed: '.$e->getMessage(), 500);
         }
     }
 }

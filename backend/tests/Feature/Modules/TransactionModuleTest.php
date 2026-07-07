@@ -1,9 +1,12 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
-use Tests\TestCase;
+use App\Models\User;
 use Modules\Shared\Http\Middleware\PlantContextMiddleware;
+use Tests\TestCase;
 
 class TransactionModuleTest extends TestCase
 {
@@ -45,11 +48,10 @@ class TransactionModuleTest extends TestCase
 
     public function test_add_supplier_validation(): void
     {
-        $user = \App\Models\User::factory()->make();
+        $user = User::factory()->make();
         $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/transactions/rm-entries/suppliers', []);
-        
+
         $response->assertStatus(422);
     }
 }
-

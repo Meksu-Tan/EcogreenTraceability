@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TraceForward\Services\TraceForwardService;
-use Modules\TraceForward\Repositories\Contracts\TraceForwardRepositoryInterface;
 use Mockery;
+use Modules\TraceForward\Repositories\TraceForwardRepositoryInterface;
+use Modules\TraceForward\Services\TraceForwardService;
+use Tests\TestCase;
 
 class TraceForwardServiceTest extends TestCase
 {
@@ -39,11 +41,11 @@ class TraceForwardServiceTest extends TestCase
 
         $repoMock->shouldReceive('getForwardTraceDetail')
             ->once()
-            ->with(1, '100001-001', 5, null, 1)
+            ->with('100001-001', 5, null, 1)
             ->andReturn($expected);
 
         $service = new TraceForwardService($repoMock);
-        $result = $service->getForwardTraceDetail(1, '100001-001', 5, null, 1);
+        $result = $service->getForwardTraceDetail('100001-001', 5, null, 1);
 
         $this->assertEquals($expected, $result);
     }
@@ -55,7 +57,7 @@ class TraceForwardServiceTest extends TestCase
 
         $repoMock->shouldReceive('forwardTrace')
             ->once()
-            ->with('100001-001', 5)
+            ->with('100001-001', 5, null, null)
             ->andReturn($expected);
 
         $service = new TraceForwardService($repoMock);

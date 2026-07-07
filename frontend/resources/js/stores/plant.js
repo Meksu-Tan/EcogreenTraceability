@@ -51,7 +51,7 @@ export const useSetupPlantStore = defineStore('setupPlant', () => {
 
 export const usePlantSelectionStore = defineStore('plantSelection', () => {
   const selectedPlantId = ref(null)
-  const selectedPlantName = ref('')
+  const selectedPlantName = ref('All Plants')
   const selectedPlantCode = ref('')
   const hasUserSelected = ref(false)
 

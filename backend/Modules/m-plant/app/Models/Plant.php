@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Plant\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,7 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 class Plant extends Model
 {
     protected $connection = 'eudr_ts';
-    protected $table      = 'm_plant';
+
+    protected $table = 'm_plant';
+
     protected $primaryKey = 'id_plant';
 
     protected $fillable = [

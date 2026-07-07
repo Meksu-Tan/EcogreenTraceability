@@ -1,8 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Shared\Services\TraceNumberService;
+use Modules\Shared\Services\TransferBalanceService;
 use Modules\Shared\Traits\DbCompatTrait;
 
 trait RmEntryTransferTrait
@@ -14,9 +18,9 @@ trait RmEntryTransferTrait
      * Finds MAX(seq) for today's traces matching prefix + warehouse + plant,
      * then returns the next sequence as a 2-digit padded string.
      *
-     * @param string $prefix    Type prefix ('3', '7', etc.)
-     * @param string $warehouse 3-digit warehouse/section code
-     * @param string $plantCode 2-digit plant suffix
+     * @param  string  $prefix  Type prefix ('3', '7', etc.)
+     * @param  string  $warehouse  3-digit warehouse/section code
+     * @param  string  $plantCode  2-digit plant suffix
      */
     /**
      * Resolve 3-digit warehouse code from tank description.
@@ -24,13 +28,17 @@ trait RmEntryTransferTrait
      */
     private function resolveWarehouseCode(?string $tankDescOrId, string $default = '000'): string
     {
-        if ($tankDescOrId === null) return $default;
+        if ($tankDescOrId === null) {
+            return $default;
+        }
 
         $desc = is_numeric($tankDescOrId)
             ? optional(DB::connection('eudr_ts')->table('m_sloc')->where('id_sloc', (int) $tankDescOrId)->where('status', 1)->first())->description
             : $tankDescOrId;
 
-        if (!$desc) return $default;
+        if (! $desc) {
+            return $default;
+        }
 
         $target = str_ireplace('Storage', 'Feed', $desc);
         $tank = DB::connection('eudr_ts')->table('m_sloc')
@@ -41,9 +49,9 @@ trait RmEntryTransferTrait
             : $default;
     }
 
-    private function tns(): \Modules\Shared\Services\TraceNumberService
+    private function tns(): TraceNumberService
     {
-        return app(\Modules\Shared\Services\TraceNumberService::class);
+        return app(TraceNumberService::class);
     }
 
     public function getTransferNumber($plantId, $tankDescOrId = null): ?string
@@ -51,6 +59,7 @@ trait RmEntryTransferTrait
         $svc = $this->tns();
         $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
         $warehouse = $this->resolveWarehouseCode($tankDescOrId);
+
         return $svc->generate('3', date('ymd'), $warehouse, $plantCode);
     }
 
@@ -65,9 +74,9 @@ trait RmEntryTransferTrait
                        FROM t_trace_header th
                       WHERE th.id_balance_head = a.id_balance_head AND th.status = 1)";
 
-        $supplierAgg = "STRING_AGG(DISTINCT CONCAT(e.code, ' :: ', e.description, ' / ', b.batch_sap, ' / Qty : ', TRIM(TO_CHAR(ROUND(CAST(b.init_qty AS numeric),3), 'FM999999999999990.000')), ' MT / ', CASE WHEN COALESCE(b.out_qty,0) = 0 THEN '-' ELSE 'BATCH TRANSFERRED' END), ' | ' ORDER BY b.batch_sap)";
+        $supplierAgg = "STRING_AGG(DISTINCT CONCAT(e.code, ' :: ', e.description, ' / ', b.batch_sap, ' / Qty : ', TRIM(TO_CHAR(ROUND(CAST(b.init_qty AS numeric),3), 'FM999999999999990.000')), ' MT / ', CASE WHEN COALESCE(b.out_qty,0) = 0 THEN '-' ELSE 'BATCH TRANSFERRED' END), ' | ')";
 
-        $tankNumbersAgg = "STRING_AGG(DISTINCT d.tf_number, ', ' ORDER BY d.tf_number)";
+        $tankNumbersAgg = "STRING_AGG(DISTINCT d.tf_number, ', ')";
 
         $query = "SELECT a.id_balance_head, a.id_material,
                          CAST(a.trace_no AS TEXT) AS trace_no,
@@ -99,10 +108,9 @@ trait RmEntryTransferTrait
                       ON f.id_balance_head = a.id_balance_head
                    WHERE c.type = 'RM'
                      AND (CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 1 OR CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 9)
-                     AND " . \Modules\Shared\Helpers\TraceHelper::isStorageOrLegacy('a.trace_no') . "
                      AND a.status = 1
                      AND (a.id_plant = ? OR ? = '0')
-                   GROUP BY a.trace_no
+                   GROUP BY a.id_balance_head, a.id_material, a.trace_no, c.code, c.description, a.entry_date, f.material_document, f.po_so, f.id_trace_head
                    ORDER BY MAX(a.id_balance_head) DESC";
 
         $results = DB::connection('eudr_ts')->select($query, [$plantId, $plantId]);
@@ -110,8 +118,8 @@ trait RmEntryTransferTrait
         foreach ($results as &$row) {
             $tankDesc = $row->tank_description ?? '';
             $tankNumbers = $row->tank_numbers ?? '';
-            if (!empty($tankNumbers)) {
-                $row->tank_name = $tankDesc . ' | ' . $tankNumbers;
+            if (! empty($tankNumbers)) {
+                $row->tank_name = $tankDesc.' | '.$tankNumbers;
             } else {
                 $row->tank_name = $tankDesc;
             }
@@ -132,8 +140,8 @@ trait RmEntryTransferTrait
     {
         $plantId = $this->resolvePlantCode($plantId);
 
-        $inQtyFmt = "ROUND(MAX(CAST(a.in_qty AS numeric)), 3)";
-        $outQtyFmt = "ROUND(MAX(CAST(a.out_qty AS numeric)), 3)";
+        $inQtyFmt = 'ROUND(MAX(CAST(a.in_qty AS numeric)), 3)';
+        $outQtyFmt = 'ROUND(MAX(CAST(a.out_qty AS numeric)), 3)';
         $subSlocConcatPg = $this->dbGroupConcat(
             "CONCAT(h.id_sloc, ' - ', h.description)",
             ' | ', false, 'h.id_sloc ASC'
@@ -180,7 +188,7 @@ trait RmEntryTransferTrait
         foreach ($rawData as $row) {
             $key = $row->id_trace_head;
 
-            if (!isset($groupedData[$key])) {
+            if (! isset($groupedData[$key])) {
                 $groupedData[$key] = [
                     'id_trace_head' => $row->id_trace_head,
                     'id_balance_head' => $row->id_balance_head,
@@ -199,7 +207,7 @@ trait RmEntryTransferTrait
                     'material_document' => $row->material_document,
                     'po_so' => $row->po_so,
                     'plant_code' => $row->plant_code,
-                    'sub_slocs' => []
+                    'sub_slocs' => [],
                 ];
             }
 
@@ -210,7 +218,7 @@ trait RmEntryTransferTrait
                     if (count($parts) === 2) {
                         $groupedData[$key]['sub_slocs'][] = [
                             'tf_number' => trim($parts[0]),
-                            'description' => trim($parts[1])
+                            'description' => trim($parts[1]),
                         ];
                     }
                 }
@@ -249,7 +257,7 @@ trait RmEntryTransferTrait
                             )
                               AND h.status = 1)";
 
-        $subSlocJoin = "STRING_AGG(DISTINCT CASE WHEN COALESCE(td.in_qty, td.out_qty, bd.qty, bd.init_qty) > 0.0001 THEN CONCAT(COALESCE(sup.code, bsup.code), ' :: ', COALESCE(sup.description, bsup.description), ' / ', COALESCE(td.batch_sap, bd.batch_sap), ' / Qty : ', TRIM(TO_CHAR(ROUND(CAST(COALESCE(bd.init_qty, td.in_qty, bd.qty) AS numeric),3), 'FM999999999999990.000')), ' MT / ', CASE WHEN '{$tankType}' = 'STORAGE' THEN CASE WHEN COALESCE(bd.out_qty,0) = 0 THEN '-' ELSE 'BATCH TRANSFERRED' END ELSE CONCAT('Qty : ', TRIM(TO_CHAR(ROUND(CAST(COALESCE(td.in_qty, td.out_qty, bd.qty) AS numeric),3), 'FM999999999999990.000')), ' MT') END) ELSE NULL END, ' | ')";
+        $subSlocJoin = "STRING_AGG(DISTINCT CASE WHEN COALESCE(NULLIF(td.in_qty,0), NULLIF(td.out_qty,0), NULLIF(bd.qty,0), NULLIF(bd.init_qty,0), 0) > 0.0001 THEN CONCAT(COALESCE(sup.code, bsup.code), ' :: ', COALESCE(sup.description, bsup.description), ' / ', COALESCE(td.batch_sap, bd.batch_sap), ' / Qty : ', TRIM(TO_CHAR(ROUND(CAST(COALESCE(NULLIF(bd.init_qty,0), NULLIF(td.in_qty,0), bd.qty, 0) AS numeric),3), 'FM999999999999990.000')), ' MT / ', CASE WHEN '{$tankType}' = 'STORAGE' THEN CASE WHEN COALESCE(bd.out_qty,0) = 0 THEN '-' ELSE 'BATCH TRANSFERRED' END ELSE CONCAT('Qty : ', TRIM(TO_CHAR(ROUND(CAST(COALESCE(NULLIF(td.in_qty,0), NULLIF(td.out_qty,0), bd.qty, 0) AS numeric),3), 'FM999999999999990.000')), ' MT') END) ELSE NULL END, ' | ')";
 
         $query = "SELECT
                           a.id_balance_head,
@@ -291,10 +299,10 @@ trait RmEntryTransferTrait
 
         foreach ($results as &$row) {
             $fromTraceNo = $row->from_trace_no_agg ?? '';
-            if (!empty($fromTraceNo)) {
+            if (! empty($fromTraceNo)) {
                 $fromTraceArray = explode(', ', $fromTraceNo);
-                $row->trace_pairs_array = array_map(function($trace) use ($row) {
-                    return $trace . ' >>> ' . $row->to_trace_no;
+                $row->trace_pairs_array = array_map(function ($trace) use ($row) {
+                    return $trace.' >>> '.$row->to_trace_no;
                 }, $fromTraceArray);
             } else {
                 $row->trace_pairs_array = [];
@@ -309,14 +317,18 @@ trait RmEntryTransferTrait
 
     public function generateTransferNumber($plantId, $tankDescOrId = null): ?string
     {
+        // ponytail: section fixed at '000' (no id_rundown here) — no materialId
+        // param at this call site, unlike ts-transfer's own resolveSection() path.
+        // Upgrade: thread materialId through and call TraceNumberService::resolveSection('7', $materialId) if RM transfers ever need per-material RRR.
         $svc = $this->tns();
         $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
+
         return $svc->generate('7', date('ymd'), '000', $plantCode);
     }
 
-    private function tbs(): \Modules\Shared\Services\TransferBalanceService
+    private function tbs(): TransferBalanceService
     {
-        return app(\Modules\Shared\Services\TransferBalanceService::class);
+        return app(TransferBalanceService::class);
     }
 
     public function findBalanceByTraceNo(string $traceNo): ?object
@@ -363,6 +375,7 @@ trait RmEntryTransferTrait
     public function createTransferTrace(array $data): object
     {
         $id = $this->tbs()->createTraceHeader($data);
+
         return (object) ['id_trace_head' => $id];
     }
 
@@ -471,6 +484,7 @@ trait RmEntryTransferTrait
         $svc = $this->tns();
         $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
         $section = $svc->resolveSection('7', $materialId);
+
         return $svc->generate('7', date('ymd'), $section, $plantCode);
     }
 
@@ -511,11 +525,11 @@ trait RmEntryTransferTrait
             return [];
         }
 
-        $code3   = $tank[0]->code_3 ?? '';
+        $code3 = $tank[0]->code_3 ?? '';
         $plantId = $tank[0]->id_plant ?? '';
-        $desc    = $tank[0]->description ?? '';
+        $desc = $tank[0]->description ?? '';
 
-        if (!empty($code3)) {
+        if (! empty($code3)) {
             return DB::connection('eudr_ts')->select(
                 'SELECT a.id_sloc AS id_sloc_tail, a.tf_number AS tankNo, a.description, a.code_3
                    FROM m_sloc a

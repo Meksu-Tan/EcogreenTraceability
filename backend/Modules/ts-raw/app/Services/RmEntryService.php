@@ -1,21 +1,29 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Services;
 
-use Modules\TsRaw\Repositories\Contracts\RmEntryRepositoryInterface;
-use Modules\TsRaw\Models\BalanceHeader;
+use Exception;
+use Illuminate\Support\Facades\DB;
+use Modules\Material\Models\Material;
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
+use Modules\Shared\Repositories\TankQueryRepository;
 use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
-use Illuminate\Support\Facades\DB;
-use Exception;
-
+use Modules\Shared\Services\FeedRundownOrchestrator;
+use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Services\TransactionCancellationService;
+use Modules\Shared\Services\TransactionCoreService;
+use Modules\TsRaw\Models\BalanceHeader;
+use Modules\TsRaw\Repositories\RmEntryRepositoryInterface;
 use Modules\TsRaw\Services\Contracts\RmEntryServiceInterface;
 
 class RmEntryService implements RmEntryServiceInterface
 {
     public function __construct(
-        protected RmEntryRepositoryInterface $rmEntryRepo
+        protected RmEntryRepositoryInterface $rmEntryRepo,
+        protected PeriodLockService $periodLockService
     ) {}
 
     private function jsonArrayContains(string $col, string $param): string
@@ -90,11 +98,21 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function saveRmEntry($data, $user): array
     {
+        $entryDate = $data['entry_date'] ?? '';
+        if ($entryDate && $this->periodLockService->isLocked($entryDate)) {
+            return ['response' => 99, 'message' => 'Period is locked'];
+        }
+
         return $this->rmEntryRepo->saveRmEntry($data, $user);
     }
 
     public function saveRmTrfEntry($data, $user): array
     {
+        $entryDate = $data['entry_date'] ?? '';
+        if ($entryDate && $this->periodLockService->isLocked($entryDate)) {
+            return ['response' => 99, 'message' => 'Period is locked'];
+        }
+
         return $this->rmEntryRepo->saveRmTrfEntry($data, $user);
     }
 
@@ -111,6 +129,11 @@ class RmEntryService implements RmEntryServiceInterface
     public function verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack = 24): array
     {
         return $this->rmEntryRepo->verifySeparateEntries($materialId, $tankId, $plantId, $hoursBack);
+    }
+
+    public function activateRmEntry($id, $user): array
+    {
+        return $this->rmEntryRepo->activateRmEntry($id, $user);
     }
 
     public function deactivateRmEntry($id, $user): array
@@ -151,6 +174,7 @@ class RmEntryService implements RmEntryServiceInterface
 
     // Transfer Methods (moved from ts-transfer)
     protected $movSeqTransfer = '000';
+
     protected $typeTransfer = '7';
 
     /**
@@ -159,6 +183,11 @@ class RmEntryService implements RmEntryServiceInterface
      */
     public function transfer($data, $user): array
     {
+        $entryDate = $data['entry_date'] ?? '';
+        if ($entryDate && $this->periodLockService->isLocked($entryDate)) {
+            return ['response' => 99, 'message' => 'Period is locked'];
+        }
+
         $data['id_plant'] = $this->resolvePlantCode($data['id_plant'] ?? 0);
 
         $connection = app('db')->connection('eudr_ts');
@@ -166,7 +195,7 @@ class RmEntryService implements RmEntryServiceInterface
 
         try {
             $sourceBalance = $this->rmEntryRepo->findBalanceHeaderById($data['id_balance_head']);
-            if (!$sourceBalance) {
+            if (! $sourceBalance) {
                 throw new Exception('Source balance not found');
             }
 
@@ -259,14 +288,14 @@ class RmEntryService implements RmEntryServiceInterface
 
     public function getLockStatus(string $entryDate): bool
     {
-        return \Modules\Shared\Services\PeriodLockService::isLocked($entryDate);
+        return PeriodLockService::isLocked($entryDate);
     }
 
     /**
      * Execute a full transfer entry using Feed::generalFeed() + Rundown::generalRundown()
      * Matching the reference Transfer::post_transferEntry() algorithm.
      *
-     * @todo Technical Debt: Directly uses Feed::generalFeed() and Rundown::generalRundown() helpers.
+     * Known debt (tracked, not a TODO): Directly uses Feed::generalFeed() and Rundown::generalRundown() helpers.
      * Recommended: Extract to repository methods for better testability.
      */
     public function executeTransferEntry(array $data, string $user): array
@@ -275,7 +304,7 @@ class RmEntryService implements RmEntryServiceInterface
         $entryDate = $data['entry_date'];
         $idMaterial = (int) $data['id_material'];
         $materialDoc = $data['material_doc'] ?? '';
-        $qty = (float) str_replace(',', '', (string)$data['qty']);
+        $qty = (float) str_replace(',', '', (string) $data['qty']);
         $trfSource = (int) $data['source_sloc'];
         $trfDestination = (int) $data['dest_sloc'];
         $trfSourceTail = $data['source_tails'] ?? [];
@@ -313,7 +342,7 @@ class RmEntryService implements RmEntryServiceInterface
             [$idMaterial, $trfSource, $srcPlant]
         );
 
-        if (!empty($orphanHeads)) {
+        if (! empty($orphanHeads)) {
             return ['response' => 6, 'message' => 'Orphan balance heads found - no supplier detail'];
         }
 
@@ -351,50 +380,50 @@ class RmEntryService implements RmEntryServiceInterface
 
         try {
             $result = DB::connection('eudr_ts')->transaction(function () use (
-                $qty, $idMaterial, $trfSource, $srcTailJson, $srcPlant,
-                $feedEntryNo, $entryDate, $entryNo, $trfDestination, $destTailJson,
-                $destPlant, $user, $materialDoc, $idPlant
+                $qty, $idMaterial, $trfSource, $srcPlant,
+                $feedEntryNo, $entryDate, $entryNo, $trfDestination,
+                $destPlant, $user, $materialDoc
             ) {
                 // Step 1: Feed - take material out of source (FIFO)
                 $feedParams = [
-                    'qty'          => $qty,
-                    'id_material'  => $idMaterial,
-                    'id_sloc'      => $trfSource,
-                    'id_plant'     => $srcPlant,
-                    'to_trace_no'  => $feedEntryNo,
-                    'entry_date'   => $entryDate,
-                    'user'         => $user,
+                    'qty' => $qty,
+                    'id_material' => $idMaterial,
+                    'id_sloc' => $trfSource,
+                    'id_plant' => $srcPlant,
+                    'to_trace_no' => $feedEntryNo,
+                    'entry_date' => $entryDate,
+                    'user' => $user,
                 ];
 
                 $rundownParams = [
-                    'user'          => $user,
-                    'entry_date'    => $entryDate,
-                    'trace_no'      => $entryNo,
+                    'user' => $user,
+                    'entry_date' => $entryDate,
+                    'trace_no' => $entryNo,
                     'from_trace_no' => $feedEntryNo,
-                    'id_material'   => $idMaterial,
-                    'id_sloc'       => $trfDestination,
-                    'id_plant'      => $destPlant,
-                    'last_qtf'      => 0,
+                    'id_material' => $idMaterial,
+                    'id_sloc' => $trfDestination,
+                    'id_plant' => $destPlant,
+                    'last_qtf' => 0,
                 ];
 
-                $orchestrator = app(\Modules\Shared\Services\FeedRundownOrchestrator::class);
+                $orchestrator = app(FeedRundownOrchestrator::class);
                 $rundownResult = $orchestrator->executeFeedRundownSequence($feedParams, $rundownParams);
 
-                if (!isset($rundownResult['response']) || $rundownResult['response'] != 1) {
-                    throw new \RuntimeException('Feed/Rundown sequence failed: response ' . ($rundownResult['response'] ?? 'unknown'));
+                if (! isset($rundownResult['response']) || $rundownResult['response'] != 1) {
+                    throw new \RuntimeException('Feed/Rundown sequence failed: response '.($rundownResult['response'] ?? 'unknown'));
                 }
 
                 // Step 4: Create material document
-                if (!empty($materialDoc)) {
+                if (! empty($materialDoc)) {
                     $traceHeadId = $rundownResult['id_trace_head'];
-                    app(\Modules\Shared\Services\TransactionCoreService::class)
+                    app(TransactionCoreService::class)
                         ->createMaterialDocument($user, $traceHeadId, $materialDoc, 'ADD');
                 }
 
                 return $rundownResult;
             });
 
-            if (!isset($result['response']) || $result['response'] != 1) {
+            if (! isset($result['response']) || $result['response'] != 1) {
                 return ['response' => 3];
             }
 
@@ -408,7 +437,7 @@ class RmEntryService implements RmEntryServiceInterface
 
             return ['response' => 1, 'message' => 'Transfer entry created successfully'];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return ['response' => 0, 'message' => $e->getMessage()];
         }
     }
@@ -421,11 +450,12 @@ class RmEntryService implements RmEntryServiceInterface
     {
         $idTraceHead = (int) $id;
         $traceHead = $this->rmEntryRepo->findTransferById($idTraceHead);
-        if (!$traceHead) {
+        if (! $traceHead) {
             return ['response' => 0, 'message' => 'Transfer not found'];
         }
-        $pipeId = $traceHead->id_balance_head . '|' . $idTraceHead;
-        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+        $pipeId = $traceHead->id_balance_head.'|'.$idTraceHead;
+
+        return app(TransactionCancellationService::class)
             ->deactivateTransfer($pipeId, $user);
     }
 
@@ -434,16 +464,16 @@ class RmEntryService implements RmEntryServiceInterface
         $resolvedPlant = null;
         if ($plantId) {
             if (is_numeric($plantId)) {
-                $plant = $this->rmEntryRepo->findPlantById((int)$plantId);
+                $plant = $this->rmEntryRepo->findPlantById((int) $plantId);
                 if ($plant && $plant->code_3) {
                     $resolvedPlant = $plant->code_3;
                 }
             } elseif ($plantId !== '0') {
-                $resolvedPlant = (string)$plantId;
+                $resolvedPlant = (string) $plantId;
             }
         }
 
-        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+        return app(TankQueryRepository::class)
             ->getActiveTanksByKeywords(['STORAGE'], $resolvedPlant)
             ->toArray();
     }
@@ -451,29 +481,31 @@ class RmEntryService implements RmEntryServiceInterface
     public function getSpecificTankDetails(string $tankId, mixed $plantId): array
     {
         $slocId = is_numeric($tankId)
-            ? (int)$tankId
-            : (int)(\Illuminate\Support\Facades\DB::table('m_sloc')
+            ? (int) $tankId
+            : (int) (DB::table('m_sloc')
                 ->where('description', $tankId)
                 ->where('status', 1)
                 ->value('id_sloc') ?? 0);
 
-        if (!$slocId) return [];
+        if (! $slocId) {
+            return [];
+        }
 
-        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+        return app(TankQueryRepository::class)
             ->getActiveSpecificTanksRundown($slocId)
             ->toArray();
     }
 
     public function getRmMaterials(): array
     {
-        return \Modules\Material\Models\Material::where('status', 1)
+        return Material::where('status', 1)
             ->where('type', 'RM')
             ->orderBy('code')
             ->get()
             ->map(function ($item) {
                 return [
                     'id_material' => $item->id_material,
-                    'material' => strtoupper($item->description) . ' (' . $item->code . ' / ' . $item->type . ' / Feed: ' . $item->qtf_feed . ' / Rundown: ' . $item->qtf_rundown . ')'
+                    'material' => strtoupper($item->description).' ('.$item->code.' / '.$item->type.' / Feed: '.$item->qtf_feed.' / Rundown: '.$item->qtf_rundown.')',
                 ];
             })
             ->toArray();
@@ -498,7 +530,7 @@ class RmEntryService implements RmEntryServiceInterface
                     'trace_no' => $item->trace_no,
                     'material' => $item->material->description ?? 'Unknown',
                     'tank' => $item->tank->description ?? 'Unknown',
-                    'qty' => $item->qty
+                    'qty' => $item->qty,
                 ];
             })
             ->toArray();
@@ -509,22 +541,23 @@ class RmEntryService implements RmEntryServiceInterface
         $resolvedPlant = app(PlantContextServiceInterface::class)->resolvePlantId($plantId);
         $resolvedPlant = $resolvedPlant && $resolvedPlant !== '0' ? $resolvedPlant : null;
 
-        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+        return app(TankQueryRepository::class)
             ->getActiveTanksByKeywords(['FEED'], $resolvedPlant)
             ->toArray();
     }
 
     public function saveMatlDoc(string $mode, int $id, string $number, string $user): array
     {
-        $res = app(\Modules\Shared\Services\TransactionCoreService::class)
+        $res = app(TransactionCoreService::class)
             ->createMaterialDocument($user, $id, $number, $mode);
-            
+
         return ['success' => $res['response'] === 1, 'status' => $res['response']];
     }
 
     public function updateSubTankSlocTail(int $idHead, $idSlocTail, string $user): array
     {
         $tails = is_array($idSlocTail) ? $idSlocTail : [$idSlocTail];
+
         return $this->rmEntryRepo->updateEntrySubTank($user, $idHead, $tails);
     }
 

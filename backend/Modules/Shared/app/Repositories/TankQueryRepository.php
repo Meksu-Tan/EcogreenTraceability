@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Repositories;
 
 use Illuminate\Support\Collection;
@@ -9,7 +11,7 @@ use Modules\Shared\Traits\TankNameFormatterTrait;
 
 class TankQueryRepository
 {
-    use TankNameFormatterTrait, DbCompatTrait;
+    use DbCompatTrait, TankNameFormatterTrait;
 
     protected string $connection = 'eudr_ts';
 
@@ -21,8 +23,8 @@ class TankQueryRepository
         $plants = $this->loadPlantAbbreviations();
 
         if ($materialId === null) {
-            $wherePlant = $excludePlant ? 'AND id_plant <> ?' : '';
-            $bindings = $excludePlant ? [(string) $plantId] : [];
+            $wherePlant = $excludePlant ? 'AND id_plant <> ?' : 'AND id_plant = ?';
+            $bindings = [(string) $plantId];
 
             $result = collect(DB::connection($this->connection)->select(
                 "SELECT MIN(id_sloc) AS tf_number,
@@ -39,20 +41,21 @@ class TankQueryRepository
 
             return $result->map(function ($item) use ($plants) {
                 $code3 = strtoupper($item->code_3 ?? '');
-                $abbr  = $plants[$item->id_plant ?? ''] ?? '';
-                if (!empty($code3)) {
+                $abbr = $plants[$item->id_plant ?? ''] ?? '';
+                if (! empty($code3)) {
                     $label = ($code3 === 'PRD') ? 'PRODUCT' : $code3;
-                    $item->tank = trim($label . ($abbr ? ' ' . $abbr : ''));
+                    $item->tank = trim($label.($abbr ? ' '.$abbr : ''));
                 } else {
                     $item->tank = $this->formatTankName($item->tank) ?: $item->tank;
                 }
                 $item->id_sloc = $item->tf_number;
+
                 return $item;
             });
         }
 
-        $wherePlant = $excludePlant ? 'AND b.id_plant <> ?' : '';
-        $bindings = $excludePlant ? [$plantId, $materialId] : [$materialId];
+        $wherePlant = $excludePlant ? 'AND b.id_plant <> ?' : 'AND b.id_plant = ?';
+        $bindings = [$plantId, $materialId];
 
         $result = collect(DB::connection($this->connection)->select(
             "SELECT MIN(b.id_sloc) AS tf_number,
@@ -60,7 +63,9 @@ class TankQueryRepository
                     COALESCE(MIN(NULLIF(b.description,'')), MIN(b.code_3)) AS tank,
                     b.id_plant
                FROM m_material a
-               LEFT JOIN m_sloc b ON a.type = b.code_2 AND b.status = 1 {$wherePlant}
+               LEFT JOIN m_sloc b ON 
+                 (b.code_3 = a.type OR (UPPER(a.type) = 'RM' AND UPPER(b.code_3) IN ('FEED', 'STORAGE'))) 
+                 AND b.status = 1 {$wherePlant}
               WHERE a.status = 1
                 AND a.id_material = ?
               GROUP BY COALESCE(NULLIF(b.code_3,''), b.description), b.id_plant",
@@ -69,14 +74,15 @@ class TankQueryRepository
 
         return $result->map(function ($item) use ($plants) {
             $code3 = strtoupper($item->code_3 ?? '');
-            $abbr  = $plants[$item->id_plant ?? ''] ?? '';
-            if (!empty($code3)) {
+            $abbr = $plants[$item->id_plant ?? ''] ?? '';
+            if (! empty($code3)) {
                 $label = ($code3 === 'PRD') ? 'PRODUCT' : $code3;
-                $item->tank = trim($label . ($abbr ? ' ' . $abbr : ''));
+                $item->tank = trim($label.($abbr ? ' '.$abbr : ''));
             } else {
                 $item->tank = $this->formatTankName($item->tank) ?: $item->tank;
             }
             $item->id_sloc = $item->tf_number;
+
             return $item;
         });
     }
@@ -91,7 +97,7 @@ class TankQueryRepository
         if (is_numeric($sloc)) {
             $tank = DB::connection($this->connection)->select(
                 'SELECT description, id_plant, code_3 FROM m_sloc WHERE id_sloc = ?',
-                [(int)$sloc]
+                [(int) $sloc]
             );
         } else {
             $tank = DB::connection($this->connection)->select(
@@ -106,11 +112,11 @@ class TankQueryRepository
 
         $originalDescription = $tank[0]->description ?? '';
         $plantId = $tank[0]->id_plant;
-        $code3   = $tank[0]->code_3 ?? '';
+        $code3 = $tank[0]->code_3 ?? '';
 
         // Prefer code_3 + id_plant lookup — includes siblings with empty description.
         // Fall back to description + id_plant only when code_3 is absent.
-        if (!empty($code3)) {
+        if (! empty($code3)) {
             $results = DB::connection($this->connection)->select(
                 'SELECT id_sloc, id_sloc AS id_sloc_tail, tf_number, description, code_3
                    FROM m_sloc
@@ -120,7 +126,7 @@ class TankQueryRepository
                   ORDER BY id_sloc ASC',
                 [$code3, $plantId]
             );
-        } elseif (!empty($originalDescription)) {
+        } elseif (! empty($originalDescription)) {
             $results = DB::connection($this->connection)->select(
                 'SELECT id_sloc, id_sloc AS id_sloc_tail, tf_number, description, code_3
                    FROM m_sloc
@@ -136,17 +142,17 @@ class TankQueryRepository
                    FROM m_sloc
                   WHERE status = 1
                     AND id_sloc = ?',
-                [is_numeric($sloc) ? (int)$sloc : 0]
+                [is_numeric($sloc) ? (int) $sloc : 0]
             );
         }
-
 
         return collect($results)->map(function ($item) {
             $item->description = $this->formatTankName($item->description);
             $tfNumber = $item->tf_number ?? '';
             $item->tankName = $tfNumber !== ''
-                ? ($item->description . ' (' . $tfNumber . ')')
-                : $item->description . ' [' . $item->id_sloc_tail . ']';
+                ? ($item->description.' ('.$tfNumber.')')
+                : $item->description.' ['.$item->id_sloc_tail.']';
+
             return $item;
         });
     }
@@ -164,15 +170,15 @@ class TankQueryRepository
         if ($plantId !== null && $plantId !== '0' && $plantId !== '') {
             $query->where(function ($q) use ($plantId) {
                 $q->where('id_plant', $plantId)
-                  ->orWhere('id_plant', (int) $plantId);
+                    ->orWhere('id_plant', (int) $plantId);
             });
         }
 
         $query->where(function ($q) use ($keywords) {
             foreach ($keywords as $word) {
-                $q->orWhere('description', 'ILIKE', '%' . $word . '%')
-                  ->orWhere('code_2', 'ILIKE', '%' . $word . '%')
-                  ->orWhere('code_3', 'ILIKE', '%' . $word . '%');
+                $q->orWhere('description', 'ILIKE', '%'.$word.'%')
+                    ->orWhere('code_2', 'ILIKE', '%'.$word.'%')
+                    ->orWhere('code_3', 'ILIKE', '%'.$word.'%');
             }
         });
 
@@ -200,13 +206,14 @@ class TankQueryRepository
             if (empty($desc)) {
                 $code3 = strtoupper($item->code_3 ?? '');
                 $label = ($code3 === 'PRD') ? 'PRODUCT' : $code3;
-                $abbr  = $plants[$item->id_plant ?? ''] ?? '';
-                $desc  = trim($label . ($abbr ? ' ' . $abbr : ''));
+                $abbr = $plants[$item->id_plant ?? ''] ?? '';
+                $desc = trim($label.($abbr ? ' '.$abbr : ''));
                 $item->description = $desc;
             }
-            $item->tank        = $this->formatTankName($desc) ?? $desc;
-            $item->tf_number    = $item->id_sloc;
+            $item->tank = $this->formatTankName($desc) ?? $desc;
+            $item->tf_number = $item->id_sloc;
             $item->tank_number = $item->tf_number;
+
             return $item;
         });
     }

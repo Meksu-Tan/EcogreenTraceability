@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Material\Services;
 
 use Illuminate\Support\Facades\DB;
@@ -23,21 +25,24 @@ class MaterialService implements MaterialServiceInterface
         if ($created === false) {
             return ['status' => 0, 'message' => 'Material code already exists'];
         }
+
         return ['status' => 1, 'message' => 'Material created successfully'];
     }
 
     public function updateMaterial(int $id, array $data): array
     {
         $updated = $this->materialRepo->update($id, $data);
-        if (!$updated) {
+        if (! $updated) {
             return ['status' => 0, 'message' => 'Failed to update material'];
         }
+
         return ['status' => 1, 'message' => 'Material updated successfully'];
     }
 
     public function deactivateMaterial(int $id, string $user): array
     {
         $result = $this->materialRepo->deactivate($id, $user);
+
         return $result
             ? ['status' => 1, 'message' => 'Material deactivated']
             : ['status' => 0, 'message' => 'Failed to deactivate material'];
@@ -46,6 +51,7 @@ class MaterialService implements MaterialServiceInterface
     public function activateMaterial(int $id, string $user): array
     {
         $result = $this->materialRepo->activate($id, $user);
+
         return $result
             ? ['status' => 1, 'message' => 'Material activated']
             : ['status' => 0, 'message' => 'Failed to activate material'];
@@ -63,12 +69,14 @@ class MaterialService implements MaterialServiceInterface
         if ($created === false) {
             return ['status' => 0, 'message' => 'Packaging code already exists'];
         }
+
         return ['status' => 1, 'message' => 'Material packaging created successfully'];
     }
 
     public function updatePackaging(int $id, array $data): array
     {
         $updated = $this->materialRepo->updatePackaging($id, $data);
+
         return $updated
             ? ['status' => 1, 'message' => 'Packaging updated successfully']
             : ['status' => 0, 'message' => 'Failed to update packaging'];
@@ -77,6 +85,7 @@ class MaterialService implements MaterialServiceInterface
     public function deactivatePackaging(int $id, string $user): array
     {
         $result = $this->materialRepo->deactivatePackaging($id, $user);
+
         return $result
             ? ['status' => 1, 'message' => 'Packaging deactivated']
             : ['status' => 0, 'message' => 'Failed to deactivate packaging'];
@@ -85,6 +94,7 @@ class MaterialService implements MaterialServiceInterface
     public function activatePackaging(int $id, string $user): array
     {
         $result = $this->materialRepo->activatePackaging($id, $user);
+
         return $result
             ? ['status' => 1, 'message' => 'Packaging activated']
             : ['status' => 0, 'message' => 'Failed to activate packaging'];
@@ -102,17 +112,27 @@ class MaterialService implements MaterialServiceInterface
             ->where('id_plant', $idPlant)
             ->value('code_3');
 
-        if (!$plantCode) {
+        if (! $plantCode) {
             return ['status' => 0, 'message' => 'Plant not found', 'data' => ['qty' => 0]];
         }
 
-        $qty = DB::connection('eudr_ts')
-            ->table('t_balance_header')
-            ->where('id_material', $idMaterial)
-            ->where('id_plant', $plantCode)
-            ->where('status', 1)
-            ->sum('qty');
+        // ponytail: use t_trace_header in/out like legacy + stock on hand
+        // t_balance_header.qty is remaining balance (decremented by outflows), not total stock
+        // filter via m_sloc.id_plant since t_balance_header.id_plant is unreliable
+        $result = DB::connection('eudr_ts')->select(
+            "SELECT ROUND(CAST(COALESCE(SUM(th.in_qty) - SUM(th.out_qty), 0) AS numeric), 3) AS total
+               FROM t_trace_header th
+               JOIN t_balance_header bh ON th.id_balance_head = bh.id_balance_head
+               JOIN m_sloc ms ON ms.id_sloc = bh.id_sloc
+              WHERE th.status = 1
+                AND th.id_material = ?
+                AND ms.id_plant = ?
+                AND SUBSTRING(bh.trace_no, 1, 1) IN ('1','2','3','7','8','9')",
+            [$idMaterial, $plantCode]
+        );
 
-        return ['status' => 1, 'data' => ['qty' => round((float) $qty, 3)]];
+        $qty = (float) ($result[0]->total ?? 0);
+
+        return ['status' => 1, 'data' => ['qty' => $qty]];
     }
 }

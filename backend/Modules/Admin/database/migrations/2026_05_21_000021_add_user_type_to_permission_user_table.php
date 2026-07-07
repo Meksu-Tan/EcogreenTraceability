@@ -1,9 +1,10 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -15,7 +16,7 @@ return new class extends Migration
 
         $permissionUserTable = $tableNames['model_has_permissions'] ?? 'model_has_permissions';
 
-        if (Schema::hasTable($permissionUserTable) && !Schema::hasColumn($permissionUserTable, 'user_type')) {
+        if (Schema::hasTable($permissionUserTable) && ! Schema::hasColumn($permissionUserTable, 'user_type')) {
             Schema::table($permissionUserTable, function (Blueprint $table) {
                 $table->string('user_type')->nullable()->after('model_type');
             });

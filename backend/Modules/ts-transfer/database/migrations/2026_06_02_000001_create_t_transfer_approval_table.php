@@ -1,9 +1,10 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -12,7 +13,7 @@ return new class extends Migration
     public function up(): void
     {
         // Create t_transfer_approval table for approval workflow
-        if (!Schema::connection('eudr_ts')->hasTable('t_transfer_approval')) {
+        if (! Schema::connection('eudr_ts')->hasTable('t_transfer_approval')) {
             Schema::connection('eudr_ts')->create('t_transfer_approval', function (Blueprint $table) {
                 $table->bigIncrements('id_approval');
                 $table->string('id_balance_head', 50)->index();
@@ -53,15 +54,15 @@ return new class extends Migration
         // Add approval_status column to t_balance_header if not exists
         if (Schema::connection('eudr_ts')->hasTable('t_balance_header')) {
             Schema::connection('eudr_ts')->table('t_balance_header', function (Blueprint $table) {
-                if (!Schema::connection('eudr_ts')->hasColumn('t_balance_header', 'approval_status')) {
+                if (! Schema::connection('eudr_ts')->hasColumn('t_balance_header', 'approval_status')) {
                     $table->enum('approval_status', ['DRAFT', 'PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'])
-                          ->default('APPROVED')
-                          ->after('status');
+                        ->default('APPROVED')
+                        ->after('status');
                 }
-                if (!Schema::connection('eudr_ts')->hasColumn('t_balance_header', 'approved_by')) {
+                if (! Schema::connection('eudr_ts')->hasColumn('t_balance_header', 'approved_by')) {
                     $table->string('approved_by', 50)->nullable()->after('approval_status');
                 }
-                if (!Schema::connection('eudr_ts')->hasColumn('t_balance_header', 'approved_at')) {
+                if (! Schema::connection('eudr_ts')->hasColumn('t_balance_header', 'approved_at')) {
                     $table->timestamp('approved_at')->nullable()->after('approved_by');
                 }
             });

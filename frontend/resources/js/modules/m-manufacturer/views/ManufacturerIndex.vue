@@ -57,13 +57,12 @@ const editRow    = ref(null)
 const submitting = ref(false)
 
 const columns = [
-  { key: 'code',        label: 'Code' },
-  { key: 'batch_code',  label: 'Batch Code' },
-  { key: 'description', label: 'Description' },
-  { key: 'type',        label: 'Sloc' },
-  { key: 'status',      label: 'Status' },
-  { key: 'created_at',  label: 'Created at' },
-  { key: 'updated_at',  label: 'Updated at' },
+  { key: 'description',   label: 'Description' },
+  { key: 'category',      label: 'Category' },
+  { key: 'material_type', label: 'Material Type' },
+  { key: 'status',        label: 'Status' },
+  { key: 'created_at',    label: 'Created at' },
+  { key: 'updated_at',    label: 'Updated at' },
 ]
 
 onMounted(async () => {

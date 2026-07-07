@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsStock\Services;
 
 use Modules\TsStock\Repositories\Contracts\StockRepositoryInterface;
@@ -15,7 +17,7 @@ class StockService implements StockServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->stockRepository->getStockList($filters),
+            'data' => $this->stockRepository->getStockList($filters),
             'message' => 'Stock list retrieved successfully',
         ];
     }
@@ -26,15 +28,15 @@ class StockService implements StockServiceInterface
 
         if ($data === null) {
             return [
-                'status'  => 0,
-                'data'    => null,
+                'status' => 0,
+                'data' => null,
                 'message' => 'Stock detail not found',
             ];
         }
 
         return [
-            'status'  => 1,
-            'data'    => $data,
+            'status' => 1,
+            'data' => $data,
             'message' => 'Stock detail retrieved successfully',
         ];
     }
@@ -43,7 +45,7 @@ class StockService implements StockServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->stockRepository->getActiveMaterialStock($search, $type),
+            'data' => $this->stockRepository->getActiveMaterialStock($search, $type),
             'message' => 'Active materials retrieved',
         ];
     }
@@ -52,7 +54,7 @@ class StockService implements StockServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->stockRepository->getStockMovement($filters),
+            'data' => $this->stockRepository->getStockMovement($filters),
             'message' => 'Stock movements retrieved',
         ];
     }
@@ -61,7 +63,7 @@ class StockService implements StockServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->stockRepository->getActiveSlocs(),
+            'data' => $this->stockRepository->getActiveSlocs(),
             'message' => 'Active slocs retrieved',
         ];
     }

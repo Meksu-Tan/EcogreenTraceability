@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Http\Middleware;
 
+use App\Helpers\ApiResponse;
 use Closure;
 use Illuminate\Http\Request;
-use App\Helpers\ApiResponse;
 use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -18,7 +20,7 @@ class PlantContextMiddleware
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return $next($request);
         }
 
@@ -80,7 +82,7 @@ class PlantScopeMiddleware
     {
         $user = $request->user();
 
-        if (!$user) {
+        if (! $user) {
             return ApiResponse::error('Authentication required', 401);
         }
 
@@ -92,7 +94,7 @@ class PlantScopeMiddleware
 
         $resolvedCode = $this->plantContext->resolvePlantId($plantId, $user->id);
 
-        if (!$resolvedCode) {
+        if (! $resolvedCode) {
             return ApiResponse::error('Invalid or inaccessible plant', 403, ['error_code' => 'PLANT_INVALID']);
         }
 

@@ -1,32 +1,38 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
 use Mockery;
-use Modules\Adjustment\Services\AdjustmentService;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
+use Modules\Adjustment\Services\AdjustmentService;
 use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
 use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
-use Modules\Shared\Services\PeriodLockService;
 use Modules\Shared\Services\AuditService;
+use Modules\Shared\Services\PeriodLockService;
+use Tests\TestCase;
 
 class AdjustmentServiceTest extends TestCase
 {
     protected AdjustmentRepositoryInterface $repoMock;
+
     protected AdjustmentMutationServiceInterface $mutationMock;
+
     protected AdjustmentPeriodServiceInterface $periodMock;
+
     protected PeriodLockService $lockMock;
+
     protected AuditService $auditMock;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repoMock     = Mockery::mock(AdjustmentRepositoryInterface::class);
+        $this->repoMock = Mockery::mock(AdjustmentRepositoryInterface::class);
         $this->mutationMock = Mockery::mock(AdjustmentMutationServiceInterface::class);
-        $this->periodMock   = Mockery::mock(AdjustmentPeriodServiceInterface::class);
-        $this->lockMock     = Mockery::mock(PeriodLockService::class);
-        $this->auditMock    = Mockery::mock(AuditService::class);
+        $this->periodMock = Mockery::mock(AdjustmentPeriodServiceInterface::class);
+        $this->lockMock = Mockery::mock(PeriodLockService::class);
+        $this->auditMock = Mockery::mock(AuditService::class);
     }
 
     protected function tearDown(): void
@@ -211,7 +217,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_get_supplier_list_to_repository(): void
     {
-        $data     = ['id_material' => 1, 'id_sloc' => 2];
+        $data = ['id_material' => 1, 'id_sloc' => 2];
         $expected = [['id_supplier' => 5, 'name' => 'PT Supplier']];
 
         $this->repoMock
@@ -227,7 +233,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_get_total_qty_supplier_to_repository(): void
     {
-        $data     = ['id_material' => 1, 'id_sloc' => 2, 'id_supplier' => 5];
+        $data = ['id_material' => 1, 'id_sloc' => 2, 'id_supplier' => 5];
 
         $this->repoMock
             ->shouldReceive('getTotalQtySupplier')
@@ -259,7 +265,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_store_adjustment_to_mutation_service(): void
     {
-        $data     = ['id_material' => 1, 'after_adjust' => 500.0];
+        $data = ['id_material' => 1, 'after_adjust' => 500.0];
         $expected = ['response' => 1];
 
         $this->mutationMock
@@ -290,7 +296,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_add_entry_supplier_to_mutation_service(): void
     {
-        $data     = ['id_supplier' => 5, 'qty' => 200.0];
+        $data = ['id_supplier' => 5, 'qty' => 200.0];
         $expected = ['response' => 1];
 
         $this->mutationMock
@@ -321,7 +327,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_create_adjustment_header_to_mutation_service(): void
     {
-        $data     = ['entry_date' => '2024-01-15', 'id_material' => 1];
+        $data = ['entry_date' => '2024-01-15', 'id_material' => 1];
         $expected = ['response' => 1, 'id' => 42];
 
         $this->mutationMock
@@ -337,7 +343,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_create_adjustment_detail_to_mutation_service(): void
     {
-        $data     = ['id_supplier' => 5, 'batch_sap' => 'BATCH-001'];
+        $data = ['id_supplier' => 5, 'batch_sap' => 'BATCH-001'];
         $expected = ['response' => 1];
 
         $this->mutationMock
@@ -398,7 +404,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_adjustment_init_to_mutation_service(): void
     {
-        $data     = ['id_material' => 1, 'qty' => 300.0];
+        $data = ['id_material' => 1, 'qty' => 300.0];
         $expected = ['response' => 1];
 
         $this->mutationMock
@@ -414,7 +420,7 @@ class AdjustmentServiceTest extends TestCase
 
     public function test_it_delegates_adjustment_supplier_to_mutation_service(): void
     {
-        $data     = ['id_supplier' => 5, 'qty' => 150.0];
+        $data = ['id_supplier' => 5, 'qty' => 150.0];
         $expected = ['response' => 1];
 
         $this->mutationMock

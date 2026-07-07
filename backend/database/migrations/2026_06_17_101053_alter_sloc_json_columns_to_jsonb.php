@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
@@ -10,11 +12,11 @@ return new class extends Migration
 
     private array $targets = [
         't_balance_header' => ['id_sloc', 'id_sloc_tail'],
-        't_balance_detail'  => ['id_sloc', 'id_sloc_tail'],
-        't_trace_header'    => ['id_sloc', 'id_sloc_tail'],
-        't_trace_detail'    => ['id_sloc', 'id_sloc_tail'],
-        't_warehouse_header'=> ['id_sloc'],
-        't_warehouse_detail'=> ['id_sloc'],
+        't_balance_detail' => ['id_sloc', 'id_sloc_tail'],
+        't_trace_header' => ['id_sloc', 'id_sloc_tail'],
+        't_trace_detail' => ['id_sloc', 'id_sloc_tail'],
+        't_warehouse_header' => ['id_sloc'],
+        't_warehouse_detail' => ['id_sloc'],
     ];
 
     public function up(): void
@@ -24,7 +26,7 @@ return new class extends Migration
         }
 
         foreach ($this->targets as $table => $columns) {
-            if (!Schema::connection($this->connection)->hasTable($table)) {
+            if (! Schema::connection($this->connection)->hasTable($table)) {
                 continue;
             }
             foreach ($columns as $col) {
@@ -44,7 +46,7 @@ return new class extends Migration
         }
 
         foreach ($this->targets as $table => $columns) {
-            if (!Schema::connection($this->connection)->hasTable($table)) {
+            if (! Schema::connection($this->connection)->hasTable($table)) {
                 continue;
             }
             foreach ($columns as $col) {

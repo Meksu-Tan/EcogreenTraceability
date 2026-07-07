@@ -192,7 +192,20 @@
       "PowerShell($env:PGPASSWORD=\"Ecogreen123!\"; & \"C:\\\\Program Files\\\\PostgreSQL\\\\17\\\\bin\\\\psql.exe\" -U eudr_app -h 127.0.0.1 -d eudr_dev -c \"\\\\d role_user\" 2>&1)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('message','?'\\)\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['status'], d['message'], len\\(d.get\\('data',[]\\)\\), 'items'\\)\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('status:', d.get\\('status'\\), '|', len\\(d.get\\('data',[]\\)\\), 'items'\\); [print\\('  -', x.get\\('description',''\\)\\) for x in d.get\\('data',[]\\)][:3]\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('status:', d.get\\('status'\\), '|', len\\(d.get\\('data',[]\\)\\), 'items'\\); [print\\('  -', x.get\\('description',''\\)\\) for x in d.get\\('data',[]\\)][:3]\")",
+      "Bash(awk '{print $1}')",
+      "Bash(git config *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "mcp__andwiki__search-wiki-tool",
+      "mcp__andwiki__list-modules-tool",
+      "mcp__andwiki__get-module-tool",
+      "Bash(python3 tools/architecture_guardian/guardian.py --version)",
+      "mcp__andwiki__scaffold-project-tool",
+      "Bash(npx eslint *)",
+      "Bash(awk -F/ '{print $NF}')",
+      "Bash(xargs -0 du -b)",
+      "Bash(PGPASSWORD='Ecogreen123!' /c/Program Files/PostgreSQL/17/bin/psql.exe *)"
     ]
   }
 }

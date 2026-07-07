@@ -1,10 +1,5 @@
 <template>
   <div>
-    <div class="mb-6">
-      <h2 class="text-h6 font-weight-bold">Welcome Back</h2>
-      <p class="text-body-2 text-medium-emphasis mt-1">Please enter your details to sign in.</p>
-    </div>
-
     <VForm @submit.prevent="handleLogin">
       <VTextField
         v-model="form.email"

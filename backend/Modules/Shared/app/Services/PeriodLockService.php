@@ -1,7 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Shared\Services\Contracts\PeriodLockServiceInterface;
@@ -24,10 +27,10 @@ class PeriodLockService implements PeriodLockServiceInterface
                 [$lockYear, $lockMonth]
             );
 
-            if (!empty($rows) && ($rows[0]->lock_status ?? '0') === '1') {
+            if (! empty($rows) && ($rows[0]->lock_status ?? '0') === '1') {
                 return true;
             }
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             Log::debug('PeriodLockService: m_period_lock not found, using fallback');
         }
 
@@ -41,10 +44,10 @@ class PeriodLockService implements PeriodLockServiceInterface
                 [$lockYear, $lockMonth]
             );
 
-            if (!empty($rows) && ($rows[0]->lock_status ?? '0') === '1') {
+            if (! empty($rows) && ($rows[0]->lock_status ?? '0') === '1') {
                 return true;
             }
-        } catch (\Illuminate\Database\QueryException $e) {
+        } catch (QueryException $e) {
             Log::warning('PeriodLockService: Both tables not available');
         }
 
@@ -65,7 +68,7 @@ class PeriodLockService implements PeriodLockServiceInterface
                 [$period, $period]
             );
 
-            if (!empty($existing)) {
+            if (! empty($existing)) {
                 if ($existing[0]->lock_status === '1') {
                     return ['response' => 2, 'message' => 'Period already locked'];
                 }
@@ -86,7 +89,8 @@ class PeriodLockService implements PeriodLockServiceInterface
             return ['response' => 1, 'message' => 'Period locked successfully'];
         } catch (\Exception $e) {
             Log::error('PeriodLockService::lock failed', ['error' => $e->getMessage()]);
-            return ['response' => 0, 'message' => 'Failed to lock period: ' . $e->getMessage()];
+
+            return ['response' => 0, 'message' => 'Failed to lock period: '.$e->getMessage()];
         }
     }
 
@@ -121,7 +125,8 @@ class PeriodLockService implements PeriodLockServiceInterface
             return ['response' => 1, 'message' => 'Period unlocked successfully'];
         } catch (\Exception $e) {
             Log::error('PeriodLockService::unlock failed', ['error' => $e->getMessage()]);
-            return ['response' => 0, 'message' => 'Failed to unlock period: ' . $e->getMessage()];
+
+            return ['response' => 0, 'message' => 'Failed to unlock period: '.$e->getMessage()];
         }
     }
 
@@ -139,6 +144,7 @@ class PeriodLockService implements PeriodLockServiceInterface
             );
         } catch (\Exception $e) {
             Log::warning('PeriodLockService::getLockedPeriods failed', ['error' => $e->getMessage()]);
+
             return [];
         }
     }

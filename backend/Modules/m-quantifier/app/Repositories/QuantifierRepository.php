@@ -1,9 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Quantifier\Repositories;
 
-use Modules\Quantifier\Repositories\Contracts\QuantifierRepositoryInterface;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Modules\Quantifier\Repositories\Contracts\QuantifierRepositoryInterface;
 
 class QuantifierRepository implements QuantifierRepositoryInterface
 {
@@ -38,12 +41,18 @@ class QuantifierRepository implements QuantifierRepositoryInterface
         }
         if (isset($filters['flowmeter'])) {
             $conditions[] = 'a.flowmeter LIKE ?';
-            $params[] = '%' . $filters['flowmeter'] . '%';
+            $params[] = '%'.$filters['flowmeter'].'%';
         }
 
-        if (!empty($conditions)) {
-            $sql .= ' WHERE ' . implode(' AND ', $conditions);
+        if (! empty($conditions)) {
+            $sql .= ' WHERE '.implode(' AND ', $conditions);
         }
+
+        $countSql = 'SELECT COUNT(*) as total FROM t_reset_quantifier a';
+        if (! empty($conditions)) {
+            $countSql .= ' WHERE '.implode(' AND ', $conditions);
+        }
+        $total = (int) DB::connection($this->connection)->selectOne($countSql, $params)->total;
 
         $sql .= ' ORDER BY a.reset_date DESC, a.id_reset DESC';
 
@@ -56,20 +65,55 @@ class QuantifierRepository implements QuantifierRepositoryInterface
             }
         }
 
-        return DB::connection($this->connection)->select($sql, $params);
+        $data = DB::connection($this->connection)->select($sql, $params);
+
+        return [
+            'data' => $data,
+            'total' => $total,
+        ];
     }
 
     public function getActiveFlowmeters(): array
     {
-        $sql = "SELECT tf_number AS flowmeter 
-                  FROM m_sloc 
-                 WHERE status = 1 
-                   AND tf_number IS NOT NULL 
-                   AND tf_number != ''
-                 GROUP BY tf_number 
-                 ORDER BY tf_number ASC";
+        // ponytail: derived from m_material, no write path here to invalidate on — short TTL only
+        return Cache::remember('quantifier.active_flowmeters', 600, fn () => $this->fetchActiveFlowmeters());
+    }
 
-        return DB::connection($this->connection)->select($sql);
+    private function fetchActiveFlowmeters(): array
+    {
+        $qtfFeed = DB::connection($this->connection)->select(
+            'SELECT qtf_feed AS flowmeter
+               FROM m_material
+              WHERE status = 1 AND qtf_feed LIKE \'%FT%\'
+              GROUP BY qtf_feed ORDER BY qtf_feed ASC'
+        );
+
+        $qtfRundown = DB::connection($this->connection)->select(
+            'SELECT qtf_rundown AS flowmeter
+               FROM m_material
+              WHERE status = 1 AND qtf_rundown LIKE \'%FT%\'
+              GROUP BY qtf_rundown ORDER BY qtf_rundown ASC'
+        );
+
+        $seen = [];
+        $result = [];
+        foreach ($qtfFeed as $row) {
+            $key = $row->flowmeter;
+            if (! isset($seen[$key])) {
+                $result[] = ['flowmeter' => $key];
+                $seen[$key] = true;
+            }
+        }
+        foreach ($qtfRundown as $row) {
+            $key = $row->flowmeter;
+            if (! isset($seen[$key])) {
+                $result[] = ['flowmeter' => $key];
+                $seen[$key] = true;
+            }
+        }
+        usort($result, fn ($a, $b) => strcmp($a['flowmeter'], $b['flowmeter']));
+
+        return $result;
     }
 
     public function getQuantifierDetail(int $id): ?array
@@ -77,10 +121,12 @@ class QuantifierRepository implements QuantifierRepositoryInterface
         $result = DB::connection($this->connection)->selectOne(
             'SELECT a.*, b.description AS flowmeter_desc
                FROM t_reset_quantifier a
-               LEFT JOIN m_sloc b ON b.tf_number = a.flowmeter
+               LEFT JOIN m_material b
+                 ON (b.qtf_feed = a.flowmeter OR b.qtf_rundown = a.flowmeter)
               WHERE a.id_reset = ?',
             [$id]
         );
+
         return $result ? (array) $result : null;
     }
 
@@ -98,10 +144,10 @@ class QuantifierRepository implements QuantifierRepositoryInterface
         DB::connection($this->connection)->table('log_transactions')->insert([
             'log_module' => 'T_RESET_QTY',
             'log_type' => 'ADD',
-            'log_description' => 'ID: ' . $id . ' | DATE: ' . $resetDate
-                . ' / FLOWMETER: ' . $flowmeter
-                . ' / VALUE: ' . $value
-                . ' / REMARK: ' . $remark . ' | Status: 1',
+            'log_description' => 'ID: '.$id.' | DATE: '.$resetDate
+                .' / FLOWMETER: '.$flowmeter
+                .' / VALUE: '.$value
+                .' / REMARK: '.$remark.' | Status: 1',
             'created_by' => $user,
         ]);
 
@@ -114,7 +160,7 @@ class QuantifierRepository implements QuantifierRepositoryInterface
             'SELECT reset_date, flowmeter, value, remark FROM t_reset_quantifier WHERE id_reset = ?',
             [$id]
         );
-        if (!$old) {
+        if (! $old) {
             return ['response' => 0, 'message' => 'Quantifier not found'];
         }
 
@@ -126,16 +172,17 @@ class QuantifierRepository implements QuantifierRepositoryInterface
                 'value' => $value,
                 'remark' => $remark,
                 'updated_by' => $user,
+                'updated_at' => now(),
             ]);
 
         DB::connection($this->connection)->table('log_transactions')->insert([
             'log_module' => 'T_RESET_QTY',
             'log_type' => 'UPDATE',
-            'log_description' => 'ID: ' . $id
-                . ' | DATE: ' . $old->reset_date . ' >> ' . $resetDate
-                . ' / FLOWMETER: ' . $old->flowmeter . ' >> ' . $flowmeter
-                . ' / VALUE: ' . $old->value . ' >> ' . $value
-                . ' / REMARK: ' . $old->remark . ' >> ' . $remark . ' | Status: 1',
+            'log_description' => 'ID: '.$id
+                .' | DATE: '.$old->reset_date.' >> '.$resetDate
+                .' / FLOWMETER: '.$old->flowmeter.' >> '.$flowmeter
+                .' / VALUE: '.$old->value.' >> '.$value
+                .' / REMARK: '.$old->remark.' >> '.$remark.' | Status: 1',
             'created_by' => $user,
         ]);
 
@@ -147,13 +194,13 @@ class QuantifierRepository implements QuantifierRepositoryInterface
         DB::connection($this->connection)->table('log_transactions')->insert([
             'log_module' => 'T_RESET_QTY',
             'log_type' => 'DE-ACTIVATE',
-            'log_description' => 'Id: ' . $id . ' | Status: 1 >> 0',
+            'log_description' => 'Id: '.$id.' | Status: 1 >> 0',
             'created_by' => $user,
         ]);
 
         $affected = DB::connection($this->connection)->table('t_reset_quantifier')
             ->where('id_reset', $id)
-            ->update(['status' => 0, 'updated_by' => $user]);
+            ->update(['status' => 0, 'updated_by' => $user, 'updated_at' => now()]);
 
         return ['response' => $affected > 0 ? 1 : 0];
     }
@@ -163,13 +210,13 @@ class QuantifierRepository implements QuantifierRepositoryInterface
         DB::connection($this->connection)->table('log_transactions')->insert([
             'log_module' => 'T_RESET_QTY',
             'log_type' => 'ACTIVATE',
-            'log_description' => 'Id: ' . $id . ' | Status: 0 >> 1',
+            'log_description' => 'Id: '.$id.' | Status: 0 >> 1',
             'created_by' => $user,
         ]);
 
         $affected = DB::connection($this->connection)->table('t_reset_quantifier')
             ->where('id_reset', $id)
-            ->update(['status' => 1, 'updated_by' => $user]);
+            ->update(['status' => 1, 'updated_by' => $user, 'updated_at' => now()]);
 
         return ['response' => $affected > 0 ? 1 : 0];
     }

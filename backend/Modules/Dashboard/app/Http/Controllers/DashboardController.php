@@ -1,11 +1,13 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Dashboard\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use Modules\Dashboard\Services\DashboardService;
 use Illuminate\Http\JsonResponse;
+use Modules\Dashboard\Services\DashboardService;
 
 class DashboardController extends Controller
 {

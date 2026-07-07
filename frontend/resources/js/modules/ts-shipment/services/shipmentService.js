@@ -11,8 +11,8 @@ export const shipmentService = {
       : {}
     return api.post('/api/v1/transactions/shipment-entries', data, { headers })
   },
-  cancel(id, traceNo) {
-    return api.delete(`/api/v1/transactions/shipment-entries/${id}`, { data: { traceNo } })
+  cancel(id, traceNo, idTraceHead, idShipHead) {
+    return api.delete(`/api/v1/transactions/shipment-entries/${id}`, { data: { traceNo, idTraceHead, idShipHead } })
   },
   updateSo(data) {
     return api.put('/api/v1/transactions/shipment-entries/so', data)

@@ -1,12 +1,15 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsTransfer\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Modules\TsTransfer\Repositories\Contracts\TransferApprovalRepositoryInterface;
 use Modules\Shared\Services\AuditService;
 use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Services\TransactionCancellationService;
+use Modules\TsTransfer\Repositories\TransferApprovalRepositoryInterface;
 
 class TransferApprovalService
 {
@@ -23,7 +26,7 @@ class TransferApprovalService
         try {
             $transfer = $this->approvalRepo->findTransferForApproval($idBalanceHead);
 
-            if (!$transfer) {
+            if (! $transfer) {
                 return ['response' => 98, 'message' => 'Transfer not found'];
             }
 
@@ -38,7 +41,7 @@ class TransferApprovalService
             // Check current status
             $currentStatus = $this->getCurrentStatus($idBalanceHead);
             if ($currentStatus !== 'DRAFT') {
-                return ['response' => 2, 'message' => 'Only DRAFT transfers can be submitted. Current: ' . $currentStatus];
+                return ['response' => 2, 'message' => 'Only DRAFT transfers can be submitted. Current: '.$currentStatus];
             }
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $traceNo, $entryDate, $transfer) {
@@ -48,7 +51,7 @@ class TransferApprovalService
                 // Insert or update approval record
                 $existingApproval = $this->approvalRepo->findApprovalRecord($idBalanceHead);
 
-                if (!$existingApproval) {
+                if (! $existingApproval) {
                     $this->approvalRepo->insertApprovalRecord([
                         'id_balance_head' => $idBalanceHead,
                         'id_trace_head' => $transfer->id_trace_head ?? '',
@@ -65,14 +68,15 @@ class TransferApprovalService
 
                 // Audit log
                 AuditService::log('TRANSFER', 'SUBMIT',
-                    'Transfer submitted for approval | ID: ' . $idBalanceHead . ' | TraceNo: ' . $traceNo,
+                    'Transfer submitted for approval | ID: '.$idBalanceHead.' | TraceNo: '.$traceNo,
                     $user, ['id_balance_head' => $idBalanceHead, 'trace_no' => $traceNo]);
 
                 return ['response' => 1, 'message' => 'Transfer submitted for approval'];
             });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::submit failed', ['error' => $e->getMessage()]);
-            return ['response' => 0, 'message' => 'Failed to submit: ' . $e->getMessage()];
+
+            return ['response' => 0, 'message' => 'Failed to submit: '.$e->getMessage()];
         }
     }
 
@@ -93,10 +97,14 @@ class TransferApprovalService
             // Check current status
             $currentStatus = $this->getCurrentStatus($idBalanceHead);
             if ($currentStatus !== 'PENDING') {
-                return ['response' => 2, 'message' => 'Only PENDING transfers can be approved. Current: ' . $currentStatus];
+                return ['response' => 2, 'message' => 'Only PENDING transfers can be approved. Current: '.$currentStatus];
             }
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $notes) {
+                // Note: no status=1 reactivation needed here — PENDING transfers were
+                // never deactivated (deactivation only happens on reject/cancel, which
+                // both block re-approval via the currentStatus !== 'PENDING' check above).
+
                 // Update balance header status
                 $this->approvalRepo->updateBalanceApprovalStatus($idBalanceHead, 'APPROVED', $user);
 
@@ -105,14 +113,15 @@ class TransferApprovalService
 
                 // Audit log
                 AuditService::log('TRANSFER', 'APPROVE',
-                    'Transfer approved | ID: ' . $idBalanceHead . ' | By: ' . $user,
+                    'Transfer approved | ID: '.$idBalanceHead.' | By: '.$user,
                     $user, ['id_balance_head' => $idBalanceHead, 'approved_by' => $user]);
 
                 return ['response' => 1, 'message' => 'Transfer approved'];
             });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::approve failed', ['error' => $e->getMessage()]);
-            return ['response' => 0, 'message' => 'Failed to approve: ' . $e->getMessage()];
+
+            return ['response' => 0, 'message' => 'Failed to approve: '.$e->getMessage()];
         }
     }
 
@@ -126,10 +135,13 @@ class TransferApprovalService
             // Check current status
             $currentStatus = $this->getCurrentStatus($idBalanceHead);
             if ($currentStatus !== 'PENDING') {
-                return ['response' => 2, 'message' => 'Only PENDING transfers can be rejected. Current: ' . $currentStatus];
+                return ['response' => 2, 'message' => 'Only PENDING transfers can be rejected. Current: '.$currentStatus];
             }
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user, $reason) {
+                // Reverse the transfer to release reserved stock
+                $this->deactivateBalance($idBalanceHead, $user);
+
                 // Update balance header status
                 $this->approvalRepo->updateBalanceApprovalStatus($idBalanceHead, 'REJECTED', $user);
 
@@ -138,14 +150,15 @@ class TransferApprovalService
 
                 // Audit log
                 AuditService::log('TRANSFER', 'REJECT',
-                    'Transfer rejected | ID: ' . $idBalanceHead . ' | Reason: ' . $reason,
+                    'Transfer rejected | ID: '.$idBalanceHead.' | Reason: '.$reason,
                     $user, ['id_balance_head' => $idBalanceHead, 'rejected_by' => $user, 'reason' => $reason]);
 
                 return ['response' => 1, 'message' => 'Transfer rejected'];
             });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::reject failed', ['error' => $e->getMessage()]);
-            return ['response' => 0, 'message' => 'Failed to reject: ' . $e->getMessage()];
+
+            return ['response' => 0, 'message' => 'Failed to reject: '.$e->getMessage()];
         }
     }
 
@@ -165,11 +178,14 @@ class TransferApprovalService
 
             // Check current status
             $currentStatus = $this->getCurrentStatus($idBalanceHead);
-            if (!in_array($currentStatus, ['DRAFT', 'REJECTED'])) {
-                return ['response' => 2, 'message' => 'Only DRAFT or REJECTED transfers can be cancelled. Current: ' . $currentStatus];
+            if (! in_array($currentStatus, ['DRAFT', 'REJECTED'])) {
+                return ['response' => 2, 'message' => 'Only DRAFT or REJECTED transfers can be cancelled. Current: '.$currentStatus];
             }
 
             return DB::connection('eudr_ts')->transaction(function () use ($idBalanceHead, $user) {
+                // Reverse the transfer to release reserved stock
+                $this->deactivateBalance($idBalanceHead, $user);
+
                 // Update balance header status
                 $this->approvalRepo->updateBalanceApprovalStatus($idBalanceHead, 'CANCELLED', $user);
 
@@ -178,14 +194,35 @@ class TransferApprovalService
 
                 // Audit log
                 AuditService::log('TRANSFER', 'CANCEL',
-                    'Transfer cancelled | ID: ' . $idBalanceHead,
+                    'Transfer cancelled | ID: '.$idBalanceHead,
                     $user, ['id_balance_head' => $idBalanceHead]);
 
                 return ['response' => 1, 'message' => 'Transfer cancelled'];
             });
         } catch (\Exception $e) {
             Log::error('TransferApprovalService::cancel failed', ['error' => $e->getMessage()]);
-            return ['response' => 0, 'message' => 'Failed to cancel: ' . $e->getMessage()];
+
+            return ['response' => 0, 'message' => 'Failed to cancel: '.$e->getMessage()];
+        }
+    }
+
+    /**
+     * Reverse a transfer's balance/trace effect via TransactionCancellationService.
+     * That service expects "idBalanceHead|idTraceHead" (see RmEntryService::deactivateTransfer
+     * for the same bridge pattern) — without idTraceHead, explode('|', $id)[1] is undefined.
+     */
+    private function deactivateBalance(int $idBalanceHead, string $user): void
+    {
+        $transfer = $this->approvalRepo->findTransferForApproval($idBalanceHead);
+        $pipeId = $idBalanceHead.'|'.($transfer->id_trace_head ?? '');
+
+        $result = app(TransactionCancellationService::class)
+            ->deactivateTransfer($pipeId, $user);
+
+        if ((int) ($result['response'] ?? 0) !== 1) {
+            throw new \RuntimeException(
+                'Failed to reverse transfer balance: '.($result['message'] ?? 'unknown error')
+            );
         }
     }
 
@@ -219,6 +256,7 @@ class TransferApprovalService
     public function canEdit(int $idBalanceHead): bool
     {
         $status = $this->getCurrentStatus($idBalanceHead);
+
         return in_array($status, ['DRAFT', 'REJECTED']);
     }
 
@@ -262,8 +300,16 @@ class TransferApprovalService
             'source_sloc' => $sourceSloc,
             'dest_sloc' => $destSloc,
             'id_plant' => $plantId,
-            'status' => 'DRAFT',
+            'status' => 'PENDING',
             'created_by' => $user,
         ]);
+    }
+
+    /**
+     * Get pending transfer history (all plants, no filter).
+     */
+    public function getPendingHistory(int $page = 1, int $perPage = 5): array
+    {
+        return $this->approvalRepo->getPendingHistory($page, $perPage);
     }
 }

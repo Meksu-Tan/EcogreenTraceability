@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Helpers;
 
 /**
@@ -17,10 +19,10 @@ class QuantityDistributionHelper
     /**
      * Proportionally distribute $totalTarget across $items.
      *
-     * @param array<int, array<string, mixed>> $items  Flat list of items, each containing $qtyKey.
-     * @param float                            $totalTarget  Desired sum after distribution.
-     * @param string                           $qtyKey   Key holding the numeric quantity (default 'out_qty').
-     * @return array<int, array<string, mixed>>  Items with adjusted $qtyKey values.
+     * @param  array<int, array<string, mixed>>  $items  Flat list of items, each containing $qtyKey.
+     * @param  float  $totalTarget  Desired sum after distribution.
+     * @param  string  $qtyKey  Key holding the numeric quantity (default 'out_qty').
+     * @return array<int, array<string, mixed>> Items with adjusted $qtyKey values.
      */
     public static function adjustToTotal(array $items, float $totalTarget, string $qtyKey = 'out_qty'): array
     {
@@ -57,4 +59,3 @@ class QuantityDistributionHelper
         return $items;
     }
 }
-

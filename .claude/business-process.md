@@ -208,61 +208,7 @@ Total: **14 digit** (semua tipe, termasuk ADJ-WH prefix 6)
 | Plant | 11–12 | `PP` | 2 digit kode plant |
 | Sequence | 13–14 | `SS` | Auto-increment dari `01` |
 
-**Rundown Section ID Mapping (Frontend → DB):**
 
-| Frontend ID | Produk | DB Rundown ID | FeedId | Seksi |
-|-------------|--------|---------------|--------|-------|
-| 102 | daoil | 011 | 11 | 101/102 |
-| 102 | pkfad | 021 | 21 | 101/102 |
-| 103 | crudeme | 012 | 12 | 103 |
-| 103 | treatedgly | 022 | 22 | 103 |
-
-#### Mode 1
-
-| Frontend ID | Produk | DB Rundown ID | FeedId | Seksi |
-|-------------|--------|---------------|--------|-------|
-| 104 | ume | 033 | 33 | 104 |
-| 104 | bdme | 023 | 23 | 104 |
-| 104 | me28 | 043 | 43 | 104 |
-| 104 | econoate665 | 053 | 53 | 104 |
-| 104 | me80 | 063 | 63 | 104 |
-| 104 | me60 | 013 | 13 | 104 |
-| 105 | cfa80 | 026 | 26 | 105 |
-| 105 | cfa28 | 016 | 16 | 105 |
-| 106 | fa1299 | 078 | 78 | 106/114 |
-| 106 | fa1499 | 088 | 88 | 106/114 |
-| 110 | crudegly | 014 | 14 | 110 |
-| 111 | glycerine | 017 | 17 | 111/116 |
-| 112 | cfa28 | 069 | 69 | 112/114 |
-| 112 | fa12 | 039 | 39 | 112/114 |
-| 112 | fa14lrr | 079 | 79 | 112/114 |
-| 112 | fa14 | 059 | 59 | 112/114 |
-| 112 | fa18 | 029 | 29 | 112/114 |
-| 112 | fa18lrr | 049 | 49 | 112/114 |
-| 112 | ecowax | 019 | 19 | 112/114 |
-| 114 | ecowax | 018 | 18 | 106/114 |
-| 114 | lefa | 028 | 28 | 106/114 |
-| 114 | fa24 | 038 | 38 | 106/114 |
-| 114 | fa16 | 048 | 48 | 106/114 |
-| 114 | fa18lrr | 058 | 58 | 106/114 |
-| 114 | fa26 | 068 | 68 | 106/114 |
-| 302 | wme | 015 | 15 | 302 |
-| 302 | me28 | 025 | 25 | 302 |
-
-#### Mode 2
-
-| Frontend ID | Produk | DB Rundown ID | FeedId | Seksi |
-|-------------|--------|---------------|--------|-------|
-| 104 | ume | 033 | 33 | 104 |
-| 104 | bdme | 023 | 23 | 104 |
-| 104 | me28 | 043 | 43 | 104 |
-| 104 | econoate665 | 053 | 53 | 104 |
-| 104 | me80 | 063 | 63 | 104 |
-| 105 | cfa80 | 026 | 26 | 105 |
-| 106 | cfa28 | 098 | 98 | 106 |
-| 106 | lefa | 028 | 28 | 106 |
-| 106 | fa8 | 108 | 108 | 106 |
-| 106 | fa10 | 118 | 118 | 106 |
 
 **File Generasi:**
 - `backend/Modules/ts-wip/app/Repositories/Traits/WipEntryBatchTrait.php:189` — `generateNewRundownNumber()`
@@ -542,9 +488,8 @@ CRUDE GLY (FeedId 07)
 
 ### Seksi 104 — Fractionation
 
-**Proses:** Distilasi CRUDE-ME — menghasilkan berbagai grade ME. Terbagi menjadi 2 mode operasi.
+**Proses:** Distilasi CRUDE-ME — menghasilkan berbagai grade ME. 
 
-#### Mode 1
 
 | Role | Material | FeedId | Tank |
 |------|----------|--------|------|
@@ -561,29 +506,9 @@ CRUDE-ME (FeedId 03)
     ├── ME-60         (FeedId 13) → produk akhir
     ├── BDME          (FeedId 23) → produk akhir
     ├── UME           (FeedId 33) → masuk ke Seksi 302
-    ├── ME28          (FeedId 43) → masuk ke Seksi 105 (short chain)
+    ├── ME28          (FeedId 43) → masuk ke Seksi 105 
     ├── ECONOATE 6/65 (FeedId 53) → produk akhir
-    └── ME80          (FeedId 63) → masuk ke Seksi 105 (long chain)
-```
-
-#### Mode 2
-
-| Role | Material | FeedId | Tank |
-|------|----------|--------|------|
-| Source | CRUDE-ME | 03 | `104 FT0118` |
-| Product | BDME | 23 | `104 FT0215` |
-| Product | UME | 33 | `104 FT0110` |
-| Product | ME28 | 43 | `104 FT0332` |
-| Product | ECONOATE 6/65 | 53 | `104 FT0170` |
-| Product | ME80 | 63 | `104 FT0157` |
-
-```
-CRUDE-ME (FeedId 03)
-    ├── BDME          (FeedId 23) → produk akhir
-    ├── UME           (FeedId 33) → masuk ke Seksi 302
-    ├── ME28          (FeedId 43) → masuk ke Seksi 105 (short chain)
-    ├── ECONOATE 6/65 (FeedId 53) → produk akhir
-    └── ME80          (FeedId 63) → masuk ke Seksi 105 (long chain)
+    └── ME80          (FeedId 63) → masuk ke Seksi 105 
 ```
 
 > **Catatan Tank:** ME-60 (FeedId 13) dan ME80 (FeedId 63) menggunakan tank yang sama `FT0157`. Bedakan via FeedId.
@@ -594,7 +519,7 @@ CRUDE-ME (FeedId 03)
 
 **Proses:** Dua mode operasi.
 
-#### Mode 1 (Short Chain & Long Chain)
+#### Mode (Short Chain & Long Chain)
 
 | Mode | Source | Feed DB ID | Tank Source |
 |------|--------|------------|-------------|
@@ -603,28 +528,13 @@ CRUDE-ME (FeedId 03)
 
 | Role | Material | FeedId | Tank |
 |------|----------|--------|------|
-| Product (short chain) | CFA28 | 16 | `3105FQ808` |
-| Product (long chain) | CFA80 | 26 | `302 105FQ808` |
+| Product (short chain) | CFA28 | 16 | `105FQ808` |
+| Product (long chain) | CFA80 | 26 | `105FQ808` |
 
 ```
-ME28 (006-01, short chain) → CFA28 (FeedId 16) → masuk ke Seksi 106/114
-ME80 (006-02, long chain)  → CFA80 (FeedId 26) → produk akhir
+ME28 (006-01, short chain) → CFA28 (FeedId 16) → masuk ke Seksi 106/114 Mode 1
+ME80 (006-02, long chain)  → CFA80 (FeedId 26) → masuk ke Seksi 106 Mode 2
 ```
-
-#### Mode 2 (Long Chain Only)
-
-| Mode | Source | Feed DB ID | Tank Source |
-|------|--------|------------|-------------|
-| Long Chain | ME80 | 006-02 | `105 FQ104` |
-
-| Role | Material | FeedId | Tank |
-|------|----------|--------|------|
-| Product (long chain) | CFA80 | 26 | `302 105FQ808` |
-
-```
-ME80 (006-02, long chain) → CFA80 (FeedId 26) → masuk ke seksi 106
-```
-
 ---
 
 ### Seksi 302 — Cracking
@@ -633,7 +543,7 @@ ME80 (006-02, long chain) → CFA80 (FeedId 26) → masuk ke seksi 106
 
 | Role | Material | FeedId | Tank |
 |------|----------|--------|------|
-| Source | UME | 05 | `321 FT0102` |
+| Source | UME | 05 | `302 FT0102` |
 | Product | ME28 | 25 | `302V04` |
 | Product | WME | 15 | `302 FT101` |
 
@@ -697,13 +607,10 @@ CFA28 (FeedId 08)
 | Product | FA8 | 108 | `106 F0134` |
 | Product | FA10 | 118 | `106 F0231` |
 
-> **Tank Shared di Seksi 106:**
-> - FA24 (38), FA26 (68), FA12/99 (78) → `F0134` — bedakan via FeedId
-> - FA16/99 (48) dan FA14/99 (88) → `F0231` — bedakan via FeedId
-> - ECOROL WAX (18) → `F0245/167` (dua tank)
+
 
 ```
-CFA28 (FeedId 08)
+CFA80 (FeedId 08)
     └── LEFA1 (28), FA8 (108), FA10 (118), CFA28 (108) → produk akhir
 ```
 
@@ -750,54 +657,6 @@ Input (berbagai FA dari Seksi 106/114 atau internal recycle)
 Loop 1: Seksi 106/114 → ECOROL WAX/FA24/FA18lrr → Seksi 112/114 → CFA28 (69) → kembali ke 106/114
 Loop 2: Seksi 105 → CFA28 (16) → Seksi 106/114 → Seksi 112/114 → CFA28 (69) → kembali ke 106/114
 ```
-
----
-
-## 7. Referensi Cepat: FeedId per Seksi
-
-| FeedId | Material | Seksi | Role | Tank |
-|--------|----------|-------|------|------|
-| 01 | RM | 101/102 | Source | `101 FT0113` |
-| 02 | DA-OIL | 103 | Source | `103 FT0101` |
-| 03 | CRUDE-ME | 104 | Source | `104 FT0118` |
-| 04 | TREATED GLY | 110 | Source | `110 FT0107` |
-| 05 | UME | 302 | Source | `321 FT0102` |
-| 006-01 | ME28 (short chain) | 105 | Source | `105 FQ104` |
-| 006-02 | ME80 (long chain) | 105 | Source | `105 FQ104` |
-| 07 | CRUDE GLY | 111/116 | Source | `111 FT0118` + `116 FC01` |
-| 08 | CFA28 | 106/114 | Source | `321 FT0102` |
-| 09 | Multi (ECOROL WAX / FA24 / FA18lrr / FA14lrr) | 112/114 | Source | `112 F0109` |
-| 11 | DA-OIL | 101/102 | Product | `101 FT0109` |
-| 12 | CRUDE-ME | 103 | Product | `103 FT0329` |
-| 13 | ME-60 | 104 | Product | `104 FT0157` |
-| 14 | CRUDE GLY | 110 | Product | `110 FT0108` |
-| 15 | WME | 302 | Product | `302 FT101` |
-| 16 | CFA28 | 105 | Product | `3105FQ808` |
-| 17 | GLY | 111/116 | Product | `111 FT0314` |
-| 18 | ECOROL WAX | 106/114 | Product | `106 F0245/167` |
-| 19 | ECOROL WAX | 112/114 | Product | `112 F0224` |
-| 21 | PKFAD | 101/102 | Product | `101 FT0113` |
-| 22 | TREATED GLY | 103 | Product | `103 FT0266` |
-| 23 | BDME | 104 | Product | `104 FT0215` |
-| 25 | ME28 | 302 | Product | `302V04` |
-| 26 | CFA80 | 105 | Product | `302 105FQ808` |
-| 28 | LEFA1 | 106/114 | Product | `106 F0167` |
-| 29 | fa18 | 112/114 | Product | `112 F0235` |
-| 33 | UME | 104 | Product | `104 FT0110` |
-| 38 | FA24 | 106/114 | Product | `106 F0134` |
-| 39 | fa12 | 112/114 | Product | `112 F0235` |
-| 43 | ME28 | 104 | Product | `104 FT0332` |
-| 48 | FA16/99 | 106/114 | Product | `106 F0231` |
-| 49 | FA18lrr | 112/114 | Product | `112 F0235` |
-| 53 | ECONOATE 6/65 | 104 | Product | `104 FT0170` |
-| 58 | FA18lrr | 106/114 | Product | `106 F0112` |
-| 59 | FA14/99 | 112/114 | Product | `112 F0235` |
-| 63 | ME80 | 104 | Product | `104 FT0157` |
-| 68 | FA26 | 106/114 | Product | `106 F0134` |
-| 69 | CFA28 | 112/114 | Product | `112 F0139` |
-| 78 | FA12/99 | 106/114 | Product | `106 F0134` |
-| 79 | fa14lrr | 112/114 | Product | `112 F0224` |
-| 88 | FA14/99 | 106/114 | Product | `106 F0231` |
 
 ---
 

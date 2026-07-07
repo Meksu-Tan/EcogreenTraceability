@@ -101,6 +101,7 @@ const pageTitle = computed(() => {
     '/setup/supplier':         'Setup Supplier',
     '/setup/plant':            'Setup Plant',
     '/setup/tank':             'Setup Tank',
+    '/setup/warehouse':        'Setup Warehouse',
     '/setup/manufacturer':     'Setup Manufacturer',
     '/admin/user-management':  'User Management',
     '/ts-raw/rm-entry':        'Raw Material Entry',

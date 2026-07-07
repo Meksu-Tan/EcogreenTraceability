@@ -1,24 +1,27 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TsShipment\Services\ShipmentService;
-use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Mockery;
 use Mockery\MockInterface;
+use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
+use Modules\TsShipment\Services\ShipmentService;
+use Tests\TestCase;
 
 class ShipmentServiceTest extends TestCase
 {
     protected MockInterface $repoMock;
+
     protected ShipmentService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->repoMock = Mockery::mock(ShipmentRepositoryInterface::class);
-        $this->service  = new ShipmentService($this->repoMock);
+        $this->service = new ShipmentService($this->repoMock);
     }
 
     protected function tearDown(): void
@@ -101,7 +104,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_get_wip_material_by_fg_product_to_repository(): void
     {
-        $data     = ['id_fg_product' => 10];
+        $data = ['id_fg_product' => 10];
         $expected = collect([
             (object) ['id_material' => 3, 'material' => 'CRUDE PALM OIL'],
         ]);
@@ -120,7 +123,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_get_active_batch_product_to_repository(): void
     {
-        $data     = ['id_plant' => 1, 'id_fg_product' => 10];
+        $data = ['id_plant' => 1, 'id_fg_product' => 10];
         $expected = collect([
             (object) ['batch_sap' => 'BATCH001', 'qty' => 5000.0],
         ]);
@@ -153,7 +156,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_store_to_repository_and_returns_success_response(): void
     {
-        $data     = ['trace_no' => 'SHP001', 'id_plant' => 1];
+        $data = ['trace_no' => 'SHP001', 'id_plant' => 1];
         $expected = ['response' => 1, 'message' => 'Shipment stored successfully'];
 
         $this->repoMock->shouldReceive('store')
@@ -169,7 +172,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_returns_failure_response_when_store_fails(): void
     {
-        $data     = ['trace_no' => 'SHP001', 'id_plant' => 1];
+        $data = ['trace_no' => 'SHP001', 'id_plant' => 1];
         $expected = ['response' => 0, 'message' => 'Failed to store shipment'];
 
         $this->repoMock->shouldReceive('store')
@@ -186,7 +189,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_cancel_to_repository_and_returns_success_response(): void
     {
-        $data     = ['id_ship' => 5];
+        $data = ['id_ship' => 5];
         $expected = ['response' => 1, 'message' => 'Shipment cancelled'];
 
         $this->repoMock->shouldReceive('cancel')
@@ -201,7 +204,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_returns_failure_response_when_cancel_fails(): void
     {
-        $data     = ['id_ship' => 99];
+        $data = ['id_ship' => 99];
         $expected = ['response' => 0, 'message' => 'Cancel failed'];
 
         $this->repoMock->shouldReceive('cancel')
@@ -218,7 +221,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_update_so_to_repository(): void
     {
-        $data     = ['id_ship' => 5, 'so_number' => 'SO-2026-001'];
+        $data = ['id_ship' => 5, 'so_number' => 'SO-2026-001'];
         $expected = ['response' => 1, 'message' => 'SO updated'];
 
         $this->repoMock->shouldReceive('updateSo')
@@ -249,7 +252,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_get_shipment_batch_packaging_to_repository(): void
     {
-        $data     = ['id_ship' => 5];
+        $data = ['id_ship' => 5];
         $expected = collect([
             (object) ['id_packaging' => 1, 'packaging_code' => 'PKG001'],
         ]);
@@ -268,7 +271,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_get_label_to_repository(): void
     {
-        $data     = ['id_ship' => 5];
+        $data = ['id_ship' => 5];
         $expected = collect([
             (object) ['label_no' => 'LBL001', 'product_name' => 'FAME'],
         ]);
@@ -301,7 +304,7 @@ class ShipmentServiceTest extends TestCase
 
     public function test_it_delegates_get_special_label_to_repository(): void
     {
-        $data     = ['id_ship' => 5];
+        $data = ['id_ship' => 5];
         $expected = collect([
             (object) ['label_no' => 'SPL001', 'product_name' => 'PALM STEARIN'],
         ]);
@@ -318,54 +321,50 @@ class ShipmentServiceTest extends TestCase
 
     // ========== getDatShipment ==========
 
-    public function test_it_delegates_get_dat_shipment_to_repository(): void
+    public function test_it_returns_error_when_so_no_empty(): void
     {
-        $data     = ['id_ship' => 5];
-        $expected = [
-            'header'  => ['trace_no' => 'SHP001'],
-            'details' => [],
-        ];
+        $result = $this->service->getDatShipment(['soNo' => '']);
 
-        $this->repoMock->shouldReceive('getDatShipment')
-            ->once()
-            ->with($data)
-            ->andReturn($expected);
+        $this->assertSame(0, $result['response']);
+        $this->assertStringContainsString('SO number is required', $result['message']);
+    }
 
-        $result = $this->service->getDatShipment($data);
+    public function test_it_returns_success_when_so_no_provided(): void
+    {
+        Http::fake([
+            '*' => Http::response(['data' => [['shipment' => 'SHP001']]], 200),
+        ]);
 
-        $this->assertEquals($expected, $result);
+        $result = $this->service->getDatShipment([
+            'soNo' => 'SO-001',
+            'batchNo' => 'BATCH-001',
+            'soItem' => '10',
+        ]);
+
+        $this->assertSame(1, $result['response']);
+        $this->assertArrayHasKey('data', $result);
     }
 
     // ========== getDatSoAllocation ==========
 
-    public function test_it_delegates_get_dat_so_allocation_to_repository(): void
+    public function test_it_returns_error_when_batch_no_empty(): void
     {
-        $data     = ['id_ship' => 5];
-        $expected = [
-            ['so_number' => 'SO-2026-001', 'allocated_qty' => 1000.0],
-        ];
+        $result = $this->service->getDatSoAllocation(['batchNo' => '']);
 
-        $this->repoMock->shouldReceive('getDatSoAllocation')
-            ->once()
-            ->with($data)
-            ->andReturn($expected);
-
-        $result = $this->service->getDatSoAllocation($data);
-
-        $this->assertEquals($expected, $result);
+        $this->assertSame(0, $result['response']);
+        $this->assertStringContainsString('Batch number is required', $result['message']);
     }
 
-    public function test_it_returns_empty_array_when_no_so_allocation(): void
+    public function test_it_returns_success_when_batch_no_provided(): void
     {
-        $data = ['id_ship' => 99];
+        Http::fake([
+            '*' => Http::response(['data' => [['so_number' => 'SO-2026-001']]], 200),
+        ]);
 
-        $this->repoMock->shouldReceive('getDatSoAllocation')
-            ->once()
-            ->with($data)
-            ->andReturn([]);
+        $result = $this->service->getDatSoAllocation(['batchNo' => 'BATCH-001']);
 
-        $result = $this->service->getDatSoAllocation($data);
-
-        $this->assertEmpty($result);
+        $this->assertSame(1, $result['response']);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertNotEmpty($result['data']);
     }
 }

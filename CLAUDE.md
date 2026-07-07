@@ -39,6 +39,24 @@ npm run lint
 
 **psql:** `"C:\Program Files\PostgreSQL\17\bin\psql.exe"` — not in PATH, use full path.
 
+## Tech Stack (AnDWiki Tech Stack Standard v2 — module 23)
+
+| Layer | Standard | Versi |
+|---|---|---|
+| Backend | Laravel | ^12 (PHP ^8.2) |
+| Modules | nwidart/laravel-modules | ^13.0 (wiki module 23 references ^12 — v13 released 2026-03, superseding baseline) |
+| Auth | Laravel Sanctum | ^4 — Bearer token di localStorage, bukan SPA cookie stateful |
+| RBAC | spatie/laravel-permission | ^6 |
+| Frontend | Vue 3 + Vite | ^3.5 / ^8 (wiki baseline ^5 — project ahead) |
+| UI Framework | Vuetify | ^3.7 — standard utama |
+| CSS utility | Tailwind CSS v4 | hybrid dengan Vuetify — wiki tandai Tailwind sebagai legacy/opsional; project pakai aktif untuk utility classes lintas 20+ komponen |
+| State | Pinia | ^3.0 (wiki baseline ^2 — project ahead) |
+| Router | vue-router | ^5.0 |
+| HTTP | Axios | latest |
+| Icons | Remix Icon (`ri-*`) | bukan MDI |
+| Database | PostgreSQL 17 | bukan MySQL |
+| Test | PHPUnit ^11 (sqlite :memory:) · Vitest ^4 (jsdom) | coverage ≥ 80% |
+
 ## Architecture
 
 ```

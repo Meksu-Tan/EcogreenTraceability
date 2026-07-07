@@ -1,23 +1,26 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TsStock\Services\StockService;
-use Modules\TsStock\Repositories\Contracts\StockRepositoryInterface;
 use Mockery;
 use Mockery\MockInterface;
+use Modules\TsStock\Repositories\Contracts\StockRepositoryInterface;
+use Modules\TsStock\Services\StockService;
+use Tests\TestCase;
 
 class StockServiceTest extends TestCase
 {
     protected MockInterface $repoMock;
+
     protected StockService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->repoMock = Mockery::mock(StockRepositoryInterface::class);
-        $this->service  = new StockService($this->repoMock);
+        $this->service = new StockService($this->repoMock);
     }
 
     protected function tearDown(): void
@@ -62,7 +65,7 @@ class StockServiceTest extends TestCase
 
     public function test_it_passes_filters_to_repository_when_getting_stock_list(): void
     {
-        $filters  = ['plant_code' => 'EOB', 'material_type' => 'RAW'];
+        $filters = ['plant_code' => 'EOB', 'material_type' => 'RAW'];
         $repoData = [['id_balance_head' => 1, 'material' => 'CRUDE PALM OIL', 'qty' => 5000.0]];
 
         $this->repoMock->shouldReceive('getStockList')
@@ -181,7 +184,7 @@ class StockServiceTest extends TestCase
 
     public function test_it_passes_filters_to_repository_when_getting_stock_movement(): void
     {
-        $filters  = ['plant_code' => 'EOB', 'date_from' => '2026-01-01'];
+        $filters = ['plant_code' => 'EOB', 'date_from' => '2026-01-01'];
         $repoData = [['id_movement' => 1, 'movement_type' => 'IN', 'qty' => 1000.0]];
 
         $this->repoMock->shouldReceive('getStockMovement')

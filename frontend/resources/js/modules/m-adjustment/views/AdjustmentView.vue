@@ -57,6 +57,19 @@
           </template>
         </div>
 
+        <div class="d-flex flex-wrap align-center ga-2 mb-3">
+          <VTextField
+            v-model="searchQuery"
+            prepend-inner-icon="ri-search-line"
+            placeholder="Search by material, adjust no, supplier..."
+            density="compact"
+            variant="outlined"
+            hide-details
+            clearable
+            style="min-width:280px"
+          />
+        </div>
+
         <div v-if="loading" class="pa-4">
           <VSkeletonLoader type="table-thead, table-tbody@5" :loading="true" />
         </div>
@@ -70,12 +83,17 @@
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material_document' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material_document')">Material Document<VIcon v-if="sortKey==='material_document'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'entry_date' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('entry_date')">Entry Date<VIcon v-if="sortKey==='entry_date'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'material' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('material')">Material<VIcon v-if="sortKey==='material'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <template v-if="adjMode === 'wh'">
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'batch_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('batch_no')">Batch No<VIcon v-if="sortKey==='batch_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                    <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'po_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('po_no')">PO No<VIcon v-if="sortKey==='po_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  </template>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'sloc' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('sloc')">SLoc<VIcon v-if="sortKey==='sloc'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'trace_no' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('trace_no')">Adjusted Batch<VIcon v-if="sortKey==='trace_no'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right sortable-th" :class="{ active: sortKey === 'adjustment' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('adjustment')">Adjustment (MT)<VIcon v-if="sortKey==='adjustment'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'supplier' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('supplier')">Supplier / Batch SAP / Qty<VIcon v-if="sortKey==='supplier'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'created_at' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_at')">Created At<VIcon v-if="sortKey==='created_at'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'created_by' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_by')">Created By<VIcon v-if="sortKey==='created_by'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" :class="{ active: sortKey === 'updated_at' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('updated_at')">Updated At<VIcon v-if="sortKey==='updated_at'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Action</th>
                 </tr>
               </thead>
@@ -86,25 +104,32 @@
                   <td class="font-monospace text-caption">{{ row.material_document || row.material_doc || '-' }}</td>
                   <td class="font-monospace text-caption">{{ row.entry_date }}</td>
                   <td class="text-caption font-weight-medium text-truncate" style="max-width:160px" :title="row.material">{{ row.material }}</td>
+                  <template v-if="adjMode === 'wh'">
+                    <td class="font-monospace text-caption">{{ row.batch_no || '-' }}</td>
+                    <td class="font-monospace text-caption">{{ row.po_no || '-' }}</td>
+                  </template>
                   <td class="font-monospace text-caption">{{ row.sloc || row.tank || '-' }}</td>
                   <td class="font-monospace text-caption">{{ row.trace_no || '-' }}</td>
                   <td class="text-right font-monospace text-caption">{{ row.adjustment || '-' }}</td>
                   <td class="text-caption text-truncate" style="max-width:200px" :title="row.supplier">{{ row.supplier || '-' }}</td>
                   <td class="text-caption text-medium-emphasis">{{ row.created_at || '-' }}</td>
                   <td class="text-caption">{{ row.created_by || '-' }}</td>
+                  <td class="text-caption text-medium-emphasis">{{ row.updated_at || '-' }}</td>
                   <td class="text-center">
                     <div class="d-flex ga-1 justify-center">
                       <VBtn icon="ri-eye-line" size="x-small" color="primary" variant="tonal" @click="viewDetail(row)" />
+                      <VBtn icon="ri-file-edit-line" size="x-small" color="info" variant="tonal" title="Edit Material Document" @click="openMaterialDoc(row)" />
                       <VBtn v-if="row.status === 1" icon="ri-checkbox-circle-line" size="x-small" color="success" variant="tonal" @click="approve(row)" />
                       <VBtn v-if="row.status === 2" icon="ri-play-circle-line" size="x-small" color="warning" variant="tonal" @click="execute(row)" />
                       <VBtn v-if="row.status === 1 || row.status === 2" icon="ri-close-circle-line" size="x-small" color="error" variant="tonal" @click="cancel(row)" />
+                      <VBtn v-if="row.status === 1" icon="ri-delete-bin-line" size="x-small" color="error" variant="tonal" title="Delete" @click="destroyRow(row)" />
                     </div>
                   </td>
                 </tr>
               </tbody>
               <tbody v-else>
                 <tr>
-                  <td colspan="12" class="text-center pa-8">
+                  <td :colspan="adjMode === 'wh' ? 14 : 12" class="text-center pa-8">
                     <VIcon icon="ri-tune-line" size="40" class="text-disabled mb-2" />
                     <p class="text-body-2 text-medium-emphasis">No adjustment records found.</p>
                   </td>
@@ -399,7 +424,10 @@
                   <tr v-for="(item, i) in initSupplierList" :key="item.idTail">
                     <td class="text-center text-caption text-medium-emphasis">{{ i + 1 }}</td>
                     <td class="text-center">
-                      <VBtn icon="ri-delete-bin-line" size="x-small" color="error" variant="tonal" @click="removeSupplierFromInit(item.idTail)" />
+                      <div class="d-flex ga-1 justify-center">
+                        <VBtn icon="ri-edit-line" size="x-small" color="warning" variant="tonal" @click="editSupplierInInit(item)" />
+                        <VBtn icon="ri-delete-bin-line" size="x-small" color="error" variant="tonal" @click="removeSupplierFromInit(item.idTail)" />
+                      </div>
                     </td>
                     <td class="text-caption">{{ item.material || '-' }}</td>
                     <td class="text-caption">{{ item.supplier || item.idSupplier }}</td>
@@ -437,7 +465,7 @@
                     <VTextField :model-value="periodNewForm.mode" label="Entry Mode" readonly density="compact" variant="outlined" />
                   </VCol>
                   <VCol cols="12" sm="6" md="4">
-                    <VTextField v-model="periodNewForm.period" label="Period (Month &amp; Year)" type="month" :disabled="periodNewForm.mode === 'UPDATE'" density="compact" variant="outlined" />
+                    <VTextField v-model="periodNewForm.period" label="Period (Month &amp; Year)" type="month" readonly density="compact" variant="outlined" />
                   </VCol>
                   <VCol cols="12" sm="6" md="4">
                     <VTextField v-model="periodNewForm.batch" label="Batch SAP" density="compact" variant="outlined" />
@@ -467,10 +495,11 @@
                       <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">Lock Status</th>
                       <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created By</th>
                       <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Created At</th>
+                      <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Updated At</th>
                     </tr>
                   </thead>
                   <tbody v-if="periodHeaders.length === 0">
-                    <tr><td colspan="9" class="text-center text-disabled py-6 text-body-2">No period history found.</td></tr>
+                    <tr><td colspan="10" class="text-center text-disabled py-6 text-body-2">No period history found.</td></tr>
                   </tbody>
                   <tbody v-else>
                     <tr v-for="(row, i) in periodHeaders" :key="row.id_pspa_head">
@@ -497,6 +526,7 @@
                           <VBtn icon="ri-edit-line" size="x-small" color="primary" variant="tonal" title="Update" @click="updatePeriod(row)" />
                           <VBtn v-if="row.uploaded_file === 1" icon="ri-eye-line" size="x-small" color="info" variant="tonal" title="View Detail" @click="viewPeriodDetail(row)" />
                           <VBtn v-if="row.status !== 3" icon="ri-lock-line" size="x-small" color="warning" variant="tonal" title="Lock Period" @click="lockPeriod(row.id_pspa_head)" />
+                          <VBtn v-if="row.status === 3" icon="ri-lock-unlock-line" size="x-small" color="info" variant="tonal" title="Unlock Period" @click="unlockPeriod(row.id_pspa_head)" />
                         </div>
                       </td>
                       <td class="font-monospace text-caption">{{ row.batch_sap || '-' }}</td>
@@ -518,6 +548,7 @@
                       </td>
                       <td class="text-caption">{{ row.created_by }}</td>
                       <td class="text-caption text-medium-emphasis">{{ row.created_at ? new Date(row.created_at.replace(' ', 'T')).toLocaleString() : '-' }}</td>
+                      <td class="text-caption text-medium-emphasis">{{ row.updated_at ? new Date(row.updated_at.replace(' ', 'T')).toLocaleString() : '-' }}</td>
                     </tr>
                   </tbody>
                 </VTable>
@@ -867,6 +898,34 @@
         </VCardText>
       </VCard>
     </VDialog>
+
+    <VDialog v-model="showMaterialDocModal" max-width="500">
+      <VCard>
+        <VCardTitle class="d-flex align-center justify-space-between pa-5 pb-3">
+          <span class="text-h6 font-weight-bold">Edit Material Document</span>
+          <VBtn icon="ri-close-line" variant="text" size="small" color="medium-emphasis" @click="showMaterialDocModal = false" />
+        </VCardTitle>
+        <VDivider />
+        <VCardText class="pa-5">
+          <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Material Document</label>
+          <VTextField
+            v-model="materialDocForm.material_doc"
+            placeholder="Enter SAP Material Document"
+            rounded="md"
+            color="primary"
+            density="compact"
+            variant="outlined"
+            class="mt-1"
+            autofocus
+          />
+        </VCardText>
+        <VCardActions class="pa-0 px-5 pb-5">
+          <VSpacer />
+          <VBtn variant="outlined" color="medium-emphasis" @click="showMaterialDocModal = false">Cancel</VBtn>
+          <VBtn color="primary" :loading="saving" @click="saveMaterialDoc">Save</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
 
@@ -876,8 +935,6 @@ import { storeToRefs } from 'pinia'
 import { useAdjustmentStore } from '../stores/adjustmentStore'
 import { useToastStore } from '@/stores/toast.js'
 import { usePlantSelectionStore } from '@/stores/plant.js'
-
-import adjustmentApi from '@/modules/m-adjustment/services/index.js'
 
 const plantSelectionStore = usePlantSelectionStore()
 
@@ -897,6 +954,8 @@ const confirmAction = ref(null)
 const showLastRecordModal = ref(false)
 const showInitModal = ref(false)
 const showInitSupplierForm = ref(false)
+const showMaterialDocModal = ref(false)
+const materialDocForm = reactive({ id: null, material_doc: '' })
 const showPeriodModal = ref(false)
 const showNewPeriodForm = ref(false)
 const showSupplierModal = ref(false)
@@ -904,9 +963,22 @@ const showPeriodDetailModal = ref(false)
 const selectedPeriodHeader = ref(null)
 
 const perPage = ref(listMeta.value.perPage || 10)
+const searchQuery = ref('')
 
 const sortKey = ref(null)
 const sortDir = ref(null)
+
+const filteredList = computed(() => {
+  const q = searchQuery.value.toLowerCase().trim()
+  if (!q) return data.value
+  return (data.value || []).filter(row =>
+    String(row.adjust_no || '').toLowerCase().includes(q) ||
+    String(row.material || '').toLowerCase().includes(q) ||
+    String(row.supplier || '').toLowerCase().includes(q) ||
+    String(row.sloc || '').toLowerCase().includes(q) ||
+    String(row.material_document || row.material_doc || '').toLowerCase().includes(q)
+  )
+})
 
 function detectColumnType(colKey) {
   const rows = data.value
@@ -935,10 +1007,11 @@ function toggleSort(key) {
 }
 
 const sortedList = computed(() => {
-  if (!sortKey.value || !sortDir.value) return data.value
+  const source = filteredList.value
+  if (!sortKey.value || !sortDir.value) return source
   const key = sortKey.value
   const dir = sortDir.value
-  const rows = [...data.value]
+  const rows = [...source]
   const type = detectColumnType(key)
   return rows.sort((a, b) => {
     const va = a[key]
@@ -977,6 +1050,7 @@ const initForm = reactive({
 })
 const initSupplierForm = reactive({ idSupplier: '', batchSap: '', qty: 0 })
 const initSupplierList = ref([])
+const editingSupplierTailId = ref(null)
 
 const periodNewForm = reactive({ mode: 'ADD', id_head: null, period: '', batch: '' })
 
@@ -1059,9 +1133,9 @@ const changePage = async (p) => {
 }
 
 const loadFormOptions = async () => {
-  const plantId = plantSelectionStore.selectedPlantId || 0
   await store.fetchSuppliers({ supplier: '' })
   store.fetchActiveMaterials()
+  const plantId = plantSelectionStore.selectedPlantId || 0
   store.fetchActiveTanks({ id_plant: plantId })
 }
 
@@ -1257,16 +1331,16 @@ const fetchSupplierAdjStockAndBatches = async () => {
     return
   }
   try {
-    const [supplierRes, batchRes] = await Promise.all([
-      adjustmentApi.getSupplierByFilter({ id_material: idMaterial, tf_number: idSloc }),
-      adjustmentApi.getBatchBySupplier({ id_material: idMaterial, tf_number: idSloc, id_supplier: idSupplier })
+    await Promise.all([
+      store.fetchSupplierByFilter({ id_material: idMaterial, tf_number: idSloc }),
+      store.fetchBatchBySupplier({ id_material: idMaterial, tf_number: idSloc, id_supplier: idSupplier })
     ])
-    const suppliers = supplierRes.data?.data || []
+    const suppliers = store.supplierList || []
     const matched = suppliers.find(s => String(s.id_supplier) === String(idSupplier))
     supplierAdjStock.value = matched ? parseFloat(matched.total_qty || 0).toFixed(3) : '0.000'
 
-    const batches = batchRes.data?.data || []
-    supplierAdjBatchOptions.value = batches.map(b => ({
+    const batchList = store.batches || []
+    supplierAdjBatchOptions.value = batchList.map(b => ({
       label: `${b.batch_sap} (Stock: ${parseFloat(b.qty || 0).toFixed(3)} MT)`,
       value: b.batch_sap
     }))
@@ -1286,6 +1360,7 @@ const onInitSupplierChange = async (val) => {
 }
 
 const openInitSupplierForm = () => {
+  editingSupplierTailId.value = null
   initSupplierForm.idSupplier = ''
   initSupplierForm.batchSap = ''
   initSupplierForm.qty = 0
@@ -1356,30 +1431,47 @@ const addSupplierToInit = async () => {
   if (!initForm.entry_no) await onInitDateChange()
   saving.value = true
   try {
+    const isEditing = editingSupplierTailId.value !== null
     const res = await store.addEntrySupplier({
       entry_no: initForm.entry_no,
       id_supplier: initSupplierForm.idSupplier,
       batch_sap: initSupplierForm.batchSap,
       qty: initSupplierForm.qty,
       entry_date: initForm.entry_date,
-      id_plant: plantSelectionStore.selectedPlantId || 0
+      id_plant: plantSelectionStore.selectedPlantId || 0,
+      id_tail: editingSupplierTailId.value
     })
     if (res?.response === 1) {
       const supplierName = searchSuppliersList.value.find(s => s.id_supplier == initSupplierForm.idSupplier)?.supplier || initSupplierForm.idSupplier
-      initSupplierList.value.push({
-        idTail: res.idTail || Date.now(),
-        idSupplier: initSupplierForm.idSupplier,
-        supplier: supplierName,
-        batch_sap: initSupplierForm.batchSap,
-        qty: initSupplierForm.qty
-      })
+      if (isEditing) {
+        const idx = initSupplierList.value.findIndex(i => i.idTail === editingSupplierTailId.value)
+        if (idx !== -1) {
+          initSupplierList.value[idx] = {
+            ...initSupplierList.value[idx],
+            idSupplier: initSupplierForm.idSupplier,
+            supplier: supplierName,
+            batch_sap: initSupplierForm.batchSap,
+            qty: initSupplierForm.qty
+          }
+        }
+        editingSupplierTailId.value = null
+        toast.success('Supplier updated')
+      } else {
+        initSupplierList.value.push({
+          idTail: res.idTail || Date.now(),
+          idSupplier: initSupplierForm.idSupplier,
+          supplier: supplierName,
+          batch_sap: initSupplierForm.batchSap,
+          qty: initSupplierForm.qty
+        })
+        toast.success('Supplier added')
+      }
       const total = initSupplierList.value.reduce((acc, i) => acc + parseFloat(i.qty || 0), 0)
       initForm.qty = total.toFixed(3)
       initSupplierForm.idSupplier = ''
       initSupplierForm.batchSap = ''
       initSupplierForm.qty = 0
       showInitSupplierForm.value = false
-      toast.success('Supplier added')
     } else {
       toast.error(res?.message || 'Failed to add supplier')
     }
@@ -1388,6 +1480,14 @@ const addSupplierToInit = async () => {
   } finally {
     saving.value = false
   }
+}
+
+const editSupplierInInit = (item) => {
+  initForm.idSupplier = item.idSupplier
+  initForm.batchSap = item.batch_sap
+  initForm.qty = item.qty
+  editingSupplierTailId.value = item.idTail
+  showInitSupplierForm.value = true
 }
 
 const removeSupplierFromInit = async (idTail) => {
@@ -1571,21 +1671,44 @@ const lockPeriod = async (idHead) => {
   }
 }
 
-const deletePeriod = async (idHead) => {
-  if (!confirm('Are you sure you want to delete this period? All details will be deleted.')) return
+const unlockPeriod = async (idHead) => {
   saving.value = true
   try {
-    const res = await store.destroyAdjustmentPeriod(idHead)
+    const res = await store.periodHeaderUnlock({ id_head: idHead })
     if (res?.response === 1) {
-      toast.success(res?.message || 'Period Deleted Successfully')
+      toast.success(res?.message || 'Period Unlocked Successfully')
       await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
     } else {
-      toast.error(res?.message || 'Delete Failed')
+      toast.error(res?.message || 'Unlock Failed')
     }
   } catch (err) {
     toast.error(err.response?.data?.message || err.message)
   } finally {
     saving.value = false
+  }
+}
+
+const destroyRow = (row) => {
+  confirmType.value = 'delete'
+  confirmMsg.value = `Delete adjustment ${row.adjust_no}? This action cannot be undone.`
+  confirmAction.value = async () => {
+    const res = await store.destroyAdjustment(row.id_adjust_head)
+    if (res?.response === 1) { toast.success('Deleted'); loadData() }
+    else toast.error(res?.message || 'Failed')
+  }
+}
+
+const deletePeriod = (idHead) => {
+  confirmType.value = 'delete'
+  confirmMsg.value = 'Delete this period? All details will be deleted.'
+  confirmAction.value = async () => {
+    const res = await store.destroyAdjustmentPeriod(idHead)
+    if (res?.response === 1) {
+      toast.success('Period Deleted')
+      await store.fetchPeriodHeaders({ page: periodMeta.value.page, per_page: periodMeta.value.perPage })
+    } else {
+      toast.error(res?.message || 'Delete Failed')
+    }
   }
 }
 
@@ -1613,6 +1736,30 @@ const submitSupplierAdj = async () => {
       loadData()
     } else {
       toast.error(result?.message || 'Failed')
+    }
+  } catch (err) {
+    toast.error(err.response?.data?.message || err.message)
+  } finally {
+    saving.value = false
+  }
+}
+
+const openMaterialDoc = (row) => {
+  materialDocForm.id = row.id_adjust_head
+  materialDocForm.material_doc = row.material_document || row.material_doc || ''
+  showMaterialDocModal.value = true
+}
+
+const saveMaterialDoc = async () => {
+  saving.value = true
+  try {
+    const res = await store.adjustMaterialDocument(materialDocForm.id, { material_doc: materialDocForm.material_doc })
+    if (res?.status === 1) {
+      toast.success('Material document updated')
+      showMaterialDocModal.value = false
+      await fetchData()
+    } else {
+      toast.error(res?.message || 'Failed to update')
     }
   } catch (err) {
     toast.error(err.response?.data?.message || err.message)

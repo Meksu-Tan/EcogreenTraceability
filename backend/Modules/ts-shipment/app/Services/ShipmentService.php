@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsShipment\Services;
 
-use Modules\TsShipment\Services\Contracts\ShipmentServiceInterface;
-use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
-use Modules\Shared\Constants\TransactionResponseCode;
-use Modules\TsShipment\Support\DispatchType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Modules\Shared\Constants\TransactionResponseCode;
+use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
+use Modules\TsShipment\Services\Contracts\ShipmentServiceInterface;
+use Modules\TsShipment\Support\DispatchType;
 
 class ShipmentService implements ShipmentServiceInterface
 {
@@ -95,7 +97,7 @@ class ShipmentService implements ShipmentServiceInterface
         if ($soNo === '') {
             return [
                 'response' => TransactionResponseCode::GENERIC_FAILURE,
-                'message' => 'SO number is required for SAP shipment inquiry.'
+                'message' => 'SO number is required for SAP shipment inquiry.',
             ];
         }
 
@@ -111,23 +113,25 @@ class ShipmentService implements ShipmentServiceInterface
                 Log::error('SAP ZFM_EUDR_SHIPMENT failed', [
                     'soNo' => $soNo,
                     'batchNo' => $batchNo,
-                    'status' => $response->status()
+                    'status' => $response->status(),
                 ]);
+
                 return [
                     'response' => TransactionResponseCode::GENERIC_FAILURE,
-                    'message' => 'SAP shipment inquiry failed. HTTP ' . $response->status()
+                    'message' => 'SAP shipment inquiry failed. HTTP '.$response->status(),
                 ];
             }
 
             return [
                 'response' => TransactionResponseCode::SUCCESS,
-                'data' => $response->json() ?? []
+                'data' => $response->json() ?? [],
             ];
         } catch (\Throwable $e) {
-            Log::error('SAP ZFM_EUDR_SHIPMENT exception: ' . $e->getMessage());
+            Log::error('SAP ZFM_EUDR_SHIPMENT exception: '.$e->getMessage());
+
             return [
                 'response' => TransactionResponseCode::GENERIC_FAILURE,
-                'message' => 'SAP connection failed: ' . $e->getMessage()
+                'message' => 'SAP connection failed: '.$e->getMessage(),
             ];
         }
     }
@@ -140,7 +144,7 @@ class ShipmentService implements ShipmentServiceInterface
         if ($batchNo === '') {
             return [
                 'response' => TransactionResponseCode::GENERIC_FAILURE,
-                'message' => 'Batch number is required for SO allocation inquiry.'
+                'message' => 'Batch number is required for SO allocation inquiry.',
             ];
         }
 
@@ -153,11 +157,21 @@ class ShipmentService implements ShipmentServiceInterface
         }
 
         $allocations = [];
+        $warnings = [];
         foreach ($batches as $realBatch) {
-            $allocations = array_merge($allocations, $this->fetchSoAllocation($realBatch));
+            $result = $this->fetchSoAllocation($realBatch);
+            $allocations = array_merge($allocations, $result['data']);
+            if ($result['error'] !== null) {
+                $warnings[] = ['batchNo' => $realBatch, 'message' => $result['error']];
+            }
         }
 
-        return ['response' => TransactionResponseCode::SUCCESS, 'data' => $allocations];
+        $response = ['response' => TransactionResponseCode::SUCCESS, 'data' => $allocations];
+        if ($warnings !== []) {
+            $response['warnings'] = $warnings;
+        }
+
+        return $response;
     }
 
     private function fetchSoAllocation(string $batchNo): array
@@ -168,32 +182,35 @@ class ShipmentService implements ShipmentServiceInterface
 
             if ($response->failed()) {
                 Log::error('SAP ZFM_AD001 failed', ['batchNo' => $batchNo, 'status' => $response->status()]);
-                return [];
+
+                return ['data' => [], 'error' => 'SAP request failed with status '.$response->status()];
             }
 
             $sapData = $response->json() ?? [];
-            return $sapData['IT_EXPORT'] ?? $sapData;
+
+            return ['data' => $sapData['IT_EXPORT'] ?? $sapData, 'error' => null];
         } catch (\Throwable $e) {
-            Log::error('SAP ZFM_AD001 exception: ' . $e->getMessage());
-            return [];
+            Log::error('SAP ZFM_AD001 exception: '.$e->getMessage());
+
+            return ['data' => [], 'error' => $e->getMessage()];
         }
     }
 
     private function buildSapUrl(string $fm, array $params, ?string $batchNo = null): string
     {
         $sapReqUrl = config('eudr.sap_url');
-        $sapClient = 'Client=' . config('eudr.sap_client');
-        $sapFm = '&FM=' . $fm;
+        $sapClient = 'Client='.config('eudr.sap_client');
+        $sapFm = '&FM='.$fm;
 
         $queryParts = [];
         foreach ($params as $key => $value) {
-            $queryParts[] = '&' . $key . '=' . urlencode((string) $value);
+            $queryParts[] = '&'.$key.'='.urlencode((string) $value);
         }
 
-        $url = $sapReqUrl . $sapClient . $sapFm . implode('', $queryParts);
+        $url = $sapReqUrl.$sapClient.$sapFm.implode('', $queryParts);
 
-        if ($fm === 'ZFM_EUDR_SHIPMENT' && $batchNo !== null && !DispatchType::isDispatch($batchNo)) {
-            $url .= '&BATCH=' . urlencode($batchNo);
+        if ($fm === 'ZFM_EUDR_SHIPMENT' && $batchNo !== null && ! DispatchType::isDispatch($batchNo)) {
+            $url .= '&BATCH='.urlencode($batchNo);
         }
 
         return $url;

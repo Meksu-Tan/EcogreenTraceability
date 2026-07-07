@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Repositories\Concerns;
 
 use Illuminate\Database\Connection;
@@ -8,15 +10,16 @@ use Modules\Shared\Traits\DbCompatTrait;
 
 final class BackwardSearchQuery
 {
-    use PlantFilterTrait, DbCompatTrait;
+    use DbCompatTrait, PlantFilterTrait;
 
     public function __construct(private Connection $connection) {}
 
-    public function execute(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null): array
+    public function execute(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null, int $page = 1, int $perPage = 100): array
     {
         $plantFilter = $this->buildTablePlantFilter('sh', $plantId, $userId);
 
         $bindings = array_merge([$materialId], $plantFilter['bindings']);
+        $offset = ($page - 1) * $perPage;
         $batchWhere = '';
         if ($batchNo) {
             $batchWhere = ' AND td.batch_sap LIKE ?';
@@ -44,14 +47,14 @@ final class BackwardSearchQuery
              WHERE sh.id_material_fg = ?
                AND sh.status = 1
                {$batchWhere}
-               AND (" . $plantFilter['sql'] . ")
+               AND (".$plantFilter['sql'].')
              GROUP BY sh.id_ship_head, sh.entry_date, sh.trace_no, sh.so_no,
                      m.code, m.description, mp.code, mp.description, sh.qty, th.from_trace_no,
                      sh.created_at, sh.created_by, sh.id_material_fg, sh.from_trace_no
-             ORDER BY sh.entry_date DESC
-             LIMIT 100
-        ";
+              ORDER BY sh.entry_date DESC
+              LIMIT ? OFFSET ?
+         ';
 
-        return $this->connection->select($sql, $bindings);
+        return $this->connection->select($sql, array_merge($bindings, [$perPage, $offset]));
     }
 }

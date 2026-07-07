@@ -147,7 +147,14 @@
                 <td class="text-right font-monospace">{{ formatQty(row.out_qty) }}</td>
                 <td class="text-right font-monospace font-weight-bold" :class="bc(row)">{{ formatQty(row.balance || row.current_qty || row.qty) }}</td>
                 <td class="text-right font-monospace" :class="bc(row)">{{ row.balance_supplier || '0.000' }}</td>
-                <td class="text-caption text-truncate" style="max-width:200px" :title="row.supplier || row.supplier_details">{{ row.supplier || row.supplier_details || '-' }}</td>
+                <td class="text-caption" style="max-width:300px">
+                  <div class="d-flex flex-wrap ga-1" v-if="(row.supplier || row.supplier_details)">
+                    <VChip size="small" density="comfortable" variant="flat" color="grey-lighten-3" class="text-black" v-for="item in (row.supplier || row.supplier_details).split('|')" :key="item" v-show="item.trim()">
+                      {{ item.trim() }}
+                    </VChip>
+                  </div>
+                  <span v-else>-</span>
+                </td>
               </tr>
             </tbody>
           </VTable>
@@ -195,7 +202,14 @@
                 <td class="text-right font-monospace">{{ formatQty(row.out_qty) }}</td>
                 <td class="text-right font-monospace font-weight-bold" :class="bc(row)">{{ formatQty(row.balance || row.qty) }}</td>
                 <td class="text-right font-monospace" :class="bc(row)">{{ row.balance_supplier || '0.000' }}</td>
-                <td class="text-caption text-truncate" style="max-width:200px">{{ row.supplier || '-' }}</td>
+                <td class="text-caption" style="max-width:300px">
+                  <div class="d-flex flex-wrap ga-1" v-if="row.supplier">
+                    <VChip size="small" density="comfortable" variant="flat" color="grey-lighten-3" class="text-black" v-for="item in (row.supplier).split('|')" :key="item" v-show="item.trim()">
+                      {{ item.trim() }}
+                    </VChip>
+                  </div>
+                  <span v-else>-</span>
+                </td>
               </tr>
             </tbody>
           </VTable>
@@ -255,7 +269,14 @@
                   <td class="text-right font-monospace">{{ row.out || '0.000' }}</td>
                   <td class="text-right font-monospace font-weight-bold" :class="sc(row)">{{ row.last_balance || '0.000' }}</td>
                   <td class="text-right font-monospace" :class="sc(row)">{{ row.balance_supplier || '0.000' }}</td>
-                  <td class="text-caption text-truncate" style="max-width:200px">{{ row.supplier || '-' }}</td>
+                  <td class="text-caption" style="max-width:300px">
+                    <div class="d-flex flex-wrap ga-1" v-if="row.supplier">
+                      <VChip size="small" density="comfortable" variant="flat" color="grey-lighten-3" class="text-black" v-for="item in (row.supplier).split('|')" :key="item" v-show="item.trim()">
+                        {{ item.trim() }}
+                      </VChip>
+                    </div>
+                    <span v-else>-</span>
+                  </td>
                 </tr>
               </tbody>
           </VTable>

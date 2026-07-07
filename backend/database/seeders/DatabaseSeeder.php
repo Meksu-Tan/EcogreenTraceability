@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Database\Seeders;
 
@@ -9,12 +11,13 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            \Database\Seeders\RolePermissionSeeder::class,
+            RolePermissionSeeder::class,
             // \Database\Seeders\TankSeeder::class, // Skipped - requires manual data entry
-            \Database\Seeders\MaterialSeeder::class,
-            \Database\Seeders\SupplierSeeder::class,
-            \Database\Seeders\PlantSeeder::class,
+            MaterialSeeder::class,
+            SupplierSeeder::class,
+            PlantSeeder::class,
             // \Database\Seeders\StorageSeeder::class,
+            QuantifierSeeder::class,
         ]);
     }
 }

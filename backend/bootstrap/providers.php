@@ -1,8 +1,11 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 use App\Providers\AppServiceProvider;
+use Nwidart\Modules\LaravelModulesServiceProvider;
 
 return [
     AppServiceProvider::class,
-    Nwidart\Modules\LaravelModulesServiceProvider::class,
+    LaravelModulesServiceProvider::class,
 ];

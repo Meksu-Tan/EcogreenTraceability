@@ -1,10 +1,13 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsStock\Repositories;
 
-use Modules\TsStock\Repositories\Contracts\StockRepositoryInterface;
-use Modules\Shared\Repositories\Traits\PlantFilterTrait;
 use Illuminate\Support\Facades\DB;
+use Modules\Shared\Helpers\TraceHelper;
+use Modules\Shared\Repositories\Traits\PlantFilterTrait;
+use Modules\TsStock\Repositories\Contracts\StockRepositoryInterface;
 
 class StockRepository implements StockRepositoryInterface
 {
@@ -24,10 +27,11 @@ class StockRepository implements StockRepositoryInterface
                           FROM m_material a WHERE a.status=1";
             $bindings = [];
             if ($search !== null) {
-                $sql .= " AND a.description ILIKE ?";
+                $sql .= ' AND a.description ILIKE ?';
                 $bindings[] = "%{$search}%";
             }
-            $sql .= " ORDER BY a.id_material) a ORDER BY material";
+            $sql .= ' ORDER BY a.id_material) a ORDER BY material';
+
             return DB::connection($this->connection)->select($sql, $bindings);
         }
 
@@ -39,10 +43,11 @@ class StockRepository implements StockRepositoryInterface
                           FROM m_material_pck a WHERE a.status=1";
             $bindings = [];
             if ($search !== null) {
-                $sql .= " AND a.description ILIKE ?";
+                $sql .= ' AND a.description ILIKE ?';
                 $bindings[] = "%{$search}%";
             }
-            $sql .= " ORDER BY a.id_materialpck) a ORDER BY material";
+            $sql .= ' ORDER BY a.id_materialpck) a ORDER BY material';
+
             return DB::connection($this->connection)->select($sql, $bindings);
         }
 
@@ -91,16 +96,16 @@ class StockRepository implements StockRepositoryInterface
         }
 
         return DB::connection($this->connection)->select(
-            "SELECT th.id_trace_head, th.entry_date, th.from_trace_no, th.to_trace_no,
+            'SELECT th.id_trace_head, th.entry_date, th.from_trace_no, th.to_trace_no,
                     m.code AS material_code, m.description AS material,
                     th.in_qty, th.out_qty, (th.in_qty - th.out_qty) AS balance,
                     t.description AS sloc, th.id_plant
                FROM t_trace_header th
                LEFT JOIN m_material m ON th.id_material = m.id_material
                LEFT JOIN m_sloc t ON CAST(th.id_sloc AS integer) = t.id_sloc
-              WHERE " . implode(' AND ', $where) . "
+              WHERE '.implode(' AND ', $where).'
               ORDER BY th.entry_date DESC, th.id_trace_head DESC
-              LIMIT 500",
+              LIMIT 500',
             $bindings
         );
     }
@@ -125,13 +130,19 @@ class StockRepository implements StockRepositoryInterface
         $idMaterial = $filters['material_id'] ?? '';
         $mode = $filters['mode'] ?? 'NORMAL';
         $plantId = $filters['id_plant'] ?? $filters['plant_id'] ?? null;
+        if ($plantId) {
+            $mapped = DB::connection()->table('m_plant')->where('id_plant', $plantId)->value('code_3');
+            if ($mapped) {
+                $plantId = $mapped;
+            }
+        }
         $idSloc = $filters['storage_id'] ?? $plantId;
 
         $parts = explode('|', $idMaterial);
         $type = $parts[0] ?? '';
         $idMaterialFix = $parts[1] ?? '';
 
-        if (!$idMaterialFix) {
+        if (! $idMaterialFix) {
             return [];
         }
 
@@ -393,7 +404,7 @@ bh_filtered AS (
                                   WHERE bgn."description" IS NOT NULL', [$startDateVal, $startDateVal, $idSloc, $startDateVal, $idSloc, $idMaterialFix]);
             }
 
-            $stock = (float)($db[0]->balances ?? 0);
+            $stock = (float) ($db[0]->balances ?? 0);
         } elseif ($type === 'WH') {
             $db = DB::connection($this->connection)->select('SELECT bgn.entry_date, bgn."description", bgn."in", bgn."out", bgn."supplier", bgn."sloc",
                                      TO_CHAR(ROUND(CAST(CAST(bgn."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\') AS "balance", bgn."balance" AS balances,
@@ -413,13 +424,13 @@ bh_filtered AS (
                                                                  WHERE bb.status = 1
                                                                    AND bb.id_material_fg = ?
                                                                    AND (SUBSTRING(bb.trace_no,1,1) = \'5\' OR SUBSTRING(bb.trace_no,1,1) = \'4\' OR SUBSTRING(bb.trace_no,1,1) = \'6\')
-                                                                   AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . ' ) bb
+                                                                   AND '.TraceHelper::warehouseCondition('bb.trace_no', '<>', '000').' ) bb
                                                          ON b.id_balance_head = bb.id_whx_head
                                                       WHERE b.entry_date <= ?
                                                         AND b.id_material = ?
                                                         AND b."status" = 1
                                                         AND (SUBSTRING(b.to_trace_no,1,1) = \'5\' OR SUBSTRING(b.to_trace_no,1,1) = \'4\' OR SUBSTRING(b.to_trace_no,1,1) = \'6\')
-                                                        AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . '
+                                                        AND '.TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000').'
                                                       GROUP BY b.id_material) b
                                            ON a.id_materialpck = b.id_material
                                         LEFT JOIN (SELECT c.id_material, STRING_AGG(DISTINCT CONCAT(c.id_trace_tail, \' / \', c."description", \' / \', c."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(c."balance" AS numeric) AS numeric),1), \'FM999999999999990.0\'), \' MT\'), \' | \') AS supplier,
@@ -440,7 +451,7 @@ bh_filtered AS (
                                                                AND c.id_material = ?
                                                                AND c."status" = 1
                                                                AND (SUBSTRING(c.to_trace_no,1,1) = \'5\' OR SUBSTRING(c.to_trace_no,1,1) = \'4\' OR SUBSTRING(c.to_trace_no,1,1) = \'6\')
-                                                               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . '
+                                                               AND '.TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000').'
                                                              GROUP BY ccc.id_supplier, cc.batch_sap) c
                                                      GROUP BY c.id_material) c
                                            ON a.id_materialpck = c.id_material
@@ -448,7 +459,7 @@ bh_filtered AS (
                                         UNION ALL
                                        SELECT ? AS entry_date, \'Beginning Balance\' AS "description", \'0\' AS "in", \'0\' AS "out", 0 AS "balance", \'|\' AS supplier, 0 AS "balance_supplier", \'-\' AS sloc
                                         LIMIT 1) bgn', [$startDateVal, $idMaterialFix, $startDateVal, $idMaterialFix, $idMaterialFix, $startDateVal, $idMaterialFix, $startDateVal]);
-            $stock = (float)($db[0]->balances ?? 0);
+            $stock = (float) ($db[0]->balances ?? 0);
         }
 
         // Loop calculation day-by-day
@@ -456,9 +467,9 @@ bh_filtered AS (
             $currDate = clone $startDate;
             $currDate->modify("+{$i} day");
             $currDateStr = $currDate->format('Y-m-d');
-            
+
             $nextDate = clone $startDate;
-            $nextDate->modify("+" . ($i + 1) . " day");
+            $nextDate->modify('+'.($i + 1).' day');
             $nextDateStr = $nextDate->format('Y-m-d');
 
             if ($type === 'WIP') {
@@ -726,14 +737,14 @@ bh_filtered AS (
                                                                      WHERE bb.status = 1
                                                                        AND bb.id_material_fg = ?
                                                                        AND (SUBSTRING(bb.trace_no,1,1) = \'5\' OR SUBSTRING(bb.trace_no,1,1) = \'4\' OR SUBSTRING(bb.trace_no,1,1) = \'6\')
-                                                                       AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . ' ) bb
+                                                                       AND '.TraceHelper::warehouseCondition('bb.trace_no', '<>', '000').' ) bb
                                                            ON b.id_balance_head = bb.id_whx_head
                                                         WHERE b.entry_date > ?
                                                           AND b.entry_date <= ?
                                                           AND b.id_material = ?
                                                           AND b."status" = 1
                                                           AND (SUBSTRING(b.to_trace_no,1,1) = \'5\' OR SUBSTRING(b.to_trace_no,1,1) = \'4\' OR SUBSTRING(b.to_trace_no,1,1) = \'6\')
-                                                          AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . '
+                                                          AND '.TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000').'
                                                         GROUP BY b.id_material) d
                                               ON a.id_materialpck = d.id_material
                                             LEFT JOIN (SELECT c.id_material, STRING_AGG(DISTINCT CONCAT(c.id_trace_tail, \' / \', c."description", \' / \', c."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(c."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\'), \' MT\'), \' | \') AS supplier,
@@ -753,7 +764,7 @@ bh_filtered AS (
                                                                   AND c.id_material = ?
                                                                   AND c."status" = 1
                                                                   AND (SUBSTRING(c.to_trace_no,1,1) = \'5\' OR SUBSTRING(c.to_trace_no,1,1) = \'4\' OR SUBSTRING(c.to_trace_no,1,1) = \'6\')
-                                                                  AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . '
+                                                                  AND '.TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000').'
                                                                 GROUP BY ccc.id_supplier) c
                                                          GROUP BY c.id_material) c
                                               ON a.id_materialpck = c.id_material
@@ -763,16 +774,16 @@ bh_filtered AS (
                                            LIMIT 1) bgn', [$nextDateStr, $stock, $stock, $stock, $stock, $idMaterialFix, $currDateStr, $nextDateStr, $idMaterialFix, $idMaterialFix, $nextDateStr, $idMaterialFix]);
             }
 
-            if (!empty($db1)) {
-                $stock = (float)($db1[0]->balances ?? $stock);
-                
-                $filtered_db1 = array_filter($db1, function($item) {
+            if (! empty($db1)) {
+                $stock = (float) ($db1[0]->balances ?? $stock);
+
+                $filtered_db1 = array_filter($db1, function ($item) {
                     return strpos($item->description ?? '', '-') === false;
                 });
-                $filtered_db1 = array_filter($filtered_db1, function($item) {
-                    return !is_null($item->in ?? null);
+                $filtered_db1 = array_filter($filtered_db1, function ($item) {
+                    return ! is_null($item->in ?? null);
                 });
-                
+
                 $db = array_merge($db, $filtered_db1);
             }
         }
@@ -785,10 +796,16 @@ bh_filtered AS (
         $startDateVal = $filters['date_from'] ?? date('Y-m-01');
         $endDateVal = $filters['date_to'] ?? date('Y-m-d');
         $plantId = $filters['id_plant'] ?? $filters['plant_id'] ?? null;
+        if ($plantId) {
+            $mapped = DB::connection()->table('m_plant')->where('id_plant', $plantId)->value('code_3');
+            if ($mapped) {
+                $plantId = $mapped;
+            }
+        }
         $idSloc = $filters['storage_id'] ?? $plantId;
         $mode = $filters['mode'] ?? 'SUMMARY_WIP';
 
-        $nextDateVal = date('Y-m-d', strtotime($endDateVal . ' + 1 day'));
+        $nextDateVal = date('Y-m-d', strtotime($endDateVal.' + 1 day'));
 
         if ($mode === 'SUMMARY_WIP') {
             return DB::connection($this->connection)->select('SELECT bgn.entry_date, bgn."description", bgn."in", bgn."out", bgn."supplier", bgn."sloc",
@@ -941,12 +958,12 @@ bh_filtered AS (
                                                                     ON bb.id_section = bbb.id_warehouse
                                                                  WHERE bb.status = 1
                                                                    AND (SUBSTRING(bb.trace_no,1,1) = \'5\' OR SUBSTRING(bb.trace_no,1,1) = \'4\' OR SUBSTRING(bb.trace_no,1,1) = \'6\')
-                                                                   AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('bb.trace_no', '<>', '000') . ' ) bb
+                                                                   AND '.TraceHelper::warehouseCondition('bb.trace_no', '<>', '000').' ) bb
                                                          ON b.id_balance_head = bb.id_whx_head
                                                       WHERE b.entry_date > ? AND b.entry_date <= ?
                                                         AND b."status" = 1
                                                         AND (SUBSTRING(b.to_trace_no,1,1) = \'5\' OR SUBSTRING(b.to_trace_no,1,1) = \'4\' OR SUBSTRING(b.to_trace_no,1,1) = \'6\')
-                                                        AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000') . '
+                                                        AND '.TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000').'
                                                       GROUP BY b.id_material) b
                                            ON a.id_materialpck = b.id_material
                                         LEFT JOIN (SELECT c.id_material, STRING_AGG(DISTINCT CONCAT(c.id_trace_tail, \' / \', c."description", \' / \', c."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(c."balance" AS numeric) AS numeric),1), \'FM999999999999990.0\'), \' MT\'), \' | \') AS supplier,
@@ -965,7 +982,7 @@ bh_filtered AS (
                                                              WHERE c.entry_date <= ?
                                                                AND c."status" = 1
                                                                AND (SUBSTRING(c.to_trace_no,1,1) = \'5\' OR SUBSTRING(c.to_trace_no,1,1) = \'4\' OR SUBSTRING(c.to_trace_no,1,1) = \'6\')
-                                                               AND ' . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000') . '
+                                                               AND '.TraceHelper::warehouseCondition('c.to_trace_no', '<>', '000').'
                                                              GROUP BY ccc.id_supplier, cc.batch_sap) c
                                                      GROUP BY c.id_material) c
                                            ON a.id_materialpck = c.id_material
@@ -988,7 +1005,7 @@ bh_filtered AS (
             [$id]
         );
 
-        if (!$header) {
+        if (! $header) {
             return null;
         }
 

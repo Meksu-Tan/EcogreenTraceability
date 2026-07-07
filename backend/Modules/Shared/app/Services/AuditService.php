@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services;
 
 use Illuminate\Support\Facades\DB;
@@ -13,12 +15,11 @@ class AuditService implements AuditServiceInterface
     /**
      * Log a transaction to log_transactions table.
      *
-     * @param string $module Module name (e.g., 'TRANSFER', 'WIP', 'BLENDING')
-     * @param string $type Operation type (e.g., 'ADD', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT')
-     * @param string $description Human-readable description
-     * @param string|null $user User performing the operation
-     * @param array $metadata Additional metadata (optional)
-     * @return bool
+     * @param  string  $module  Module name (e.g., 'TRANSFER', 'WIP', 'BLENDING')
+     * @param  string  $type  Operation type (e.g., 'ADD', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT')
+     * @param  string  $description  Human-readable description
+     * @param  string|null  $user  User performing the operation
+     * @param  array  $metadata  Additional metadata (optional)
      */
     public static function log(
         string $module,
@@ -37,7 +38,7 @@ class AuditService implements AuditServiceInterface
             );
 
             // Log metadata if provided (stored in extended description)
-            if (!empty($metadata)) {
+            if (! empty($metadata)) {
                 Log::channel('audit')->info('AUDIT', [
                     'module' => $module,
                     'type' => $type,
@@ -53,6 +54,7 @@ class AuditService implements AuditServiceInterface
                 'type' => $type,
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }
@@ -269,27 +271,27 @@ class AuditService implements AuditServiceInterface
         $where = ['1=1'];
         $params = [];
 
-        if (!empty($filters['module'])) {
+        if (! empty($filters['module'])) {
             $where[] = 'log_module = ?';
             $params[] = $filters['module'];
         }
 
-        if (!empty($filters['type'])) {
+        if (! empty($filters['type'])) {
             $where[] = 'log_type = ?';
             $params[] = $filters['type'];
         }
 
-        if (!empty($filters['user'])) {
+        if (! empty($filters['user'])) {
             $where[] = 'created_by = ?';
             $params[] = $filters['user'];
         }
 
-        if (!empty($filters['date_from'])) {
+        if (! empty($filters['date_from'])) {
             $where[] = 'created_at >= ?';
             $params[] = $filters['date_from'];
         }
 
-        if (!empty($filters['date_to'])) {
+        if (! empty($filters['date_to'])) {
             $where[] = 'created_at <= ?';
             $params[] = $filters['date_to'];
         }
@@ -305,6 +307,7 @@ class AuditService implements AuditServiceInterface
             return DB::connection('eudr_ts')->select($sql, $params);
         } catch (\Exception $e) {
             Log::error('AuditService::getLogs failed', ['error' => $e->getMessage()]);
+
             return [];
         }
     }
@@ -325,6 +328,7 @@ class AuditService implements AuditServiceInterface
             );
         } catch (\Exception $e) {
             Log::error('AuditService::getSummary failed', ['error' => $e->getMessage()]);
+
             return [];
         }
     }

@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsTsreport\Services;
 
 use Modules\TsTsreport\Repositories\Contracts\TsReportRepositoryInterface;
@@ -15,7 +17,7 @@ class TsReportService implements TsReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->tsReportRepository->getTsReport($filters),
+            'data' => $this->tsReportRepository->getTsReport($filters),
             'message' => 'TS Report retrieved',
         ];
     }
@@ -24,7 +26,7 @@ class TsReportService implements TsReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->tsReportRepository->getTsReportRm($filters),
+            'data' => $this->tsReportRepository->getTsReportRm($filters),
             'message' => 'TS Report RM section retrieved',
         ];
     }
@@ -33,7 +35,7 @@ class TsReportService implements TsReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->tsReportRepository->getTsReportPck($filters),
+            'data' => $this->tsReportRepository->getTsReportPck($filters),
             'message' => 'TS Report PCK section retrieved',
         ];
     }
@@ -42,7 +44,7 @@ class TsReportService implements TsReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->tsReportRepository->getTsReportShipment($filters),
+            'data' => $this->tsReportRepository->getTsReportShipment($filters),
             'message' => 'TS Report Shipment section retrieved',
         ];
     }
@@ -51,7 +53,7 @@ class TsReportService implements TsReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->tsReportRepository->getTsReportTransfer($filters),
+            'data' => $this->tsReportRepository->getTsReportTransfer($filters),
             'message' => 'TS Report Transfer section retrieved',
         ];
     }
@@ -60,7 +62,7 @@ class TsReportService implements TsReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->tsReportRepository->getTsReportWip($filters),
+            'data' => $this->tsReportRepository->getTsReportWip($filters),
             'message' => 'TS Report WIP section retrieved',
         ];
     }

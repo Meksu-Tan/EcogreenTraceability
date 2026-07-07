@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace App\Support;
 
@@ -9,6 +11,7 @@ use RuntimeException;
 class DbConnectionRetry
 {
     private const MAX_RETRIES = 3;
+
     private const RETRY_DELAY_MS = 500;
 
     public static function execute(callable $callback, int $maxRetries = self::MAX_RETRIES)
@@ -18,11 +21,11 @@ class DbConnectionRetry
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
                 return $callback();
-            } catch (QueryException | PDOException $e) {
+            } catch (QueryException|PDOException $e) {
                 $lastException = $e;
 
                 // Only retry on connection-related errors
-                if (!self::isRetryableError($e)) {
+                if (! self::isRetryableError($e)) {
                     throw $e;
                 }
 

@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace App\Helpers;
 
@@ -34,6 +36,7 @@ final class ApiResponse
         if ($errors !== null) {
             $payload['errors'] = $errors;
         }
+
         return response()->json($payload, $code);
     }
 

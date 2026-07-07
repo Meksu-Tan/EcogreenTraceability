@@ -1,17 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Modules\Material\Models\Material;
 
 class MaterialFactory extends Factory
 {
-    protected $model = \Modules\Material\Models\Material::class;
+    protected $model = Material::class;
 
     public function definition(): array
     {
         return [
-            'code' => 'MAT-' . $this->faker->unique()->numerify('####'),
+            'code' => 'MAT-'.$this->faker->unique()->numerify('####'),
             'code_noneudr' => $this->faker->bothify('NE-??-####'),
             'description' => $this->faker->words(3, true),
             'type' => $this->faker->randomElement(['feed', 'rundown']),

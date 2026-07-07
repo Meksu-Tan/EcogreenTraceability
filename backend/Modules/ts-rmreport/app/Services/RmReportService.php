@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRmreport\Services;
 
 use Modules\TsRmreport\Repositories\Contracts\RmReportRepositoryInterface;
@@ -15,7 +17,7 @@ class RmReportService implements RmReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->rmReportRepository->getRmReport($filters),
+            'data' => $this->rmReportRepository->getRmReport($filters),
             'message' => 'RM Report retrieved',
         ];
     }
@@ -24,7 +26,7 @@ class RmReportService implements RmReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->rmReportRepository->getRmListDetail($filters),
+            'data' => $this->rmReportRepository->getRmListDetail($filters),
             'message' => 'RM detail list retrieved',
         ];
     }
@@ -33,7 +35,7 @@ class RmReportService implements RmReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->rmReportRepository->getRmListTransfer($filters),
+            'data' => $this->rmReportRepository->getRmListTransfer($filters),
             'message' => 'RM transfer list retrieved',
         ];
     }
@@ -42,7 +44,7 @@ class RmReportService implements RmReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->rmReportRepository->getRmSummaryRmPrd($filters),
+            'data' => $this->rmReportRepository->getRmSummaryRmPrd($filters),
             'message' => 'RM summary retrieved',
         ];
     }
@@ -51,7 +53,7 @@ class RmReportService implements RmReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->rmReportRepository->getRmDetailRmPrdOnTank($batchSap),
+            'data' => $this->rmReportRepository->getRmDetailRmPrdOnTank($batchSap),
             'message' => 'RM detail on tank retrieved',
         ];
     }
@@ -60,7 +62,7 @@ class RmReportService implements RmReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->rmReportRepository->getRmDetailRmPrdOnAdjOut($batchSap),
+            'data' => $this->rmReportRepository->getRmDetailRmPrdOnAdjOut($batchSap),
             'message' => 'RM detail on adj out retrieved',
         ];
     }
@@ -69,7 +71,7 @@ class RmReportService implements RmReportServiceInterface
     {
         return [
             'status' => 1,
-            'data'   => $this->rmReportRepository->getRmDetailRmPrdOnWarehouse($batchSap),
+            'data' => $this->rmReportRepository->getRmDetailRmPrdOnWarehouse($batchSap),
             'message' => 'RM detail on warehouse retrieved',
         ];
     }

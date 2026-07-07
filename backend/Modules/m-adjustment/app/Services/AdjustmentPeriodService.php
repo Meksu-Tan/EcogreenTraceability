@@ -1,17 +1,19 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Adjustment\Services;
 
-use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
-use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
-use Modules\Shared\Services\AuditService;
 use Illuminate\Support\Facades\DB;
+use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
+use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
+use Modules\Shared\Services\Contracts\AuditServiceInterface;
 
 class AdjustmentPeriodService implements AdjustmentPeriodServiceInterface
 {
     public function __construct(
         protected AdjustmentRepositoryInterface $repository,
-        protected AuditService $auditService
+        protected AuditServiceInterface $auditService
     ) {}
 
     // â€”â€”â€” Period Adjustment â€”â€”â€”
@@ -52,6 +54,13 @@ class AdjustmentPeriodService implements AdjustmentPeriodServiceInterface
         );
     }
 
+    public function periodHeaderUnlock(string $user, int $idHead): array
+    {
+        return DB::connection('eudr_ts')->transaction(
+            fn () => $this->repository->periodHeaderUnlock($user, $idHead)
+        );
+    }
+
     public function destroyAdjustmentPeriod(int $id, string $user): array
     {
         return DB::connection('eudr_ts')->transaction(
@@ -73,6 +82,7 @@ class AdjustmentPeriodService implements AdjustmentPeriodServiceInterface
             if (($result['response'] ?? 0) == 1) {
                 $this->auditService->logAdjustment('CREATE_WHX', $data, $user, 1);
             }
+
             return $result;
         });
     }
@@ -84,6 +94,7 @@ class AdjustmentPeriodService implements AdjustmentPeriodServiceInterface
             if (($result['response'] ?? 0) == 1) {
                 $this->auditService->logAdjustment('INIT_WHX', $data, $user, 1);
             }
+
             return $result;
         });
     }

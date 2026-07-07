@@ -153,7 +153,7 @@
                     item-title="label"
                     item-value="value"
                     :loading="initLoading"
-                    :disabled="form.trf_type === 'out'"
+                    :disabled="form.trf_type === 'out' && !isMaterialRM"
                     rounded="md"
                     color="primary"
                     density="compact"
@@ -173,7 +173,7 @@
                     item-title="label"
                     item-value="value"
                     :loading="initLoading"
-                    :disabled="form.trf_type === 'in'"
+                    :disabled="form.trf_type === 'in' && !isMaterialRM"
                     rounded="md"
                     color="primary"
                     density="compact"
@@ -333,7 +333,7 @@ const plantId = computed(() => {
 
 const displayPlantName = computed(() => {
   if (plantSelectionStore.selectedPlantId !== null) {
-    return plantSelectionStore.selectedPlantName || 'EOMB'
+    return plantSelectionStore.selectedPlantName || 'All Plants'
   }
   return selectedPlantForTransferName.value || 'selected plant'
 })
@@ -375,6 +375,11 @@ const materialOptions = computed(() => {
     value: m.id_material,
     label: m.material_code || m.description || m.material
   }))
+})
+
+const isMaterialRM = computed(() => {
+  const mat = store.activeMaterials?.find(m => String(m.id_material) === String(form.id_material))
+  return mat && mat.type && String(mat.type).toUpperCase() === 'RM'
 })
 
 const sourceTankOptions = computed(() => {
@@ -555,22 +560,22 @@ async function populateTanks() {
   try {
     if (trfType === 'in') {
       const [sourceRes, destRes] = await Promise.all([
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false }),
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false })
+        store.fetchActiveTanksRundown({ id_plant: currentPlant, exclude_plant: true }),
+        store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: currentPlant, exclude_plant: false })
       ])
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
     } else if (trfType === 'out') {
       const [sourceRes, destRes] = await Promise.all([
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false }),
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: true })
+        store.fetchActiveTanksRundown({ idMaterial: idMat, id_plant: currentPlant, exclude_plant: false }),
+        store.fetchActiveTanksRundown({ id_plant: currentPlant, exclude_plant: true })
       ])
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
     } else {
       const [sourceRes, destRes] = await Promise.all([
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false }),
-        store.fetchActiveTanksRundown({ idMaterial: null, id_plant: currentPlant, exclude_plant: false })
+        store.fetchActiveTanksRundown({ id_plant: currentPlant, exclude_plant: false }),
+        store.fetchActiveTanksRundown({ id_plant: currentPlant, exclude_plant: false })
       ])
       sourceTanks.value = sourceRes?.data || []
       destTanks.value = destRes?.data || []
@@ -579,16 +584,7 @@ async function populateTanks() {
     const currentPlantCode = plantCode.value
 
     if (trfType === 'out') {
-      const findWip = (tanks) => {
-        const byPlant = currentPlantCode
-          ? tanks.find(t => String(t.id_plant || '') === String(currentPlantCode) && String(t.tank || t.description || '').toUpperCase().includes('WIP'))
-          : null
-        return byPlant || tanks.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
-      }
-      const wipTank = findWip(sourceTanks.value)
-      if (wipTank) {
-        form.source_sloc = String(wipTank.id_sloc || wipTank.tf_number)
-      } else if (sourceTanks.value.length > 0) {
+      if (sourceTanks.value.length > 0) {
         form.source_sloc = String(sourceTanks.value[0].id_sloc || sourceTanks.value[0].tf_number)
       }
       await onSourceChange()
@@ -597,16 +593,7 @@ async function populateTanks() {
     }
 
     if (trfType === 'in') {
-      const findWip = (tanks) => {
-        const byPlant = currentPlantCode
-          ? tanks.find(t => String(t.id_plant || '') === String(currentPlantCode) && String(t.tank || t.description || '').toUpperCase().includes('WIP'))
-          : null
-        return byPlant || tanks.find(t => String(t.tank || t.description || '').toUpperCase().includes('WIP'))
-      }
-      const wipTank = findWip(destTanks.value)
-      if (wipTank) {
-        form.trf_sloc = String(wipTank.id_sloc || wipTank.tf_number)
-      } else if (destTanks.value.length > 0) {
+      if (destTanks.value.length > 0) {
         form.trf_sloc = String(destTanks.value[0].id_sloc || destTanks.value[0].tf_number)
       }
       await onDestinationChange()

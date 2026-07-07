@@ -1,17 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Modules\Manufacturer\Models\Manufacturer;
 
 class ManufacturerFactory extends Factory
 {
-    protected $model = \Modules\Manufacturer\Models\Manufacturer::class;
+    protected $model = Manufacturer::class;
 
     public function definition(): array
     {
         return [
-            'code' => 'MFR-' . $this->faker->unique()->numerify('####'),
+            'code' => 'MFR-'.$this->faker->unique()->numerify('####'),
             'batch_code' => $this->faker->bothify('BATCH-??-####'),
             'description' => $this->faker->company(),
             'type' => $this->faker->randomElement(['local', 'import']),

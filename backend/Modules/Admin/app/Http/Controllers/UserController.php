@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Admin\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Modules\Admin\Http\Requests\StoreUserRequest;
 use Modules\Admin\Http\Requests\UpdateUserRequest;
 use Modules\Admin\Services\Contracts\AdminServiceInterface;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
@@ -22,6 +24,7 @@ class UserController extends Controller
     public function index(): JsonResponse
     {
         $users = $this->adminService->listUsers();
+
         return ApiResponse::success($users, 'OK', 200);
     }
 
@@ -31,6 +34,7 @@ class UserController extends Controller
     public function store(StoreUserRequest $request): JsonResponse
     {
         $user = $this->adminService->createUser($request->validated());
+
         return ApiResponse::success($user, 'User successfully added.', 201);
     }
 
@@ -39,12 +43,13 @@ class UserController extends Controller
      */
     public function update(UpdateUserRequest $request, $id): JsonResponse
     {
-        $success = $this->adminService->updateUser((int)$id, $request->validated());
-        if (!$success) {
+        $success = $this->adminService->updateUser((int) $id, $request->validated());
+        if (! $success) {
             return ApiResponse::error('User not found.', 404);
         }
 
-        $user = $this->adminService->findUserById((int)$id);
+        $user = $this->adminService->findUserById((int) $id);
+
         return ApiResponse::success($user, 'User successfully updated.', 200);
     }
 
@@ -60,8 +65,8 @@ class UserController extends Controller
      */
     public function destroy($id): JsonResponse
     {
-        $user = $this->adminService->findUserById((int)$id);
-        if (!$user) {
+        $user = $this->adminService->findUserById((int) $id);
+        if (! $user) {
             return ApiResponse::error('User not found.', 404);
         }
 
@@ -70,7 +75,7 @@ class UserController extends Controller
         }
 
         DB::transaction(function () use ($id) {
-            $this->adminService->deleteUser((int)$id);
+            $this->adminService->deleteUser((int) $id);
         });
 
         return ApiResponse::success(null, 'User successfully deleted.', 200);

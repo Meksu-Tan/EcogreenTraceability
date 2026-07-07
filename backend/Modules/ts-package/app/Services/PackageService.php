@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsPackage\Services;
 
-use Modules\TsPackage\Services\Contracts\PackageServiceInterface;
-use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
 use Illuminate\Support\Collection;
+use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
+use Modules\TsPackage\Services\Contracts\PackageServiceInterface;
 
 class PackageService implements PackageServiceInterface
 {

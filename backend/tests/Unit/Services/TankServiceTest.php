@@ -1,12 +1,14 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Tank\Services\TankService;
-use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
 use Illuminate\Support\Facades\Http;
 use Mockery;
+use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
+use Modules\Tank\Services\TankService;
+use Tests\TestCase;
 
 class TankServiceTest extends TestCase
 {
@@ -191,6 +193,40 @@ class TankServiceTest extends TestCase
 
         $this->assertSame(1, $result['status']);
         $this->assertStringContainsString('2 tanks', $result['message']);
+    }
+
+    public function test_it_syncs_tanks_with_refresh_clears_first(): void
+    {
+        $repoMock = Mockery::mock(TankRepositoryInterface::class);
+
+        $apiResponse = [
+            'success' => true,
+            'data' => [
+                [
+                    'plantCode' => '1007',
+                    'plantName' => 'Plant A',
+                    'tanks' => [
+                        ['tankNumber' => 'T001', 'tankHeight' => 10.5],
+                    ],
+                ],
+            ],
+        ];
+
+        Http::fake([
+            '*' => Http::response($apiResponse, 200),
+        ]);
+
+        $repoMock->shouldReceive('clearAll')
+            ->once();
+
+        $repoMock->shouldReceive('syncUpdateOrCreate')
+            ->once()
+            ->andReturn(true);
+
+        $service = new TankService($repoMock);
+        $result = $service->syncFromExternal('admin', true);
+
+        $this->assertSame(1, $result['status']);
     }
 
     public function test_it_returns_up_to_date_message_when_no_tanks_were_updated_on_sync(): void

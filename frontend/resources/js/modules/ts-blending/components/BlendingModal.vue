@@ -202,6 +202,7 @@
     :id-head="form.idHead"
     :id-tank="form.tf_number"
     :id-plant="activePlantId"
+    :id-material="form.id_material"
     @success="onSourceMaterialInserted"
   />
 </template>
@@ -241,8 +242,7 @@ const activePlantId = computed(() => {
       return tank.id_plant
     }
   }
-  const firstTank = blendingStore.allTanks.find(t => t.id_plant)
-  return firstTank?.id_plant || setupPlantStore.plants[0]?.code_3 || setupPlantStore.plants[0]?.id || 0
+  return 0
 })
 
 const initLoading = ref(false)
@@ -346,6 +346,16 @@ async function onMaterialChange() {
     if (entryResponse?.data?.[0]?.entryNo) {
       form.entry_no = entryResponse.data[0].entryNo
     }
+
+    // Reset tank selection when material changes
+    form.tf_number = ''
+    selectedTankTails.value = []
+    specificTanks.value = []
+
+    await blendingStore.fetchAllTanks({
+      id_plant: plantId,
+      idMaterial: form.id_material
+    })
 
     await blendingStore.fetchActiveTanksRundown({
       idMaterial: form.id_material,

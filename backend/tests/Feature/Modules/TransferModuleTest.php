@@ -1,11 +1,15 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
 use App\Models\User;
-use Modules\TsTransfer\Services\Contracts\TransferServiceInterface;
-use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 use Mockery;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
+use Modules\TsTransfer\Services\Contracts\TransferServiceInterface;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class TransferModuleTest extends TestCase
@@ -14,6 +18,19 @@ class TransferModuleTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware(PlantContextMiddleware::class);
+
+        Permission::firstOrCreate(['name' => 'task-update']);
+        foreach (['admin', 'super-admin', 'manager', 'superintendent', 'senior-supervisor', 'supervisor', 'senior-staff', 'staff'] as $role) {
+            Role::firstOrCreate(['name' => $role]);
+        }
+    }
+
+    private function createUserWithRole(string $role = 'admin'): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        return $user;
     }
 
     protected function tearDown(): void
@@ -76,17 +93,17 @@ class TransferModuleTest extends TestCase
      */
     public function test_store_fails_when_quantity_is_negative(): void
     {
-        $user = User::factory()->make();
+        $user = $this->createUserWithRole('admin');
 
         $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/transactions/transfers', [
-                'flag'         => 'post_transferEntry',
-                'entry_no'     => 'TEST001',
-                'entry_date'   => '2026-06-13',
-                'id_material'  => 1,
-                'trf_qty'      => -10,
-                'source_sloc'  => 1,
-                'trf_sloc'     => 2,
+                'flag' => 'post_transferEntry',
+                'entry_no' => 'TEST001',
+                'entry_date' => '2026-06-13',
+                'id_material' => 1,
+                'trf_qty' => -10,
+                'source_sloc' => 1,
+                'trf_sloc' => 2,
             ]);
 
         $response->assertStatus(422)
@@ -99,17 +116,17 @@ class TransferModuleTest extends TestCase
      */
     public function test_store_fails_when_from_and_to_tank_are_same(): void
     {
-        $user = User::factory()->make();
+        $user = $this->createUserWithRole('admin');
 
         $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/transactions/transfers', [
-                'flag'         => 'post_transferEntry',
-                'entry_no'     => 'TEST002',
-                'entry_date'   => '2026-06-13',
-                'id_material'  => 1,
-                'trf_qty'      => 100,
-                'source_sloc'  => 1,
-                'trf_sloc'     => 1,
+                'flag' => 'post_transferEntry',
+                'entry_no' => 'TEST002',
+                'entry_date' => '2026-06-13',
+                'id_material' => 1,
+                'trf_qty' => 100,
+                'source_sloc' => 1,
+                'trf_sloc' => 1,
             ]);
 
         $response->assertStatus(422);
@@ -121,7 +138,7 @@ class TransferModuleTest extends TestCase
      */
     public function test_store_fails_without_required_flag(): void
     {
-        $user = User::factory()->make();
+        $user = $this->createUserWithRole('admin');
 
         $response = $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/transactions/transfers', [
@@ -137,17 +154,17 @@ class TransferModuleTest extends TestCase
      */
     public function test_index_returns_paginated_data(): void
     {
-        $user = User::factory()->make();
+        $user = $this->createUserWithRole('admin');
 
         $listData = [
-            'data'  => collect([
-                (object)[
+            'data' => collect([
+                (object) [
                     'id_balance_head' => 1,
-                    'entry_no'        => '82606130010101',
-                    'entry_date'      => '2026-06-13',
-                    'description'     => 'CPO',
-                    'qty'             => '100.000',
-                    'status'          => 1,
+                    'entry_no' => '82606130010101',
+                    'entry_date' => '2026-06-13',
+                    'description' => 'CPO',
+                    'qty' => '100.000',
+                    'status' => 1,
                 ],
             ]),
             'total' => 1,
@@ -172,10 +189,10 @@ class TransferModuleTest extends TestCase
      */
     public function test_active_materials_returns_200_when_authenticated(): void
     {
-        $user = User::factory()->make();
+        $user = $this->createUserWithRole('admin');
 
         $materials = [
-            (object)['id_material' => 1, 'description' => 'CPO'],
+            (object) ['id_material' => 1, 'description' => 'CPO'],
         ];
 
         $serviceMock = Mockery::mock(TransferServiceInterface::class);

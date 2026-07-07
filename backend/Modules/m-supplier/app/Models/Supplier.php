@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Supplier\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,7 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 class Supplier extends Model
 {
     protected $connection = 'eudr_ts';
-    protected $table      = 'm_supplier';
+
+    protected $table = 'm_supplier';
+
     protected $primaryKey = 'id_supplier';
 
     protected $fillable = [

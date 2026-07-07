@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Plant\Services;
 
 use Modules\Plant\Repositories\Contracts\PlantRepositoryInterface;
@@ -22,25 +24,28 @@ class PlantService implements PlantServiceInterface
         if ($id === false) {
             return ['status' => 0, 'message' => 'Plant code already exists'];
         }
+
         return [
             'status' => 1,
             'message' => 'Plant created successfully',
-            'data' => ['id_plant' => $id]
+            'data' => ['id_plant' => $id],
         ];
     }
 
     public function updatePlant(int $id, array $data): array
     {
         $updated = $this->plantRepo->update($id, $data);
-        if (!$updated) {
+        if (! $updated) {
             return ['status' => 0, 'message' => 'Failed to update plant'];
         }
+
         return ['status' => 1, 'message' => 'Plant updated successfully'];
     }
 
     public function deactivatePlant(int $id, string $user): array
     {
         $result = $this->plantRepo->deactivate($id, $user);
+
         return $result
             ? ['status' => 1, 'message' => 'Plant deactivated']
             : ['status' => 0, 'message' => 'Failed to deactivate plant'];
@@ -49,6 +54,7 @@ class PlantService implements PlantServiceInterface
     public function activatePlant(int $id, string $user): array
     {
         $result = $this->plantRepo->activate($id, $user);
+
         return $result
             ? ['status' => 1, 'message' => 'Plant activated']
             : ['status' => 0, 'message' => 'Failed to activate plant'];

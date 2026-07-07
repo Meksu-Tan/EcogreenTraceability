@@ -32,6 +32,11 @@
           <div class="text-caption">Loading trace detail...</div>
         </div>
 
+        <div v-else-if="error" class="pa-8 text-center text-error">
+          <VIcon icon="ri-error-warning-line" size="48" class="mb-2" />
+          <div class="text-body-2">{{ error }}</div>
+        </div>
+
         <div v-else-if="items.length === 0" class="pa-8 text-center text-medium-emphasis">
           <VIcon icon="ri-inbox-line" size="48" class="mb-2 text-disabled" />
           <div class="text-body-2">No trace chain data.</div>
@@ -128,6 +133,7 @@
     traceNo:    { type: String, default: '' },
     items:      { type: Array,  default: () => [] },
     loading:    { type: Boolean, default: false },
+    error:      { type: String, default: '' },
     mode:       { type: String, default: 'backward', validator: v => ['forward', 'backward'].includes(v) },
   })
   

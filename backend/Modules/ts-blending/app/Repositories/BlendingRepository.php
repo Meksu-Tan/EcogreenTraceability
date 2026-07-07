@@ -1,19 +1,26 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsBlending\Repositories;
 
-use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
-use Modules\Shared\Services\PeriodLockService;
-use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
-use Modules\Shared\Traits\DbCompatTrait;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Modules\Shared\Helpers\TraceHelper;
+use Modules\Shared\Repositories\TankQueryRepository;
+use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
+use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Services\TraceNumberService;
+use Modules\Shared\Services\TransactionCancellationService;
+use Modules\Shared\Services\TransactionCoreService;
+use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Traits\TankNameFormatterTrait;
 use Modules\Shared\Traits\TransactionLoggerTrait;
+use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
 
 class BlendingRepository implements BlendingRepositoryInterface
 {
-    use TankNameFormatterTrait, TransactionLoggerTrait, DbCompatTrait;
+    use DbCompatTrait, TankNameFormatterTrait, TransactionLoggerTrait;
 
     protected $connection = 'eudr_ts';
 
@@ -22,52 +29,36 @@ class BlendingRepository implements BlendingRepositoryInterface
         $whereIdRundown = 'CAST(a.id_rundown AS TEXT) <> \'-\'';
 
         return collect(DB::connection($this->connection)->select(
-            "SELECT a.id_material, CONCAT(UPPER(a.description), ' (', a.code, ')') AS material
+            "SELECT a.id_material, a.type, CONCAT(UPPER(a.description), ' (', a.code, ')') AS material
                FROM m_material a
               WHERE a.status = 1
                 AND {$whereIdRundown}
-              GROUP BY a.code, a.id_material, a.description
+              GROUP BY a.code, a.id_material, a.type, a.description
               ORDER BY a.description ASC"
         ));
     }
 
-
     public function generateBlendingEntryNo(int $materialId, int $plantId): ?string
     {
-        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $svc = app(TraceNumberService::class);
         $date = date('ymd');
         $plantCode = $svc->resolvePlantCode((string) $plantId);
         $section = $svc->resolveSection('8', $materialId);
+
         return $svc->generate('8', $date, $section, $plantCode, 't_balance_header', 'trace_no');
     }
 
     public function getTotalStockMaterial(int $materialId, int $plantId): float
     {
-        $resolvedPlant = DB::connection($this->connection)->table('m_plant')
-            ->where('id_plant', $plantId)
-            ->value('code_3') ?: $plantId;
-
-        $slocMatch = 'CAST(c.id_sloc AS TEXT) = CAST(cc.id_sloc AS TEXT)';
-
+        // Fix: cc.id_plant is a numeric id column — compare directly, not against code_3
         $result = DB::connection($this->connection)->select(
             "SELECT COALESCE(SUM(c.qty),0) AS total
-               FROM m_material a
-               LEFT JOIN (SELECT b.code, b.id_material
-                            FROM m_material b WHERE b.status = 1) b
-                 ON a.code = b.code
-               LEFT JOIN (SELECT c.id_material, c.qty
-                            FROM m_sloc cc
-                            LEFT JOIN t_balance_header c
-                              ON {$slocMatch}
-                           WHERE c.status = 1
-                             AND cc.status = 1
-                             AND (SUBSTRING(c.trace_no FROM 1 FOR 1) IN ('1','2','7','8','9'))
-                             AND cc.id_plant = ?
-                         ) c
-                 ON b.id_material = c.id_material
-              WHERE a.status = 1
-                AND a.id_material = ?",
-            [$resolvedPlant, $materialId]
+               FROM t_balance_header c
+              WHERE c.status = 1
+                AND c.id_material = ?
+                AND c.id_plant = ?
+                AND SUBSTRING(c.trace_no FROM 1 FOR 1) IN ('1','2','3','7','8','9')",
+            [$materialId, $plantId]
         );
 
         return (float) ($result[0]->total ?? 0);
@@ -98,12 +89,12 @@ class BlendingRepository implements BlendingRepositoryInterface
             return DB::connection($this->connection)->table('t_balance_temporary as a')
                 ->leftJoin('m_material as c', 'a.id_material', '=', 'c.id_material')
                 ->select(
-                    DB::raw($this->dbNumberFormat('a.qty', 3) . ' AS qty'),
+                    DB::raw($this->dbNumberFormat('a.qty', 3).' AS qty'),
                     'a.id_material',
                     DB::raw("CONCAT(c.code, ' :: ', c.description) AS material"),
                     'a.id_balance_temp AS idTail',
                     'a.entry_no',
-                    DB::raw("'" . $mode . "' AS mode")
+                    DB::raw("'".$mode."' AS mode")
                 )
                 ->where('a.entry_no', $entryNo)
                 ->where('a.status', 1)
@@ -115,12 +106,12 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->leftJoin('t_balance_header as c', 'a.id_balance_head', '=', 'c.id_balance_head')
             ->leftJoin('m_material as d', 'a.id_material', '=', 'd.id_material')
             ->select(
-                DB::raw($this->dbNumberFormat('a.qty', 3) . ' AS qty'),
+                DB::raw($this->dbNumberFormat('a.qty', 3).' AS qty'),
                 'a.id_material',
                 DB::raw("CONCAT(d.code, ' :: ', d.description) AS material"),
                 'a.id_balance_tail AS idTail',
                 'c.trace_no AS entry_no',
-                DB::raw("'" . $mode . "' AS mode")
+                DB::raw("'".$mode."' AS mode")
             )
             ->where('a.id_balance_head', $idHead)
             ->where('a.status', 1)
@@ -153,11 +144,12 @@ class BlendingRepository implements BlendingRepositoryInterface
 
         return $result->map(function ($item) use ($plants) {
             $code3 = strtoupper($item->code_3 ?? '');
-            $abbr  = $plants[$item->id_plant ?? ''] ?? '';
-            $label = !empty($code3) ? (($code3 === 'PRD') ? 'PRODUCT' : $code3) : '';
-            $item->description = trim($label . ($abbr ? ' ' . $abbr : ''));
+            $abbr = $plants[$item->id_plant ?? ''] ?? '';
+            $label = ! empty($code3) ? (($code3 === 'PRD') ? 'PRODUCT' : $code3) : '';
+            $item->description = trim($label.($abbr ? ' '.$abbr : ''));
             $item->id_sloc = $item->tf_number;
-            $item->tank    = $item->description;
+            $item->tank = $item->description;
+
             return $item;
         });
     }
@@ -184,7 +176,7 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->select('s.id_sloc as id_sloc_tail', 's.description as tankNo', 's.tf_number as tankNumber')
             ->where('s.status', 1);
 
-        if (!empty($tankDescription)) {
+        if (! empty($tankDescription)) {
             $query->where('s.description', $tankDescription);
         } else {
             $query->whereNull('s.description')->orWhere('s.description', '');
@@ -202,7 +194,7 @@ class BlendingRepository implements BlendingRepositoryInterface
         $offset = ($page - 1) * $perPage;
 
         $supplierConcat = $this->dbGroupConcat(
-            "CONCAT(f.description, ' / ', e.batch_sap, ' / Qty : ', " . $this->dbNumberFormat('e.init_qty', 3) . ", ' MT / Qty : ', " . $this->dbNumberFormat('e.qty', 3) . ", ' MT')",
+            "CONCAT(f.description, ' / ', e.batch_sap, ' / Qty : ', ".$this->dbNumberFormat('e.init_qty', 3).", ' MT / Qty : ', ".$this->dbNumberFormat('e.qty', 3).", ' MT')",
             ' | ',
             true
         );
@@ -225,7 +217,9 @@ class BlendingRepository implements BlendingRepositoryInterface
         $total = DB::connection($this->connection)->table('t_balance_header as a')
             ->where('a.status', 1)
             ->whereRaw("SUBSTRING(a.trace_no FROM 1 FOR 1) = '8'")
-            ->when($plantId != 0, function($q) use ($plantId) { return $q->where('a.id_plant', $plantId); })
+            ->when($plantId != 0, function ($q) use ($plantId) {
+                return $q->where('a.id_plant', $plantId);
+            })
             ->distinct('a.trace_no')->count('a.trace_no');
 
         $idsQuery = DB::connection($this->connection)->table('t_balance_header as a')
@@ -233,7 +227,9 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->distinct()
             ->where('a.status', 1)
             ->whereRaw("SUBSTRING(a.trace_no FROM 1 FOR 1) = '8'")
-            ->when($plantId != 0, function($q) use ($plantId) { return $q->where('a.id_plant', $plantId); });
+            ->when($plantId != 0, function ($q) use ($plantId) {
+                return $q->where('a.id_plant', $plantId);
+            });
 
         $idsResult = $idsQuery->orderByDesc('a.trace_no')
             ->offset($offset)
@@ -245,24 +241,24 @@ class BlendingRepository implements BlendingRepositoryInterface
             return ['data' => [], 'total' => $total];
         }
 
-        $idList = array_map(function($row) { return $row->id_balance_head; }, $idsResult);
-        $traceList = array_map(function($row) { return $row->trace_no; }, $idsResult);
-        
+        $idList = array_map(function ($row) {
+            return $row->id_balance_head;
+        }, $idsResult);
+
         $idCsv = implode(',', array_map('intval', $idList));
-        $traceCsv = implode(',', array_map(function($t) { return "'" . addslashes((string)$t) . "'"; }, $traceList));
 
         $subFromTraceConcat = $this->dbGroupConcat(
-            "CONCAT(c.from_trace_no, ' :: ', cc.description, ' (', cc.code, ') - Qty ', " . $this->dbNumberFormat('c.out_qty', 3) . ", ' MT')",
+            "CONCAT(c.from_trace_no, ' :: ', cc.description, ' (', cc.code, ') - Qty ', ".$this->dbNumberFormat('c.out_qty', 3).", ' MT')",
             '|'
         );
 
         $traceSubquery = "(SELECT b.id_balance_head, b.id_trace_head, c.from_trace_no, d.material_document,
-                  CASE WHEN b.to_trace_no = (SELECT to_trace_no FROM t_trace_header WHERE SUBSTRING(to_trace_no FROM 1 FOR 1) = '8' AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('to_trace_no') . " AND SUBSTRING(to_trace_no FROM 9 FOR 1) <> '0' AND status = 1 ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
+                  CASE WHEN b.to_trace_no = (SELECT to_trace_no FROM t_trace_header WHERE SUBSTRING(to_trace_no FROM 1 FOR 1) = '8' AND ".TraceHelper::only14Digit('to_trace_no')." AND SUBSTRING(to_trace_no FROM 9 FOR 1) <> '0' AND status = 1 ORDER BY to_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS is_last_row,
                   CASE WHEN b.to_trace_no = (SELECT from_trace_no FROM t_trace_header WHERE from_trace_no = b.to_trace_no AND status = 1 ORDER BY from_trace_no DESC LIMIT 1) THEN 1 ELSE NULL END AS next_process
              FROM t_trace_header b
              LEFT JOIN (SELECT c.to_trace_no, c.id_balance_head, {$subFromTraceConcat} AS from_trace_no
                          FROM t_trace_header c LEFT JOIN m_material cc ON c.id_material = cc.id_material
-                        WHERE c.status = 1 AND SUBSTRING(c.to_trace_no FROM 1 FOR 1) = '8' AND " . \Modules\Shared\Helpers\TraceHelper::only14Digit('c.to_trace_no') . " AND SUBSTRING(c.to_trace_no FROM 9 FOR 1) = '0' GROUP BY c.to_trace_no, c.id_balance_head
+                        WHERE c.status = 1 AND SUBSTRING(c.to_trace_no FROM 1 FOR 1) = '8' AND ".TraceHelper::only14Digit('c.to_trace_no')." AND SUBSTRING(c.to_trace_no FROM 9 FOR 1) = '0' GROUP BY c.to_trace_no, c.id_balance_head
               ) c ON b.from_trace_no = c.to_trace_no
               LEFT JOIN t_material_document d ON d.id_trace_head = b.id_trace_head
              WHERE b.status = 1 AND b.id_balance_head IN ({$idCsv}) AND SUBSTRING(b.to_trace_no FROM 1 FOR 1) = '8' AND SUBSTRING(b.from_trace_no FROM 1 FOR 1) = '8') b";
@@ -271,9 +267,9 @@ class BlendingRepository implements BlendingRepositoryInterface
             ->select(DB::raw($selectFields))
             ->leftJoin(DB::raw($traceSubquery), 'a.id_balance_head', '=', 'b.id_balance_head')
             ->leftJoin('m_material as c', 'c.id_material', '=', 'a.id_material')
-            ->leftJoin('m_plant as p', function($join) {
+            ->leftJoin('m_plant as p', function ($join) {
                 $join->on('a.id_plant', '=', 'p.code_3')
-                     ->where('p.status', 1);
+                    ->where('p.status', 1);
             })
             ->leftJoin('t_balance_detail as e', 'a.id_balance_head', '=', 'e.id_balance_head')
             ->leftJoin(DB::raw('(SELECT ee1.trace_no, SUM(ee2.init_qty) AS init_qty FROM t_balance_header ee1 LEFT JOIN t_balance_detail ee2 ON ee1.id_balance_head = ee2.id_balance_head WHERE ee1.status = 1 GROUP BY ee1.trace_no) ee'), 'a.trace_no', '=', 'ee.trace_no')
@@ -286,16 +282,16 @@ class BlendingRepository implements BlendingRepositoryInterface
         }
 
         $groupByCols = ['a.trace_no', 'a.entry_date', 'a.id_sloc',
-                'a.qty', 'a.init_qty', 'a.id_balance_head',
-                'c.description', 'c.code', 'p.code_2',
-                'ee.init_qty',
-                'a.created_at', 'a.created_by',
-            ];
+            'a.qty', 'a.init_qty', 'a.id_balance_head',
+            'c.description', 'c.code', 'p.code_2',
+            'ee.init_qty',
+            'a.created_at', 'a.created_by',
+        ];
         $query->groupBy($groupByCols)->orderByDesc('a.trace_no');
 
         $sliced = $query->get();
 
-        $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
+        $slocs = DB::connection('eudr_ts')
             ->table('m_sloc')
             ->select('id_sloc', 'tf_number')
             ->get()
@@ -304,7 +300,9 @@ class BlendingRepository implements BlendingRepositoryInterface
         foreach ($sliced as $row) {
             $row->sloc = '';
             $raw = $row->raw_id_sloc ?? null;
-            if ($raw === null || $raw === '' || $raw === 'null') continue;
+            if ($raw === null || $raw === '' || $raw === 'null') {
+                continue;
+            }
             $decoded = json_decode($raw, true);
             $ids = (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) ? $decoded : [$raw];
             $tanks = [];
@@ -313,7 +311,7 @@ class BlendingRepository implements BlendingRepositoryInterface
                     $tanks[] = $slocs[$id]->tf_number;
                 }
             }
-            if (!empty($tanks)) {
+            if (! empty($tanks)) {
                 $tanks = array_unique($tanks);
                 sort($tanks);
                 $row->sloc = implode(' | ', $tanks);
@@ -325,11 +323,11 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function getActiveTanksRundown(int $materialId, int $plantId): Collection
     {
-        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+        return app(TankQueryRepository::class)
             ->getActiveTanksRundown($materialId, $plantId, false);
     }
 
-    public function getAllTanks(int $plantId): Collection
+    public function getAllTanks(int $plantId, ?int $materialId = null): Collection
     {
         $plantCode = $plantId > 0
             ? app(PlantContextServiceInterface::class)->resolvePlantId($plantId)
@@ -341,9 +339,20 @@ class BlendingRepository implements BlendingRepositoryInterface
                 DB::raw("COALESCE(MAX(NULLIF(a.code_3,'')), '') AS code_3"),
                 'a.id_plant'
             )
-            ->where('a.status', 1)
-            ->where('a.code_2', 'WIP')
-            ->where('a.code_3', 'WIP');
+            ->where('a.status', 1);
+
+        if ($materialId) {
+            $materialType = DB::connection($this->connection)->table('m_material')
+                ->where('id_material', $materialId)
+                ->value('type');
+            if ($materialType) {
+                if (strtoupper($materialType) === 'RM') {
+                    $query->whereIn(DB::raw('UPPER(a.code_3)'), ['FEED', 'STORAGE']);
+                } else {
+                    $query->where(DB::raw('UPPER(a.code_3)'), strtoupper($materialType));
+                }
+            }
+        }
 
         if ($plantCode && $plantCode !== '0') {
             $query->where('a.id_plant', $plantCode);
@@ -357,18 +366,19 @@ class BlendingRepository implements BlendingRepositoryInterface
 
         return $result->map(function ($item) use ($plants) {
             $code3 = strtoupper($item->code_3 ?? '');
-            $abbr  = $plants[$item->id_plant ?? ''] ?? '';
-            $label = !empty($code3) ? (($code3 === 'PRD') ? 'PRODUCT' : $code3) : '';
-            $item->description = trim($label . ($abbr ? ' ' . $abbr : ''));
+            $abbr = $plants[$item->id_plant ?? ''] ?? '';
+            $label = ! empty($code3) ? (($code3 === 'PRD') ? 'PRODUCT' : $code3) : '';
+            $item->description = trim($label.($abbr ? ' '.$abbr : ''));
             $item->id_sloc = $item->tf_number;
-            $item->tank    = $item->description;
+            $item->tank = $item->description;
+
             return $item;
         });
     }
 
     public function getActiveSpecificTanksRundown(int $sloc): Collection
     {
-        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+        return app(TankQueryRepository::class)
             ->getActiveSpecificTanksRundown($sloc);
     }
 
@@ -393,24 +403,24 @@ class BlendingRepository implements BlendingRepositoryInterface
 
     public function getLockStatus(string $entryDate): bool
     {
-        return \Modules\Shared\Services\PeriodLockService::isLocked($entryDate);
+        return PeriodLockService::isLocked($entryDate);
     }
 
     public function createMaterialDocument(string $user, int $idTraceHead, ?string $materialDoc, string $mode): array
     {
-        return app(\Modules\Shared\Services\TransactionCoreService::class)
+        return app(TransactionCoreService::class)
             ->createMaterialDocument($user, $idTraceHead, $materialDoc, $mode);
     }
 
     public function deactivateBlending(string $id, string $user): array
     {
-        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+        return app(TransactionCancellationService::class)
             ->deactivateBlending($id, $user);
     }
 
     public function updateEntrySubTank(string $user, int $idHead, array $tails): array
     {
-        return app(\Modules\Shared\Services\TransactionCoreService::class)
+        return app(TransactionCoreService::class)
             ->updateEntrySubTank($user, $idHead, $tails);
     }
 
@@ -462,5 +472,4 @@ class BlendingRepository implements BlendingRepositoryInterface
             [$entryNo]
         ));
     }
-
 }

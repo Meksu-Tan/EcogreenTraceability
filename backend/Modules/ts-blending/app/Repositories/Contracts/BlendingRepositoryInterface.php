@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsBlending\Repositories\Contracts;
 
 use Illuminate\Support\Collection;
@@ -59,7 +61,7 @@ interface BlendingRepositoryInterface
     /**
      * Get all active sloc records for a plant (independent of material)
      */
-    public function getAllTanks(int $plantId): Collection;
+    public function getAllTanks(int $plantId, ?int $materialId = null): Collection;
 
     /**
      * Add material to blending entry (temporary storage)

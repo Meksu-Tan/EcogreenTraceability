@@ -1,19 +1,20 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Adjustment\Services;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
-use Modules\Shared\Services\PeriodLockService;
-use Modules\Shared\Services\AuditService;
 use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
 use Modules\Shared\Helpers\ResponseCode;
-use Illuminate\Support\Facades\DB;
+use Modules\Shared\Services\Contracts\AuditServiceInterface;
 
 class AdjustmentMutationService implements AdjustmentMutationServiceInterface
 {
     public function __construct(
         protected AdjustmentRepositoryInterface $repository,
-        protected AuditService $auditService
+        protected AuditServiceInterface $auditService
     ) {}
 
     public function storeAdjustment(string $user, array $data, mixed $plantId): array
@@ -23,6 +24,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
             if (($result['response'] ?? 0) == 1) {
                 $this->auditService->logAdjustment('CREATE', $data, $user, 1);
             }
+
             return $result;
         });
     }
@@ -34,6 +36,19 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
             if (($result['response'] ?? 0) == 1) {
                 $this->auditService->logAdjustment('DELETE', ['id_adjust_head' => $id], $user, 1);
             }
+
+            return $result;
+        });
+    }
+
+    public function destroyAdjustmentWhx(int $id, string $user): array
+    {
+        return DB::connection('eudr_ts')->transaction(function () use ($id, $user) {
+            $result = $this->repository->destroyAdjustmentWhx($id, $user);
+            if (($result['response'] ?? 0) == 1) {
+                $this->auditService->logAdjustment('DELETE_WHX', ['id_adjust_head' => $id], $user, 1);
+            }
+
             return $result;
         });
     }
@@ -45,6 +60,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
             if (($result['response'] ?? 0) == 1) {
                 $this->auditService->logAdjustment('ADD_SUPPLIER', $data, $user, 1);
             }
+
             return $result;
         });
     }
@@ -53,6 +69,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
     {
         return DB::connection('eudr_ts')->transaction(function () use ($id) {
             $result = $this->repository->deleteSupplierTemp($id);
+
             return $result;
         });
     }
@@ -64,6 +81,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
             if (($result['response'] ?? 0) == 1) {
                 $this->auditService->logAdjustment('INIT', $data, $user, 1);
             }
+
             return $result;
         });
     }
@@ -75,6 +93,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
             if (($result['response'] ?? 0) == 1) {
                 $this->auditService->logAdjustment('SUPPLIER_ADJUST', $data, $user, 1);
             }
+
             return $result;
         });
     }
@@ -89,6 +108,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
                     'material_doc' => $materialDoc,
                 ], $user, 1);
             }
+
             return $result;
         });
     }
@@ -109,6 +129,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
                     'qty' => $data['after_adjust'] ?? null,
                 ], $user, 1);
             }
+
             return $result;
         });
     }
@@ -124,6 +145,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
                     'batch_sap' => $data['batch_sap'] ?? null,
                 ], $user, 1);
             }
+
             return $result;
         });
     }
@@ -131,7 +153,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
     public function approveAdjustment(string $user, int $headerId, int $status): array
     {
         $header = $this->repository->getAdjustmentHeader($headerId);
-        if (!$header) {
+        if (! $header) {
             return ['response' => 0, 'message' => 'Adjustment not found'];
         }
         if ($header->status != 1) {
@@ -144,6 +166,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
                 $action = $status == 2 ? 'APPROVE' : 'REJECT';
                 $this->auditService->logAdjustment($action, ['id_adjust_head' => $headerId, 'status' => $status], $user, 1);
             }
+
             return $result;
         });
     }
@@ -151,7 +174,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
     public function executeAdjustment(string $user, int $headerId): array
     {
         $header = $this->repository->getAdjustmentHeader($headerId);
-        if (!$header) {
+        if (! $header) {
             return ['response' => 0, 'message' => 'Adjustment not found'];
         }
         if ($header->status != 2) {
@@ -163,6 +186,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
             if ($result['response'] == 1) {
                 $this->auditService->logAdjustment('EXECUTE', ['id_adjust_head' => $headerId], $user, 1);
             }
+
             return $result;
         });
     }
@@ -170,10 +194,10 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
     public function cancelAdjustment(string $user, int $headerId, string $reason): array
     {
         $header = $this->repository->getAdjustmentHeader($headerId);
-        if (!$header) {
+        if (! $header) {
             return ['response' => 0, 'message' => 'Adjustment not found'];
         }
-        if (!in_array($header->status, [1, 2])) {
+        if (! in_array($header->status, [1, 2])) {
             return ['response' => 2, 'message' => 'Cannot cancel adjustment in current status'];
         }
 
@@ -182,6 +206,7 @@ class AdjustmentMutationService implements AdjustmentMutationServiceInterface
             if ($result['response'] == 1) {
                 $this->auditService->logAdjustment('CANCEL', ['id_adjust_head' => $headerId, 'reason' => $reason], $user, 1);
             }
+
             return $result;
         });
     }

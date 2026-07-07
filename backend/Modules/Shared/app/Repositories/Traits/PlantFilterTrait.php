@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Repositories\Traits;
 
 use Modules\Shared\Services\Contracts\PlantContextServiceInterface;

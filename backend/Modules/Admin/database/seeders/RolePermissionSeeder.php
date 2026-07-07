@@ -1,19 +1,22 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
     public function run(): void
     {
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         $permissions = [
             'material.view',
@@ -38,20 +41,20 @@ class RolePermissionSeeder extends Seeder
         }
 
         $roles = [
-            'super-admin'        => Permission::all()->pluck('name')->toArray(),
-            'admin'              => Permission::all()->pluck('name')->toArray(),
-            'manager'            => Permission::all()->pluck('name')->toArray(),
-            'superintendent'     => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
-                                     'material.create', 'material.update', 'storage.create', 'storage.update',
-                                     'supplier.create', 'supplier.update', 'task-read', 'task-update'],
-            'senior-supervisor'  => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
-                                     'material.create', 'material.update', 'storage.create', 'storage.update',
-                                     'supplier.create', 'supplier.update', 'task-read', 'task-update'],
-            'supervisor'         => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
-                                     'material.create', 'material.update', 'storage.create', 'storage.update',
-                                     'supplier.create', 'supplier.update', 'task-read', 'task-update'],
-            'senior-staff'       => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view', 'task-read'],
-            'staff'              => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view', 'task-read'],
+            'super-admin' => Permission::all()->pluck('name')->toArray(),
+            'admin' => Permission::all()->pluck('name')->toArray(),
+            'manager' => Permission::all()->pluck('name')->toArray(),
+            'superintendent' => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
+                'material.create', 'material.update', 'storage.create', 'storage.update',
+                'supplier.create', 'supplier.update', 'task-read', 'task-update'],
+            'senior-supervisor' => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
+                'material.create', 'material.update', 'storage.create', 'storage.update',
+                'supplier.create', 'supplier.update', 'task-read', 'task-update'],
+            'supervisor' => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view',
+                'material.create', 'material.update', 'storage.create', 'storage.update',
+                'supplier.create', 'supplier.update', 'task-read', 'task-update'],
+            'senior-staff' => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view', 'task-read'],
+            'staff' => ['dashboard.view', 'material.view', 'storage.view', 'supplier.view', 'task-read'],
         ];
 
         foreach ($roles as $roleName => $rolePermissions) {
@@ -62,7 +65,7 @@ class RolePermissionSeeder extends Seeder
         $admin = User::firstOrCreate(
             ['email' => 'admin@eods.local'],
             [
-                'name'     => 'Administrator',
+                'name' => 'Administrator',
                 'password' => Hash::make(Config::get('app.admin_default_password')),
             ]
         );

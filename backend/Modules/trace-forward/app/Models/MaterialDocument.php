@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceForward\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,8 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 class MaterialDocument extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_material_document';
+
     protected $primaryKey = 'id_matdoc';
+
     public $timestamps = true;
 
     protected $fillable = [

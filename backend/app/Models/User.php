@@ -1,16 +1,21 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Modules\Plant\Models\Plant;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     protected $fillable = [
         'name',
@@ -30,11 +35,11 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
+            'password' => 'hashed',
         ];
     }
 
-    public function roles(): \Illuminate\Database\Eloquent\Relations\MorphToMany
+    public function roles(): MorphToMany
     {
         return $this->morphToMany(
             config('permission.models.role'),
@@ -45,7 +50,7 @@ class User extends Authenticatable
         );
     }
 
-    public function permissions(): \Illuminate\Database\Eloquent\Relations\MorphToMany
+    public function permissions(): MorphToMany
     {
         return $this->morphToMany(
             config('permission.models.permission'),
@@ -56,10 +61,10 @@ class User extends Authenticatable
         );
     }
 
-    public function plants(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function plants(): BelongsToMany
     {
         return $this->belongsToMany(
-            \Modules\Plant\Models\Plant::class,
+            Plant::class,
             'm_plant_user',
             'user_id',
             'id_plant',

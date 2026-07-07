@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Repositories\Concerns;
 
 use Illuminate\Database\Connection;
@@ -8,32 +10,32 @@ use Modules\Shared\Traits\DbCompatTrait;
 
 final class BackwardListQuery
 {
-    use PlantFilterTrait, DbCompatTrait;
+    use DbCompatTrait, PlantFilterTrait;
 
     public function __construct(private Connection $connection) {}
 
     public function execute(array $filters = []): array
     {
         $plantId = $filters['id_plant'] ?? null;
-        $userId  = $filters['user_id'] ?? null;
-        $search  = $filters['search'] ?? null;
+        $userId = $filters['user_id'] ?? null;
+        $search = $filters['search'] ?? null;
         $sortDir = strtoupper($filters['sort_dir'] ?? 'desc') === 'ASC' ? 'ASC' : 'DESC';
         $sortColumn = match ($filters['sort_by'] ?? 'entry_date') {
             'trace_no' => 'sh.trace_no',
-            'so_no'    => 'sh.so_no',
+            'so_no' => 'sh.so_no',
             'material' => 'material',
             'batch_no' => 'batch_no',
             'supplier' => 'supplier',
-            default    => 'sh.entry_date',
+            default => 'sh.entry_date',
         };
 
         $plantFilter = $this->buildTablePlantFilter('sh', $plantId, $userId);
-        $bindings    = $plantFilter['bindings'];
-        $plantSql    = $plantFilter['sql'];
+        $bindings = $plantFilter['bindings'];
+        $plantSql = $plantFilter['sql'];
 
         $searchSql = '';
         if ($search !== null && $search !== '') {
-            $like = '%' . $search . '%';
+            $like = '%'.$search.'%';
             $searchSql = ' AND (CAST(sh.trace_no AS TEXT) ILIKE ? OR sh.so_no ILIKE ?
                             OR m.description ILIKE ? OR mp.description ILIKE ?)';
             $bindings = array_merge($bindings, [$like, $like, $like, $like]);
@@ -91,22 +93,22 @@ final class BackwardListQuery
              ORDER BY {$sortColumn} {$sortDir}, sh.id_ship_head DESC
         ";
 
-        $page    = max(1, (int) ($filters['page'] ?? 1));
+        $page = max(1, (int) ($filters['page'] ?? 1));
         $perPage = min(100, max(10, (int) ($filters['per_page'] ?? 25)));
-        $offset  = ($page - 1) * $perPage;
+        $offset = ($page - 1) * $perPage;
 
         $countResult = $this->connection->select(
             "SELECT COUNT(*) AS total FROM ({$sql}) AS cnt", $bindings
         );
         $total = (int) ($countResult[0]->total ?? 0);
 
-        $data = $this->connection->select($sql . " LIMIT {$perPage} OFFSET {$offset}", $bindings);
+        $data = $this->connection->select($sql." LIMIT {$perPage} OFFSET {$offset}", $bindings);
 
         return [
-            'data'      => $data,
-            'total'     => $total,
-            'page'      => $page,
-            'per_page'  => $perPage,
+            'data' => $data,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
             'last_page' => (int) ceil($total / $perPage),
         ];
     }

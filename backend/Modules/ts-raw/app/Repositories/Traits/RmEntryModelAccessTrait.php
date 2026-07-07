@@ -1,12 +1,14 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Repositories\Traits;
 
 // Cross-module model access — acceptable coupling for complex JOIN queries.
-use Modules\TsRaw\Models\BalanceHeader;
 use Modules\Material\Models\Material;
-use Modules\Supplier\Models\Supplier;
 use Modules\Plant\Models\Plant;
+use Modules\Supplier\Models\Supplier;
+use Modules\TsRaw\Models\BalanceHeader;
 
 /**
  * RmEntryModelAccessTrait
@@ -43,7 +45,7 @@ trait RmEntryModelAccessTrait
             ->map(function ($item) {
                 return [
                     'id' => $item->id_material,
-                    'text' => $item->material_code . ' :: ' . $item->description
+                    'text' => $item->material_code.' :: '.$item->description,
                 ];
             })
             ->toArray();
@@ -57,13 +59,13 @@ trait RmEntryModelAccessTrait
         $sanitizedSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
 
         return Supplier::where('status', 1)
-            ->where('description', 'like', '%' . $sanitizedSearch . '%')
+            ->where('description', 'like', '%'.$sanitizedSearch.'%')
             ->orderBy('description')
             ->get()
             ->map(function ($item) {
                 return [
                     'id' => $item->id_supplier,
-                    'text' => $item->code . ' :: ' . $item->description
+                    'text' => $item->code.' :: '.$item->description,
                 ];
             })
             ->toArray();

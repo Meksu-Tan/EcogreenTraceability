@@ -1,13 +1,15 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
+use Illuminate\Support\Facades\DB;
 use Mockery;
 use Mockery\MockInterface;
-use Illuminate\Support\Facades\DB;
-use Modules\Quantifier\Services\QuantifierService;
 use Modules\Quantifier\Repositories\Contracts\QuantifierRepositoryInterface;
+use Modules\Quantifier\Services\QuantifierService;
+use Tests\TestCase;
 
 class QuantifierServiceTest extends TestCase
 {
@@ -175,11 +177,11 @@ class QuantifierServiceTest extends TestCase
             ->andReturn(10);
 
         $data = [
-            'mode'       => 'ADD',
-            'flowmeter'  => 'FM-01',
+            'mode' => 'ADD',
+            'flowmeter' => 'FM-01',
             'reset_date' => '2026-01-15',
-            'value'      => 100.0,
-            'remark'     => 'Resetting',
+            'value' => 100.0,
+            'remark' => 'Resetting',
         ];
 
         $result = $this->makeService()->storeQuantifier('Admin', $data);
@@ -215,10 +217,10 @@ class QuantifierServiceTest extends TestCase
             ->andReturn(11, 12);
 
         $data = [
-            'mode'       => 'ADD',
+            'mode' => 'ADD',
             'reset_date' => '2026-01-15',
-            'value'      => 0.0,
-            'remark'     => '',
+            'value' => 0.0,
+            'remark' => '',
         ];
 
         $result = $this->makeService()->storeQuantifier('Admin', $data);
@@ -247,12 +249,12 @@ class QuantifierServiceTest extends TestCase
             ->andReturn($updateResult);
 
         $data = [
-            'mode'       => 'UPDATE',
-            'id'         => 5,
-            'flowmeter'  => 'FM-01',
+            'mode' => 'UPDATE',
+            'id' => 5,
+            'flowmeter' => 'FM-01',
             'reset_date' => '2026-01-15',
-            'value'      => 150.0,
-            'remark'     => 'Updated remark',
+            'value' => 150.0,
+            'remark' => 'Updated remark',
         ];
 
         $result = $this->makeService()->storeQuantifier('Admin', $data);

@@ -13,24 +13,28 @@
         </div>
 
         <div v-else>
-          <!-- SAP Shipment Info Card -->
+          <!-- SAP Shipment Info Card (ZFM_EUDR_SHIPMENT) -->
           <VCard variant="flat" border class="mb-5 pa-4">
             <VCardTitle class="px-0 pt-0 text-subtitle-1 font-weight-bold text-primary">
-              <VIcon icon="ri-truck-line" class="me-2" /> SAP Shipment Detail
+              <VIcon icon="ri-truck-line" class="me-2" /> SAP Shipment Detail (ZFM_EUDR_SHIPMENT)
             </VCardTitle>
             <VDivider class="mb-4" />
             <VRow class="text-body-2">
               <VCol cols="12" sm="6">
-                <div class="mb-2"><strong>SO Number:</strong> {{ sapShipmentData?.vbeln || '-' }}</div>
-                <div class="mb-2"><strong>SO Item:</strong> {{ sapShipmentData?.posnr || '-' }}</div>
-                <div class="mb-2"><strong>Batch:</strong> {{ sapShipmentData?.charg || '-' }}</div>
-                <div class="mb-2"><strong>Customer Name:</strong> {{ sapShipmentData?.name1 || '-' }}</div>
+                <div class="mb-2"><strong>SO Number:</strong> {{ soNo || '-' }}</div>
+                <div class="mb-2"><strong>Batch:</strong> {{ batchNo || '-' }}</div>
+                <div class="mb-2"><strong>Customer Code:</strong> {{ sapShipmentData?.CUSTOMER_CODE || '-' }}</div>
+                <div class="mb-2"><strong>Customer Name:</strong> {{ sapShipmentData?.CUSTOMER_NAME || '-' }}</div>
+                <div class="mb-2"><strong>PO Number:</strong> {{ sapShipmentData?.PO_NUM || '-' }}</div>
+                <div class="mb-2"><strong>Proforma Invoice:</strong> {{ sapShipmentData?.PRO_INVOICE || '-' }}</div>
               </VCol>
               <VCol cols="12" sm="6">
-                <div class="mb-2"><strong>Material:</strong> {{ sapShipmentData?.arktx || '-' }}</div>
-                <div class="mb-2"><strong>Total Qty (MT):</strong> {{ sapShipmentData?.lfimg || '-' }}</div>
-                <div class="mb-2"><strong>Shipment Document:</strong> {{ sapShipmentData?.tknum || '-' }}</div>
-                <div class="mb-2"><strong>Container:</strong> {{ sapShipmentData?.signi || '-' }}</div>
+                <div class="mb-2"><strong>Net Weight (MT):</strong> {{ sapShipmentData?.NET_WEIGHT || '0' }}</div>
+                <div class="mb-2"><strong>Container:</strong> {{ sapShipmentData?.CONTAINER_NUMBER || '-' }}</div>
+                <div class="mb-2"><strong>Vessel:</strong> {{ sapShipmentData?.VESSEL || '-' }}</div>
+                <div class="mb-2"><strong>Port Discharge:</strong> {{ sapShipmentData?.PORT_DISCHARGE || '-' }}</div>
+                <div class="mb-2"><strong>Date Depart:</strong> {{ sapShipmentData?.DATE_DEPART || '-' }}</div>
+                <div class="mb-2"><strong>Ship to Loc:</strong> {{ sapShipmentData?.SHIP_TO_LOC || '-' }}</div>
               </VCol>
             </VRow>
           </VCard>
@@ -59,16 +63,16 @@
                   </td>
                 </tr>
                 <tr v-else v-for="(alloc, idx) in allocationList" :key="idx">
-                  <td class="text-body-2 font-weight-semibold">{{ alloc.vbeln || '-' }}</td>
-                  <td class="text-caption">{{ alloc.posnr || '-' }}</td>
+                  <td class="text-body-2 font-weight-semibold">{{ alloc.VBELN || '-' }}</td>
+                  <td class="text-caption">{{ alloc.POSNR || '-' }}</td>
                   <td>
                     <VChip size="x-small" variant="flat" color="neutral-100">
-                      {{ alloc.charg || '-' }}
+                      {{ alloc.CHARG || alloc.charg || '-' }}
                     </VChip>
                   </td>
-                  <td class="text-body-2 font-weight-semibold text-right">{{ alloc.lfimg || '0' }}</td>
-                  <td class="text-caption">{{ alloc.vrkme || '-' }}</td>
-                  <td class="text-caption">{{ alloc.werks || '-' }}</td>
+                  <td class="text-body-2 font-weight-semibold text-right">{{ alloc.LFIMG || '0' }}</td>
+                  <td class="text-caption">{{ alloc.MEINS || '-' }}</td>
+                  <td class="text-caption">{{ alloc.WERKS || alloc.werks || '-' }}</td>
                 </tr>
               </tbody>
             </VTable>
@@ -98,10 +102,27 @@ const loading = ref(false)
 
 const soNo = computed(() => props.row?.so_no || '')
 const batchNo = computed(() => props.row?.batch_no || '')
+const batchSap = computed(() => props.row?.batch_sap || '')
+
+function parseSoNumber(rawSo) {
+  if (!rawSo || !rawSo.includes('-')) {
+    return { soNo: rawSo, soItem: '' }
+  }
+  const parts = rawSo.split(/[-,]/)
+  const soNum = parts[0]
+  let soItem = parts[1] || ''
+  if (soItem) {
+    if (!soItem.endsWith('0')) {
+      soItem = soItem.padStart(5, '0') + '0'
+    } else {
+      soItem = soItem.padStart(5, '0')
+    }
+  }
+  return { soNo: soNum, soItem }
+}
 
 // SAP payload data extraction
 const sapShipmentData = computed(() => {
-  // If api returns list or object, extract correctly
   if (store.sapShipment) {
     if (Array.isArray(store.sapShipment)) {
       return store.sapShipment[0] || null
@@ -125,10 +146,10 @@ watch(() => props.modelValue, async (newVal) => {
   if (newVal && props.row) {
     loading.value = true
     try {
-      // Try to query both SAP endpoints
+      const parsed = parseSoNumber(soNo.value)
       await Promise.allSettled([
-        store.fetchSapShipment(batchNo.value, soNo.value, '000010'), // default SO item 10
-        store.fetchSapSoAllocation(batchNo.value)
+        store.fetchSapShipment(batchNo.value, parsed.soNo, parsed.soItem),
+        store.fetchSapSoAllocation(batchSap.value || batchNo.value)
       ])
     } finally {
       loading.value = false

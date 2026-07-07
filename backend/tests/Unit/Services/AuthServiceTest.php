@@ -1,12 +1,14 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Auth\Services\AuthService;
-use Modules\Auth\Repositories\Contracts\AuthRepositoryInterface;
 use Illuminate\Support\Facades\Hash;
 use Mockery;
+use Modules\Auth\Repositories\Contracts\AuthRepositoryInterface;
+use Modules\Auth\Services\AuthService;
+use Tests\TestCase;
 
 class AuthServiceTest extends TestCase
 {
@@ -20,11 +22,11 @@ class AuthServiceTest extends TestCase
     {
         $repoMock = Mockery::mock(AuthRepositoryInterface::class);
         $credentials = ['email' => 'admin@ecogreen.com', 'password' => 'password'];
-        
+
         $mockUser = Mockery::mock(\stdClass::class);
         $mockUser->password = Hash::make('password');
         $mockUser->isActive = 1;
-        
+
         $mockUserData = Mockery::mock(\stdClass::class);
         $mockUserData->id = 1;
         $mockUserData->name = 'Admin';
@@ -33,7 +35,7 @@ class AuthServiceTest extends TestCase
         $mockUserData->role = 'admin';
         $mockUserData->shouldReceive('getRoleNames')->andReturn(collect(['admin']));
         $mockUserData->shouldReceive('getAllPermissions')->andReturn(collect([
-            (object)['name' => 'task-read']
+            (object) ['name' => 'task-read'],
         ]));
         $mockUserData->shouldReceive('plants')->andReturn(
             Mockery::mock(['get' => Mockery::mock(['toArray' => [['id_plant' => 1, 'code_3' => 'PLN', 'description' => 'Plant 1']]])])
@@ -65,7 +67,7 @@ class AuthServiceTest extends TestCase
     public function test_it_can_logout_user(): void
     {
         $repoMock = Mockery::mock(AuthRepositoryInterface::class);
-        $user = (object)['id' => 1];
+        $user = (object) ['id' => 1];
 
         $repoMock->shouldReceive('revokeCurrentToken')
             ->once()

@@ -1,9 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Admin\Services;
 
-use Modules\Admin\Repositories\Contracts\AdminRepositoryInterface;
-
+use Modules\Admin\Repositories\AdminRepositoryInterface;
 use Modules\Admin\Services\Contracts\AdminServiceInterface;
 
 class AdminService implements AdminServiceInterface
@@ -19,7 +20,7 @@ class AdminService implements AdminServiceInterface
 
     public function createUser(array $data): object
     {
-        if (!empty($data['password'])) {
+        if (! empty($data['password'])) {
             $data['password'] = bcrypt($data['password']);
         }
 
@@ -28,7 +29,7 @@ class AdminService implements AdminServiceInterface
 
     public function updateUser(int $id, array $data): bool
     {
-        if (!empty($data['password'])) {
+        if (! empty($data['password'])) {
             $data['password'] = bcrypt($data['password']);
         }
 

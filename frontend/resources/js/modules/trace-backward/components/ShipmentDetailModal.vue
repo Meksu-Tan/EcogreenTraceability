@@ -1,7 +1,7 @@
 <template>
   <VDialog
     :model-value="modelValue"
-    max-width="900"
+    max-width="1100"
     persistent
     @update:model-value="$emit('update:modelValue', $event)"
   >
@@ -29,8 +29,8 @@
         <template v-else>
           <VRow>
             <VCol cols="12" md="6">
-              <VCard variant="outlined" class="pa-4 h-100">
-                <div class="text-subtitle-2 font-weight-bold mb-3 pb-1 border-b">Customer & PO Information</div>
+              <VCard variant="outlined" class="pa-4 h-100 bg-surface">
+                <div class="text-subtitle-2 font-weight-bold text-primary mb-2">Customer & PO Information</div>
                 <div class="d-flex flex-column gap-2 text-body-2">
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">Customer Code:</span>
@@ -61,8 +61,8 @@
             </VCol>
 
             <VCol cols="12" md="6">
-              <VCard variant="outlined" class="pa-4 h-100">
-                <div class="text-subtitle-2 font-weight-bold mb-3 pb-1 border-b">Logistic & Quality Information</div>
+              <VCard variant="outlined" class="pa-4 h-100 bg-surface">
+                <div class="text-subtitle-2 font-weight-bold text-primary mb-2">Logistic & Quality Information</div>
                 <div class="d-flex flex-column gap-2 text-body-2">
                   <div class="d-flex justify-space-between">
                     <span class="text-medium-emphasis">ZBatch (SAP):</span>
@@ -94,7 +94,7 @@
           </VRow>
 
           <div class="d-flex flex-column gap-4 mt-4">
-            <VCard variant="outlined" class="pa-4">
+            <VCard variant="outlined" class="mt-4 pa-4">
               <div class="text-subtitle-2 font-weight-bold mb-2">Container Numbers</div>
               <div class="d-flex flex-wrap gap-2">
                 <template v-if="data?.CONTAINER_NUMBER">
@@ -113,7 +113,7 @@
               </div>
             </VCard>
 
-            <VCard variant="outlined" class="pa-4">
+            <VCard variant="outlined" class="mt-4 pa-4">
               <div class="text-subtitle-2 font-weight-bold mb-2">Shipment Lot Numbers</div>
               <div class="d-flex flex-wrap gap-2">
                 <template v-if="data?.SHIP_LOT">
@@ -132,7 +132,7 @@
               </div>
             </VCard>
 
-            <VCard variant="outlined" class="pa-4">
+            <VCard variant="outlined" class="mt-4 pa-4">
               <div class="text-subtitle-2 font-weight-bold mb-2">Batch Allocations</div>
               <div class="d-flex flex-wrap gap-2">
                 <template v-if="data?.BATCH_ALLOC">

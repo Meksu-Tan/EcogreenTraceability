@@ -1,12 +1,14 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
+use Mockery;
+use Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface;
 use Modules\TsWip\Services\WipEntryService;
 use Modules\TsWip\Services\WipTreeService;
-use Modules\TsWip\Repositories\Contracts\WipEntryRepositoryInterface;
-use Mockery;
+use Tests\TestCase;
 
 class WipEntryServiceTest extends TestCase
 {

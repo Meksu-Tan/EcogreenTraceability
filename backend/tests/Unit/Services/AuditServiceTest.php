@@ -1,12 +1,14 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Shared\Services\AuditService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Mockery;
+use Modules\Shared\Services\AuditService;
+use Tests\TestCase;
 
 class AuditServiceTest extends TestCase
 {
@@ -80,11 +82,11 @@ class AuditServiceTest extends TestCase
             ->andReturn(true);
 
         $data = [
-            'entry_no'       => 'TRF-2606001',
-            'id_material'    => 3,
-            'trf_qty'        => '500.000',
-            'source_sloc'    => 'SL01',
-            'trf_sloc'       => 'SL02',
+            'entry_no' => 'TRF-2606001',
+            'id_material' => 3,
+            'trf_qty' => '500.000',
+            'source_sloc' => 'SL01',
+            'trf_sloc' => 'SL02',
         ];
 
         // Should not throw
@@ -171,11 +173,11 @@ class AuditServiceTest extends TestCase
             ->andReturn(true);
 
         $data = [
-            'adj_no'         => 'ADJ-2606001',
-            'id_material'    => 5,
-            'qty'            => '50.000',
-            'before_adjust'  => '200.000',
-            'after_adjust'   => '250.000',
+            'adj_no' => 'ADJ-2606001',
+            'id_material' => 5,
+            'qty' => '50.000',
+            'before_adjust' => '200.000',
+            'after_adjust' => '250.000',
         ];
 
         AuditService::logAdjustment('APPROVE', $data, 'admin', 1);
@@ -216,7 +218,7 @@ class AuditServiceTest extends TestCase
     public function test_it_returns_logs_with_module_filter(): void
     {
         $rows = [
-            (object)['log_module' => 'BLENDING', 'log_type' => 'ADD', 'created_by' => 'admin'],
+            (object) ['log_module' => 'BLENDING', 'log_type' => 'ADD', 'created_by' => 'admin'],
         ];
 
         DB::shouldReceive('connection')
@@ -258,8 +260,8 @@ class AuditServiceTest extends TestCase
     public function test_it_returns_summary_grouped_by_module_and_type(): void
     {
         $rows = [
-            (object)['log_module' => 'BLENDING', 'log_type' => 'ADD', 'total' => 5],
-            (object)['log_module' => 'TRANSFER', 'log_type' => 'CREATE', 'total' => 12],
+            (object) ['log_module' => 'BLENDING', 'log_type' => 'ADD', 'total' => 5],
+            (object) ['log_module' => 'TRANSFER', 'log_type' => 'CREATE', 'total' => 12],
         ];
 
         DB::shouldReceive('connection')

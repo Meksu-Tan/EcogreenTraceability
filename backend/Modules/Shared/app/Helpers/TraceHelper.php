@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Modules\Shared\Helpers;
 
@@ -23,9 +25,9 @@ class TraceHelper
      * 11-digit: warehouse doesn't exist; pos 8-9 = plant code (2 digits)
      * 14-digit: pos 8-10 = warehouse code (3 digits, e.g. "000", "001")
      *
-     * @param string $col   Column expression, e.g. "a.to_trace_no" or "bb.trace_no"
-     * @param string $op    '=' or '<>'
-     * @param string $value 3-digit warehouse value to compare against, e.g. '000'
+     * @param  string  $col  Column expression, e.g. "a.to_trace_no" or "bb.trace_no"
+     * @param  string  $op  '=' or '<>'
+     * @param  string  $value  3-digit warehouse value to compare against, e.g. '000'
      */
     public static function warehouseCondition(string $col, string $op = '<>', string $value = '000'): string
     {
@@ -44,13 +46,13 @@ class TraceHelper
      * 11-digit: plant at pos 8-9
      * 14-digit: plant at pos 11-12
      *
-     * @param string   $col    Column expression, e.g. "a.to_trace_no"
-     * @param string[] $plants 2-digit plant codes, e.g. ['01', '02']
-     * @param string   $op     'IN' or 'NOT IN'
+     * @param  string  $col  Column expression, e.g. "a.to_trace_no"
+     * @param  string[]  $plants  2-digit plant codes, e.g. ['01', '02']
+     * @param  string  $op  'IN' or 'NOT IN'
      */
     public static function plantCondition(string $col, array $plants, string $op = 'IN'): string
     {
-        $list = implode(',', array_map(fn(string $p): string => "'{$p}'", $plants));
+        $list = implode(',', array_map(fn (string $p): string => "'{$p}'", $plants));
 
         return "(
             (CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14 AND SUBSTRING(CAST({$col} AS TEXT),11,2) {$op} ({$list}))
@@ -65,14 +67,14 @@ class TraceHelper
      * Use for WIP/Blending rundown matching where the warehouse field must exist
      * (pos 8-10) and 11-digit legacy data should be silently excluded.
      *
-     * @param string $col Column expression, e.g. "a.to_trace_no"
+     * @param  string  $col  Column expression, e.g. "a.to_trace_no"
      */
     /**
      * Build a SQL expression returning the 2-digit plant code from a trace number.
      * Returns SUBSTRING(col,11,2) for 14-digit, SUBSTRING(col,8,2) for 11-digit.
      * Use when you need the raw plant code value (not a human-readable name).
      *
-     * @param string $col Column expression, e.g. "a.trace_no"
+     * @param  string  $col  Column expression, e.g. "a.trace_no"
      */
     public static function plantCodeExpression(string $col): string
     {
@@ -95,7 +97,7 @@ class TraceHelper
      * Use wherever the original code had SUBSTRING(col,8,3) = '000' as a
      * "this is a storage entry, not a line/production entry" filter.
      *
-     * @param string $col Column expression, e.g. "trace_no" or "a.trace_no"
+     * @param  string  $col  Column expression, e.g. "trace_no" or "a.trace_no"
      */
     public static function isStorageOrLegacy(string $col): string
     {
@@ -116,7 +118,7 @@ class TraceHelper
      * Produces COALESCE(p_from.code_2, CASE ... END) AS alias.
      * The caller must LEFT JOIN m_plant p_from on t_from.id_plant = p_from.code_3.
      *
-     * @param string $col Column expression for the from_trace_no, e.g. "b.from_trace_no"
+     * @param  string  $col  Column expression for the from_trace_no, e.g. "b.from_trace_no"
      */
     public static function fromPlantNameExpression(string $col): string
     {
@@ -144,12 +146,13 @@ class TraceHelper
      *
      * Use for next_process detection, latest trace matching, etc.
      *
-     * @param string $col   Column expression, e.g. "from_trace_no"
-     * @param string $value 3-digit warehouse value to compare against
+     * @param  string  $col  Column expression, e.g. "from_trace_no"
+     * @param  string  $value  3-digit warehouse value to compare against
      */
     public static function warehouseConditionFor(string $col, string $value): string
     {
         $v3 = str_pad(substr($value, 0, 3), 3, '0', STR_PAD_LEFT);
+
         return "(
             CHAR_LENGTH(CAST({$col} AS TEXT)) >= 14
             AND SUBSTRING(CAST({$col} AS TEXT), 8, 3) = '{$v3}'
@@ -168,7 +171,7 @@ class TraceHelper
      * Usage in SELECT:
      *   TraceHelper::plantNameExpression('a.trace_no') . ' AS plant_name'
      *
-     * @param string $col Column expression, e.g. "a.trace_no"
+     * @param  string  $col  Column expression, e.g. "a.trace_no"
      */
     public static function plantNameExpression(string $col): string
     {

@@ -1,7 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services;
 
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
@@ -33,7 +36,7 @@ class PlantContextService implements PlantContextServiceInterface
             ->where('status', 1)
             ->first();
 
-        if (!$plant) {
+        if (! $plant) {
             $plant = DB::connection('eudr_ts')->table('m_plant')
                 ->select('code_3', 'id_plant')
                 ->where('code_3', $plantId)
@@ -42,11 +45,12 @@ class PlantContextService implements PlantContextServiceInterface
         }
 
         if ($plant && $userId) {
-            if (!$this->userHasAccessToPlant($userId, $plant->code_3)) {
+            if (! $this->userHasAccessToPlant($userId, $plant->code_3)) {
                 Log::warning('PlantContextService: User does not have access to plant', [
                     'user_id' => $userId,
                     'plant_id' => $plantId,
                 ]);
+
                 return null;
             }
         }
@@ -63,7 +67,7 @@ class PlantContextService implements PlantContextServiceInterface
             ->first();
 
         if ($plant && $userId) {
-            if (!$this->userHasAccessToPlant($userId, $plant->code_3)) {
+            if (! $this->userHasAccessToPlant($userId, $plant->code_3)) {
                 return null;
             }
         }
@@ -73,7 +77,7 @@ class PlantContextService implements PlantContextServiceInterface
 
     public function getUserPlants(int $userId): array
     {
-        $user = \App\Models\User::find($userId);
+        $user = User::find($userId);
         if ($user && $user->hasRole(['super-admin', 'admin'])) {
             return $this->getAllPlants();
         }
@@ -101,8 +105,10 @@ class PlantContextService implements PlantContextServiceInterface
 
     public function userHasAccessToPlant(int $userId, string $code_3): bool
     {
-        $user = \App\Models\User::find($userId);
-        if (!$user) return false;
+        $user = User::find($userId);
+        if (! $user) {
+            return false;
+        }
 
         if ($user->hasRole(['super-admin', 'admin'])) {
             return true;
@@ -215,7 +221,7 @@ class PlantContextService implements PlantContextServiceInterface
         }
 
         return [
-            'sql' => '(' . implode(' OR ', $conditions) . ')',
+            'sql' => '('.implode(' OR ', $conditions).')',
             'bindings' => $bindings,
         ];
     }

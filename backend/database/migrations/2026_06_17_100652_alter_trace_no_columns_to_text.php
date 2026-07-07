@@ -1,4 +1,6 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
@@ -15,15 +17,15 @@ return new class extends Migration
         }
 
         $alters = [
-            't_balance_header'   => ['trace_no'],
-            't_balance_temporary'=> ['entry_no'],
-            't_trace_header'     => ['from_trace_no', 'to_trace_no'],
-            't_shipment_header'  => ['trace_no', 'from_trace_no'],
+            't_balance_header' => ['trace_no'],
+            't_balance_temporary' => ['entry_no'],
+            't_trace_header' => ['from_trace_no', 'to_trace_no'],
+            't_shipment_header' => ['trace_no', 'from_trace_no'],
             't_warehouse_header' => ['trace_no', 'from_trace_no'],
         ];
 
         foreach ($alters as $table => $columns) {
-            if (!Schema::connection($this->connection)->hasTable($table)) {
+            if (! Schema::connection($this->connection)->hasTable($table)) {
                 continue;
             }
             foreach ($columns as $col) {
@@ -43,15 +45,15 @@ return new class extends Migration
         }
 
         $alters = [
-            't_balance_header'   => ['trace_no'],
-            't_balance_temporary'=> ['entry_no'],
-            't_trace_header'     => ['from_trace_no', 'to_trace_no'],
-            't_shipment_header'  => ['trace_no', 'from_trace_no'],
+            't_balance_header' => ['trace_no'],
+            't_balance_temporary' => ['entry_no'],
+            't_trace_header' => ['from_trace_no', 'to_trace_no'],
+            't_shipment_header' => ['trace_no', 'from_trace_no'],
             't_warehouse_header' => ['trace_no', 'from_trace_no'],
         ];
 
         foreach ($alters as $table => $columns) {
-            if (!Schema::connection($this->connection)->hasTable($table)) {
+            if (! Schema::connection($this->connection)->hasTable($table)) {
                 continue;
             }
             foreach ($columns as $col) {

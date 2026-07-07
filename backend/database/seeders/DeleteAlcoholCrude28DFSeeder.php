@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -20,11 +22,12 @@ class DeleteAlcoholCrude28DFSeeder extends Seeder
         // First, find the material ID
         $material = DB::connection('eudr_ts')->select(
             'SELECT id_material, description FROM m_material WHERE description LIKE ? AND status = 1',
-            ['%' . $materialName . '%']
+            ['%'.$materialName.'%']
         );
 
         if (empty($material)) {
             $this->command->warn("Material '{$materialName}' not found in database.");
+
             return;
         }
 
@@ -43,18 +46,20 @@ class DeleteAlcoholCrude28DFSeeder extends Seeder
 
         if (empty($traceHeaders)) {
             $this->command->warn("No active trace headers found for material '{$materialName}' on date '{$targetDate}'.");
+
             return;
         }
 
         $traceIds = array_column($traceHeaders, 'id_trace_head');
-        $this->command->info("Found " . count($traceIds) . " trace headers to deactivate:");
+        $this->command->info('Found '.count($traceIds).' trace headers to deactivate:');
 
         foreach ($traceHeaders as $header) {
             $this->command->line("  - ID: {$header->id_trace_head}, Trace No: {$header->to_trace_no}, Date: {$header->entry_date}");
         }
 
-        if (!$this->command->confirm('Do you wish to proceed with deactivation?')) {
+        if (! $this->command->confirm('Do you wish to proceed with deactivation?')) {
             $this->command->warn('Operation cancelled by user.');
+
             return;
         }
 

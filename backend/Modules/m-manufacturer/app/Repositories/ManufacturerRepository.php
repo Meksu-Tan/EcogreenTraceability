@@ -1,8 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Manufacturer\Repositories;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Modules\Manufacturer\Models\Manufacturer;
 use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;
 use Modules\Shared\Traits\TransactionLoggerTrait;
@@ -10,49 +12,53 @@ use Modules\Shared\Traits\TransactionLoggerTrait;
 class ManufacturerRepository implements ManufacturerRepositoryInterface
 {
     use TransactionLoggerTrait;
+
+    private const CACHE_TTL = 3600;
+
     public function getAll(): array
     {
-        return Manufacturer::selectRaw("
-            a.id_manufacturer, a.code, a.description, a.status,
-            a.created_at, a.created_by, a.updated_at, a.updated_by,
-            a.type, a.batch_code,
-            CASE
-                WHEN b.id_sloc IS NULL THEN 'other'
-                ELSE COALESCE(b.id_plant, '') || ' - ' || COALESCE(b.description, '') || ' (' || COALESCE(b.code_4, '') || ')'
-            END AS sloc
-        ")
-        ->from('m_manufacturer AS a')
-        ->leftJoin('m_sloc AS b', DB::raw('CAST(a.type AS TEXT)'), '=', DB::raw('CAST(b.id_sloc AS TEXT)'))
-        ->orderBy('a.description')
-        ->get()
-        ->toArray();
+        return Cache::remember('manufacturer.all', self::CACHE_TTL, function () {
+            return Manufacturer::selectRaw('
+                a.id_manufacturer, a.description, a.category, a.material_type, a.status,
+                a.created_at, a.created_by, a.updated_at, a.updated_by
+            ')
+                ->from('m_manufacturer AS a')
+                ->orderBy('a.description')
+                ->get()
+                ->toArray();
+        });
+    }
+
+    private function flushCache(): void
+    {
+        Cache::forget('manufacturer.all');
+        Cache::forget('manufacturer.active');
     }
 
     public function findById(int $id): ?object
     {
         $model = Manufacturer::find($id);
+
         return $model ? (object) $model->toArray() : null;
     }
 
     public function create(array $data): bool
     {
-        $exists = Manufacturer::where('code', $data['code'])->where('status', '1')->exists();
+        $exists = Manufacturer::where('description', $data['description'])->where('status', '1')->exists();
         if ($exists) {
             return false;
         }
 
         $model = Manufacturer::create([
-            'code' => $data['code'],
             'description' => $data['description'],
-            'type' => $data['type'] ?? null,
-            'batch_code' => $data['batch_code'] ?? null,
             'created_by' => $data['created_by'],
         ]);
 
         if ($model) {
             $this->logTransaction('M_MANUFACTURER', 'ADD',
-                'ID: ' . $model->id_manufacturer . ' | CODE: ' . $data['code'] . ' / NAME: ' . $data['description'],
+                'ID: '.$model->id_manufacturer.' | CODE: '.$data['code'].' / NAME: '.$data['description'],
                 $data['created_by']);
+            $this->flushCache();
         }
 
         return (bool) $model;
@@ -61,54 +67,69 @@ class ManufacturerRepository implements ManufacturerRepositoryInterface
     public function update(int $id, array $data): bool
     {
         $model = Manufacturer::find($id);
-        if (!$model) {
+        if (! $model) {
             return false;
         }
 
         $this->logTransaction('M_MANUFACTURER', 'UPDATE',
-            'ID: ' . $id . ' | CODE: ' . $model->code . ' >> ' . $data['code'] . ' / NAME: ' . $model->description . ' >> ' . $data['description'],
+            'ID: '.$id.' | NAME: '.$model->description.' >> '.$data['description'],
             $data['updated_by']);
 
-        return (bool) $model->update([
-            'code' => $data['code'],
+        $result = (bool) $model->update([
             'description' => $data['description'],
-            'type' => $data['type'] ?? null,
-            'batch_code' => $data['batch_code'] ?? null,
             'updated_by' => $data['updated_by'],
         ]);
+
+        if ($result) {
+            $this->flushCache();
+        }
+
+        return $result;
     }
 
     public function deactivate(int $id, string $user): bool
     {
-        $this->logTransaction('M_MANUFACTURER', 'DE-ACTIVATE', 'ID: ' . $id . ' | Status: 1 >> 0', $user);
+        $this->logTransaction('M_MANUFACTURER', 'DE-ACTIVATE', 'ID: '.$id.' | Status: 1 >> 0', $user);
 
         $model = Manufacturer::find($id);
-        if (!$model) {
+        if (! $model) {
             return false;
         }
 
-        return (bool) $model->update(['status' => '0', 'updated_by' => $user]);
+        $result = (bool) $model->update(['status' => '0', 'updated_by' => $user]);
+        if ($result) {
+            $this->flushCache();
+        }
+
+        return $result;
     }
 
     public function activate(int $id, string $user): bool
     {
-        $this->logTransaction('M_MANUFACTURER', 'ACTIVATE', 'ID: ' . $id . ' | Status: 0 >> 1', $user);
+        $this->logTransaction('M_MANUFACTURER', 'ACTIVATE', 'ID: '.$id.' | Status: 0 >> 1', $user);
 
         $model = Manufacturer::find($id);
-        if (!$model) {
+        if (! $model) {
             return false;
         }
 
-        return (bool) $model->update(['status' => '1', 'updated_by' => $user]);
+        $result = (bool) $model->update(['status' => '1', 'updated_by' => $user]);
+        if ($result) {
+            $this->flushCache();
+        }
+
+        return $result;
     }
 
     public function getActive(): array
     {
-        return Manufacturer::selectRaw("a.id_manufacturer, CONCAT(a.code, ' / ', a.description) AS manufacturer")
-            ->from('m_manufacturer as a')
-            ->where('a.status', '1')
-            ->orderBy('a.description')
-            ->get()
-            ->toArray();
+        return Cache::remember('manufacturer.active', self::CACHE_TTL, function () {
+            return Manufacturer::selectRaw('a.id_manufacturer, a.description AS manufacturer, a.material_type')
+                ->from('m_manufacturer as a')
+                ->where('a.status', '1')
+                ->orderBy('a.description')
+                ->get()
+                ->toArray();
+        });
     }
 }

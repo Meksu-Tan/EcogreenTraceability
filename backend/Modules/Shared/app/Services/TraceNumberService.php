@@ -1,8 +1,11 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Modules\Shared\Helpers\TraceHelper;
 
 /**
@@ -22,12 +25,12 @@ class TraceNumberService
     /**
      * Generate next trace number with pessimistic locking.
      *
-     * @param string $prefix    Movement type (1-9)
-     * @param string $date      YYMMDD
-     * @param string $section   3-digit section/warehouse/rundown code
-     * @param string $plantCode 2-digit plant suffix
-     * @param string $table     Sequence-check table (t_trace_header|t_balance_header)
-     * @param string $column    Column (to_trace_no|trace_no)
+     * @param  string  $prefix  Movement type (1-9)
+     * @param  string  $date  YYMMDD
+     * @param  string  $section  3-digit section/warehouse/rundown code
+     * @param  string  $plantCode  2-digit plant suffix
+     * @param  string  $table  Sequence-check table (t_trace_header|t_balance_header)
+     * @param  string  $column  Column (to_trace_no|trace_no)
      */
     public function generate(
         string $prefix,
@@ -40,8 +43,8 @@ class TraceNumberService
         $existing = DB::connection($this->connection)
             ->table($table)
             ->where('status', 1)
-            ->whereRaw('SUBSTRING(' . $column . ', 1, 1) = ?', [$prefix])
-            ->whereRaw('SUBSTRING(' . $column . ', 2, 6) = ?', [$date])
+            ->whereRaw('SUBSTRING('.$column.', 1, 1) = ?', [$prefix])
+            ->whereRaw('SUBSTRING('.$column.', 2, 6) = ?', [$date])
             ->whereRaw(TraceHelper::warehouseCondition($column, '=', $section))
             ->whereRaw(TraceHelper::plantCondition($column, [$plantCode]))
             ->lockForUpdate()
@@ -67,7 +70,7 @@ class TraceNumberService
 
         if (in_array($prefix, ['5', '4'], true)) {
             return $materialId
-                ? str_pad((string)$materialId, 3, '0', STR_PAD_LEFT)
+                ? str_pad((string) $materialId, 3, '0', STR_PAD_LEFT)
                 : '000';
         }
 
@@ -79,16 +82,16 @@ class TraceNumberService
             ->where('id_material', $materialId)
             ->first();
 
-        if (!$material) {
+        if (! $material) {
             return '000';
         }
 
-        if (!empty($material->id_rundown) && !in_array($material->id_rundown, ['0', '-', ''], true)) {
-            return str_pad((string)$material->id_rundown, 3, '0', STR_PAD_LEFT);
+        if (! empty($material->id_rundown) && ! in_array($material->id_rundown, ['0', '-', ''], true)) {
+            return str_pad((string) $material->id_rundown, 3, '0', STR_PAD_LEFT);
         }
 
-        if (!empty($material->id_feed) && !in_array($material->id_feed, ['0', '-', ''], true)) {
-            return str_pad((string)$material->id_feed, 3, '0', STR_PAD_LEFT);
+        if (! empty($material->id_feed) && ! in_array($material->id_feed, ['0', '-', ''], true)) {
+            return str_pad((string) $material->id_feed, 3, '0', STR_PAD_LEFT);
         }
 
         return '000';
@@ -107,6 +110,10 @@ class TraceNumberService
             ->table('m_plant')
             ->where('code_3', $idPlant)
             ->value('code_3');
+
+        if (! $plant) {
+            Log::warning('TraceNumberService: plant code not found in m_plant, falling back to raw suffix', ['id_plant' => $idPlant]);
+        }
 
         return $plant ? substr($plant, -2) : substr($idPlant, -2);
     }
@@ -134,6 +141,7 @@ class TraceNumberService
                 $max = $seq;
             }
         }
+
         return $max + 1;
     }
 }

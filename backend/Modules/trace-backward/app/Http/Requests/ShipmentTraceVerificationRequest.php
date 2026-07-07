@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -15,7 +17,7 @@ class ShipmentTraceVerificationRequest extends FormRequest
     {
         return [
             'so_no' => ['required_without:trace_no', 'nullable', 'string', 'max:20'],
-            'trace_no' => ['required_without:so_no', 'nullable', 'string', 'regex:/^[1-9]\d{10}$|^[1-9]\d{13}$/'],
+            'trace_no' => ['required_without:so_no', 'nullable', 'string', 'max:100'],
         ];
     }
 }

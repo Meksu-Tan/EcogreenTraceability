@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Tank\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,11 +9,15 @@ use Illuminate\Database\Eloquent\Model;
 class TankDetail extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 'm_sloc_detail';
+
     protected $primaryKey = 'id_sloc_tail';
+
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [

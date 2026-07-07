@@ -1,13 +1,15 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Integration;
 
 use App\Models\User;
 use Mockery;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 use Modules\TsBlending\Services\Contracts\BlendingServiceInterface;
 use Modules\TsRaw\Services\Contracts\RmEntryServiceInterface;
 use Modules\TsTransfer\Services\Contracts\TransferServiceInterface;
-use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 use Tests\TestCase;
 
 class ApiSmokeTest extends TestCase
@@ -29,7 +31,7 @@ class ApiSmokeTest extends TestCase
         $user = User::factory()->make();
 
         $mockData = [
-            'data'  => collect([(object)['id' => 1]]),
+            'data' => collect([(object) ['id' => 1]]),
             'total' => 1,
         ];
 
@@ -50,7 +52,7 @@ class ApiSmokeTest extends TestCase
         $user = User::factory()->make();
 
         $mockData = [
-            'data'  => collect([(object)['id_balance_head' => 1]]),
+            'data' => collect([(object) ['id_balance_head' => 1]]),
             'total' => 1,
         ];
 
@@ -70,7 +72,7 @@ class ApiSmokeTest extends TestCase
         $user = User::factory()->make();
 
         $mockData = [
-            'data'  => collect([(object)['id_balance_head' => 1]]),
+            'data' => collect([(object) ['id_balance_head' => 1]]),
             'total' => 1,
         ];
 

@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
@@ -20,7 +22,31 @@ class Rundown
 {
     protected $connection = 'eudr_ts';
 
+    private static function normalizeIdSloc($idSloc): string
+    {
+        if (empty($idSloc)) {
+            return '[]';
+        }
+        if (is_string($idSloc)) {
+            $decoded = json_decode($idSloc, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $idSloc;
+            }
+            if (is_numeric($idSloc)) {
+                return json_encode([(int) $idSloc]);
+            }
 
+            return '[]';
+        }
+        if (is_array($idSloc)) {
+            return json_encode(array_values($idSloc));
+        }
+        if (is_numeric($idSloc)) {
+            return json_encode([(int) $idSloc]);
+        }
+
+        return '[]';
+    }
 
     /**
      * Insert a new rundown balance entry together with all its supplier rows.
@@ -47,17 +73,17 @@ class Rundown
             }
 
             $existingHead = DB::connection($connection)->select(
-                "SELECT id_balance_head, qty, in_qty, init_qty
+                'SELECT id_balance_head, qty, in_qty, init_qty
                    FROM t_balance_header
                   WHERE trace_no = ?
                     AND id_material = ?
                     AND id_sloc = ?
                     AND status = 1
-                  LIMIT 1 FOR UPDATE",
+                  LIMIT 1 FOR UPDATE',
                 [$data['trace_no'], $data['id_material'], $slocInt]
             );
 
-            if (!empty($existingHead)) {
+            if (! empty($existingHead)) {
                 // UPDATE EXISTING BALANCE HEADER
                 $idHead = $existingHead[0]->id_balance_head;
                 $inQtyFloat = (float) $data['in_qty'];
@@ -80,7 +106,7 @@ class Rundown
                     'id_balance_head' => $idHead,
                     'id_material' => $data['id_material'],
                     'entry_date' => $data['entry_date'],
-                    'id_sloc' => $data['id_sloc'] ?? '[]',
+                    'id_sloc' => self::normalizeIdSloc($data['id_sloc'] ?? '[]'),
                     'in_qty' => $data['in_qty'],
                     'last_qtf' => $data['last_qtf'] ?? 0,
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
@@ -100,6 +126,7 @@ class Rundown
                     'out_qty' => 0,
                     'init_qty' => $data['in_qty'],
                     'id_plant' => $data['id_plant'],
+                    'status' => $data['status'] ?? 1,
                     'created_by' => $data['user'],
                     'created_at' => now(),
                 ], 'id_balance_head');
@@ -111,11 +138,12 @@ class Rundown
                     'id_balance_head' => $idHead,
                     'id_material' => $data['id_material'],
                     'entry_date' => $data['entry_date'],
-                    'id_sloc' => $data['id_sloc'] ?? '[]',
+                    'id_sloc' => self::normalizeIdSloc($data['id_sloc'] ?? '[]'),
                     'in_qty' => $data['in_qty'],
                     'last_qtf' => $data['last_qtf'] ?? 0,
                     'curr_qtf' => $data['curr_qtf'] ?? 0,
                     'id_plant' => $data['id_plant'],
+                    'status' => $data['status'] ?? 1,
                     'created_by' => $data['user'],
                     'created_at' => now(),
                 ], 'id_trace_head');
@@ -127,7 +155,9 @@ class Rundown
                 $batchSap = $row['batch_sap'];
                 $qty = round((float) $row['rundownSupplier'], 4);
 
-                if ($qty <= 0) continue;
+                if ($qty <= 0) {
+                    continue;
+                }
 
                 // CHECK IF TRACE DETAIL ALREADY EXISTS FOR THIS SUPPLIER+BATCH UNDER THIS TRACE HEAD
                 $existing = DB::connection($connection)->select(
@@ -148,13 +178,14 @@ class Rundown
                         'id_supplier' => $idSupplier,
                         'id_manufacturer' => $row['id_manufacturer'] ?? null,
                         'id_material' => $data['id_material'],
-                        'id_sloc' => $data['id_sloc'] ?? '[]',
+                        'id_sloc' => self::normalizeIdSloc($data['id_sloc'] ?? '[]'),
                         'qty' => $qty,
                         'in_qty' => $qty,
                         'out_qty' => 0,
                         'init_qty' => $qty,
                         'batch_sap' => $batchSap,
                         'id_plant' => $data['id_plant'],
+                        'status' => $data['status'] ?? 1,
                         'created_by' => $data['user'],
                         'created_at' => now(),
                     ], 'id_balance_tail');
@@ -166,10 +197,11 @@ class Rundown
                         'id_supplier' => $idSupplier,
                         'id_manufacturer' => $row['id_manufacturer'] ?? null,
                         'id_material' => $data['id_material'],
-                        'id_sloc' => $data['id_sloc'] ?? '[]',
+                        'id_sloc' => self::normalizeIdSloc($data['id_sloc'] ?? '[]'),
                         'in_qty' => $qty,
                         'batch_sap' => $batchSap,
                         'id_plant' => $data['id_plant'],
+                        'status' => $data['status'] ?? 1,
                         'created_by' => $data['user'],
                     ]);
                 } else {
@@ -219,7 +251,9 @@ class Rundown
             $total = bcadd($total, self::normalizeNumber($row['rundownSupplier']), 10);
         }
 
-        if (bccomp($total, '0', 10) === 0) return;
+        if (bccomp($total, '0', 10) === 0) {
+            return;
+        }
 
         $factor = bcdiv($targetTotal, $total, 10);
 
@@ -240,7 +274,9 @@ class Rundown
 
     private static function normalizeNumber(mixed $num): string
     {
-        if ($num === null) return '0';
+        if ($num === null) {
+            return '0';
+        }
 
         $str = (string) $num;
 

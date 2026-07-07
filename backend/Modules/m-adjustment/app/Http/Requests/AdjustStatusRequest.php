@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Adjustment\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,7 +24,7 @@ class AdjustStatusRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($v) {
-            if (!$this->input('adjust_no') && !$this->input('id_adjust_head')) {
+            if (! $this->input('adjust_no') && ! $this->input('id_adjust_head')) {
                 $v->errors()->add('lookup', 'Either adjust_no or id_adjust_head must be provided');
             }
         });

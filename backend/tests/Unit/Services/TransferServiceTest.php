@@ -1,19 +1,22 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TsTransfer\Services\TransferService;
-use Modules\TsTransfer\Services\TransferApprovalService;
-use Modules\TsTransfer\Repositories\Contracts\TransferRepositoryInterface;
-use Illuminate\Support\Collection;
 use Mockery;
 use Mockery\MockInterface;
+use Modules\TsTransfer\Repositories\TransferRepositoryInterface;
+use Modules\TsTransfer\Services\TransferApprovalService;
+use Modules\TsTransfer\Services\TransferService;
+use Tests\TestCase;
 
 class TransferServiceTest extends TestCase
 {
     protected MockInterface $repoMock;
+
     protected MockInterface $approvalMock;
+
     protected TransferService $service;
 
     protected function setUp(): void
@@ -497,15 +500,15 @@ class TransferServiceTest extends TestCase
     public function test_it_returns_response_99_when_period_is_locked_on_execute_transfer(): void
     {
         $data = [
-            'entry_no'      => '726060310001',
-            'entry_date'    => '2026-06-03',
-            'id_material'   => 1,
-            'material_doc'  => '',
-            'trf_qty'       => '100.00',
-            'source_sloc'   => 1,
-            'trf_sloc'      => 2,
+            'entry_no' => '726060310001',
+            'entry_date' => '2026-06-03',
+            'id_material' => 1,
+            'material_doc' => '',
+            'trf_qty' => '100.00',
+            'source_sloc' => 1,
+            'trf_sloc' => 2,
             'source_sloc_no' => [],
-            'trf_sloc_no'   => [],
+            'trf_sloc_no' => [],
         ];
 
         // getSlocPlant → resolves srcPlant and destPlant
@@ -526,15 +529,15 @@ class TransferServiceTest extends TestCase
     public function test_it_returns_response_4_when_stock_is_insufficient_on_execute_transfer(): void
     {
         $data = [
-            'entry_no'      => '726060310001',
-            'entry_date'    => '2026-06-03',
-            'id_material'   => 1,
-            'material_doc'  => '',
-            'trf_qty'       => '200.000',
-            'source_sloc'   => 1,
-            'trf_sloc'      => 2,
+            'entry_no' => '726060310001',
+            'entry_date' => '2026-06-03',
+            'id_material' => 1,
+            'material_doc' => '',
+            'trf_qty' => '200.000',
+            'source_sloc' => 1,
+            'trf_sloc' => 2,
             'source_sloc_no' => [],
-            'trf_sloc_no'   => [],
+            'trf_sloc_no' => [],
         ];
 
         $this->repoMock->shouldReceive('getSlocPlant')

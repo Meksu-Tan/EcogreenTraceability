@@ -64,15 +64,15 @@
               <tr>
                 <th class="text-center" style="width:48px">No</th>
                 <th class="text-center" style="width:96px">Action</th>
-                <th class="sortable-th" :class="{ active: sortKey === 'flowmeter' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('flowmeter')">Flowmeter<VIcon v-if="sortKey==='flowmeter'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-right sortable-th" :class="{ active: sortKey === 'value' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('value')">Reset Value<VIcon v-if="sortKey==='value'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="sortable-th" :class="{ active: sortKey === 'remark' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('remark')">Remark<VIcon v-if="sortKey==='remark'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="text-center sortable-th" :class="{ active: sortKey === 'status' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('status')">Status<VIcon v-if="sortKey==='status'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="sortable-th" :class="{ active: sortKey === 'created_at' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_at')">Created At<VIcon v-if="sortKey==='created_at'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
-                <th class="sortable-th" :class="{ active: sortKey === 'created_by' }" style="cursor:pointer;user-select:none;white-space:nowrap" @click="toggleSort('created_by')">Created By<VIcon v-if="sortKey==='created_by'" :icon="sortDir==='asc'?'ri-arrow-up-s-line':'ri-arrow-down-s-line'" size="14" class="sort-icon" /><VIcon v-else icon="ri-arrow-up-down-line" size="12" class="sort-icon" /></th>
+                <th>Flowmeter</th>
+                <th class="text-right">Reset Value</th>
+                <th>Remark</th>
+                <th class="text-center">Status</th>
+                <th>Created At</th>
+                <th>Created By</th>
               </tr>
             </thead>
-            <tbody v-if="sortedList.length === 0">
+            <tbody v-if="!data || data.length === 0">
               <tr>
                 <td colspan="8" class="text-center pa-8">
                   <VIcon icon="ri-calculator-line" size="48" class="text-disabled mb-2" />
@@ -81,8 +81,8 @@
               </tr>
             </tbody>
             <tbody v-else>
-              <tr v-for="(row, i) in paginatedData" :key="row.id_reset">
-                <td class="text-center text-medium-emphasis font-monospace">{{ (page - 1) * perPage + i + 1 }}</td>
+              <tr v-for="(row, i) in data" :key="row.id_reset">
+                <td class="text-center text-medium-emphasis font-monospace">{{ (pagination.currentPage - 1) * pagination.perPage + i + 1 }}</td>
                 <td class="text-center">
                   <div class="d-flex ga-1 justify-center">
                     <VBtn icon="ri-edit-line" size="x-small" color="primary" variant="tonal" @click="openEditModal(row)" />
@@ -121,28 +121,30 @@
           </VTable>
         </div>
 
-        <div v-if="sortedList.length > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
+        <div v-if="pagination.total > 0" class="d-flex flex-wrap justify-space-between align-center px-4 py-2 custom-pagination-footer gap-2">
           <div class="d-flex align-center gap-3">
             <span class="text-caption text-medium-emphasis">
-              Showing {{ (page - 1) * perPage + 1 }} - {{ Math.min(page * perPage, sortedList.length) }} of {{ sortedList.length }} records
+              Showing {{ (pagination.currentPage - 1) * pagination.perPage + 1 }} - {{ Math.min(pagination.currentPage * pagination.perPage, pagination.total) }} of {{ pagination.total }} records
             </span>
             <VSelect
-              v-model="perPage"
+              v-model="pagination.perPage"
               :items="[5, 10, 15, 20]"
               density="compact"
               variant="outlined"
               hide-details
               style="min-width: 80px; max-width: 100px;"
+              @update:model-value="onPerPageChange"
             />
           </div>
           <VPagination
-            v-if="totalPages > 1"
-            v-model="page"
-            :length="totalPages"
+            v-if="pagination.lastPage > 1"
+            v-model="pagination.currentPage"
+            :length="pagination.lastPage"
             :total-visible="5"
             density="comfortable"
             size="small"
             show-first-last-page
+            @update:model-value="onPageChange"
           />
         </div>
       </VCardText>
@@ -237,7 +239,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useQuantifierStore } from '../stores/quantifierStore'
 import { useToastStore } from '@/stores/toast.js'
@@ -245,65 +247,13 @@ import { useToastStore } from '@/stores/toast.js'
 const store = useQuantifierStore()
 const toast = useToastStore()
 
-const { list: data, flowmeters, loading, saving } = storeToRefs(store)
+const { list: data, flowmeters, loading, saving, pagination } = storeToRefs(store)
 
 const showModal = ref(false)
 const editMode = ref('ADD')
 const confirmMsg = ref('')
 const confirmType = ref('')
 const confirmAction = ref(null)
-
-const sortKey = ref(null)
-const sortDir = ref(null)
-const page = ref(1)
-const perPage = ref(10)
-
-function detectColumnType(colKey) {
-  const rows = data.value
-  if (!rows || rows.length === 0) return 'text'
-  for (const row of rows) {
-    const val = row[colKey]
-    if (val !== null && val !== undefined && val !== '') {
-      return !isNaN(parseFloat(val)) && isFinite(val) ? 'number' : 'text'
-    }
-  }
-  return 'text'
-}
-
-function toggleSort(key) {
-  if (sortKey.value === key) {
-    if (sortDir.value === 'asc') { sortDir.value = 'desc' }
-    else if (sortDir.value === 'desc') { sortKey.value = null; sortDir.value = null }
-  } else {
-    sortKey.value = key
-    sortDir.value = detectColumnType(key) === 'text' ? 'asc' : 'desc'
-  }
-  page.value = 1
-}
-
-const sortedList = computed(() => {
-  if (!sortKey.value || !sortDir.value) return data.value || []
-  const key = sortKey.value
-  const dir = sortDir.value
-  const rows = [...(data.value || [])]
-  const type = detectColumnType(key)
-  return rows.sort((a, b) => {
-    const va = a[key]; const vb = b[key]
-    if (va == null && vb == null) return 0
-    if (va == null) return 1; if (vb == null) return -1
-    if (type === 'number') return dir === 'asc' ? va - vb : vb - va
-    return dir === 'asc' ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va))
-  })
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(sortedList.value.length / perPage.value)))
-
-const paginatedData = computed(() => {
-  const start = (page.value - 1) * perPage.value
-  return sortedList.value.slice(start, start + perPage.value)
-})
-
-watch(perPage, () => { page.value = 1 })
 
 const filters = reactive({ flowmeter: '', date_from: '', date_to: '', status: '' })
 const form = reactive({ id: null, reset_date: '', flowmeter: '', value: 0, remark: '' })
@@ -328,6 +278,19 @@ const resetFilters = () => {
   filters.date_from = ''
   filters.date_to = ''
   filters.status = ''
+  store.resetCache()
+  store.setPage(1)
+  loadData()
+}
+
+const onPageChange = (page) => {
+  store.setPage(page)
+  loadData()
+}
+
+const onPerPageChange = (perPage) => {
+  pagination.value.perPage = perPage
+  store.setPage(1)
   loadData()
 }
 
@@ -361,11 +324,12 @@ const saveQuantifier = async () => {
     remark: form.remark,
     ...(editMode.value === 'UPDATE' ? { id: form.id } : {})
   }
-  
+
   const res = await store.save(payload)
   if (res.ok) {
     toast.success('Quantifier saved successfully')
     showModal.value = false
+    store.resetCache()
     await loadData()
   } else {
     toast.error('Failed to save quantifier: ' + res.error)
@@ -379,9 +343,10 @@ const toggleStatus = (row, type) => {
     const res = type === 'activate'
       ? await store.activate(row.id_reset)
       : await store.deactivate(row.id_reset)
-    
+
     if (res.ok) {
       toast.success(`Quantifier ${type === 'activate' ? 'activated' : 'deactivated'} successfully`)
+      store.resetCache()
       await loadData()
     } else {
       toast.error(`Failed to ${type} quantifier: ` + res.error)
@@ -402,7 +367,5 @@ const formatQty = (q) => parseFloat(q || 0).toFixed(3)
 </script>
 
 <style scoped>
-.sort-icon { vertical-align: middle; transition: opacity 0.15s; opacity: 0.35; }
-.sortable-th:hover .sort-icon { opacity: 0.7; }
-.sortable-th.active .sort-icon { opacity: 1 !important; color: rgb(var(--v-theme-primary)); }
+.custom-pagination-footer { border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); }
 </style>

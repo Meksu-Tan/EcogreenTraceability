@@ -1,21 +1,29 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Tank\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\TsRaw\Models\BalanceHeader;
 
 class Tank extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 'm_sloc';
+
     protected $primaryKey = 'id_sloc';
+
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
         'id_sloc',
+        'id_tankfarm',
         'id_plant',
         'plant_name',
         'tf_number',
@@ -40,12 +48,12 @@ class Tank extends Model
     public function details()
     {
         return $this->hasMany(TankDetail::class, 'id_sloc', 'id_sloc')
-                    ->where('status', 1);
+            ->where('status', 1);
     }
 
     public function balanceHeaders()
     {
-        return $this->hasMany(\Modules\TsRaw\Models\BalanceHeader::class, 'id_sloc', 'id_sloc');
+        return $this->hasMany(BalanceHeader::class, 'id_sloc', 'id_sloc');
     }
 
     public function scopeActive($query)

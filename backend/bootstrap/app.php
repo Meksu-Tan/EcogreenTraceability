@@ -1,11 +1,22 @@
-<?php declare(strict_types=1);
+<?php
 
+declare(strict_types=1);
+
+use App\Helpers\ApiResponse;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
+use Modules\Shared\Http\Middleware\PlantScopeMiddleware;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -17,46 +28,46 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Register Plant Context Middleware aliases
         $middleware->alias([
-            'plant.context' => \Modules\Shared\Http\Middleware\PlantContextMiddleware::class,
-            'plant.scope' => \Modules\Shared\Http\Middleware\PlantScopeMiddleware::class,
+            'plant.context' => PlantContextMiddleware::class,
+            'plant.scope' => PlantScopeMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (\Throwable $e, \Illuminate\Http\Request $request) {
-            if (!($request->is('api/*') || $request->expectsJson())) {
+        $exceptions->render(function (Throwable $e, Request $request) {
+            if (! ($request->is('api/*') || $request->expectsJson())) {
                 return null;
             }
 
-            if ($e instanceof \Illuminate\Auth\AuthenticationException) {
-                return \App\Helpers\ApiResponse::error('Unauthenticated.', 401);
+            if ($e instanceof AuthenticationException) {
+                return ApiResponse::error('Unauthenticated.', 401);
             }
 
-            if ($e instanceof \Illuminate\Validation\ValidationException) {
-                return \App\Helpers\ApiResponse::error(
+            if ($e instanceof ValidationException) {
+                return ApiResponse::error(
                     $e->getMessage(),
                     422,
                     $e->errors()
                 );
             }
 
-            if ($e instanceof \Illuminate\Auth\Access\AuthorizationException) {
-                return \App\Helpers\ApiResponse::error('This action is unauthorized.', 403);
+            if ($e instanceof AuthorizationException) {
+                return ApiResponse::error('This action is unauthorized.', 403);
             }
 
-            if ($e instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
-                return \App\Helpers\ApiResponse::error('The requested resource was not found.', 404);
+            if ($e instanceof NotFoundHttpException) {
+                return ApiResponse::error('The requested resource was not found.', 404);
             }
 
             if ($e instanceof ModelNotFoundException) {
-                return \App\Helpers\ApiResponse::error('The requested resource was not found.', 404);
+                return ApiResponse::error('The requested resource was not found.', 404);
             }
 
             if ($e instanceof ThrottleRequestsException) {
-                return \App\Helpers\ApiResponse::error('Too many requests. Please slow down.', 429);
+                return ApiResponse::error('Too many requests. Please slow down.', 429);
             }
 
-            if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpException) {
-                return \App\Helpers\ApiResponse::error($e->getMessage() ?: 'HTTP error.', $e->getStatusCode());
+            if ($e instanceof HttpException) {
+                return ApiResponse::error($e->getMessage() ?: 'HTTP error.', $e->getStatusCode());
             }
 
             Log::error('Unhandled exception', [
@@ -66,7 +77,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            $response = \App\Helpers\ApiResponse::error($e->getMessage(), 500);
+            $response = ApiResponse::error($e->getMessage(), 500);
 
             $origin = $request->headers->get('Origin');
             if ($origin) {

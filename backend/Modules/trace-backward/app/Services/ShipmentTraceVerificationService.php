@@ -1,8 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Services;
 
-use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterface;
+use Modules\TraceBackward\Repositories\TraceBackwardRepositoryInterface;
 use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
 use Modules\TsShipment\Services\Contracts\ShipmentServiceInterface;
 
@@ -16,18 +18,20 @@ class ShipmentTraceVerificationService implements ShipmentTraceVerificationServi
     public function verifyBySoNo(string $soNo): array
     {
         $shipment = $this->traceBackwardRepository->findShipmentBySo($soNo);
+
         return $shipment ? $this->buildVerification($shipment) : ['found' => false];
     }
 
     public function verifyByTraceNo(string $traceNo): array
     {
         $shipment = $this->traceBackwardRepository->findShipmentByTraceNo($traceNo);
+
         return $shipment ? $this->buildVerification($shipment) : ['found' => false];
     }
 
     private function buildVerification(object $shipment): array
     {
-        $chain = $this->traceBackwardRepository->backwardTrace((string) $shipment->trace_no);
+        $chain = $this->traceBackwardRepository->backwardTrace((string) $shipment->trace_no, null, $shipment->id_plant ?? null);
         $packaging = $this->shipmentService->getShipmentBatchPackaging(['batchNo' => $shipment->batch_no]);
         $sapOverview = $this->shipmentService->getDatShipment([
             'soNo' => $shipment->so_no,

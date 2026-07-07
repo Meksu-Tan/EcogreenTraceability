@@ -1,23 +1,26 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TsRmreport\Services\RmReportService;
-use Modules\TsRmreport\Repositories\Contracts\RmReportRepositoryInterface;
 use Mockery;
 use Mockery\MockInterface;
+use Modules\TsRmreport\Repositories\Contracts\RmReportRepositoryInterface;
+use Modules\TsRmreport\Services\RmReportService;
+use Tests\TestCase;
 
 class RmReportServiceTest extends TestCase
 {
     protected MockInterface $repoMock;
+
     protected RmReportService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->repoMock = Mockery::mock(RmReportRepositoryInterface::class);
-        $this->service  = new RmReportService($this->repoMock);
+        $this->service = new RmReportService($this->repoMock);
     }
 
     protected function tearDown(): void
@@ -62,7 +65,7 @@ class RmReportServiceTest extends TestCase
 
     public function test_it_passes_filters_to_repository_when_getting_rm_report(): void
     {
-        $filters  = ['plant_code' => 'EOB', 'period' => '2026-06'];
+        $filters = ['plant_code' => 'EOB', 'period' => '2026-06'];
         $repoData = [['batch_sap' => 'BATCH001', 'material' => 'CRUDE PALM OIL']];
 
         $this->repoMock->shouldReceive('getRmReport')
@@ -111,7 +114,7 @@ class RmReportServiceTest extends TestCase
 
     public function test_it_passes_filters_to_repository_when_getting_rm_list_detail(): void
     {
-        $filters  = ['batch_sap' => 'BATCH001'];
+        $filters = ['batch_sap' => 'BATCH001'];
         $repoData = [['id_detail' => 1, 'movement_type' => 'GR']];
 
         $this->repoMock->shouldReceive('getRmListDetail')
@@ -180,7 +183,7 @@ class RmReportServiceTest extends TestCase
 
     public function test_it_passes_filters_to_repository_when_getting_rm_summary(): void
     {
-        $filters  = ['plant_code' => 'EOB', 'batch_sap' => 'BATCH001'];
+        $filters = ['plant_code' => 'EOB', 'batch_sap' => 'BATCH001'];
         $repoData = [['batch_sap' => 'BATCH001', 'total_in' => 5000.0]];
 
         $this->repoMock->shouldReceive('getRmSummaryRmPrd')

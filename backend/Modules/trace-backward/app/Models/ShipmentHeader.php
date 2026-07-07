@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,8 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 class ShipmentHeader extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_shipment_header';
+
     protected $primaryKey = 'id_ship_head';
+
     public $timestamps = true;
 
     protected $fillable = [

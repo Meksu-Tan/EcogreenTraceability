@@ -84,6 +84,11 @@ export const sidebarMenu = [
         path: '/ts-rmreport/rm-report',
         label: 'RM to PRD',
         icon: 'ri:calculator-line'
+      },
+      {
+        path: '/ts-acknowledge',
+        label: 'Acknowledge Dashboard',
+        icon: 'ri:check-double-line'
       }
     ]
   },
@@ -104,6 +109,11 @@ export const sidebarMenu = [
         icon: 'ri:mind-map'
       },
       {
+        path: '/setup/wip-process',
+        label: 'WIP Process',
+        icon: 'ri:node-tree'
+      },
+      {
         path: '/setup/supplier',
         label: 'Supplier',
         icon: 'ri:user-shared-line'
@@ -119,6 +129,11 @@ export const sidebarMenu = [
         icon: 'ri:water-flash-line'
       },
       {
+        path: '/setup/warehouse',
+        label: 'Warehouse',
+        icon: 'ri:database-2-line'
+      },
+      {
         path: '/qtfsetup',
         label: 'Quantifier',
         icon: 'ri:scales-3-line'
@@ -128,6 +143,7 @@ export const sidebarMenu = [
         label: 'Plant',
         icon: 'ri:building-4-line'
       }
+
     ]
   },
 

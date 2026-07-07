@@ -1,22 +1,28 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import quantifierApi from '@/modules/m-quantifier/services'
+import { useTransactionList } from '@/composables/useTransactionList.js'
 
 export const useQuantifierStore = defineStore('quantifier', () => {
-  const list = ref([])
+  const {
+    list,
+    loading,
+    error,
+    pagination,
+    setPage,
+    fetchList: doFetchList,
+    resetCache,
+  } = useTransactionList(
+    (params) => quantifierApi.getQuantifierList(params),
+    { listKey: 'quantifier', defaultPerPage: 10 }
+  )
+
   const flowmeters = ref([])
   const detail = ref(null)
-  const loading = ref(false)
   const saving = ref(false)
-  const error = ref(null)
 
   async function fetchList(params = {}) {
-    loading.value = true; error.value = null
-    try {
-      const res = await quantifierApi.getQuantifierList(params)
-      list.value = res.data?.data || []
-    } catch (err) { error.value = err.message || 'Failed'; list.value = [] }
-    finally { loading.value = false }
+    return doFetchList(params)
   }
 
   async function fetchFlowmeters() {
@@ -65,5 +71,5 @@ export const useQuantifierStore = defineStore('quantifier', () => {
     list.value = []; flowmeters.value = []; detail.value = null; error.value = null
   }
 
-  return { list, flowmeters, detail, loading, saving, error, fetchList, fetchFlowmeters, fetchDetail, save, activate, deactivate, clear }
+  return { list, flowmeters, detail, loading, saving, error, pagination, setPage, fetchList, fetchFlowmeters, fetchDetail, save, activate, deactivate, resetCache, clear }
 })

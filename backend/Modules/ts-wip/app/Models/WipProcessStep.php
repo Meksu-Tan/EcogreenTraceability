@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsWip\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -8,7 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class WipProcessStep extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 'm_wip_process_step';
+
     protected $primaryKey = 'id';
 
     protected $fillable = [
@@ -30,6 +34,7 @@ class WipProcessStep extends Model
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = 'updated_at';
 
     public function section(): BelongsTo

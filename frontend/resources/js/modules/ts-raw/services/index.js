@@ -148,5 +148,20 @@ export default {
   async getActiveManufacturers() {
     const response = await api.get('/api/v1/manufacturers/active')
     return response.data
+  },
+
+  async updateSubTank(data) {
+    const response = await api.post(`${BASE_URL}/update-sub-tank`, data)
+    return response.data
+  },
+
+  async updateMatlDoc(data) {
+    const response = await api.post(`${BASE_URL}/matl-doc`, data)
+    return response.data
+  },
+
+  async getSpecificTanks(params = {}) {
+    const response = await api.get(`${BASE_URL}/specific-tanks`, { params })
+    return response.data
   }
 }

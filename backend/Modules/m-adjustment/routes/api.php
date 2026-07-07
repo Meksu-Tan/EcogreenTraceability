@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Adjustment\Http\Controllers\AdjustmentController;
@@ -26,6 +27,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::post('period-view-on-hand', [AdjustmentController::class, 'periodViewOnHand']);
         Route::post('period-view-adjustment', [AdjustmentController::class, 'periodViewAdjustment']);
         Route::post('period-header-lock', [AdjustmentController::class, 'periodHeaderLock']);
+        Route::post('period-header-unlock', [AdjustmentController::class, 'periodHeaderUnlock']);
         Route::delete('destroy-adjustment-period/{id}', [AdjustmentController::class, 'destroyAdjustmentPeriod']);
         Route::get('last-record', [AdjustmentController::class, 'getLastRecord']);
 
@@ -38,6 +40,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         // New combined / direct mutations
         Route::post('store-adjustment', [AdjustmentController::class, 'storeAdjustment']);
         Route::delete('destroy/{id}', [AdjustmentController::class, 'destroyAdjustment']);
+        Route::delete('destroy-whx/{id}', [AdjustmentController::class, 'destroyAdjustmentWhx']);
         Route::post('add-entry-supplier', [AdjustmentController::class, 'addEntrySupplier']);
         Route::delete('delete-supplier-temp/{id}', [AdjustmentController::class, 'deleteSupplierTemp']);
         Route::post('init', [AdjustmentController::class, 'adjustmentInit']);

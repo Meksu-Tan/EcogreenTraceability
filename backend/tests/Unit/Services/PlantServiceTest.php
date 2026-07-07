@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Plant\Services\PlantService;
-use Modules\Plant\Repositories\Contracts\PlantRepositoryInterface;
 use Mockery;
+use Modules\Plant\Repositories\Contracts\PlantRepositoryInterface;
+use Modules\Plant\Services\PlantService;
+use Tests\TestCase;
 
 class PlantServiceTest extends TestCase
 {

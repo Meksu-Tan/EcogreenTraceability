@@ -1,13 +1,16 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsTsreport\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use Modules\TsTsreport\Services\Contracts\TsReportServiceInterface;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Modules\TsTsreport\Http\Requests\TsReportRequest;
 use Modules\TsTsreport\Http\Resources\TsReportResource;
-use Illuminate\Http\JsonResponse;
+use Modules\TsTsreport\Services\Contracts\TsReportServiceInterface;
 
 class TsReportController extends Controller
 {
@@ -24,9 +27,12 @@ class TsReportController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
+
             return ApiResponse::success(TsReportResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            Log::error('TsReport action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report data', 500);
         }
     }
 
@@ -39,9 +45,12 @@ class TsReportController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
+
             return ApiResponse::success(TsReportResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            Log::error('TsReport action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report data', 500);
         }
     }
 
@@ -54,9 +63,12 @@ class TsReportController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
+
             return ApiResponse::success(TsReportResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            Log::error('TsReport action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report data', 500);
         }
     }
 
@@ -69,9 +81,12 @@ class TsReportController extends Controller
             if (isset($result['status']) && $result['status'] === 0) {
                 return ApiResponse::error($result['message'] ?? 'Not found', 404);
             }
+
             return ApiResponse::success(TsReportResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            Log::error('TsReport action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report data', 500);
         }
     }
 
@@ -80,9 +95,16 @@ class TsReportController extends Controller
         try {
             $filters = $request->validated();
             $filters['user_id'] = $request->user()?->id;
-            return ApiResponse::success(TsReportResource::collection($this->tsReportService->getTsReportTransfer($filters)));
+            $result = $this->tsReportService->getTsReportTransfer($filters);
+            if (isset($result['status']) && $result['status'] === 0) {
+                return ApiResponse::error($result['message'] ?? 'Not found', 404);
+            }
+
+            return ApiResponse::success(TsReportResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            Log::error('TsReport action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report data', 500);
         }
     }
 
@@ -91,9 +113,16 @@ class TsReportController extends Controller
         try {
             $filters = $request->validated();
             $filters['user_id'] = $request->user()?->id;
-            return ApiResponse::success(TsReportResource::collection($this->tsReportService->getTsReportWip($filters)));
+            $result = $this->tsReportService->getTsReportWip($filters);
+            if (isset($result['status']) && $result['status'] === 0) {
+                return ApiResponse::error($result['message'] ?? 'Not found', 404);
+            }
+
+            return ApiResponse::success(TsReportResource::collection($result['data'] ?? $result));
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            Log::error('TsReport action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report data', 500);
         }
     }
 
@@ -108,14 +137,16 @@ class TsReportController extends Controller
             }
 
             return ApiResponse::success(new TsReportResource([
-                'rm'        => $this->tsReportService->getTsReportRm($filters)['data'] ?? [],
-                'pck'       => $this->tsReportService->getTsReportPck($filters)['data'] ?? [],
-                'shipment'  => $this->tsReportService->getTsReportShipment($filters)['data'] ?? [],
-                'transfer'  => $this->tsReportService->getTsReportTransfer($filters)['data'] ?? [],
-                'wip'       => $this->tsReportService->getTsReportWip($filters)['data'] ?? [],
+                'rm' => $this->tsReportService->getTsReportRm($filters)['data'] ?? [],
+                'pck' => $this->tsReportService->getTsReportPck($filters)['data'] ?? [],
+                'shipment' => $this->tsReportService->getTsReportShipment($filters)['data'] ?? [],
+                'transfer' => $this->tsReportService->getTsReportTransfer($filters)['data'] ?? [],
+                'wip' => $this->tsReportService->getTsReportWip($filters)['data'] ?? [],
             ]), 'All TS Report sections retrieved', 200);
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed: ' . $e->getMessage(), 500);
+            Log::error('TsReport action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report data', 500);
         }
     }
 }

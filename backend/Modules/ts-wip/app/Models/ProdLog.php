@@ -1,9 +1,14 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsWip\Models;
 
 // GAP #10: Add dedicated Models for WIP Entry module
 use Illuminate\Database\Eloquent\Model;
+use Modules\Material\Models\Material;
+use Modules\Tank\Models\Tank;
+use Modules\TsRaw\Models\TraceHeader;
 
 /**
  * ProdLog Model - Production log for WIP processing
@@ -14,11 +19,15 @@ use Illuminate\Database\Eloquent\Model;
 class ProdLog extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_prod_log';
+
     protected $primaryKey = 'id_prod_log';
+
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
@@ -55,7 +64,7 @@ class ProdLog extends Model
      */
     public function traceHeader()
     {
-        return $this->belongsTo(\Modules\TsRaw\Models\TraceHeader::class, 'id_trace_head', 'id_trace_head');
+        return $this->belongsTo(TraceHeader::class, 'id_trace_head', 'id_trace_head');
     }
 
     /**
@@ -63,7 +72,7 @@ class ProdLog extends Model
      */
     public function material()
     {
-        return $this->belongsTo(\Modules\Material\Models\Material::class, 'id_material', 'id_material');
+        return $this->belongsTo(Material::class, 'id_material', 'id_material');
     }
 
     /**
@@ -71,7 +80,7 @@ class ProdLog extends Model
      */
     public function tank()
     {
-        return $this->belongsTo(\Modules\Tank\Models\Tank::class, 'tank_id', 'id_sloc');
+        return $this->belongsTo(Tank::class, 'tank_id', 'id_sloc');
     }
 
     /**

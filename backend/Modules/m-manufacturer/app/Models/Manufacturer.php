@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Manufacturer\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,14 +9,13 @@ use Illuminate\Database\Eloquent\Model;
 class Manufacturer extends Model
 {
     protected $connection = 'eudr_ts';
-    protected $table      = 'm_manufacturer';
+
+    protected $table = 'm_manufacturer';
+
     protected $primaryKey = 'id_manufacturer';
 
     protected $fillable = [
-        'code',
-        'batch_code',
         'description',
-        'type',
         'status',
         'created_by',
         'updated_by',

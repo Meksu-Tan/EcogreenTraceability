@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TraceBackward\Services\TraceBackwardService;
-use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterface;
 use Mockery;
+use Modules\TraceBackward\Repositories\TraceBackwardRepositoryInterface;
+use Modules\TraceBackward\Services\TraceBackwardService;
+use Tests\TestCase;
 
 class TraceBackwardServiceTest extends TestCase
 {
@@ -55,7 +57,7 @@ class TraceBackwardServiceTest extends TestCase
 
         $repoMock->shouldReceive('backwardTrace')
             ->once()
-            ->with('300001-001', 3)
+            ->with('300001-001', 3, null, null)
             ->andReturn($expected);
 
         $service = new TraceBackwardService($repoMock);

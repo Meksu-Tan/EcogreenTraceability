@@ -1,18 +1,19 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Http\Controllers;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
-use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
-use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
 use Modules\TraceBackward\Http\Requests\ShipmentTraceVerificationRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardDetailRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardListRequest;
 use Modules\TraceBackward\Http\Requests\TraceBackwardSearchRequest;
-use Modules\TraceBackward\Http\Resources\TraceBackwardResource;
-use Illuminate\Http\JsonResponse;
+use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
+use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
 
 class TraceBackwardController extends Controller
 {
@@ -27,9 +28,11 @@ class TraceBackwardController extends Controller
             $filters = $request->validated();
             $filters['user_id'] = $request->user()?->id;
             $data = $this->traceBackwardService->getBackwardList($filters);
+
             return ApiResponse::success($data, 'Backward list retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceBackward index failed', ['exception' => $e]);
+
             return ApiResponse::error('Failed to retrieve backward list', 500);
         }
     }
@@ -40,10 +43,14 @@ class TraceBackwardController extends Controller
             $data = $request->validated();
             $materialId = (int) $data['id_material'];
             $batchNo = $data['batch_no'] ?? null;
-            $result = $this->traceBackwardService->searchTraces($materialId, $batchNo);
+            $plantId = isset($data['id_plant']) ? (int) $data['id_plant'] : null;
+            $userId = $request->user()?->id;
+            $result = $this->traceBackwardService->searchTraces($materialId, $batchNo, $plantId, $userId);
+
             return ApiResponse::success($result, 'Backward search results retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceBackward search failed', ['exception' => $e]);
+
             return ApiResponse::error('Failed to search backward traces', 500);
         }
     }
@@ -57,21 +64,18 @@ class TraceBackwardController extends Controller
             $traceNo = $data['trace_no'];
             $idMaterial = isset($data['id_material']) ? (int) $data['id_material'] : null;
 
-            $rows   = $this->traceBackwardService->getBackwardTraceDetail($traceNo, $idMaterial, $plantId, $userId);
+            $rows = $this->traceBackwardService->getBackwardTraceDetail($traceNo, $idMaterial, $plantId, $userId);
             $result = [
-                'initial' => array_values(array_filter((array) $rows, fn($r) => ($r->level ?? 0) === 1)),
-                'chain'   => array_values(array_filter((array) $rows, fn($r) => ($r->level ?? 0) > 1)),
+                'initial' => array_values(array_filter((array) $rows, fn ($r) => ($r->level ?? 0) === 1)),
+                'chain' => array_values(array_filter((array) $rows, fn ($r) => ($r->level ?? 0) > 1)),
             ];
+
             return ApiResponse::success($result, 'Backward trace detail retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceBackward traceDetail failed', ['exception' => $e]);
+
             return ApiResponse::error('Failed to retrieve backward trace detail', 500);
         }
-    }
-
-    public function show(string $traceNo): JsonResponse
-    {
-        return ApiResponse::success(['trace_no' => $traceNo], 'Trace found', 200);
     }
 
     public function verify(ShipmentTraceVerificationRequest $request): JsonResponse
@@ -81,9 +85,11 @@ class TraceBackwardController extends Controller
             $result = isset($data['so_no'])
                 ? $this->verificationService->verifyBySoNo($data['so_no'])
                 : $this->verificationService->verifyByTraceNo($data['trace_no']);
+
             return ApiResponse::success($result, 'Backward trace verification retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TraceBackward verify failed', ['exception' => $e]);
+
             return ApiResponse::error('Failed to verify backward trace', 500);
         }
     }

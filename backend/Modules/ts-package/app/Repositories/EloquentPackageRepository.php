@@ -1,16 +1,20 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Modules\TsPackage\Repositories;
 
-use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
-use Modules\Shared\Services\PeriodLockService;
-use Modules\Shared\Traits\DbCompatTrait;
-use Modules\Shared\Traits\TransactionLoggerTrait;
-use Modules\Shared\Traits\TankNameFormatterTrait;
-use Modules\Shared\Helpers\Feed;
+use Exception;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Exception;
+use Modules\Shared\Helpers\Feed;
+use Modules\Shared\Helpers\TraceHelper;
+use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Services\TraceNumberService;
+use Modules\Shared\Traits\DbCompatTrait;
+use Modules\Shared\Traits\TankNameFormatterTrait;
+use Modules\Shared\Traits\TransactionLoggerTrait;
+use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
 
 /**
  * @todo Technical Debt: This class is 671 lines (limit: 200). Requires refactoring into smaller, focused classes.
@@ -20,27 +24,28 @@ use Exception;
  */
 class EloquentPackageRepository implements PackageRepositoryInterface
 {
-    use DbCompatTrait, TransactionLoggerTrait, TankNameFormatterTrait;
+    use DbCompatTrait, TankNameFormatterTrait, TransactionLoggerTrait;
 
     protected string $connection = 'eudr_ts';
-    protected static string $movType1 = "4";
+
+    protected static string $movType1 = '4';
 
     public function getDtPckEntry(int $plantId = 0, int $page = 1, int $perPage = 50): array
     {
-        $gcSloc     = "''";
+        $gcSloc = "''";
         $gcSupplier = $this->dbGroupConcat(
             "CONCAT(d.description, ' / ', d.batch_sap, ' / Init: ', {$this->dbNumberFormat('d.init_qty', 3)}, ' MT / Balance: ', {$this->dbNumberFormat('d.qty', 3)}, ' MT')",
             ' | ',
             true
         );
         $gcFromTrace = $this->dbGroupConcat('DISTINCT g.from_trace_no', ' ');
-        $fmtInitQty  = $this->isPgsql()
+        $fmtInitQty = $this->isPgsql()
             ? $this->dbNumberFormat('MIN(wh_sub.init_qty)', 3)
             : $this->dbNumberFormat('wh_sub.init_qty', 3);
-        $fmtQty      = $this->isPgsql()
+        $fmtQty = $this->isPgsql()
             ? $this->dbNumberFormat('MIN(wh_sub.qty)', 3)
             : $this->dbNumberFormat('wh_sub.qty', 3);
-        $fmtBalSup   = $this->dbNumberFormat('SUM(DISTINCT dd.init_qty)', 3);
+        $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT dd.init_qty)', 3);
 
         $groupKw = $this->isPgsql() ? 'GROUP BY a.trace_no' : 'GROUP BY a.trace_no';
 
@@ -53,8 +58,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         $bindings[] = $perPage;
         $bindings[] = ($page - 1) * $perPage;
 
-        $results = DB::connection($this->connection)->select("
-            SELECT" . ($this->isPgsql() ? "
+        $results = DB::connection($this->connection)->select('
+            SELECT'.($this->isPgsql() ? "
                    MIN(a.id_whx_head) AS id_whx_head,
                    MIN(a.entry_date) AS entry_date,
                    MIN(CONCAT(wh_sub.from_trace_no, ' >>> ', a.trace_no)) AS fromto_trace_no,
@@ -79,11 +84,11 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     MIN(a.id_section) AS id_section,
                     {$gcSupplier} AS supplier,
                     {$fmtBalSup} AS balance_supplier,
-                    MIN(" . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . ") AS plant_name,
+                    MIN(".TraceHelper::plantNameExpression('a.trace_no').') AS plant_name,
                     MAX(CASE
                        WHEN a.trace_no = (SELECT tth.to_trace_no
                                             FROM t_trace_header tth
-                                           WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('tth.to_trace_no', '<>', '000') . "
+                                           WHERE '.TraceHelper::warehouseCondition('tth.to_trace_no', '<>', '000')."
                                              AND SUBSTRING(tth.to_trace_no, 1, 1) = '4'
                                              AND tth.status = 1
                                            ORDER BY tth.id_trace_head DESC LIMIT 1) THEN 1
@@ -103,11 +108,11 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     UPPER(b.description) AS feed, UPPER(c.description) AS fg, a.trace_no, a.po_no, wh.code AS whx, a.id_section,
                     {$gcSupplier} AS supplier,
                    {$fmtBalSup} AS balance_supplier,
-                   " . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . " AS plant_name,
+                   ".TraceHelper::plantNameExpression('a.trace_no').' AS plant_name,
                    CASE
                       WHEN a.trace_no = (SELECT to_trace_no
                                            FROM t_trace_header
-                                          WHERE " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('to_trace_no', '<>', '000') . "
+                                          WHERE '.TraceHelper::warehouseCondition('to_trace_no', '<>', '000')."
                                             AND SUBSTRING(to_trace_no, 1, 1) = '4'
                                             AND status = 1
                                           ORDER BY id_trace_head DESC LIMIT 1) THEN 1
@@ -121,7 +126,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                                           LIMIT 1) THEN 1
                       ELSE NULL
                    END AS next_process")
-              . "
+              ."
        FROM t_warehouse_header a
        LEFT JOIN m_material b ON a.id_material_feed = b.id_material
        LEFT JOIN m_material_pck c ON a.id_material_fg = c.id_materialpck
@@ -152,11 +157,11 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         AND wh_sub.from_trace_no IS NOT NULL
         {$wherePlant}
       {$groupKw}
-      ORDER BY " . ($this->isPgsql() ? 'MIN(a.entry_date) DESC, MIN(a.id_whx_head) DESC' : 'a.entry_date DESC, a.id_whx_head DESC') . "
+      ORDER BY ".($this->isPgsql() ? 'MIN(a.entry_date) DESC, MIN(a.id_whx_head) DESC' : 'a.entry_date DESC, a.id_whx_head DESC').'
       LIMIT ? OFFSET ?
-        ", $bindings);
+        ', $bindings);
 
-        $slocs = \Illuminate\Support\Facades\DB::connection('eudr_ts')
+        $slocs = DB::connection('eudr_ts')
             ->table('m_sloc')
             ->select('id_sloc', 'tf_number')
             ->get()
@@ -165,17 +170,19 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         foreach ($results as $row) {
             $row->sloc = '';
             $raw = $row->raw_sloc ?? null;
-            if ($raw === null || $raw === '' || $raw === 'null') continue;
+            if ($raw === null || $raw === '' || $raw === 'null') {
+                continue;
+            }
             $decoded = json_decode($raw, true);
             $ids = (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) ? $decoded : [$raw];
             $tanks = [];
             foreach ($ids as $id) {
-                $id = trim((string)$id);
+                $id = trim((string) $id);
                 if (isset($slocs[$id]) && $slocs[$id]->tf_number) {
                     $tanks[] = $slocs[$id]->tf_number;
                 }
             }
-            if (!empty($tanks)) {
+            if (! empty($tanks)) {
                 $tanks = array_unique($tanks);
                 sort($tanks);
                 $row->sloc = implode(' | ', $tanks);
@@ -193,11 +200,11 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                         ) wh_sub ON a.trace_no = wh_sub.trace_no
              WHERE a.status = 1
                AND wh_sub.from_trace_no IS NOT NULL
-               " . ($plantId > 0 ? 'AND a.id_plant = ?' : '') . "
-        ", $countBindings);
+               ".($plantId > 0 ? 'AND a.id_plant = ?' : '').'
+        ', $countBindings);
 
         return [
-            'data'  => $results,
+            'data' => $results,
             'total' => (int) ($countResult[0]->total ?? 0),
         ];
     }
@@ -211,6 +218,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
              WHERE a.status = 1
              ORDER BY a.description ASC
         ");
+
         return collect($results);
     }
 
@@ -222,6 +230,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
              WHERE a.status = 1
              ORDER BY a.id_warehouse ASC
         ');
+
         return collect($results);
     }
 
@@ -231,11 +240,11 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         $idSloc = $data['tank'] ?? null;
         $idPlant = $data['id_plant'] ?? null;
 
-        if (!$idMaterialPck) {
+        if (! $idMaterialPck) {
             return collect([]);
         }
 
-        if (!$idPlant && $idSloc) {
+        if (! $idPlant && $idSloc) {
             $idPlant = DB::connection($this->connection)->table('m_sloc')
                 ->where('id_sloc', $idSloc)
                 ->value('id_plant');
@@ -248,7 +257,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         $bindings = [$idMaterialPck];
         if ($idPlant) {
             $plantCondition = 'AND c.id_plant = ?';
-            $bindings[] = (string)$idPlant;
+            $bindings[] = (string) $idPlant;
         }
         if ($idSloc) {
             $slocCondition = 'AND c.id_sloc = CAST(? AS INTEGER)';
@@ -270,6 +279,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                           SELECT c.id_material, c.qty, c.id_sloc
                             FROM t_balance_header c
                            WHERE c.status = 1
+                             AND SUBSTRING(c.trace_no FROM 1 FOR 1) IN ('1','2','3','7','8','9')
                            {$plantCondition}
                            {$slocCondition}
                           ) c ON b.id_material = c.id_material
@@ -283,28 +293,44 @@ class EloquentPackageRepository implements PackageRepositoryInterface
     public function getCmbActiveTankPck(array $data): Collection
     {
         $rundownID = $data['rundownID'] ?? null;
-        $plantCode  = $data['plant_code'] ?? null;
+        $plantCode = $data['plant_code'] ?? null;
 
-        if (!$rundownID) {
+        if (! $rundownID) {
             return collect([]);
         }
 
-        $wipMaterial = DB::connection($this->connection)->select(
-            'SELECT id_material FROM m_material WHERE status = 1 AND id_rundown = ? LIMIT 1',
+        $material = DB::connection($this->connection)->select(
+            'SELECT type FROM m_material WHERE status = 1 AND id_rundown = ? LIMIT 1',
             [$rundownID]
         );
 
-        if (empty($wipMaterial)) {
+        if (empty($material)) {
             return collect([]);
         }
 
-        $idMaterial = $wipMaterial[0]->id_material;
+        $type = $material[0]->type;
+        if (! $type) {
+            return collect([]);
+        }
 
+        $pattern = match ($type) {
+            'RM' => '%FEED TANK%',
+            'PRD' => '%PRODUCT TANK%',
+            'WIP' => '%WIP TANK%',
+            default => null,
+        };
+
+        if (! $pattern) {
+            return collect([]);
+        }
+
+        $bindings = [$pattern];
         $plantFilter = '';
-        $bindings = [$idMaterial];
+
+        // ponytail: reference hardcodes plants ['1002', '1007']; use context plant instead
         if ($plantCode && $plantCode !== '0') {
             $plantFilter = 'AND sl.id_plant = ?';
-            array_unshift($bindings, $plantCode);
+            $bindings[] = $plantCode;
         }
 
         $results = DB::connection($this->connection)->select(
@@ -315,18 +341,10 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     MIN(sl.tf_number) AS tf_number
                FROM m_sloc sl
               WHERE sl.status = 1
+                AND sl.description ILIKE ?
                 {$plantFilter}
-                AND EXISTS (
-                    SELECT 1 FROM t_balance_header bh
-                     WHERE bh.status = 1 AND bh.qty > 0
-                       AND bh.id_material = ?
-                       AND bh.id_sloc IN (
-                           SELECT sl2.id_sloc FROM m_sloc sl2
-                            WHERE sl2.code_3 = sl.code_3 AND sl2.id_plant = sl.id_plant
-                       )
-                )
-              GROUP BY COALESCE(NULLIF(sl.code_3,''), sl.description), sl.id_plant
-              ORDER BY COALESCE(MIN(NULLIF(sl.description,'')), MIN(sl.code_3)) ASC",
+              GROUP BY sl.code_3, sl.id_plant
+              ORDER BY MIN(sl.code) ASC",
             $bindings
         );
 
@@ -335,16 +353,17 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         return collect($results)->map(function ($item) use ($plants) {
             $desc = $item->description ?? '';
             $code3 = strtoupper($item->code_3 ?? '');
-            
+
             if (empty($desc) || $desc === $item->code_3) {
                 $label = ($code3 === 'PRD') ? 'PRODUCT' : $code3;
-                $abbr  = $plants[$item->id_plant ?? ''] ?? '';
-                $desc  = trim($label . ($abbr ? ' ' . $abbr : ''));
+                $abbr = $plants[$item->id_plant ?? ''] ?? '';
+                $desc = trim($label.($abbr ? ' '.$abbr : ''));
             }
-            
+
             $item->tank = $this->formatTankName($desc) ?? $desc;
             $item->id_sloc = (int) $item->id_sloc;
             $item->tf_number = $item->tf_number;
+
             return $item;
         });
     }
@@ -358,7 +377,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 ->get()
                 ->pluck('code_2', 'code_3')
                 ->toArray();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return [];
         }
     }
@@ -388,40 +407,59 @@ class EloquentPackageRepository implements PackageRepositoryInterface
     {
         $sloc = $data['sloc'] ?? null;
         $fgProduct = $data['fgProduct'] ?? null;
-        if (!$sloc) return collect([]);
+        if (! $sloc) {
+            return collect([]);
+        }
 
-        $balanceJoin = "";
-        $balanceSelect = "NULL";
-        $groupClause = "";
-        $bindings = [$sloc, $sloc];
+        // Find group (code_3 + id_plant) from selected sloc
+        $group = DB::connection($this->connection)->selectOne(
+            'SELECT code_3, id_plant FROM m_sloc WHERE id_sloc = ? LIMIT 1',
+            [$sloc]
+        );
+        if (! $group) {
+            return collect([]);
+        }
+
+        $bindings = [$group->code_3, $group->id_plant];
+        $groupBalance = '0';
 
         if ($fgProduct) {
-            $idMaterial = $fgProduct;
             $datMaterial = DB::connection($this->connection)->select('
                 SELECT b.id_material
                   FROM m_material_pck a
                   JOIN m_material b ON a.id_material = b.id_material
                  WHERE a.id_materialpck = ?
-            ', [$idMaterial]);
+            ', [$fgProduct]);
             $rawMaterialId = $datMaterial[0]->id_material ?? 0;
 
-            $balanceSelect = "COALESCE(SUM(c.qty), 0)";
-            $balanceJoin = "LEFT JOIN t_balance_header c ON c.id_sloc = a.id_sloc AND c.id_material = ? AND c.status = 1";
-            $groupClause = "GROUP BY a.id_sloc";
-            $bindings = [$rawMaterialId, $sloc, $sloc];
-        }
+            // ponytail: join via id_sloc
+            $tfJoin = 'a.id_sloc = c.id_sloc';
 
-        $results = DB::connection($this->connection)->select("
-            SELECT a.id_sloc, a.id_sloc AS id_sloc_tail, 
-                   CASE WHEN {$balanceSelect} IS NOT NULL THEN CONCAT(a.tf_number, ' || Balance: ', CAST({$balanceSelect} AS TEXT), ' MT') ELSE a.tf_number END AS tf_number
-              FROM m_sloc a
-              {$balanceJoin}
-             WHERE a.status = 1
-               AND a.code_3 = (SELECT code_3 FROM m_sloc WHERE id_sloc = ? LIMIT 1)
-               AND a.id_plant = (SELECT id_plant FROM m_sloc WHERE id_sloc = ? LIMIT 1)
-             {$groupClause}
-             ORDER BY a.id_sloc ASC
-        ", $bindings);
+            $results = DB::connection($this->connection)->select("
+                SELECT MIN(a.id_sloc) AS id_sloc, MIN(a.id_sloc) AS id_sloc_tail,
+                       a.tf_number,
+                       COALESCE(SUM(c.qty), 0) AS balance
+                  FROM m_sloc a
+                  LEFT JOIN t_balance_header c ON {$tfJoin} AND c.id_material = ? AND c.status = 1
+                 WHERE a.status = 1
+                   AND a.code_3 = ?
+                   AND a.id_plant = ?
+                 GROUP BY a.tf_number
+                 ORDER BY COALESCE(SUM(c.qty), 0) DESC, a.tf_number ASC
+            ", [$rawMaterialId, $group->code_3, $group->id_plant]);
+        } else {
+            $results = DB::connection($this->connection)->select('
+                SELECT MIN(a.id_sloc) AS id_sloc, MIN(a.id_sloc) AS id_sloc_tail,
+                       a.tf_number,
+                       NULL AS balance
+                  FROM m_sloc a
+                 WHERE a.status = 1
+                   AND a.code_3 = ?
+                   AND a.id_plant = ?
+                 GROUP BY a.tf_number
+                 ORDER BY a.tf_number ASC
+            ', $bindings);
+        }
 
         return collect($results);
     }
@@ -432,17 +470,17 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             $entryDate = $data['entryDate'];
             $idMaterialPck = $data['fgProduct'];
             $batchNo = $data['batchNo'];
-            $qtyPck = (float)$data['qty'];
+            $qtyPck = (float) $data['qty'];
             $poNo = $data['poNo'] ?? null;
             $idSloc = $data['tank'];
             $tankNo = $data['tankNo'] ?? [];
-            $slocIds = (!empty($tankNo) && is_array($tankNo)) ? array_map('intval', $tankNo) : [(int)$idSloc];
+            $slocIds = (! empty($tankNo) && is_array($tankNo)) ? array_map('intval', $tankNo) : [(int) $idSloc];
             $idSlocJson = json_encode($slocIds);
-            
+
             $idWarehouse = $data['warehouse'];
             $idPlant = $data['id_plant'] ?? null;
 
-            if (!$idPlant) {
+            if (! $idPlant) {
                 $idPlant = DB::connection($this->connection)->table('m_sloc')
                     ->where('id_sloc', $idSloc)
                     ->value('id_plant');
@@ -452,14 +490,14 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 return ['response' => 99, 'message' => 'Period is locked.'];
             }
 
-            $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+            $svc = app(TraceNumberService::class);
             $plantCode = $svc->resolvePlantCode((string) $idPlant);
 
             $whRow = DB::connection($this->connection)->selectOne(
                 'SELECT id_warehouse FROM m_warehouse WHERE id_batch = ? AND status = 1 LIMIT 1',
                 [$batchNo]
             );
-            $whID = $whRow ? str_pad((string) $whRow->id_warehouse, 3, "0", STR_PAD_LEFT) : str_pad((string)$idWarehouse, 3, "0", STR_PAD_LEFT);
+            $whID = $whRow ? str_pad((string) $whRow->id_warehouse, 3, '0', STR_PAD_LEFT) : str_pad((string) $idWarehouse, 3, '0', STR_PAD_LEFT);
             $date = date('ymd');
 
             $traceNoWhx = $svc->generate(self::$movType1, $date, $whID, $plantCode);
@@ -481,8 +519,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
             // Check balance stock
             $inClause = implode(',', array_fill(0, count($slocIds), '?'));
-            $bindings = array_merge([$codeMaterial], $slocIds);
-            
+            $bindings = array_merge([$codeMaterial], $slocIds, [(string) $idPlant]);
+
             $datBalQty = DB::connection($this->connection)->select("
                 SELECT SUM(b.qty) AS total
                   FROM m_material a
@@ -491,10 +529,12 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                    AND a.status = 1
                    AND b.status = 1
                    AND b.qty > '0.0001'
+                   AND SUBSTRING(b.trace_no FROM 1 FOR 1) IN ('1','2','3','7','8','9')
                    AND b.id_sloc IN ({$inClause})
+                   AND b.id_plant = ?
             ", $bindings);
 
-            $totalStock = (float)($datBalQty[0]->total ?? 0);
+            $totalStock = (float) ($datBalQty[0]->total ?? 0);
             if (($totalStock - $qtyPck) < -0.000001) {
                 return ['response' => 4, 'message' => "Insufficient stock balance. Stock: {$totalStock}, Needed: {$qtyPck}, Code: {$codeMaterial}, Sloc: {$idSloc}, Plant: {$idPlant}"];
             }
@@ -520,17 +560,26 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
             // Perform Feed using generalFeed
             $feedResult = Feed::generalFeed([
-                'user'         => $user,
-                'entry_date'   => $entryDate,
-                'id_material'  => $idMaterialFeed,
-                'id_sloc'      => $idSlocJson,
-                'id_plant'     => $idPlant,
-                'qty'          => $qtyPck,
-                'to_trace_no'  => $traceNoTrf,
+                'user' => $user,
+                'entry_date' => $entryDate,
+                'id_material' => $idMaterialFeed,
+                'id_sloc' => $idSlocJson,
+                'id_plant' => $idPlant,
+                'qty' => $qtyPck,
+                'to_trace_no' => $traceNoTrf,
+                'trace_prefixes' => [1, 2, 7, 8, 9],
             ]);
 
             if (($feedResult['response'] ?? 0) != 1) {
                 return ['response' => 3, 'message' => 'Failed to feed from stock.'];
+            }
+
+            $feedTraceExists = DB::connection($this->connection)->select(
+                'SELECT id_trace_head FROM t_trace_header WHERE to_trace_no = ? AND status = 1 LIMIT 1',
+                [$traceNoTrf]
+            );
+            if (empty($feedTraceExists)) {
+                return ['response' => 6, 'message' => 'Companion feed trace missing after generalFeed — aborting to avoid orphaned warehouse entry.'];
             }
 
             Feed::normalizeSupplierRundown($feedResult['trace_head_ids'], $qtyPck);
@@ -545,8 +594,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
             $fromTraceNo = $feedResult['used_heads'][0]['from_trace_no'];
 
-            return DB::connection($this->connection)->transaction(function () use ($entryDate, $fromTraceNo, $traceNoWhx, $idMaterialFeed, $idMaterialPck, $idWarehouse, $idSloc, $idSlocJson, $batchNo, $poNo, $qtyPck, $idPlant, $user, $traceNoTrf, $finalSupplierDetails) {
-                
+            return DB::connection($this->connection)->transaction(function () use ($entryDate, $fromTraceNo, $traceNoWhx, $idMaterialFeed, $idMaterialPck, $idWarehouse, $idSlocJson, $batchNo, $poNo, $qtyPck, $idPlant, $user, $traceNoTrf, $finalSupplierDetails) {
+
                 // Insert Warehouse Header
                 $idWhxHead = DB::connection($this->connection)->table('t_warehouse_header')->insertGetId([
                     'entry_date' => $entryDate,
@@ -562,7 +611,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     'in_qty' => $qtyPck,
                     'init_qty' => $qtyPck,
                     'id_plant' => $idPlant,
-                    'created_by' => $user
+                    'created_by' => $user,
                 ], 'id_whx_head');
 
                 // Insert Trace Header Rundown
@@ -581,29 +630,29 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
                 foreach ($finalSupplierDetails as $detail) {
                     $idWhxTail = DB::connection($this->connection)->table('t_warehouse_detail')->insertGetId([
-                        'id_whx_head'      => $idWhxHead,
+                        'id_whx_head' => $idWhxHead,
                         'id_material_feed' => $idMaterialFeed,
-                        'id_material_fg'   => $idMaterialPck,
-                        'id_supplier'      => $detail->id_supplier,
-                        'batch_sap'        => $detail->batch_sap,
-                        'qty'              => $detail->qty,
-                        'in_qty'           => $detail->qty,
-                        'init_qty'         => $detail->qty,
-                        'id_plant'         => $idPlant,
-                        'id_sloc'          => $idSlocJson,
-                        'created_by'       => $user
+                        'id_material_fg' => $idMaterialPck,
+                        'id_supplier' => $detail->id_supplier,
+                        'batch_sap' => $detail->batch_sap,
+                        'qty' => $detail->qty,
+                        'in_qty' => $detail->qty,
+                        'init_qty' => $detail->qty,
+                        'id_plant' => $idPlant,
+                        'id_sloc' => $idSlocJson,
+                        'created_by' => $user,
                     ], 'id_whx_tail');
 
                     DB::connection($this->connection)->table('t_trace_detail')->insert([
-                        'id_trace_head'   => $idTraceHeadRundown,
+                        'id_trace_head' => $idTraceHeadRundown,
                         'id_balance_tail' => $idWhxTail,
-                        'id_supplier'     => $detail->id_supplier,
-                        'id_material'     => $idMaterialPck,
-                        'in_qty'          => $detail->qty,
-                        'batch_sap'       => $detail->batch_sap,
-                        'id_sloc'         => $idSlocJson,
-                        'id_plant'        => $idPlant,
-                        'created_by'      => $user,
+                        'id_supplier' => $detail->id_supplier,
+                        'id_material' => $idMaterialPck,
+                        'in_qty' => $detail->qty,
+                        'batch_sap' => $detail->batch_sap,
+                        'id_sloc' => $idSlocJson,
+                        'id_plant' => $idPlant,
+                        'created_by' => $user,
                     ]);
                 }
 
@@ -611,7 +660,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             });
 
         } catch (Exception $e) {
-            return ['response' => 0, 'message' => 'Store failed: ' . $e->getMessage()];
+            return ['response' => 0, 'message' => 'Store failed: '.$e->getMessage()];
         }
     }
 
@@ -619,7 +668,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
     {
         try {
             $traceNo = $data['traceNo'] ?? null;
-            if (!$traceNo) {
+            if (! $traceNo) {
                 return ['response' => 0, 'message' => 'Trace number is required.'];
             }
 
@@ -660,7 +709,9 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                            AND a.init_qty = ?
                     ', [$traceNo, $inQtyWhx]);
 
-                    if (empty($datWhx)) continue;
+                    if (empty($datWhx)) {
+                        continue;
+                    }
                     $idWhxHead = $datWhx[0]->id_whx_head;
 
                     $datTraceHeadFeed = DB::connection($this->connection)->select('
@@ -671,7 +722,9 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                            AND a.status = 1
                     ', [$idTraceHead]);
 
-                    if (empty($datTraceHeadFeed)) continue;
+                    if (empty($datTraceHeadFeed)) {
+                        continue;
+                    }
                     $idBalHead = $datTraceHeadFeed[0]->id_balance_head;
 
                     $datWhxHead = DB::connection($this->connection)->select('
@@ -681,7 +734,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                            AND status = 1
                     ', [$idWhxHead]);
 
-                    $whxQty = (float)$datWhxHead[0]->init_qty;
+                    $whxQty = (float) $datWhxHead[0]->init_qty;
 
                     $datBalHead = DB::connection($this->connection)->select('
                         SELECT qty, out_qty
@@ -690,9 +743,9 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                            AND status = 1
                     ', [$idBalHead]);
 
-                    if (!empty($datBalHead)) {
-                        $balQty = (float)$datBalHead[0]->qty;
-                        $balOutQty = (float)$datBalHead[0]->out_qty;
+                    if (! empty($datBalHead)) {
+                        $balQty = (float) $datBalHead[0]->qty;
+                        $balOutQty = (float) $datBalHead[0]->out_qty;
 
                         $newBalQty = $balQty + $whxQty;
                         $newBalOutQty = $balOutQty - $whxQty;
@@ -701,13 +754,14 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                             UPDATE t_balance_header
                                SET qty = ?,
                                    out_qty = ?,
-                                   updated_by = ?
+                                   updated_by = ?,
+                                   updated_at = NOW()
                              WHERE id_balance_head = ?
                                AND status = 1
                         ', [$newBalQty, $newBalOutQty, $user, $idBalHead]);
 
                         // Log
-                        $this->logTransaction('T_BALANCE_HEAD', 'UPDATE', 'IDHEAD: ' . $idBalHead . ' | QTY: ' . $balQty . ' >>> ' . $newBalQty . ' / OUT_QTY: ' . $balOutQty . ' >>> ' . $newBalOutQty, $user);
+                        $this->logTransaction('T_BALANCE_HEAD', 'UPDATE', 'IDHEAD: '.$idBalHead.' | QTY: '.$balQty.' >>> '.$newBalQty.' / OUT_QTY: '.$balOutQty.' >>> '.$newBalOutQty, $user);
                     }
 
                     // Return Tail
@@ -722,43 +776,46 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     ', [$idWhxHead]);
 
                     foreach ($datWhxTail as $tailRow) {
-                        $whxQtyTail = (float)$tailRow->init_qty;
+                        $whxQtyTail = (float) $tailRow->init_qty;
                         $idBalTail = $tailRow->id_balance_tail;
-                        $balQtyTail = (float)$tailRow->qty;
-                        $balOutQtyTail = (float)$tailRow->out_qty;
+                        $balQtyTail = (float) $tailRow->qty;
+                        $balOutQtyTail = (float) $tailRow->out_qty;
 
                         $newBalQtyTail = $balQtyTail + $whxQtyTail;
                         $newBalOutQtyTail = $balOutQtyTail - $whxQtyTail;
 
-                        if ($newBalOutQtyTail < 0) continue;
+                        if ($newBalOutQtyTail < 0) {
+                            break;
+                        }
 
                         DB::connection($this->connection)->update('
                             UPDATE t_balance_detail
                                SET qty = ?,
                                    out_qty = ?,
-                                   updated_by = ?
+                                   updated_by = ?,
+                                   updated_at = NOW()
                              WHERE id_balance_tail = ?
                                AND status = 1
                         ', [$newBalQtyTail, $newBalOutQtyTail, $user, $idBalTail]);
 
                         // Log
-                        $this->logTransaction('T_BALANCE_TAIL', 'UPDATE', 'IDTAIL: ' . $idBalTail . ' | QTY: ' . $balQtyTail . ' >>> ' . $newBalQtyTail . ' / OUT_QTY: ' . $balOutQtyTail . ' >>> ' . $newBalOutQtyTail, $user);
+                        $this->logTransaction('T_BALANCE_TAIL', 'UPDATE', 'IDTAIL: '.$idBalTail.' | QTY: '.$balQtyTail.' >>> '.$newBalQtyTail.' / OUT_QTY: '.$balOutQtyTail.' >>> '.$newBalOutQtyTail, $user);
                     }
 
                     // Set header and detail status to 0
-                    DB::connection($this->connection)->update('UPDATE t_warehouse_header SET status = 0, updated_by = ? WHERE id_whx_head = ?', [$user, $idWhxHead]);
-                    DB::connection($this->connection)->update('UPDATE t_warehouse_detail SET status = 0, updated_by = ? WHERE id_whx_head = ?', [$user, $idWhxHead]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $idTraceHead]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
-                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
+                    DB::connection($this->connection)->update('UPDATE t_warehouse_header SET status = 0, updated_by = ?, updated_at = NOW() WHERE id_whx_head = ?', [$user, $idWhxHead]);
+                    DB::connection($this->connection)->update('UPDATE t_warehouse_detail SET status = 0, updated_by = ?, updated_at = NOW() WHERE id_whx_head = ?', [$user, $idWhxHead]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ?, updated_at = NOW() WHERE id_trace_head = ?', [$user, $idTraceHead]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ?, updated_at = NOW() WHERE id_trace_head = ?', [$user, $idTraceHead]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_header SET status = 0, updated_by = ?, updated_at = NOW() WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
+                    DB::connection($this->connection)->update('UPDATE t_trace_detail SET status = 0, updated_by = ?, updated_at = NOW() WHERE id_trace_head = ?', [$user, $datTraceHeadFeed[0]->id_trace_head]);
                 }
 
                 return ['response' => 1, 'message' => 'Packaging entry cancelled successfully.'];
             });
 
         } catch (Exception $e) {
-            return ['response' => 0, 'message' => 'Cancellation failed: ' . $e->getMessage()];
+            return ['response' => 0, 'message' => 'Cancellation failed: '.$e->getMessage()];
         }
     }
 
@@ -771,13 +828,14 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             DB::connection($this->connection)->update('
                 UPDATE t_warehouse_header
                    SET po_no = ?,
-                       updated_by = ?
+                       updated_by = ?,
+                       updated_at = NOW()
                  WHERE id_whx_head = ?
             ', [$poNo, $user, $id]);
 
             return ['response' => 1, 'message' => 'PO number updated successfully.'];
         } catch (Exception $e) {
-            return ['response' => 0, 'message' => 'Failed to update PO: ' . $e->getMessage()];
+            return ['response' => 0, 'message' => 'Failed to update PO: '.$e->getMessage()];
         }
     }
 
@@ -792,13 +850,14 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 UPDATE t_warehouse_header
                    SET batch_no = ?,
                        id_section = ?,
-                       updated_by = ?
+                       updated_by = ?,
+                       updated_at = NOW()
                  WHERE id_whx_head = ?
             ', [$batchNo, $idSection, $user, $id]);
 
             return ['response' => 1, 'message' => 'Batch and warehouse updated successfully.'];
         } catch (Exception $e) {
-            return ['response' => 0, 'message' => 'Failed to update batch: ' . $e->getMessage()];
+            return ['response' => 0, 'message' => 'Failed to update batch: '.$e->getMessage()];
         }
     }
 
@@ -808,7 +867,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             $idHead = $data['id'];
             $slocs = $data['idSlocTail'] ?? [];
 
-            if (!is_array($slocs)) {
+            if (! is_array($slocs)) {
                 return ['response' => 0, 'message' => 'INVALID SLOC DATA'];
             }
 
@@ -820,7 +879,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                  WHERE id_whx_head = ? AND status = 1
             ', [$idHead]);
 
-            if (!$row) {
+            if (! $row) {
                 return ['response' => 0, 'message' => 'Warehouse header not found.'];
             }
 
@@ -828,28 +887,28 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 // Update warehouse header
                 DB::connection($this->connection)->update('
                     UPDATE t_warehouse_header
-                       SET id_sloc = ?, updated_by = ?
+                       SET id_sloc = ?, updated_by = ?, updated_at = NOW()
                      WHERE id_whx_head = ?
                 ', [$jsonSlocs, $user, $idHead]);
 
                 // Update trace header
                 DB::connection($this->connection)->update('
                     UPDATE t_trace_header
-                       SET id_sloc = ?, updated_by = ?
+                       SET id_sloc = ?, updated_by = ?, updated_at = NOW()
                      WHERE id_balance_head = ?
                 ', [$jsonSlocs, $user, $idHead]);
 
                 // Update warehouse details
                 DB::connection($this->connection)->update('
                     UPDATE t_warehouse_detail
-                       SET id_sloc = ?, updated_by = ?
+                       SET id_sloc = ?, updated_by = ?, updated_at = NOW()
                      WHERE id_whx_head = ?
                 ', [$jsonSlocs, $user, $idHead]);
 
                 // Update trace details
                 DB::connection($this->connection)->update('
                     UPDATE t_trace_detail
-                       SET id_sloc = ?, updated_by = ?
+                       SET id_sloc = ?, updated_by = ?, updated_at = NOW()
                      WHERE id_trace_head IN (
                          SELECT id_trace_head 
                            FROM t_trace_header 
@@ -858,18 +917,18 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                 ', [$jsonSlocs, $user, $idHead]);
 
                 // Log
-                $this->logTransaction('T_WAREHOUSE_HEAD', 'UPDATE_SUBTANK', 'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SLOCS: ' . implode(',', $slocs), $user);
+                $this->logTransaction('T_WAREHOUSE_HEAD', 'UPDATE_SUBTANK', 'IDHEAD: '.$idHead.' | TRACE: '.$row->trace_no.' | SLOCS: '.implode(',', $slocs), $user);
             });
 
             return ['response' => 1, 'message' => 'Sloc updated successfully.'];
         } catch (Exception $e) {
-            return ['response' => 0, 'message' => 'Failed to update sloc: ' . $e->getMessage()];
+            return ['response' => 0, 'message' => 'Failed to update sloc: '.$e->getMessage()];
         }
     }
 
     public function generateTraceNo(int $materialId, int $plantId, ?int $warehouseId = null, ?string $batchNo = null): string
     {
-        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $svc = app(TraceNumberService::class);
         $date = date('ymd');
         $plantCode = $svc->resolvePlantCode((string) $plantId);
 

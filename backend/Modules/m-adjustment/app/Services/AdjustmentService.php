@@ -1,21 +1,22 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Adjustment\Services;
 
-use Modules\Adjustment\Services\Contracts\AdjustmentServiceInterface;
-use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
 use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
-use Modules\Shared\Services\PeriodLockService;
-use Modules\Shared\Services\AuditService;
-use Illuminate\Support\Facades\DB;
+use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
+use Modules\Adjustment\Services\Contracts\AdjustmentServiceInterface;
+use Modules\Shared\Services\Contracts\AuditServiceInterface;
+use Modules\Shared\Services\Contracts\PeriodLockServiceInterface;
 
 class AdjustmentService implements AdjustmentServiceInterface
 {
     public function __construct(
         protected AdjustmentRepositoryInterface $repository,
-        protected PeriodLockService $periodLockService,
-        protected AuditService $auditService,
+        protected PeriodLockServiceInterface $periodLockService,
+        protected AuditServiceInterface $auditService,
         protected AdjustmentPeriodServiceInterface $periodService,
         protected AdjustmentMutationServiceInterface $mutationService
     ) {}
@@ -185,6 +186,11 @@ class AdjustmentService implements AdjustmentServiceInterface
     public function periodHeaderLock(string $user, int $idHead): array
     {
         return $this->periodService->periodHeaderLock($user, $idHead);
+    }
+
+    public function periodHeaderUnlock(string $user, int $idHead): array
+    {
+        return $this->periodService->periodHeaderUnlock($user, $idHead);
     }
 
     public function destroyAdjustmentPeriod(int $id, string $user): array

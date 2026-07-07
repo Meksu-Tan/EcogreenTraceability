@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services;
 
 use Illuminate\Support\Facades\DB;
@@ -20,6 +22,7 @@ class TransferBalanceService
             'SELECT * FROM t_balance_header WHERE trace_no = ? AND status = 1 LIMIT 1',
             [$traceNo]
         );
+
         return $result[0] ?? null;
     }
 
@@ -29,6 +32,7 @@ class TransferBalanceService
             'SELECT * FROM t_balance_header WHERE id_balance_head = ? AND status = 1 LIMIT 1',
             [$id]
         );
+
         return $result[0] ?? null;
     }
 
@@ -55,6 +59,7 @@ class TransferBalanceService
     public function createBalanceHeader(array $data): int
     {
         $data['created_at'] ??= now();
+
         return DB::connection($this->connection)->table('t_balance_header')->insertGetId($data, 'id_balance_head');
     }
 
@@ -64,6 +69,7 @@ class TransferBalanceService
     public function createTraceHeader(array $data): int
     {
         $data['created_at'] ??= now();
+
         return DB::connection($this->connection)->table('t_trace_header')->insertGetId($data, 'id_trace_head');
     }
 
@@ -75,8 +81,8 @@ class TransferBalanceService
         return (bool) DB::connection($this->connection)->table('t_balance_header')
             ->where('id_balance_head', $balanceId)
             ->update([
-                'qty' => DB::raw('qty - ' . $qty),
-                'out_qty' => DB::raw('out_qty + ' . $qty),
+                'qty' => DB::raw('qty - '.$qty),
+                'out_qty' => DB::raw('out_qty + '.$qty),
             ]);
     }
 
@@ -89,7 +95,7 @@ class TransferBalanceService
             ->where('id_balance_head', $balanceHeadId)
             ->where('status', 1)
             ->update([
-                'out_qty' => DB::raw('out_qty + ' . $qty),
+                'out_qty' => DB::raw('out_qty + '.$qty),
             ]);
     }
 
@@ -102,8 +108,8 @@ class TransferBalanceService
             ->where('trace_no', $traceNo)
             ->where('status', 1)
             ->update([
-                'qty' => DB::raw('qty + ' . $qty),
-                'out_qty' => DB::raw('out_qty - ' . $qty),
+                'qty' => DB::raw('qty + '.$qty),
+                'out_qty' => DB::raw('out_qty - '.$qty),
             ]);
     }
 
@@ -116,7 +122,7 @@ class TransferBalanceService
             ->where('id_balance_head', $balanceHeadId)
             ->where('status', 1)
             ->update([
-                'out_qty' => DB::raw('out_qty - ' . $qty),
+                'out_qty' => DB::raw('out_qty - '.$qty),
             ]);
     }
 

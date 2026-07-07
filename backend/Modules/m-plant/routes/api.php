@@ -1,8 +1,8 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Plant\Http\Controllers\PlantController;
-use Modules\Plant\Http\Controllers\QuantifierController;
 
 Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
     // Plant Management

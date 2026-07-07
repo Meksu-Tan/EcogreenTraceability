@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Adjustment\Services\Contracts;
 
 interface AdjustmentMutationServiceInterface
@@ -7,6 +9,8 @@ interface AdjustmentMutationServiceInterface
     public function storeAdjustment(string $user, array $data, mixed $plantId): array;
 
     public function destroyAdjustment(int $id, string $user): array;
+
+    public function destroyAdjustmentWhx(int $id, string $user): array;
 
     public function addEntrySupplier(string $user, array $data, mixed $plantId): array;
 

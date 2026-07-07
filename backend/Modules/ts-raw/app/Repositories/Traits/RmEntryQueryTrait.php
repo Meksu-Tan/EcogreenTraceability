@@ -1,19 +1,21 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Material\Models\Material;
-use Modules\Plant\Models\Plant;
-use Exception;
-use Modules\Shared\Traits\TransactionLoggerTrait;
-use Modules\Shared\Traits\DbCompatTrait;
+use Modules\Shared\Repositories\TankQueryRepository;
 use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
+use Modules\Shared\Services\PeriodLockService;
 use Modules\Shared\Services\TraceNumberGeneratorService;
+use Modules\Shared\Services\TraceNumberService;
+use Modules\Shared\Traits\DbCompatTrait;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 trait RmEntryQueryTrait
 {
-    use TransactionLoggerTrait, DbCompatTrait;
+    use DbCompatTrait, TransactionLoggerTrait;
 
     public function getRmList($plantId, int $page = 1, int $perPage = 5): array
     {
@@ -21,9 +23,11 @@ trait RmEntryQueryTrait
         $allPlants = empty($resolvedPlant);
 
         $bhQuery = $this->buildBhSubquery($resolvedPlant, $allPlants, []);
-        
+
         $total = DB::connection('eudr_ts')->table($bhQuery, 'bh')->count();
-        if ($total == 0) return ['data' => [], 'total' => 0];
+        if ($total == 0) {
+            return ['data' => [], 'total' => 0];
+        }
 
         $idsResult = DB::connection('eudr_ts')->table($bhQuery, 'bh')
             ->select('id_balance_head')
@@ -32,7 +36,7 @@ trait RmEntryQueryTrait
             ->limit($perPage)
             ->pluck('id_balance_head')
             ->toArray();
-        
+
         $idCsv = implode(',', array_map('intval', $idsResult));
 
         $groupConcatSloc = $this->dbGroupConcat('DISTINCT sl.tf_number', ', ', false, 'sl.tf_number ASC');
@@ -50,13 +54,13 @@ trait RmEntryQueryTrait
                 {$balanceFmt} AS balance_supplier,
                 bh.id_plant, p.code AS plant_code, p.description AS plant_description
             ")
-            ->join('m_material as m', function($join) {
+            ->join('m_material as m', function ($join) {
                 $join->on('bh.id_material', '=', 'm.id_material')
-                     ->where('m.type', '=', clone DB::raw("'{$this->typeMaterial}'"));
+                    ->where('m.type', '=', clone DB::raw("'{$this->typeMaterial}'"));
             })
-            ->leftJoin('m_sloc as sl', function($join) {
+            ->leftJoin('m_sloc as sl', function ($join) {
                 $slocClause = $this->dbSlocJsonClause('bh.id_sloc', 'sl.id_sloc');
-                $join->on(function($q) use ($slocClause) {
+                $join->on(function ($q) use ($slocClause) {
                     $q->whereRaw($slocClause);
                 })->where('sl.status', 1);
             })
@@ -68,14 +72,16 @@ trait RmEntryQueryTrait
             ->orderByDesc('bh.id_balance_head');
 
         $results = $query->get()->toArray();
-        if (empty($results)) return ['data' => [], 'total' => $total];
+        if (empty($results)) {
+            return ['data' => [], 'total' => $total];
+        }
 
         $traceNos = array_values(array_unique(array_column($results, 'trace_no')));
         $supplierMap = $this->fetchSupplierDetails($traceNos);
         $traceStatusMap = $this->fetchTraceStatus($traceNos);
-        
+
         $mapped = $this->mapRmListResults($results, $supplierMap, $traceStatusMap);
-        
+
         return ['data' => $mapped, 'total' => $total];
     }
 
@@ -83,17 +89,18 @@ trait RmEntryQueryTrait
     {
         $slocQuery = DB::connection('eudr_ts')->table('m_sloc')
             ->where('status', 1)
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->where('description', 'LIKE', '%STORAGE%')
-                  ->orWhere('code_2', 'LIKE', '%STORAGE%')
-                  ->orWhere('code_3', 'LIKE', '%STORAGE%');
+                    ->orWhere('code_2', 'LIKE', '%STORAGE%')
+                    ->orWhere('code_3', 'LIKE', '%STORAGE%');
             });
 
-        if (!$allPlants && $resolvedPlant) {
+        if (! $allPlants && $resolvedPlant) {
             $slocQuery->where('id_plant', $resolvedPlant);
         }
 
         $ids = $slocQuery->pluck('id_sloc')->toArray();
+
         return empty($ids) ? [0] : $ids;
     }
 
@@ -103,9 +110,10 @@ trait RmEntryQueryTrait
             ->select('id_balance_head', 'id_material', 'id_sloc', 'status', 'trace_no', 'qty', 'init_qty', 'created_by', 'created_at', 'entry_date', 'id_plant')
             ->where('status', 1)
             ->whereRaw("SUBSTRING(CAST(trace_no AS TEXT),1,1) = '1'")
-            ->whereRaw("" . \Modules\Shared\Helpers\TraceHelper::isStorageOrLegacy('CAST(trace_no AS TEXT)') . "")
-            ->where(function($q) use ($resolvedPlant, $allPlants) {
-                if (!$allPlants) $q->where('id_plant', $resolvedPlant);
+            ->where(function ($q) use ($resolvedPlant, $allPlants) {
+                if (! $allPlants) {
+                    $q->where('id_plant', $resolvedPlant);
+                }
             })
             ->orderByDesc('id_balance_head');
     }
@@ -124,6 +132,7 @@ trait RmEntryQueryTrait
             $map[$sd->trace_no]['supplier'][] = sprintf('%s :: %s / %s / Qty : %s MT / %s', $sd->code ?? 'N/A', $sd->description ?? 'Unknown', $sd->batch_sap ?? '', number_format((float) $sd->init_qty, 3), $sd->out_qty == 0 ? '-' : 'BATCH TRANSFERRED');
             $map[$sd->trace_no]['id_balance_detail'][] = $sd->id_balance_tail;
         }
+
         return $map;
     }
 
@@ -140,16 +149,17 @@ trait RmEntryQueryTrait
 
     private function mapRmListResults(array $results, array $supplierMap, array $traceStatusMap): array
     {
-        return array_map(function($r) use ($supplierMap, $traceStatusMap) {
+        return array_map(function ($r) use ($supplierMap, $traceStatusMap) {
             $traceKey = $r->trace_no;
             $r->supplier = isset($supplierMap[$traceKey]) ? implode(' | ', $supplierMap[$traceKey]['supplier']) : 'N/A';
             $r->id_balance_detail = isset($supplierMap[$traceKey]) ? implode(',', $supplierMap[$traceKey]['id_balance_detail']) : '';
-            $r->tf_number = !empty($r->sloc_tank_number) ? $r->sloc_description . ' | ' . $r->sloc_tank_number : $r->sloc_description;
+            $r->tf_number = ! empty($r->sloc_tank_number) ? $r->sloc_description.' | '.$r->sloc_tank_number : $r->sloc_description;
             $r->tank_name = $r->tf_number;
             $r->traced = $traceStatusMap[$traceKey] ?? 'N/A';
             $r->qty = number_format((float) $r->qty, 3, '.', '');
             $r->init_qty = number_format((float) $r->init_qty, 3, '.', '');
             $r->plant_code = $r->plant_description ?? (string) $r->id_plant;
+
             return $r;
         }, $results);
     }
@@ -179,17 +189,18 @@ trait RmEntryQueryTrait
 
     public function getNewNumber($plantId): ?string
     {
-        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $svc = app(TraceNumberService::class);
         $plantCode = $svc->resolvePlantCode($this->resolvePlantCode($plantId));
+
         return $svc->generate('1', date('ymd'), '000', $plantCode, 't_balance_header', 'trace_no');
     }
 
     public function getTanks($plantId): array
     {
         $resolvedPlant = $this->resolvePlantCode($plantId);
-        $plantFilter   = ($resolvedPlant && $resolvedPlant !== '0') ? $resolvedPlant : null;
+        $plantFilter = ($resolvedPlant && $resolvedPlant !== '0') ? $resolvedPlant : null;
 
-        return app(\Modules\Shared\Repositories\TankQueryRepository::class)
+        return app(TankQueryRepository::class)
             ->getActiveTanksByKeywords(['STORAGE'], $plantFilter)
             ->toArray();
     }
@@ -229,7 +240,7 @@ trait RmEntryQueryTrait
 
     public function getLockStatus(string $entryDate): bool
     {
-        return \Modules\Shared\Services\PeriodLockService::isLocked($entryDate);
+        return PeriodLockService::isLocked($entryDate);
     }
 
     public function resolvePlantCode($plantId)
@@ -245,8 +256,7 @@ trait RmEntryQueryTrait
     public function traceNoToInt(string $traceNo): int
     {
         $digits = preg_replace('/\D/', '', $traceNo);
+
         return (int) ($digits !== '' ? $digits : 0);
     }
-
-
 }

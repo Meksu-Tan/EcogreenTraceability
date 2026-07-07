@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services\Contracts;
 
 interface PlantContextServiceInterface
@@ -7,8 +9,8 @@ interface PlantContextServiceInterface
     /**
      * Resolve plant ID dari request/input
      *
-     * @param mixed $plantId Plant ID (bisa int, string, atau null)
-     * @param int|null $userId User ID untuk cek plant access
+     * @param  mixed  $plantId  Plant ID (bisa int, string, atau null)
+     * @param  int|null  $userId  User ID untuk cek plant access
      * @return string|null Resolved plant code_3 atau null untuk "all plants"
      */
     public function resolvePlantId(mixed $plantId, ?int $userId = null): ?string;
@@ -56,8 +58,8 @@ interface PlantContextServiceInterface
     /**
      * Build plant filter SQL clause
      *
-     * @param string $tableAlias Table alias (e.g., 'bh', 'a', 't')
-     * @param string|null $plantCode Resolved plant code (null = all plants)
+     * @param  string  $tableAlias  Table alias (e.g., 'bh', 'a', 't')
+     * @param  string|null  $plantCode  Resolved plant code (null = all plants)
      * @return array ['sql' => string, 'bindings' => array]
      */
     public function buildPlantFilter(string $tableAlias, ?string $plantCode): array;
@@ -65,8 +67,7 @@ interface PlantContextServiceInterface
     /**
      * Build plant filter dengan multiple tables
      *
-     * @param array $tableColumns ['alias.column' => 'binding_param']
-     * @param string|null $plantCode
+     * @param  array  $tableColumns  ['alias.column' => 'binding_param']
      * @return array ['sql' => string, 'bindings' => array]
      */
     public function buildMultiPlantFilter(array $tableColumns, ?string $plantCode): array;

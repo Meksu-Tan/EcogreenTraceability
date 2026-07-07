@@ -1,24 +1,29 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsBlending\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBlendingRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     protected function prepareForValidation()
     {
         if ($this->has('qty')) {
             $this->merge([
-                'qty' => str_replace(',', '', (string)$this->qty)
+                'qty' => str_replace(',', '', (string) $this->qty),
             ]);
         }
 
         if ($this->route('id')) {
             $this->merge([
-                'id' => $this->route('id')
+                'id' => $this->route('id'),
             ]);
         }
     }
@@ -27,7 +32,7 @@ class StoreBlendingRequest extends FormRequest
     {
         $flag = $this->input('flag');
 
-        if (!$flag) {
+        if (! $flag) {
             $path = $this->path();
             if ($this->isMethod('POST')) {
                 if (str_ends_with($path, '/material')) {

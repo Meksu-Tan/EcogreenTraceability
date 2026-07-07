@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Material\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,7 +9,9 @@ use Illuminate\Database\Eloquent\Model;
 class MaterialPackaging extends Model
 {
     protected $connection = 'eudr_ts';
-    protected $table      = 'm_material_pck';
+
+    protected $table = 'm_material_pck';
+
     protected $primaryKey = 'id_materialpck';
 
     protected $fillable = [

@@ -1,18 +1,23 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsTransfer\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreTransferRequest extends FormRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     public function rules(): array
     {
         $flag = $this->input('flag');
 
-        if (!$flag) {
+        if (! $flag) {
             $path = $this->path();
             if ($this->isMethod('POST')) {
                 if (str_ends_with($path, '/transfers')) {

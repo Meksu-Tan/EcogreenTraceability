@@ -1,7 +1,8 @@
 <?php
+
 declare(strict_types=1);
-use Modules\Supplier\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
+use Modules\Supplier\Http\Controllers\SupplierController;
 
 Route::middleware('auth:sanctum')->prefix('api/v1')->group(function () {
     Route::get('suppliers/active', [SupplierController::class, 'active']);

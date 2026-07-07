@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\TsRaw\Http\Controllers\RmEntryController;
@@ -35,6 +36,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::post('update-sub-tank', [RmEntryController::class, 'updateSubTank']);
         Route::delete('transfers/{id}', [RmEntryController::class, 'deactivateTransfer']);
         Route::delete('feed-log/{id}', [RmEntryController::class, 'deactivateFeedLog']);
+        Route::post('{id}/activate', [RmEntryController::class, 'activate']);
         // Parameterized routes must come last to avoid conflicts
         Route::post('/', [RmEntryController::class, 'store']);
         Route::get('{id}', [RmEntryController::class, 'show']);

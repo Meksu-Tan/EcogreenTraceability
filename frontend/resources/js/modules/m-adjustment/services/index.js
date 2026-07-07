@@ -110,6 +110,9 @@ export default {
   periodHeaderLock(data) {
     return api.post(`${BASE_URL}/period-header-lock`, data)
   },
+  periodHeaderUnlock(data) {
+    return api.post(`${BASE_URL}/period-header-unlock`, data)
+  },
 
   // ——— Delete ———
   destroyAdjustment(id) {

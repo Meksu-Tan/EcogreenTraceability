@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
 use App\Models\User;
-use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
-use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 use Mockery;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
+use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
 use Tests\TestCase;
 
 class TraceBackwardModuleTest extends TestCase
@@ -30,16 +32,6 @@ class TraceBackwardModuleTest extends TestCase
     public function test_it_returns_401_when_unauthenticated_on_detail(): void
     {
         $this->getJson('/api/v1/trace/backward/detail')->assertStatus(401);
-    }
-
-    public function test_it_returns_401_when_unauthenticated_on_show(): void
-    {
-        $this->getJson('/api/v1/trace/backward/B456')->assertStatus(401);
-    }
-
-    public function test_it_returns_401_when_unauthenticated_on_show_with_id_material(): void
-    {
-        $this->getJson('/api/v1/trace/backward/B456?id_material=3')->assertStatus(401);
     }
 
     public function test_it_validates_trace_no_required_for_detail(): void

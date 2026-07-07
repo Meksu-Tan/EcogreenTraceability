@@ -197,6 +197,7 @@
       :trace-no="modalTraceNo"
       :items="allTraceRows"
       :loading="loadingDetail"
+      :error="error"
     />
 
     <ShipmentDetailModal

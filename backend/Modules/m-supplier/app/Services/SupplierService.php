@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Supplier\Services;
 
 use Modules\Supplier\Repositories\Contracts\SupplierRepositoryInterface;
@@ -11,11 +13,15 @@ class SupplierService implements SupplierServiceInterface
         protected SupplierRepositoryInterface $supplierRepo
     ) {}
 
-    public function listSuppliers(): array { return $this->supplierRepo->getAll(); }
+    public function listSuppliers(): array
+    {
+        return $this->supplierRepo->getAll();
+    }
 
     public function storeSupplier(array $data): array
     {
         $result = $this->supplierRepo->create($data);
+
         return $result
             ? ['status' => 1, 'message' => 'Supplier created successfully']
             : ['status' => 0, 'message' => 'Supplier code already exists'];
@@ -24,6 +30,7 @@ class SupplierService implements SupplierServiceInterface
     public function updateSupplier(int $id, array $data): array
     {
         $result = $this->supplierRepo->update($id, $data);
+
         return $result
             ? ['status' => 1, 'message' => 'Supplier updated successfully']
             : ['status' => 0, 'message' => 'Failed to update supplier'];
@@ -43,5 +50,8 @@ class SupplierService implements SupplierServiceInterface
             : ['status' => 0, 'message' => 'Failed to activate'];
     }
 
-    public function getActiveSuppliers(): array { return $this->supplierRepo->getActive(); }
+    public function getActiveSuppliers(): array
+    {
+        return $this->supplierRepo->getActive();
+    }
 }

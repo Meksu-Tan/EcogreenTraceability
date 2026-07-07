@@ -1,18 +1,19 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services;
 
 use Modules\Shared\Helpers\Feed;
 use Modules\Shared\Helpers\Rundown;
-use Illuminate\Support\Facades\DB;
 
 class FeedRundownOrchestrator
 {
     /**
      * Executes the Feed and Rundown orchestration sequence.
-     * 
-     * @param array $feedParams Parameters for Feed::generalFeed
-     * @param array $rundownParams Parameters for Rundown::generalRundown, minus supplier_rows, in_qty, curr_qtf
+     *
+     * @param  array  $feedParams  Parameters for Feed::generalFeed
+     * @param  array  $rundownParams  Parameters for Rundown::generalRundown, minus supplier_rows, in_qty, curr_qtf
      * @return array Response array with ['response' => code, 'id_trace_head' => id (optional)]
      */
     public function executeFeedRundownSequence(array $feedParams, array $rundownParams): array
@@ -38,7 +39,7 @@ class FeedRundownOrchestrator
         $rundownParams['in_qty'] = $actualQty;
         $rundownParams['curr_qtf'] = $actualQty;
         $rundownParams['supplier_rows'] = $supplierRows;
-        
+
         // 4. Execute Rundown
         $rundownResult = Rundown::generalRundown($rundownParams);
         if ($rundownResult['response'] != 1) {
@@ -54,9 +55,9 @@ class FeedRundownOrchestrator
             return null;
         }
 
-        return array_map(function($d) {
+        return array_map(function ($d) {
             return [
-                'id_supplier' => $d['id_supplier'], 
+                'id_supplier' => $d['id_supplier'],
                 'batch_sap' => $d['batch_sap'],
                 'rundownSupplier' => (float) $d['qty'],
             ];

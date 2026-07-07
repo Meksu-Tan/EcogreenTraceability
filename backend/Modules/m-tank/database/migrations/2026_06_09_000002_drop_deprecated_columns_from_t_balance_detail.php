@@ -1,24 +1,18 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     protected $connection = 'eudr_ts';
 
     public function up(): void
     {
-        if (DB::connection('eudr_ts')->getDriverName() === 'sqlite') {
-            return;
-        }
+        // DISABLED: id_sloc is actively used by Feed::generalFeed(), Rundown::generalRundown(),
+        // and all transaction modules. The column migration to tf_number was never completed.
+        // Re-enable only after all readers/writers are migrated to tf_number.
 
-        $cols = ['id_sloc', 'id_sloc_tail', 'id_sloc_tail'];
-        foreach ($cols as $col) {
-            if (Schema::connection('eudr_ts')->hasColumn('t_balance_detail', $col)) {
-                DB::connection('eudr_ts')->statement("ALTER TABLE t_balance_detail DROP COLUMN \"{$col}\"");
-            }
-        }
     }
 
     public function down(): void

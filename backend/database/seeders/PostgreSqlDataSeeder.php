@@ -1,10 +1,12 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class PostgreSqlDataSeeder extends Seeder
 {
@@ -62,15 +64,14 @@ class PostgreSqlDataSeeder extends Seeder
 
         // Step 0: Alter PG tables schema to drop nullable constraints that legacy MySQL doesn't have
         try {
-            DB::connection('eudr_ts')->statement("ALTER TABLE t_adjustment_detail ALTER COLUMN id_sloc DROP NOT NULL");
-            DB::connection('eudr_ts')->statement("ALTER TABLE t_balance_temporary ALTER COLUMN id_supplier DROP NOT NULL");
-            DB::connection('eudr_ts')->statement("ALTER TABLE t_balance_temporary ALTER COLUMN id_sloc DROP NOT NULL");
+            DB::connection('eudr_ts')->statement('ALTER TABLE t_adjustment_detail ALTER COLUMN id_sloc DROP NOT NULL');
+            DB::connection('eudr_ts')->statement('ALTER TABLE t_balance_temporary ALTER COLUMN id_supplier DROP NOT NULL');
+            DB::connection('eudr_ts')->statement('ALTER TABLE t_balance_temporary ALTER COLUMN id_sloc DROP NOT NULL');
             echo "✓ Altered schema constraints for legacy NULL safety\n\n";
         } catch (\Exception $e) {
 
             echo "⚠️  Could not alter schema constraints: {$e->getMessage()}\n\n";
         }
-
 
         // Step 1: Clear existing data using TRUNCATE CASCADE to resolve dependencies
         echo "Step 1: Clearing existing data...\n";
@@ -96,15 +97,16 @@ class PostgreSqlDataSeeder extends Seeder
                         WHERE table_schema = 'public' AND table_name = ?
                     )", [$table]);
 
-                if (!$targetExists[0]->exists) {
+                if (! $targetExists[0]->exists) {
                     echo "⚠️  SKIP: $table (table doesn't exist in PostgreSQL)\n\n";
+
                     continue;
                 }
 
                 // Query from MySQL source connection
                 if ($table === 'm_sloc') {
                     // m_sloc maps to joined m_sloc and m_sloc_detail in MySQL
-                    $rows = DB::connection('mysql_legacy')->select("
+                    $rows = DB::connection('mysql_legacy')->select('
                         SELECT 
                             td.id_sloc_tail AS id_sloc,
                             t.id_plant,
@@ -124,7 +126,7 @@ class PostgreSqlDataSeeder extends Seeder
                         FROM m_sloc_detail td
                         JOIN m_sloc t ON td.id_sloc = t.id_sloc
                         LEFT JOIN m_plant p ON t.id_plant = p.id_plant
-                    ");
+                    ');
                     $rows = collect($rows);
                     $sourceCount = $rows->count();
                 } elseif ($table === 'log_transactions') {
@@ -137,6 +139,7 @@ class PostgreSqlDataSeeder extends Seeder
                     $sourceCount = DB::connection('mysql_legacy')->table($sourceTable)->count();
                     if ($sourceCount === 0) {
                         echo "⚠️  SKIP: $table (0 records in legacy MySQL)\n\n";
+
                         continue;
                     }
                     $rows = DB::connection('mysql_legacy')->table($sourceTable)->get();
@@ -144,6 +147,7 @@ class PostgreSqlDataSeeder extends Seeder
 
                 if ($sourceCount === 0) {
                     echo "⚠️  SKIP: $table (0 records to migrate)\n\n";
+
                     continue;
                 }
 
@@ -266,7 +270,7 @@ class PostgreSqlDataSeeder extends Seeder
             ];
             if (in_array($table, $jsonbSlocTables)) {
                 $tail = isset($data['id_sloc_tail']) ? json_decode($data['id_sloc_tail'], true) : null;
-                $slocArray = is_array($tail) ? $tail : (isset($data['id_sloc']) ? [(int)$data['id_sloc']] : []);
+                $slocArray = is_array($tail) ? $tail : (isset($data['id_sloc']) ? [(int) $data['id_sloc']] : []);
                 $data['id_sloc'] = json_encode($slocArray);
                 unset($data['id_sloc']);
                 unset($data['id_sloc_tail']);
@@ -274,7 +278,7 @@ class PostgreSqlDataSeeder extends Seeder
 
             if ($table === 't_adjustment_header') {
                 $tail = isset($data['id_sloc_tail']) ? json_decode($data['id_sloc_tail'], true) : null;
-                $slocArray = is_array($tail) ? $tail : (isset($data['id_sloc']) ? [(int)$data['id_sloc']] : []);
+                $slocArray = is_array($tail) ? $tail : (isset($data['id_sloc']) ? [(int) $data['id_sloc']] : []);
                 $data['id_sloc'] = json_encode($slocArray);
                 unset($data['id_sloc']);
                 unset($data['id_sloc_tail']);
@@ -289,17 +293,17 @@ class PostgreSqlDataSeeder extends Seeder
             // Handle specific column type mismatches
             $typeTransforms = [
                 'm_material' => [
-                    'id_feed' => fn($v) => is_numeric($v) ? (int)$v : null,
-                    'qtf_feed' => fn($v) => empty($v) ? null : (string)$v,
-                    'id_rundown' => fn($v) => is_numeric($v) ? (int)$v : null,
-                    'qtf_rundown' => fn($v) => empty($v) ? null : (string)$v,
-                    'yield' => fn($v) => is_numeric($v) ? (float)$v : 100.0,
+                    'id_feed' => fn ($v) => is_numeric($v) ? (int) $v : null,
+                    'qtf_feed' => fn ($v) => empty($v) ? null : (string) $v,
+                    'id_rundown' => fn ($v) => is_numeric($v) ? (int) $v : null,
+                    'qtf_rundown' => fn ($v) => empty($v) ? null : (string) $v,
+                    'yield' => fn ($v) => is_numeric($v) ? (float) $v : 100.0,
                 ],
                 't_balance_detail' => [
-                    'batch_sap' => fn($v) => $v ?: null,
+                    'batch_sap' => fn ($v) => $v ?: null,
                 ],
                 't_trace_detail' => [
-                    'batch_sap' => fn($v) => $v ?: null,
+                    'batch_sap' => fn ($v) => $v ?: null,
                 ],
             ];
 
@@ -335,7 +339,7 @@ class PostgreSqlDataSeeder extends Seeder
             }
         }
 
-        if (!empty($batch)) {
+        if (! empty($batch)) {
             DB::connection('eudr_ts')->table($table)->insert($batch);
             $inserted += count($batch);
         }
@@ -353,14 +357,14 @@ class PostgreSqlDataSeeder extends Seeder
 
         foreach ($tables as $t) {
             $table = $t->table_name;
-            
+
             // Get the primary key column name
-            $pkResult = DB::connection('eudr_ts')->select("
+            $pkResult = DB::connection('eudr_ts')->select('
                 SELECT a.attname
                 FROM   pg_index i
                 JOIN   pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
                 WHERE  i.indrelid = ?::regclass AND i.indisprimary
-            ", [$table]);
+            ', [$table]);
 
             if (empty($pkResult)) {
                 continue;
@@ -377,14 +381,14 @@ class PostgreSqlDataSeeder extends Seeder
             }
 
             // Check if sequence exists
-            $seqResult = DB::connection('eudr_ts')->select("
+            $seqResult = DB::connection('eudr_ts')->select('
                 SELECT pg_get_serial_sequence(?, ?) as seq_name
-            ", [$table, $pk]);
+            ', [$table, $pk]);
 
             $seqName = $seqResult[0]->seq_name ?? null;
 
             if ($seqName) {
-                DB::connection('eudr_ts')->statement("SELECT setval(?, ?, true)", [$seqName, $maxVal]);
+                DB::connection('eudr_ts')->statement('SELECT setval(?, ?, true)', [$seqName, $maxVal]);
                 echo "  Sequence reset for {$table}.{$pk} to {$maxVal}\n";
             }
         }

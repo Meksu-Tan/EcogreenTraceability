@@ -1,9 +1,23 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\TsWip\Http\Controllers\WipEntryController;
+use Modules\TsWip\Http\Controllers\WipProcessController;
 
 Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(function () {
+    Route::prefix('wip-process')->group(function () {
+        Route::get('sections', [WipProcessController::class, 'sections'])->middleware('can:task-read');
+        Route::post('sections', [WipProcessController::class, 'storeSection'])->middleware('can:task-update');
+        Route::put('sections/reorder', [WipProcessController::class, 'reorderSections'])->middleware('can:task-update');
+        Route::put('sections/{id}', [WipProcessController::class, 'updateSection'])->middleware('can:task-update');
+        Route::delete('sections/{id}', [WipProcessController::class, 'destroySection'])->middleware('can:task-update');
+        Route::post('steps', [WipProcessController::class, 'storeStep'])->middleware('can:task-update');
+        Route::put('steps/reorder', [WipProcessController::class, 'reorderSteps'])->middleware('can:task-update');
+        Route::put('steps/{id}', [WipProcessController::class, 'updateStep'])->middleware('can:task-update');
+        Route::delete('steps/{id}', [WipProcessController::class, 'destroyStep'])->middleware('can:task-update');
+    });
+
     Route::prefix('transactions/wip-entries')->group(function () {
         Route::get('/', [WipEntryController::class, 'index'])->middleware('can:task-read');
         Route::delete('{id}', [WipEntryController::class, 'destroy'])->middleware('can:task-update');

@@ -281,7 +281,7 @@ async function onCancel(row) {
   })
 
   if (isConfirmed) {
-    await store.cancelEntry(row.id_ship_head, row.trace_no)
+    await store.cancelEntry(row.id_ship_head, row.trace_no, row.id_trace_head, row.id_ship_head)
     await fetchData()
   }
 }

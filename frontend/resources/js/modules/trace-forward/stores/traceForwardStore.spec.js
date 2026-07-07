@@ -53,7 +53,7 @@ describe('useTraceForwardStore', () => {
       traceApi.getForwardList.mockRejectedValue(new Error('Network error'))
 
       const store = useTraceForwardStore()
-      await store.fetchList()
+      await expect(store.fetchList()).rejects.toThrow('Network error')
 
       expect(store.list).toEqual([])
       expect(store.error).toBe('Network error')

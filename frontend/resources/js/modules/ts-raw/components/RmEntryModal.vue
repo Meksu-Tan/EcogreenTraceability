@@ -378,8 +378,34 @@ const supplierOptions = computed(() => {
   return (suppliers.value || []).map(s => ({ value: s.id, label: s.text }))
 })
 
+const selectedMaterialType = computed(() => {
+  try {
+    if (!form.value.id_material) return null
+    const mat = materials.value.find(m => Number(m.id_material) === Number(form.value.id_material))
+    if (!mat?.material) return null
+    const lastParen = mat.material.lastIndexOf('(')
+    if (lastParen < 0) return null
+    return mat.material.substring(lastParen + 1).split('/')[0].trim().split('-')[0] || null
+  } catch {
+    return null
+  }
+})
+
 const manufacturerOptions = computed(() => {
-  return (store.manufacturers || []).map(m => ({ value: m.id_manufacturer, label: m.manufacturer }))
+  try {
+    const mfgs = store.manufacturers
+    if (!mfgs?.length) return []
+    const all = mfgs.map(m => ({ value: m.id_manufacturer, label: m.manufacturer }))
+    const type = selectedMaterialType.value
+    if (!type) return all
+    const t = type.toLowerCase()
+    const filtered = mfgs
+      .filter(m => m.material_type?.toLowerCase().startsWith(t))
+      .map(m => ({ value: m.id_manufacturer, label: m.manufacturer }))
+    return filtered.length ? filtered : all
+  } catch {
+    return []
+  }
 })
 
 const canAddSupplier = computed(() => {
@@ -632,7 +658,7 @@ watch(isSupplierModalOpen, async (open) => {
   try {
     await Promise.all([
       store.suppliers.length === 0 ? store.searchSuppliers('') : Promise.resolve(),
-      store.manufacturers.length === 0 ? store.fetchManufacturers() : Promise.resolve()
+      store.fetchManufacturers(true)
     ])
   } catch (e) {
     toastStore.error('Failed to load suppliers or manufacturers')

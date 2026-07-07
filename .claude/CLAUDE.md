@@ -40,13 +40,19 @@ The reference uses different table names for tank/storage data. **Always substit
 
 | Layer       | Technology                                          |
 |-------------|-----------------------------------------------------|
-| Backend     | Laravel 12 + Composer (PHP 8.3, strict_types)       |
-| Frontend    | Vue 3 + Vite + JavaScript + Pinia + Vuetify 3       |
+| Backend     | Laravel 12 + Composer (PHP ^8.2, strict_types)      |
+| Modules     | nwidart/laravel-modules ^13.0 (pinned)              |
+| Auth        | Laravel Sanctum ^4 — Bearer token localStorage      |
+| RBAC        | spatie/laravel-permission ^6                        |
+| Frontend    | Vue 3.5 + Vite 8 + JavaScript + Pinia 3 + Vuetify 3.7 |
+| Router      | vue-router ^5.0                                     |
 | Database    | PostgreSQL 17 (dev: port 5432, database `eudr_dev`) |
 | Cache       | Redis 7                                             |
-| Styling     | Tailwind CSS v3 + Vuetify theme                     |
-| Testing     | PHPUnit (backend), Vitest (frontend)                |
+| Styling     | Tailwind CSS v4 (utility hybrid) + Vuetify theme    |
+| Testing     | PHPUnit ^11 sqlite :memory: (backend), Vitest ^4 jsdom (frontend) |
 | CI/CD       | GitLab CI → auto-deploy ke staging saat merge ke `dev` |
+
+> Versi mengikuti **AnDWiki Tech Stack Standard v2** (module 23). Deviasi ter-dokumentasi: nwidart v13 (wiki baseline ^12, dirilis setelah wiki ditulis), Vite 8 & Pinia 3 (wiki baseline ^5 / ^2 — project ahead, valid krn compat terverifikasi).
 
 ---
 
@@ -101,6 +107,13 @@ npm run lint         # ESLint + oxlint (auto-fix)
 - Tests use SQLite in-memory (configured in `phpunit.xml`)
 - `TANKFARM_API_URL` / `TANKFARM_API_TOKEN` in `backend/.env` for external tank farm API
 - `declare(strict_types=1)` required on **every** PHP file — including generated factories and migrations
+
+**SAP eOWS integration (ts-shipment):**
+- `config/eudr.php` → `sap_url`, `sap_client` (values from `SAP_URL`, `SAP_CLIENT` env vars)
+- `ZFM_EUDR_SHIPMENT` — `ShipmentService::getDatShipment()` — flat 18-field object
+- `ZFM_AD001` — `ShipmentService::getDatSoAllocation()` — `IT_EXPORT` array
+- Dispatch: BATCH = FB/IS/VS → skip BATCH param
+- All calls via `Http::timeout(10)->get()`, errors logged via `Log::error()`
 
 **Backend .env setup:**
 ```
@@ -587,6 +600,8 @@ Sisipkan audit ini setiap selesai fitur — bukan hanya akhir sprint:
 | 01 | **Inject interface, bukan concrete class di Service:** Memudahkan unit test via Mockery dan swap implementation via DI container. |
 | 01 | **Jangan `new Class()` di Service — pakai constructor injection:** Terima dependency via constructor, binding di ServiceProvider. |
 | 01 | **Gunakan `Config::get()` bukan `env()` di Service class:** `env()` tidak jalan setelah `php artisan config:cache`. |
+| Audit-01 | **`nwidart/laravel-modules: "*"` bahaya:** wildcard composer constraint bisa auto-upgrade major tanpa notice. Pinned ke `^13.0` (versi terinstal, AnDWiki module 23 baseline ^12 sudah outdated — v13 rilis 2026-03). Selalu pin exact major di composer.json, jangan `*`. |
+| Audit-01 | **Tailwind v4 bukan dead code:** dipakai aktif di 20+ komponen Vue sbg utility hybrid bareng Vuetify (`@import "tailwindcss"` di `main.css`, `@tailwindcss/vite` plugin aktif). AnDWiki tandai Tailwind legacy/opsional — project ini genuine hybrid usage, bukan leftover, jangan dihapus tanpa audit CSS penuh. |
 
 ---
 

@@ -88,8 +88,16 @@
                 <td class="text-center text-caption text-medium-emphasis">{{ (currentPageStorage - 1) * itemsPerPage + index + 1 }}</td>
                 <td class="font-weight-medium font-mono text-caption">{{ entry.trace_no }}</td>
                 <td class="text-caption">{{ formatDate(entry.entry_date) }}</td>
-                <td class="text-caption">{{ entry.material_document || '-' }}</td>
-                <td class="text-caption">{{ entry.po_so || '-' }}</td>
+                <td class="text-caption">
+                  <a href="#" @click.prevent="openMatlDocEdit(entry)" class="text-medium-emphasis text-decoration-underline">
+                    {{ entry.material_document || '-' }}
+                  </a>
+                </td>
+                <td class="text-caption">
+                  <a href="#" @click.prevent="openPoEdit(entry)" class="text-medium-emphasis text-decoration-underline">
+                    {{ entry.po_so || '-' }}
+                  </a>
+                </td>
                 <td class="text-caption font-weight-medium">{{ entry.material }}</td>
                 <td class="text-caption">{{ entry.manufacturer_name || '-' }}</td>
                 <td class="text-caption">
@@ -180,7 +188,6 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Entry Date</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Matl Doc</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
-                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Manufacturer</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Sloc</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Init Material (MT)</th>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Init Supplier (MT)</th>
@@ -194,12 +201,12 @@
             </thead>
             <tbody>
               <tr v-if="feedLoading">
-                <td colspan="15" class="pa-0">
+                <td colspan="14" class="pa-0">
                   <VSkeletonLoader type="table-tbody@5" :loading="true" />
                 </td>
               </tr>
               <tr v-else-if="feedLogsSafe.length === 0">
-                <td colspan="15" class="text-center text-medium-emphasis py-4">No feed logs found</td>
+                <td colspan="14" class="text-center text-medium-emphasis py-4">No feed logs found</td>
               </tr>
               <tr v-for="(log, index) in paginatedFeedLogs" :key="log.id_trace_head" v-else>
                 <td class="text-center text-caption text-medium-emphasis">{{ (currentPageFeed - 1) * itemsPerPage + index + 1 }}</td>
@@ -211,7 +218,6 @@
                 <td class="text-caption">{{ formatDate(log.entry_date) }}</td>
                 <td class="text-caption font-mono">{{ log.material_document || '-' }}</td>
                 <td class="font-weight-medium text-caption">{{ log.material_name }}</td>
-                <td class="text-caption">{{ log.manufacturer_name || '-' }}</td>
                 <td class="text-center text-caption">{{ log.tank_name }}</td>
                 <td class="text-right font-weight-medium text-caption">{{ log.in_qty }}</td>
                 <td class="text-right font-weight-medium text-caption">{{ log.in_qty }}</td>
@@ -279,6 +285,20 @@
       @close="isTransferModalOpen = false"
       @saved="fetchData"
     />
+    <SubSlocEditModal
+      v-model:is-open="isSlocModalOpen"
+      :id-head="selectedEntry?.id_balance_head"
+      :id-sloc="selectedEntry?.raw_id_sloc"
+      :main-sloc="selectedEntry?.tank_name || ''"
+      @success="isSlocModalOpen = false; fetchData()"
+    />
+    <MaterialDocModal
+      v-model:is-open="isMatlDocModalOpen"
+      :id="matlDocEntry?.id_balance_head"
+      :current-value="matlDocMode === 'po' ? matlDocEntry?.po_so : matlDocEntry?.material_document"
+      :mode="matlDocMode"
+      @success="isMatlDocModalOpen = false; fetchData()"
+    />
   </div>
 </template>
 
@@ -290,6 +310,8 @@ import { usePlantSelectionStore } from '@/stores/plant.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import RmEntryModal from '@/modules/ts-raw/components/RmEntryModal.vue'
 import TransferModal from '@/modules/ts-raw/components/TransferModal.vue'
+import SubSlocEditModal from '@/modules/ts-raw/components/SubSlocEditModal.vue'
+import MaterialDocModal from '@/modules/ts-raw/components/MaterialDocModal.vue'
 import { useToastStore } from '@/stores/toast.js'
 
 const store = useTsRawRmEntryStore()
@@ -300,6 +322,9 @@ const plantSelectionStore = usePlantSelectionStore()
 const isCreateModalOpen = ref(false)
 const isTransferModalOpen = ref(false)
 const isSlocModalOpen = ref(false)
+const isMatlDocModalOpen = ref(false)
+const matlDocMode = ref('matlDoc')
+const matlDocEntry = ref(null)
 const selectedEntry = ref(null)
 const editingEntryId = ref(null)
 
@@ -379,6 +404,18 @@ function openUpdateModal(entry) {
 function openSlocEdit(entry) {
   selectedEntry.value = entry
   isSlocModalOpen.value = true
+}
+
+function openMatlDocEdit(entry) {
+  matlDocEntry.value = entry
+  matlDocMode.value = 'matlDoc'
+  isMatlDocModalOpen.value = true
+}
+
+function openPoEdit(entry) {
+  matlDocEntry.value = entry
+  matlDocMode.value = 'po'
+  isMatlDocModalOpen.value = true
 }
 
 async function deactivateEntry(id) {

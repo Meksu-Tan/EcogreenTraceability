@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\TsBlending\Http\Controllers\BlendingController;
@@ -8,7 +9,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::get('/', [BlendingController::class, 'index']);
         Route::post('/', [BlendingController::class, 'store']);
         Route::delete('{id}', [BlendingController::class, 'destroy']);
-        
+
         // REST Endpoints replacing monolithic store()
         Route::post('material', [BlendingController::class, 'storeMaterial']);
         Route::post('execute', [BlendingController::class, 'executeBlending']);

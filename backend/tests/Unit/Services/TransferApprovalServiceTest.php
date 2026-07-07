@@ -1,14 +1,16 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TsTransfer\Services\TransferApprovalService;
-use Modules\TsTransfer\Repositories\Contracts\TransferApprovalRepositoryInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Mockery;
 use Mockery\MockInterface;
+use Modules\TsTransfer\Repositories\TransferApprovalRepositoryInterface;
+use Modules\TsTransfer\Services\TransferApprovalService;
+use Tests\TestCase;
 
 /**
  * Unit tests for TransferApprovalService.
@@ -21,6 +23,7 @@ use Mockery\MockInterface;
 class TransferApprovalServiceTest extends TestCase
 {
     protected TransferApprovalService $service;
+
     protected MockInterface $repoMock;
 
     protected function setUp(): void
@@ -50,7 +53,7 @@ class TransferApprovalServiceTest extends TestCase
     // Returns the mock so the caller can stack further ->shouldReceive() calls.
     // =========================================================================
 
-    private function mockEudrConnection(): \Mockery\MockInterface
+    private function mockEudrConnection(): MockInterface
     {
         $conn = Mockery::mock('AnonymousDbConnection');
 
@@ -59,6 +62,30 @@ class TransferApprovalServiceTest extends TestCase
             ->andReturn($conn);
 
         return $conn;
+    }
+
+    // =========================================================================
+    // Helper: stub the DB calls made by TransactionCancellationService::deactivateTransfer
+    // (entryDate lookup, logTransaction's table()->insert()) so reject()/cancel() can
+    // reach a real success response through deactivateBalance(). Caller must still stub
+    // ->select() to cover the 2 extra period-lock lookups deactivateTransfer makes
+    // internally, on top of any period-lock check the caller itself performs.
+    // =========================================================================
+
+    private function mockDeactivateTransferChain(MockInterface $conn, int $idBalanceHead, int $idTraceHead): void
+    {
+        $this->repoMock->shouldReceive('findTransferForApproval')
+            ->once()->with($idBalanceHead)->andReturn((object) ['id_trace_head' => $idTraceHead]);
+
+        $conn->shouldReceive('selectOne')->once()
+            ->andReturn((object) ['entry_date' => '2026-06-03']);
+
+        $logBuilder = Mockery::mock();
+        $logBuilder->shouldReceive('insert')->andReturn(true);
+        $conn->shouldReceive('table')->with('log_transactions')->andReturn($logBuilder);
+
+        // Balance/trace status flips before the empty-select break.
+        $conn->shouldReceive('update')->twice()->andReturn(1);
     }
 
     // =========================================================================
@@ -195,8 +222,8 @@ class TransferApprovalServiceTest extends TestCase
             ->with(42)
             ->andReturn((object) [
                 'id_trace_head' => 10,
-                'trace_no'      => '726060310001',
-                'entry_date'    => '2026-01-01',
+                'trace_no' => '726060310001',
+                'entry_date' => '2026-01-01',
             ]);
 
         // PeriodLockService::isLocked calls DB::connection('eudr_ts')->select(...)
@@ -216,8 +243,8 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock->shouldReceive('findTransferForApproval')
             ->once()->andReturn((object) [
                 'id_trace_head' => 10,
-                'trace_no'      => '726060310001',
-                'entry_date'    => '2026-06-03',
+                'trace_no' => '726060310001',
+                'entry_date' => '2026-06-03',
             ]);
 
         $conn->shouldReceive('select')->twice()->andReturn([]);
@@ -238,8 +265,8 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock->shouldReceive('findTransferForApproval')
             ->once()->andReturn((object) [
                 'id_trace_head' => 10,
-                'trace_no'      => '726060310001',
-                'entry_date'    => '2026-06-03',
+                'trace_no' => '726060310001',
+                'entry_date' => '2026-06-03',
             ]);
 
         $conn->shouldReceive('select')->twice()->andReturn([]);
@@ -248,7 +275,7 @@ class TransferApprovalServiceTest extends TestCase
             ->once()->with(42)->andReturn('DRAFT');
 
         $conn->shouldReceive('transaction')->once()
-            ->andReturnUsing(fn(callable $cb) => $cb());
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         // Inside transaction: updateBalanceApprovalStatus
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
@@ -278,8 +305,8 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock->shouldReceive('findTransferForApproval')
             ->once()->andReturn((object) [
                 'id_trace_head' => 10,
-                'trace_no'      => '726060310001',
-                'entry_date'    => '2026-06-03',
+                'trace_no' => '726060310001',
+                'entry_date' => '2026-06-03',
             ]);
 
         $conn->shouldReceive('select')->twice()->andReturn([]);
@@ -288,7 +315,7 @@ class TransferApprovalServiceTest extends TestCase
             ->once()->with(42)->andReturn('DRAFT');
 
         $conn->shouldReceive('transaction')->once()
-            ->andReturnUsing(fn(callable $cb) => $cb());
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
             ->once()->with(42, 'PENDING', 'admin');
@@ -369,7 +396,7 @@ class TransferApprovalServiceTest extends TestCase
             ->once()->with(42)->andReturn('PENDING');
 
         $conn->shouldReceive('transaction')->once()
-            ->andReturnUsing(fn(callable $cb) => $cb());
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
             ->once()->with(42, 'APPROVED', 'admin');
@@ -396,7 +423,7 @@ class TransferApprovalServiceTest extends TestCase
             ->once()->with(42)->andReturn('PENDING');
 
         $conn->shouldReceive('transaction')->once()
-            ->andReturnUsing(fn(callable $cb) => $cb());
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
             ->once()->with(42, 'APPROVED', 'admin');
@@ -442,12 +469,15 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_returns_response_1_on_successful_reject_with_reason(): void
     {
         $conn = $this->mockEudrConnection();
+        $this->mockDeactivateTransferChain($conn, 42, 99);
+
+        $conn->shouldReceive('select')->times(3)->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
             ->once()->with(42)->andReturn('PENDING');
 
-        $conn->shouldReceive('transaction')->once()
-            ->andReturnUsing(fn(callable $cb) => $cb());
+        $conn->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
             ->once()->with(42, 'REJECTED', 'admin');
@@ -455,7 +485,7 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock->shouldReceive('updateApprovalStatus')
             ->once()->with('42', 'REJECTED', 'admin', null, 'Incorrect source tank');
 
-        $conn->shouldReceive('insert')->once()->andReturn(true);
+        $conn->shouldReceive('insert')->twice()->andReturn(true);
 
         $result = $this->service->reject(42, 'admin', 'Incorrect source tank');
 
@@ -526,17 +556,18 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_cancels_draft_transfer_successfully(): void
     {
         $conn = $this->mockEudrConnection();
+        $this->mockDeactivateTransferChain($conn, 42, 99);
 
         $this->repoMock->shouldReceive('findBalanceEntryDate')
             ->once()->with(42)->andReturn('2026-06-03');
 
-        $conn->shouldReceive('select')->twice()->andReturn([]);
+        $conn->shouldReceive('select')->times(5)->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
             ->once()->with(42)->andReturn('DRAFT');
 
-        $conn->shouldReceive('transaction')->once()
-            ->andReturnUsing(fn(callable $cb) => $cb());
+        $conn->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
             ->once()->with(42, 'CANCELLED', 'admin');
@@ -544,7 +575,7 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock->shouldReceive('updateApprovalStatus')
             ->once()->with('42', 'CANCELLED', 'admin');
 
-        $conn->shouldReceive('insert')->once()->andReturn(true);
+        $conn->shouldReceive('insert')->twice()->andReturn(true);
 
         $result = $this->service->cancel(42, 'admin');
 
@@ -555,17 +586,18 @@ class TransferApprovalServiceTest extends TestCase
     public function test_it_cancels_rejected_transfer_successfully(): void
     {
         $conn = $this->mockEudrConnection();
+        $this->mockDeactivateTransferChain($conn, 42, 99);
 
         $this->repoMock->shouldReceive('findBalanceEntryDate')
             ->once()->with(42)->andReturn('2026-06-03');
 
-        $conn->shouldReceive('select')->twice()->andReturn([]);
+        $conn->shouldReceive('select')->times(5)->andReturn([]);
 
         $this->repoMock->shouldReceive('getCurrentApprovalStatus')
             ->once()->with(42)->andReturn('REJECTED');
 
-        $conn->shouldReceive('transaction')->once()
-            ->andReturnUsing(fn(callable $cb) => $cb());
+        $conn->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         $this->repoMock->shouldReceive('updateBalanceApprovalStatus')
             ->once()->with(42, 'CANCELLED', 'admin');
@@ -573,7 +605,7 @@ class TransferApprovalServiceTest extends TestCase
         $this->repoMock->shouldReceive('updateApprovalStatus')
             ->once()->with('42', 'CANCELLED', 'admin');
 
-        $conn->shouldReceive('insert')->once()->andReturn(true);
+        $conn->shouldReceive('insert')->twice()->andReturn(true);
 
         $result = $this->service->cancel(42, 'admin');
 
@@ -703,4 +735,3 @@ class TransferApprovalServiceTest extends TestCase
         $this->addToAssertionCount(1);
     }
 }
-

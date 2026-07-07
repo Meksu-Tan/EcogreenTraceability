@@ -1,15 +1,17 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Modules;
 
-use Tests\TestCase;
-use Modules\Adjustment\Services\AdjustmentService;
-use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
-use Modules\Shared\Services\PeriodLockService;
-use Modules\Shared\Services\AuditService;
-use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
-use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
 use Mockery;
+use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
+use Modules\Adjustment\Services\AdjustmentService;
+use Modules\Adjustment\Services\Contracts\AdjustmentMutationServiceInterface;
+use Modules\Adjustment\Services\Contracts\AdjustmentPeriodServiceInterface;
+use Modules\Shared\Services\AuditService;
+use Modules\Shared\Services\PeriodLockService;
+use Tests\TestCase;
 
 class AdjustmentServiceTest extends TestCase
 {

@@ -1,8 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Dashboard\Services;
 
-use Modules\Dashboard\Repositories\Contracts\DashboardRepositoryInterface;
+use Modules\Dashboard\Repositories\DashboardRepositoryInterface;
 use Modules\Dashboard\Services\Contracts\DashboardServiceInterface;
 
 class DashboardService implements DashboardServiceInterface
@@ -14,10 +16,10 @@ class DashboardService implements DashboardServiceInterface
     public function getStats(): array
     {
         return [
-            'material_count'    => $this->dashboardRepository->getMaterialCount(),
-            'storage_count'     => $this->dashboardRepository->getStorageCount(),
-            'supplier_count'    => $this->dashboardRepository->getSupplierCount(),
-            'user_count'        => $this->dashboardRepository->getUserCount(),
+            'material_count' => $this->dashboardRepository->getMaterialCount(),
+            'storage_count' => $this->dashboardRepository->getStorageCount(),
+            'supplier_count' => $this->dashboardRepository->getSupplierCount(),
+            'user_count' => $this->dashboardRepository->getUserCount(),
             'transaction_counts' => $this->dashboardRepository->getTransactionCounts(),
         ];
     }

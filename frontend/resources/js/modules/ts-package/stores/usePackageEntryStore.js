@@ -33,7 +33,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
   registerCacheResetCallback(resetCache)
 
   async function fetchEntries(params = {}) {
-    return doFetchList({ plant: plantId.value, ...params })
+    return doFetchList({ id_plant: plantId.value, ...params })
   }
   const activeFgProducts = ref([])
   const wipMaterials = ref([])

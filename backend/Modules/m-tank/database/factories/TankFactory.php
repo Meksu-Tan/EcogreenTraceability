@@ -1,12 +1,15 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Modules\Tank\Models\Tank;
 
 class TankFactory extends Factory
 {
-    protected $model = \Modules\Tank\Models\Tank::class;
+    protected $model = Tank::class;
 
     public function definition(): array
     {

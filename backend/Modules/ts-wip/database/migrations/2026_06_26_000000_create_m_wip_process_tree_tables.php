@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
@@ -89,23 +90,19 @@ return new class extends Migration
                 $this->rundown('TREATED-GLY RUNDOWNS (103 FT0266)', '022', '103_FT0266'), $this->label('END OF SECTION 103'),
             ],
             '104' => [
-                $this->mode('Mode', 'mode104', '1', [['value' => '1', 'label' => 'Mode 1'], ['value' => '2', 'label' => 'Mode 2']], 'toggle'),
                 $this->label('START OF SECTION 104'), $this->feed('CRUDE-ME FEEDS (104 F0110)', '003', '104_F0110'),
                 $this->label('PROCESS OF SECTION 104'), $this->rundown('BDME RUNDOWNS', '023'), $this->rundown('UME RUNDOWNS (104 F0110)', '033', '104_F0110'),
                 $this->rundown('ME28 RUNDOWNS (104 F0332)', '043', '104_F0332'), $this->rundown('ECONOATE 665 RUNDOWNS', '053'),
-                $this->rundown('ME80 RUNDOWNS', '063'), $this->rundown('ME60 RUNDOWNS (104 FT0157)', '013', '104_FT0157', ['mode104' => '1']),
+                $this->rundown('ME80 RUNDOWNS', '063'),
                 $this->label('END OF SECTION 104'),
             ],
             '105' => [
-                $this->mode('Mode', 'mode105', '1', [['value' => '1', 'label' => 'Mode 1'], ['value' => '2', 'label' => 'Mode 2']], 'toggle'),
                 $this->label('START OF SECTION 105'),
-                $this->mode('Chain', 'mode105_chain', 'me28', [['value' => 'me28', 'label' => 'Short Chain (ME28)'], ['value' => 'me80', 'label' => 'Long Chain (ME80)']], 'select', ['mode105' => '1']),
-                $this->feed('ME28 FEEDS (105 FQ104)', '006-01', '105_FQ104', ['mode105' => '1', 'mode105_chain' => 'me28']),
-                $this->rundown('CFA28 RUNDOWNS (105 FQ808)', '016', '105_FQ808', ['mode105' => '1', 'mode105_chain' => 'me28']),
-                $this->feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104', ['mode105' => '1', 'mode105_chain' => 'me80']),
-                $this->rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808', ['mode105' => '1', 'mode105_chain' => 'me80']),
-                $this->feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104', ['mode105' => '2']),
-                $this->label('PROCESS OF SECTION 105'), $this->rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808', ['mode105' => '2']),
+                $this->mode('Chain', 'mode105_chain', 'me28', [['value' => 'me28', 'label' => 'Short Chain (ME28)'], ['value' => 'me80', 'label' => 'Long Chain (ME80)']], 'select'),
+                $this->feed('ME28 FEEDS (105 FQ104)', '006-01', '105_FQ104', ['mode105_chain' => 'me28']),
+                $this->rundown('CFA28 RUNDOWNS (105 FQ808)', '016', '105_FQ808', ['mode105_chain' => 'me28']),
+                $this->feed('ME80 FEEDS (105 FQ104)', '006-02', '105_FQ104', ['mode105_chain' => 'me80']),
+                $this->label('PROCESS OF SECTION 105'), $this->rundown('CFA80 RUNDOWNS (105 FQ808)', '026', '105_FQ808', ['mode105_chain' => 'me80']),
                 $this->label('END OF SECTION 105'),
             ],
             '106' => [
@@ -114,6 +111,7 @@ return new class extends Migration
                 $this->mode('Mode', 'mode106', 'mode-106-1', [['value' => 'mode-106-1', 'label' => '- Mode ECOROL 24 -'], ['value' => 'mode-106-2', 'label' => '- Mode ECOROL 12/14 -']], 'select', ['mode106_major' => '1']),
                 $this->feed('CFA28 FEEDS (106 F0115)', '008-01', '106_F0115', ['mode106_major' => '1']),
                 $this->feed('CFA80 FEEDS (106 F0115)', '008-02', '106_F0115', ['mode106_major' => '2']),
+                $this->label('PROCESS OF SECTION 106/114'),
                 $this->rundown('ECOROL-WAX RUNDOWNS (106 F0245)', '018', '106_F0245', ['mode106_major' => '1']),
                 $this->rundown('CFA28 RUNDOWNS (106 F0245)', '098', '106_F0245', ['mode106_major' => '2']),
                 $this->rundown('LEFA RUNDOWNS (106 F0167)', '028', '106_F0167'),
@@ -125,7 +123,7 @@ return new class extends Migration
                 $this->rundown('FA14/99 RUNDOWNS (106 F0231)', '088', '106_F0231', ['mode106_major' => '1', 'mode106' => 'mode-106-2']),
                 $this->rundown('FA8 RUNDOWNS (106 F0134)', '108', '106_F0134', ['mode106_major' => '2']),
                 $this->rundown('FA10 RUNDOWNS (106 F0231)', '118', '106_F0231', ['mode106_major' => '2']),
-                $this->label('PROCESS OF SECTION 106/114'), $this->label('END OF SECTION 106/114'),
+                $this->label('END OF SECTION 106/114'),
             ],
             '110' => [$this->label('START OF SECTION 110'), $this->feed('TREATED-GLY FEEDS (110 F0107)', '004', '110_F0107'), $this->label('PROCESS OF SECTION 110'), $this->rundown('CRUDE-GLY RUNDOWNS (110 F0108)', '014', '110_F0108'), $this->label('END OF SECTION 110')],
             '111' => [$this->label('START OF SECTION 111/116'), $this->feed('CRUDE-GLY FEEDS (111 F0118 + 116 FC01)', '007', '111_F0118_116_FC01'), $this->label('PROCESS OF SECTION 111/116'), $this->rundown('GLYCERINE RUNDOWNS', '017'), $this->label('END OF SECTION 111/116')],

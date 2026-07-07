@@ -1,6 +1,21 @@
 # AI-Assisted DevOps Lifecycle — Planning to Commit with Audit Trail
 
 > Source: EO-PIMS Implementation Guide (v20260605)
+> Last updated: 2026-06-29 — disesuaikan dengan setup aktual project EODS
+
+**Setup aktual project ini:**
+
+| Field | Value |
+|-------|-------|
+| Azure DevOps Org | `https://dev.azure.com/eoads05` |
+| Project | `pteo-traceability` |
+| Repo (Azure) | `https://dev.azure.com/eoads05/pteo-traceability/_git/pteo-traceability` |
+| Repo (GitHub mirror) | `https://github.com/Meksu-Tan/EcogreenTraceability.git` |
+| Git remote `origin` | GitHub (push utama) |
+| Git remote `devops` | Azure DevOps (sudah ditambahkan) |
+| Branch aktif | `develop` |
+| Branch di DevOps | `main`, `sprint-1` |
+| Project path (lokal) | `C:\XAMPP\htdocs\EODS\trace-dev` |
 
 > Modul ini melanjutkan Modul 20 (AI-Assisted Enhancement). Jika Modul 20 membahas
 > memory sistem dan executor collaboration, Modul 21 menutup loop terakhir:
@@ -140,7 +155,7 @@ Epic [291]: Sprint 01 — Organization + Employee
 
 ### 3.2 Akses yang Dibutuhkan
 
-- **Azure DevOps account** dengan akses ke project tim
+- **Azure DevOps account** dengan akses ke `dev.azure.com/eoads05` project `pteo-traceability`
 - **Personal Access Token (PAT)** — dibuat di langkah §5
 - **Anthropic account** untuk Claude Code CLI
 
@@ -170,7 +185,7 @@ dengan akun Anthropic. Ikuti langkah di browser, lalu kembali ke terminal.
 
 ```powershell
 # Masuk ke folder project dan jalankan Claude
-cd "D:\Apps\[nama-project]"
+cd "C:\XAMPP\htdocs\EODS\trace-dev"
 claude
 ```
 
@@ -212,7 +227,7 @@ Start-Process -FilePath $exe `
   -ArgumentList @("serve","--port","4099") `
   -RedirectStandardOutput "C:\Users\$env:USERNAME\AppData\Local\Temp\oc-serve.txt" `
   -RedirectStandardError  "C:\Users\$env:USERNAME\AppData\Local\Temp\oc-serve-err.txt" `
-  -NoNewWindow -WorkingDirectory "D:\Apps\[nama-project]"
+  -NoNewWindow -WorkingDirectory "C:\XAMPP\htdocs\EODS\trace-dev"
 
 # Verifikasi (tunggu ~5 detik)
 Start-Sleep -Seconds 5
@@ -232,11 +247,11 @@ Azure DevOps API tanpa username/password.
 
 ### 5.1 Cara Membuat PAT
 
-1. Buka **Azure DevOps** → `https://dev.azure.com/[org-name]`
+1. Buka **Azure DevOps** → `https://dev.azure.com/eoads05`
 2. Klik **foto profil** di pojok kanan atas → **Personal Access Tokens**
 3. Klik **+ New Token**
 4. Isi form:
-   - **Name:** `claude-devops-[nama-project]` *(deskriptif agar mudah diidentifikasi)*
+   - **Name:** `claude-devops-pteo-traceability` *(deskriptif agar mudah diidentifikasi)*
    - **Organization:** pilih organisasi yang sesuai
    - **Expiration:** maksimal 180 hari *(catat tanggal expired!)*
    - **Scopes:** pilih **Custom defined**, lalu centang:
@@ -260,18 +275,18 @@ File ini **sudah ada di `.gitignore`** — tidak akan masuk repository.
 ```powershell
 # Di root project
 $content = @"
-AZURE_DEVOPS_ORG=https://dev.azure.com/[nama-org]
-AZURE_DEVOPS_PROJECT=[Nama Project]
+AZURE_DEVOPS_ORG=https://dev.azure.com/eoads05
+AZURE_DEVOPS_PROJECT=pteo-traceability
 AZURE_DEVOPS_PAT=[token-yang-sudah-disalin]
 "@
-Set-Content -Path "D:\Apps\[nama-project]\.env.claude" -Value $content -Encoding UTF8
+Set-Content -Path "C:\XAMPP\htdocs\EODS\trace-dev\.env.claude" -Value $content -Encoding UTF8
 ```
 
 Atau buat manual — buat file `.env.claude` di root project dengan isi:
 
 ```
-AZURE_DEVOPS_ORG=https://dev.azure.com/nama-org
-AZURE_DEVOPS_PROJECT=Nama Project
+AZURE_DEVOPS_ORG=https://dev.azure.com/eoads05
+AZURE_DEVOPS_PROJECT=pteo-traceability
 AZURE_DEVOPS_PAT=AzAW...token...
 ```
 
@@ -280,13 +295,14 @@ AZURE_DEVOPS_PAT=AzAW...token...
 Test koneksi ke Azure DevOps API:
 
 ```powershell
-$cfg = Get-Content "D:\Apps\[nama-project]\.env.claude" | ConvertFrom-StringData
+$cfg = Get-Content "C:\XAMPP\htdocs\EODS\trace-dev\.env.claude" | ConvertFrom-StringData
 $b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":$($cfg.AZURE_DEVOPS_PAT)"))
 $headers = @{ Authorization = "Basic $b64" }
 $org = $cfg.AZURE_DEVOPS_ORG
 
 $r = Invoke-WebRequest -Uri "$org/_apis/projects?api-version=7.1" -Headers $headers -UseBasicParsing
 ($r.Content | ConvertFrom-Json).value | Select-Object name, id
+# Harus muncul: pteo-traceability
 ```
 
 Output harus menampilkan daftar project di organisasi. Jika error `401` → cek PAT.
@@ -340,7 +356,7 @@ Setelah seed selesai, Claude melaporkan semua ID work item yang dibuat.
 Buka Azure DevOps board dan pastikan semua work items muncul:
 
 ```
-https://dev.azure.com/[org]/[project]/_boards/board/t/[team]/Issues
+https://dev.azure.com/eoads05/pteo-traceability/_boards/board/t/pteo-traceability%20Team/Issues
 ```
 
 Semua task harus dalam state **To Do** sebelum sprint dimulai.
@@ -489,7 +505,7 @@ Claude mengupdate sprint doc, lalu commit:
 # - [x] Backend Organization module (Brief 1)
 
 # Kemudian commit dengan format wajib
-git add .docs/sprints/sprint-01-organization-employee.md
+git add .claude/.docs/sprints/sprint-01.md
 git commit -m @'
 [progress] sprint-01 brief-1 done — Organization module backend AB#292 AB#293 AB#294 AB#295 AB#296 AB#297 AB#298 AB#299 AB#300
 '@
@@ -561,7 +577,7 @@ Setelah beberapa brief selesai, ada jejak lengkap yang bisa ditelusuri dari dua 
 
 1. Buka Azure DevOps board:
    ```
-   https://dev.azure.com/[org]/[project]/_boards/board/t/[team]/Issues
+   https://dev.azure.com/eoads05/pteo-traceability/_boards/board/t/pteo-traceability%20Team/Issues
    ```
 2. Klik work item yang ingin ditelusuri (misal Task #293)
 3. Di panel kanan → tab **Development** atau bagian **Links**
@@ -572,7 +588,7 @@ Setelah beberapa brief selesai, ada jejak lengkap yang bisa ditelusuri dari dua 
 
 1. Buka Azure Repos → Commits:
    ```
-   https://dev.azure.com/[org]/[project]/_git/[repo]/commits
+   https://dev.azure.com/eoads05/pteo-traceability/_git/pteo-traceability/commits
    ```
 2. Klik commit yang ingin ditelusuri
 3. Di bagian atas commit detail → work item yang di-link muncul sebagai badge
@@ -580,7 +596,7 @@ Setelah beberapa brief selesai, ada jejak lengkap yang bisa ditelusuri dari dua 
 
 ### 10.3 Dari Sprint Timeline
 
-1. Azure DevOps → Boards → Sprints → pilih **Sprint 01**
+1. Buka `https://dev.azure.com/eoads05/pteo-traceability/_sprints` → pilih **Sprint 01**
 2. Semua task tampil dengan state saat ini
 3. Klik task → lihat history kapan state berubah (To Do → Doing → Done)
 4. Tab Development → commit yang mengerjakan task ini
@@ -772,7 +788,7 @@ Cara buat via PowerShell jika belum ada:
 
 ```powershell
 
-$dir = "D:\Apps\[nama-project]\.claude"
+$dir = "C:\XAMPP\htdocs\EODS\trace-dev\.claude"
 New-Item -ItemType Directory -Force $dir | Out-Null
 
 $settings = @'
@@ -1004,6 +1020,27 @@ git log --oneline -5
 
 **Jika repository belum terhubung ke Azure Repos:**
 Hubungkan dulu di Azure DevOps → Project Settings → Repos → tambahkan GitHub/Azure Repos connection.
+
+**Setup aktual project ini (sudah dikonfigurasi 2026-06-29):**
+
+Remote `devops` sudah ditambahkan ke repo lokal:
+```bash
+git remote -v
+# origin   https://github.com/Meksu-Tan/EcogreenTraceability.git (push/fetch)
+# devops   https://eoads05@dev.azure.com/eoads05/pteo-traceability/_git/pteo-traceability (push/fetch)
+```
+
+Untuk push ke Azure DevOps:
+```bash
+# Push branch develop ke main di DevOps
+git push devops develop:main
+
+# Atau buat branch develop di DevOps
+git push devops develop:develop
+```
+
+> ⚠️ DevOps saat ini hanya punya `main` (last: 2026-05-26) dan `sprint-1`.
+> Branch `develop` belum ada di DevOps — perlu dibuat saat push pertama.
 
 ---
 

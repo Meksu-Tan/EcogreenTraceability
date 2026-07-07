@@ -1,12 +1,15 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Shared\Services\PeriodLockService;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Mockery;
+use Modules\Shared\Services\PeriodLockService;
+use Tests\TestCase;
 
 class PeriodLockServiceTest extends TestCase
 {
@@ -22,7 +25,7 @@ class PeriodLockServiceTest extends TestCase
 
     public function test_it_returns_true_when_period_is_locked(): void
     {
-        $lockRow = [(object)['lock_status' => '1']];
+        $lockRow = [(object) ['lock_status' => '1']];
 
         DB::shouldReceive('connection')
             ->with('eudr_ts')
@@ -50,7 +53,7 @@ class PeriodLockServiceTest extends TestCase
         DB::shouldReceive('select')
             ->twice()
             ->andReturnValues([
-                [(object)['lock_status' => '0']],
+                [(object) ['lock_status' => '0']],
                 [],
             ]);
 
@@ -86,13 +89,13 @@ class PeriodLockServiceTest extends TestCase
 
         DB::shouldReceive('select')
             ->once()
-            ->andThrow(new \Illuminate\Database\QueryException('eudr_ts', 'SELECT', [], new \Exception('Table does not exist')));
+            ->andThrow(new QueryException('eudr_ts', 'SELECT', [], new \Exception('Table does not exist')));
 
         Log::shouldReceive('debug')->once();
 
         DB::shouldReceive('select')
             ->once()
-            ->andReturn([(object)['lock_status' => '1']]);
+            ->andReturn([(object) ['lock_status' => '1']]);
 
         $result = PeriodLockService::isLocked('2026-03-01');
 
@@ -128,7 +131,7 @@ class PeriodLockServiceTest extends TestCase
 
     public function test_it_returns_already_locked_when_period_is_already_locked(): void
     {
-        $existing = [(object)['id' => 1, 'lock_status' => '1']];
+        $existing = [(object) ['id' => 1, 'lock_status' => '1']];
 
         DB::shouldReceive('connection')
             ->with('eudr_ts')
@@ -170,7 +173,7 @@ class PeriodLockServiceTest extends TestCase
 
     public function test_it_unlocks_a_locked_period_successfully(): void
     {
-        $existing = [(object)['id' => 1, 'lock_status' => '1']];
+        $existing = [(object) ['id' => 1, 'lock_status' => '1']];
 
         // 2 DB::connection calls: 1 for select (check existing), 1 for update
         DB::shouldReceive('connection')
@@ -211,7 +214,7 @@ class PeriodLockServiceTest extends TestCase
 
     public function test_it_returns_already_unlocked_when_period_is_not_locked(): void
     {
-        $existing = [(object)['id' => 2, 'lock_status' => '0']];
+        $existing = [(object) ['id' => 2, 'lock_status' => '0']];
 
         DB::shouldReceive('connection')
             ->with('eudr_ts')
@@ -235,8 +238,8 @@ class PeriodLockServiceTest extends TestCase
     public function test_it_returns_locked_periods_in_date_range(): void
     {
         $rows = [
-            (object)['period' => '2026-05-01', 'lock_status' => '1', 'locked_by' => 'admin'],
-            (object)['period' => '2026-06-01', 'lock_status' => '1', 'locked_by' => 'admin'],
+            (object) ['period' => '2026-05-01', 'lock_status' => '1', 'locked_by' => 'admin'],
+            (object) ['period' => '2026-06-01', 'lock_status' => '1', 'locked_by' => 'admin'],
         ];
 
         DB::shouldReceive('connection')

@@ -7,6 +7,8 @@ export const useSetupTankStore = defineStore('setupTank', () => {
   const loading = ref(false)
   const lastSyncAt = ref(null)
   const lastSyncUser = ref(null)
+  const lastSyncCount = ref(0)
+  const lastSyncTanks = ref([])
 
   async function fetchTanks() {
     loading.value = true
@@ -36,8 +38,8 @@ export const useSetupTankStore = defineStore('setupTank', () => {
     return r.data
   }
 
-  async function syncTanks() {
-    const r = await tankApi.syncTanks()
+  async function syncTanks(refresh = false) {
+    const r = await tankApi.syncTanks(refresh)
     if (r.data.status === 1 || r.data.status === 2) {
       await fetchTanks()
       await fetchLastSync()
@@ -50,14 +52,20 @@ export const useSetupTankStore = defineStore('setupTank', () => {
       const r = await tankApi.getLastSync()
       lastSyncAt.value = r.data?.data?.last_sync_at || null
       lastSyncUser.value = r.data?.data?.last_sync_user || null
+      lastSyncCount.value = r.data?.data?.last_sync_count || 0
+      lastSyncTanks.value = r.data?.data?.last_sync_tanks || []
     } catch {
       lastSyncAt.value = null
       lastSyncUser.value = null
+      lastSyncCount.value = 0
+      lastSyncTanks.value = []
     }
   }
 
   return {
-    tanks, loading, lastSyncAt, lastSyncUser,
+    tanks, loading, lastSyncAt, lastSyncUser, lastSyncCount, lastSyncTanks,
     fetchTanks, createTank, editTank, toggleTank, syncTanks, fetchLastSync
   }
 })
+
+export { useSetupWarehouseStore } from './warehouseStore.js'

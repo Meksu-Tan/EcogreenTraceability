@@ -10,12 +10,22 @@
         </div>
       </div>
       <div class="d-flex align-center gap-3">
-        <div class="d-flex align-center gap-2 text-caption text-medium-emphasis">
-          <VIcon icon="ri-time-line" size="14" />
-          <span v-if="store.lastSyncAt">Last sync: {{ formatLastSync(store.lastSyncAt) }} by {{ store.lastSyncUser }}</span>
-          <span v-else>No sync yet</span>
-          <span class="font-weight-bold text-primary">|</span>
-          <span>Next sync: {{ countdownDisplay }} ({{ nextSyncLabel }})</span>
+        <div class="d-flex flex-column align-end text-caption text-medium-emphasis">
+          <div class="d-flex align-center gap-2">
+            <VIcon icon="ri-time-line" size="14" />
+            <span v-if="store.lastSyncAt">Last sync: {{ formatLastSync(store.lastSyncAt) }} by {{ store.lastSyncUser }}</span>
+            <span v-else>No sync yet</span>
+            <span class="font-weight-bold text-primary">|</span>
+            <span>Next sync: {{ countdownDisplay }} ({{ nextSyncLabel }})</span>
+          </div>
+          <div v-if="store.lastSyncAt" class="text-caption text-medium-emphasis mt-0.5">
+            <span v-if="store.lastSyncCount > 0" class="text-success font-weight-semibold">
+              Synced {{ store.lastSyncCount }} new tanks: {{ store.lastSyncTanks.join(', ') }}
+            </span>
+            <span v-else class="text-medium-emphasis">
+              No new tanks updated in last sync
+            </span>
+          </div>
         </div>
         <VBtn
           id="btn-sync-tank"
@@ -23,7 +33,7 @@
           variant="tonal"
           :loading="syncing"
           prepend-icon="ri-refresh-line"
-          @click="onSync"
+          @click="onSync(false)"
         >
           Update Data
         </VBtn>
@@ -224,10 +234,10 @@ async function onToggle(row) {
   }
 }
 
-async function onSync() {
+async function onSync(refresh = false) {
   syncing.value = true
   try {
-    const r = await store.syncTanks()
+    const r = await store.syncTanks(refresh)
     if (r.status === 1 || r.status === 2) {
       toast.success(r.message)
       startCountdown()
@@ -240,6 +250,8 @@ async function onSync() {
     syncing.value = false
   }
 }
+
+
 
 async function onSubmit(data) {
   submitting.value = true

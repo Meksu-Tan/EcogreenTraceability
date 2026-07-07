@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
 use App\Models\User;
+use Mockery;
 use Modules\Admin\Services\Contracts\AdminServiceInterface;
 use Modules\Shared\Http\Middleware\PlantContextMiddleware;
-use Mockery;
 use Tests\TestCase;
 
 class RolePermissionModuleTest extends TestCase
@@ -129,8 +131,8 @@ class RolePermissionModuleTest extends TestCase
 
         $response = $this->actingAs($actingUser, 'sanctum')
             ->postJson('/api/v1/admin/users', [
-                'name'     => 'Test User',
-                'email'    => 'not-an-email',
+                'name' => 'Test User',
+                'email' => 'not-an-email',
                 'password' => 'Secret1234',
                 // role intentionally omitted — tests email validation only
             ]);
@@ -153,8 +155,8 @@ class RolePermissionModuleTest extends TestCase
 
         $response = $this->actingAs($actingUser, 'sanctum')
             ->postJson('/api/v1/admin/users', [
-                'name'     => 'Short Pass',
-                'email'    => 'not-valid-email', // invalid — stops before unique:users
+                'name' => 'Short Pass',
+                'email' => 'not-valid-email', // invalid — stops before unique:users
                 'password' => '1234567',         // 7 chars, min is 8
                 // role intentionally omitted
             ]);
@@ -170,7 +172,7 @@ class RolePermissionModuleTest extends TestCase
     public function test_it_deletes_user_successfully(): void
     {
         $actingUser = User::factory()->make(['id' => 1]);
-        $targetUser = (object)['id' => 99, 'name' => 'DeleteMe', 'email' => 'del@eods.local'];
+        $targetUser = (object) ['id' => 99, 'name' => 'DeleteMe', 'email' => 'del@eods.local'];
 
         $serviceMock = Mockery::mock(AdminServiceInterface::class);
         $serviceMock->shouldReceive('findUserById')
@@ -221,9 +223,9 @@ class RolePermissionModuleTest extends TestCase
         // Give the acting user a known numeric ID via make()
         $actingUser = User::factory()->make(['id' => 42]);
 
-        $targetUser = (object)[
-            'id'    => 42,
-            'name'  => 'Self',
+        $targetUser = (object) [
+            'id' => 42,
+            'name' => 'Self',
             'email' => 'self@eods.local',
         ];
 

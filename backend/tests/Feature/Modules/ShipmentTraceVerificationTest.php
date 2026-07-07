@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Feature\Modules;
 
 use App\Models\User;
-use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
-use Modules\Shared\Http\Middleware\PlantContextMiddleware;
 use Mockery;
+use Modules\Shared\Http\Middleware\PlantContextMiddleware;
+use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
 use Tests\TestCase;
 
 class ShipmentTraceVerificationTest extends TestCase

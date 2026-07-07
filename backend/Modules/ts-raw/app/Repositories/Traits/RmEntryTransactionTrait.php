@@ -1,19 +1,23 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Repositories\Traits;
 
-use Illuminate\Support\Facades\DB;
-use Modules\TsRaw\Models\TraceHeader;
-use Modules\Material\Models\Material;
-use Modules\Shared\Helpers\Rundown;
-use Modules\Shared\Helpers\Feed;
 use Exception;
+use Illuminate\Support\Facades\DB;
+use Modules\Material\Models\Material;
+use Modules\Shared\Helpers\Feed;
+use Modules\Shared\Helpers\Rundown;
+use Modules\Shared\Services\TransactionCancellationService;
+use Modules\Shared\Services\TransactionCoreService;
 use Modules\Shared\Traits\DbCompatTrait;
 
 trait RmEntryTransactionTrait
 {
     use DbCompatTrait;
-    public function checkStockSynchronization(string $entryNo, int $materialId = null): array
+
+    public function checkStockSynchronization(string $entryNo, ?int $materialId = null): array
     {
         $tempQuery = 'SELECT COUNT(*) as temp_count, SUM(qty) as temp_qty FROM t_balance_temporary WHERE entry_no = ? AND status = 1';
         $tempParams = [$entryNo];
@@ -42,7 +46,7 @@ trait RmEntryTransactionTrait
             'is_synchronized' => $balanceCount > 0 && $tempCount == 0,
             'status' => $balanceCount > 0 ? 'processed' : ($tempCount > 0 ? 'pending' : 'no_data'),
             'message' => $balanceCount > 0 ? 'RM Entry has been processed and stock is synchronized' :
-                        ($tempCount > 0 ? 'RM Entry has temporary data but not yet processed' : 'No data found for this entry')
+                        ($tempCount > 0 ? 'RM Entry has temporary data but not yet processed' : 'No data found for this entry'),
         ];
     }
 
@@ -78,8 +82,8 @@ trait RmEntryTransactionTrait
                 'id_material' => $materialId,
                 'tf_number' => $tankId,
                 'id_plant' => $plantId,
-                'hours_back' => $hoursBack
-            ]
+                'hours_back' => $hoursBack,
+            ],
         ];
     }
 
@@ -93,7 +97,7 @@ trait RmEntryTransactionTrait
                 ->where('status', 1)
                 ->first();
 
-            if (!$balanceHeader) {
+            if (! $balanceHeader) {
                 throw new Exception('RM Entry not found');
             }
 
@@ -106,6 +110,7 @@ trait RmEntryTransactionTrait
                     $updateData['po_so'] = $data['po_so'];
                 }
                 $updateData['updated_by'] = $user;
+                $updateData['updated_at'] = now();
 
                 DB::connection('eudr_ts')->table('t_balance_header')
                     ->where('id_balance_head', $id)
@@ -114,7 +119,7 @@ trait RmEntryTransactionTrait
 
             if (isset($data['id_sloc'])) {
                 $slocVal = null;
-                if (!empty($data['id_sloc'])) {
+                if (! empty($data['id_sloc'])) {
                     if (is_array($data['id_sloc'])) {
                         $slocVal = json_encode(array_map('strval', array_values($data['id_sloc'])));
                     } else {
@@ -122,7 +127,7 @@ trait RmEntryTransactionTrait
                         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                             $slocVal = json_encode(array_map('strval', array_values($decoded)));
                         } else {
-                            $slocVal = json_encode([(string)$data['id_sloc']]);
+                            $slocVal = json_encode([(string) $data['id_sloc']]);
                         }
                     }
                 }
@@ -130,11 +135,13 @@ trait RmEntryTransactionTrait
                     ->where('id_balance_head', $id)
                     ->update([
                         'id_sloc' => $slocVal,
-                        'updated_by' => $user
+                        'updated_by' => $user,
+                        'updated_at' => now(),
                     ]);
             }
 
             DB::connection('eudr_ts')->commit();
+
             return ['success' => true, 'id' => $id];
 
         } catch (Exception $e) {
@@ -146,7 +153,7 @@ trait RmEntryTransactionTrait
     public function saveRmEntry(array $data, string $user): array
     {
         $firstSlocId = null;
-        if (!empty($data['id_sloc'])) {
+        if (! empty($data['id_sloc'])) {
             if (is_array($data['id_sloc'])) {
                 $firstSlocId = $data['id_sloc'][0] ?? null;
             } else {
@@ -180,13 +187,17 @@ trait RmEntryTransactionTrait
 
             $supplierRows = [];
             foreach ($dat as $row) {
-                if ($row->qty_tail <= 0) continue;
-                if (empty($row->id_supplier)) continue;
+                if ($row->qty_tail <= 0) {
+                    continue;
+                }
+                if (empty($row->id_supplier)) {
+                    continue;
+                }
                 $supplierRows[] = [
                     'id_supplier' => $row->id_supplier,
                     'id_manufacturer' => $row->id_manufacturer ?? null,
                     'batch_sap' => $row->batch_sap,
-                    'rundownSupplier' => round((float)$row->qty_tail, 4),
+                    'rundownSupplier' => round((float) $row->qty_tail, 4),
                 ];
             }
 
@@ -197,7 +208,7 @@ trait RmEntryTransactionTrait
             Rundown::adjustRundownToTotal($supplierRows, $qty);
 
             $slocVal = null;
-            if (!empty($data['id_sloc'])) {
+            if (! empty($data['id_sloc'])) {
                 if (is_array($data['id_sloc'])) {
                     $slocVal = json_encode(array_map('strval', array_values($data['id_sloc'])));
                 } else {
@@ -205,7 +216,7 @@ trait RmEntryTransactionTrait
                     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                         $slocVal = json_encode(array_map('strval', array_values($decoded)));
                     } else {
-                        $slocVal = json_encode([(string)$data['id_sloc']]);
+                        $slocVal = json_encode([(string) $data['id_sloc']]);
                     }
                 }
             }
@@ -231,15 +242,16 @@ trait RmEntryTransactionTrait
 
             $idTraceHead = $rundownResult['id_trace_head'];
 
-            if (!empty($data['material_document'])) {
-                app(\Modules\Shared\Services\TransactionCoreService::class)
+            if (! empty($data['material_document'])) {
+                app(TransactionCoreService::class)
                     ->createMaterialDocument($user, $idTraceHead, $data['material_document'], 'ADD');
             }
 
             $this->clearTempData($entry_no, $user);
-            $this->logTransaction('RM_ENTRY', 'ADD', 'ID: ' . $rundownResult['id_balance_head'] . ' | Trace No: ' . $entry_no, $user);
+            $this->logTransaction('RM_ENTRY', 'ADD', 'ID: '.$rundownResult['id_balance_head'].' | Trace No: '.$entry_no, $user);
 
             DB::connection('eudr_ts')->commit();
+
             return ['success' => true, 'id' => $rundownResult['id_balance_head']];
 
         } catch (Exception $e) {
@@ -286,8 +298,8 @@ trait RmEntryTransactionTrait
                 }
             }
 
-            $srcPlant = !empty($srcTankRec->first()?->id_plant) ? $this->resolvePlantCode($srcTankRec->first()->id_plant) : $idPlant;
-            $tgtPlant = !empty($tgtTankRec->first()?->id_plant) ? $this->resolvePlantCode($tgtTankRec->first()->id_plant) : $idPlant;
+            $srcPlant = ! empty($srcTankRec->first()?->id_plant) ? $this->resolvePlantCode($srcTankRec->first()->id_plant) : $idPlant;
+            $tgtPlant = ! empty($tgtTankRec->first()?->id_plant) ? $this->resolvePlantCode($tgtTankRec->first()->id_plant) : $idPlant;
             $balancePlant = $srcPlant;
 
             $datTempMaterial = $this->getTempData($entry_no);
@@ -315,15 +327,15 @@ trait RmEntryTransactionTrait
                 $availableQty = Feed::getAvailableQty($feedParams);
                 if (round($availableQty, 4) < round($out_qty, 4)) {
                     $material = Material::find($id_material);
-                    $matLabel = $material ? ($material->code . ' :: ' . $material->description) : (string) $id_material;
+                    $matLabel = $material ? ($material->code.' :: '.$material->description) : (string) $id_material;
 
                     $tempCheck = DB::connection('eudr_ts')->select(
                         'SELECT COUNT(*) as count FROM t_balance_temporary WHERE entry_no = ? AND status = 1 AND id_material = ? AND qty > 0',
                         [$entry_no, $id_material]
                     );
 
-                    $slocNames = $srcTankRec->map(function($tank) {
-                        return $tank->description ?: ($tank->plant_name ? ($tank->plant_name . ' - ' . $tank->code) : $tank->code);
+                    $slocNames = $srcTankRec->map(function ($tank) {
+                        return $tank->description ?: ($tank->plant_name ? ($tank->plant_name.' - '.$tank->code) : $tank->code);
                     })->filter()->implode(', ');
                     if (empty($slocNames)) {
                         $slocNames = implode(', ', $id_slocSource);
@@ -331,16 +343,16 @@ trait RmEntryTransactionTrait
 
                     if ($tempCheck[0]->count > 0) {
                         throw new Exception(
-                             'Stock synchronization issue detected in Sloc (' . $slocNames . '). Material ' . $matLabel .
-                            ' has temporary data but stock not updated. Available: ' . number_format($availableQty, 3) .
-                            ' MT, requested: ' . number_format($out_qty, 3) . ' MT. Please complete RM Entry process first.'
+                            'Stock synchronization issue detected in Sloc ('.$slocNames.'). Material '.$matLabel.
+                            ' has temporary data but stock not updated. Available: '.number_format($availableQty, 3).
+                            ' MT, requested: '.number_format($out_qty, 3).' MT. Please complete RM Entry process first.'
                         );
                     }
 
                     throw new Exception(
-                        'Insufficient stock in Sloc (' . $slocNames . ') for ' . $matLabel .
-                        '. Available: ' . number_format($availableQty, 3) .
-                        ' MT, requested: ' . number_format($out_qty, 3) . ' MT (FIFO sloc/sub-sloc/plant).'
+                        'Insufficient stock in Sloc ('.$slocNames.') for '.$matLabel.
+                        '. Available: '.number_format($availableQty, 3).
+                        ' MT, requested: '.number_format($out_qty, 3).' MT (FIFO sloc/sub-sloc/plant).'
                     );
                 }
 
@@ -363,7 +375,7 @@ trait RmEntryTransactionTrait
                     throw new Exception('Feed failed');
                 }
 
-                 $supplierRows = DB::connection('eudr_ts')->select(
+                $supplierRows = DB::connection('eudr_ts')->select(
                     'SELECT id_supplier, id_manufacturer, batch_sap, SUM(out_qty) AS rundown_supplier
                        FROM t_trace_detail
                       WHERE status = 1
@@ -379,7 +391,7 @@ trait RmEntryTransactionTrait
 
                 if (empty($supplierRows)) {
                     throw new Exception(
-                        'Supplier breakdown is empty for transfer ' . number_format($out_qty, 3) .
+                        'Supplier breakdown is empty for transfer '.number_format($out_qty, 3).
                         ' MT. Ensure RM entry has active supplier data.'
                     );
                 }
@@ -387,9 +399,9 @@ trait RmEntryTransactionTrait
                 $supplierRowsFormatted = [];
                 foreach ($supplierRows as $r) {
                     $supplierRowsFormatted[] = [
-                        'id_supplier'     => $r->id_supplier,
+                        'id_supplier' => $r->id_supplier,
                         'id_manufacturer' => $r->id_manufacturer,
-                        'batch_sap'       => $r->batch_sap,
+                        'batch_sap' => $r->batch_sap,
                         'rundownSupplier' => (float) ($r->rundown_supplier ?? $r->rundownsupplier ?? 0),
                     ];
                 }
@@ -417,16 +429,17 @@ trait RmEntryTransactionTrait
                     throw new Exception('Rundown failed for feed tank');
                 }
 
-                if (!empty($materialDoc)) {
-                    app(\Modules\Shared\Services\TransactionCoreService::class)
+                if (! empty($materialDoc)) {
+                    app(TransactionCoreService::class)
                         ->createMaterialDocument($user, $rundownResult['id_trace_head'], $materialDoc, 'ADD');
                 }
             }
 
             $this->clearTempData($entry_no, $user);
-            $this->logTransaction('RMTRF_ENTRY', 'ADD', 'Transfer to Feed Tank | Entry No: ' . $entry_no, $user);
+            $this->logTransaction('RMTRF_ENTRY', 'ADD', 'Transfer to Feed Tank | Entry No: '.$entry_no, $user);
 
             DB::connection('eudr_ts')->commit();
+
             return ['success' => true];
 
         } catch (Exception $e) {
@@ -435,27 +448,33 @@ trait RmEntryTransactionTrait
         }
     }
 
+    public function activateRmEntry(int $id, string $user): array
+    {
+        return app(TransactionCancellationService::class)
+            ->activateRmEntry($id, $user);
+    }
+
     public function deactivateRmEntry(int $id, string $user): array
     {
-        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+        return app(TransactionCancellationService::class)
             ->deactivateRmEntry($id, $user);
     }
 
     public function deactivateFeedLogEntry(int $id, string $user): array
     {
-        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+        return app(TransactionCancellationService::class)
             ->deactivateFeedLogEntry($id, $user);
     }
 
     public function updateEntrySubTank(string $user, int $idHead, array $tails): array
     {
-        return app(\Modules\Shared\Services\TransactionCoreService::class)
+        return app(TransactionCoreService::class)
             ->updateEntrySubTank($user, $idHead, $tails);
     }
 
     public function deactivateRmEntryTrf(int $id, string $user): array
     {
-        return app(\Modules\Shared\Services\TransactionCancellationService::class)
+        return app(TransactionCancellationService::class)
             ->deactivateRmEntryTrf($id, $user);
     }
 }

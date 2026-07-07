@@ -23,9 +23,10 @@
         <VAlert v-if="submitError" type="error" variant="tonal" density="comfortable" class="mb-4">{{ submitError }}</VAlert>
 
         <form @submit.prevent="save" class="d-flex flex-column ga-4">
+          <!-- STEP 1: Plant + Date + Trace No -->
           <VCard variant="outlined">
             <VCardText>
-              <VRow dense class="mb-2">
+              <VRow dense>
                 <VCol cols="12" md="3">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Plant</label>
                   <VSelect
@@ -43,22 +44,7 @@
                     :clearable="plantSelectionStore.selectedPlantId === null"
                   />
                 </VCol>
-              </VRow>
-              <VRow dense>
-                <VCol cols="12" sm="6" md="4">
-                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Mode</label>
-                  <VTextField
-                    model-value="ADD"
-                    readonly
-                    rounded="md"
-                    color="primary"
-                    density="compact"
-                    variant="outlined"
-                    class="mt-1"
-                  />
-                </VCol>
-
-                <VCol cols="12" sm="6" md="4">
+                <VCol cols="12" sm="6" md="3">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Date</label>
                   <VTextField
                     v-model="form.entryDate"
@@ -71,8 +57,19 @@
                     class="mt-1"
                   />
                 </VCol>
-
-                <VCol cols="12" sm="6" md="4">
+                <VCol cols="12" sm="6" md="3">
+                  <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Entry Mode</label>
+                  <VTextField
+                    model-value="ADD"
+                    readonly
+                    rounded="md"
+                    color="primary"
+                    density="compact"
+                    variant="outlined"
+                    class="mt-1"
+                  />
+                </VCol>
+                <VCol cols="12" sm="6" md="3">
                   <label class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Trace No</label>
                   <VTextField
                     v-model="newTraceNo"
@@ -91,7 +88,8 @@
             </VCardText>
           </VCard>
 
-          <VCard variant="outlined">
+          <!-- STEP 2: Packaging fields (after plant + date filled) -->
+          <VCard v-if="showStep2" variant="outlined">
             <VCardText>
               <VRow dense>
                 <VCol cols="12" md="6">
@@ -225,7 +223,7 @@
             </VCardText>
           </VCard>
 
-          <VCardActions class="pa-0">
+          <VCardActions v-if="showStep2" class="pa-0">
             <VSpacer />
             <VBtn variant="outlined" color="medium-emphasis" @click="close">Cancel</VBtn>
             <VBtn color="primary" :loading="submitting" prepend-icon="ri-save-line" type="submit">Save</VBtn>
@@ -263,6 +261,10 @@ const effectivePlantId = computed(() => {
     return plantSelectionStore.selectedPlantId
   }
   return selectedPlantForTransfer.value
+})
+
+const showStep2 = computed(() => {
+  return !!effectivePlantId.value && !!form.entryDate
 })
 
 const plantOptions = computed(() => {

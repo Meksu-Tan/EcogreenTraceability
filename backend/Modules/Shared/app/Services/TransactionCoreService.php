@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Shared\Traits\TransactionLoggerTrait;
 use Modules\Shared\Constants\TransactionResponseCode;
+use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class TransactionCoreService
 {
@@ -29,7 +31,7 @@ class TransactionCoreService
             );
 
             $this->logTransaction('T_MATERIAL_DOCUMENT', 'ADD',
-                'ID: ' . $id[0]->id_matdoc . ' | IDTRACEHEAD: ' . $idTraceHead . ' / DOC_NO: ' . $materialDoc,
+                'ID: '.$id[0]->id_matdoc.' | IDTRACEHEAD: '.$idTraceHead.' / DOC_NO: '.$materialDoc,
                 $user);
 
             return ['response' => TransactionResponseCode::SUCCESS];
@@ -53,7 +55,7 @@ class TransactionCoreService
         );
 
         $this->logTransaction('T_MATERIAL_DOCUMENT', 'UPDATE',
-            'ID: ' . $id_matdoc . ' | IDTRACEHEAD: ' . $idTraceHead . ' / DOC_NO: ' . $old_materialDoc . ' >>> ' . $materialDoc,
+            'ID: '.$id_matdoc.' | IDTRACEHEAD: '.$idTraceHead.' / DOC_NO: '.$old_materialDoc.' >>> '.$materialDoc,
             $user);
 
         return ['response' => TransactionResponseCode::SUCCESS];
@@ -75,7 +77,7 @@ class TransactionCoreService
             [$idHead]
         );
 
-        if (!$row) {
+        if (! $row) {
             return ['response' => TransactionResponseCode::GENERIC_FAILURE, 'message' => 'BALANCE HEAD NOT FOUND'];
         }
 
@@ -93,7 +95,7 @@ class TransactionCoreService
         );
 
         $this->logTransaction('T_BALANCE_HEAD', 'UPDATE_SUBTANK',
-            'IDHEAD: ' . $idHead . ' | TRACE: ' . $row->trace_no . ' | SUBTANKS: ' . implode(',', $tails),
+            'IDHEAD: '.$idHead.' | TRACE: '.$row->trace_no.' | SUBTANKS: '.implode(',', $tails),
             $user);
 
         return ['response' => TransactionResponseCode::SUCCESS];

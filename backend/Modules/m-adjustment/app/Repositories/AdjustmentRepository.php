@@ -1,20 +1,27 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Adjustment\Repositories;
 
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+use Modules\Adjustment\Imports\PeriodTailImport;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
 use Modules\Shared\Helpers\QuantityDistributionHelper;
+use Modules\Shared\Helpers\TraceHelper;
 use Modules\Shared\Repositories\Traits\PlantFilterTrait;
 use Modules\Shared\Services\Contracts\PlantContextServiceInterface;
+use Modules\Shared\Services\TraceNumberService;
+use Modules\Shared\Services\TransactionCoreService;
 use Modules\Shared\Traits\DbCompatTrait;
 use Modules\Shared\Traits\TransactionLoggerTrait;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class AdjustmentRepository implements AdjustmentRepositoryInterface
 {
-    use PlantFilterTrait;
     use DbCompatTrait;
+    use PlantFilterTrait;
     use TransactionLoggerTrait;
 
     protected string $connection = 'eudr_ts';
@@ -25,38 +32,41 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function getAdjustmentList(mixed $plantId, ?int $userId = null, string $adjType = 'wip', array $filters = []): array
     {
-        $isWh        = ($adjType === 'wh');
+        $isWh = ($adjType === 'wh');
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
         $substrFilter = $isWh ? '6' : '9';
+        $statusFilter = $filters['status'] ?? [1];
+        $statusFilter = is_array($statusFilter) ? $statusFilter : [$statusFilter];
+        $statusPlaceholders = implode(',', array_fill(0, count($statusFilter), '?'));
 
         $materialJoin = $isWh
-            ? "LEFT JOIN m_material_pck b ON a.id_material = b.id_materialpck"
-            : "LEFT JOIN m_material b ON a.id_material = b.id_material";
+            ? 'LEFT JOIN m_material_pck b ON a.id_material = b.id_materialpck'
+            : 'LEFT JOIN m_material b ON a.id_material = b.id_material';
 
         $balanceJoin = $isWh
-            ? "LEFT JOIN t_warehouse_header c ON a.id_balance_head = c.id_whx_head AND c.status = 1"
-            : "LEFT JOIN t_balance_header c ON a.id_balance_head = c.id_balance_head AND c.status = 1";
+            ? 'LEFT JOIN t_warehouse_header c ON a.id_balance_head = c.id_whx_head AND c.status = 1'
+            : 'LEFT JOIN t_balance_header c ON a.id_balance_head = c.id_balance_head AND c.status = 1';
 
         $slocJoinG = $isWh
-            ? "LEFT JOIN m_warehouse g ON g.id_warehouse = CAST(a.id_sloc AS bigint)"
-            : "LEFT JOIN m_sloc g ON ({$this->dbSlocColumnClause('a.id_sloc', 'g.id_sloc')}) AND g.status = 1";
+            ? 'LEFT JOIN m_warehouse g ON g.id_warehouse = CAST(a.id_sloc AS bigint)'
+            : 'LEFT JOIN m_sloc g ON a.id_sloc IS NOT NULL AND a.id_sloc::jsonb @> to_jsonb(g.id_sloc) AND g.status = 1';
 
         $slocJoinH = $isWh
-            ? ""
-            : "LEFT JOIN m_sloc h ON ({$this->dbSlocColumnClause('c.id_sloc', 'h.id_sloc')}) AND h.status = 1";
+            ? ''
+            : 'LEFT JOIN m_sloc h ON c.id_sloc = h.id_sloc AND h.status = 1';
 
         $slocColumn = $isWh
             ? "COALESCE(g.description, '') AS sloc"
             : "CONCAT(
                   COALESCE(MIN(g.description), ''),
-                  CASE WHEN {$this->dbGroupConcat('DISTINCT h.description', ', ', true, 'h.description ASC')} IS NULL
+                  CASE WHEN {$this->dbGroupConcat('DISTINCT h.tf_number', ', ', true, 'h.tf_number ASC')} IS NULL
                       THEN ''
-                      ELSE CONCAT(' | ', {$this->dbGroupConcat('DISTINCT h.description', ', ', true, 'h.description ASC')})
+                      ELSE CONCAT(' | ', {$this->dbGroupConcat('DISTINCT h.tf_number', ', ', true, 'h.tf_number ASC')})
                   END
                ) AS sloc";
 
-        $whxColumns  = $isWh ? ", c.batch_no, c.po_no" : ", NULL AS batch_no, NULL AS po_no";
-        $whxGroupBy  = $isWh ? ", c.batch_no, c.po_no, g.id_warehouse" : ", c.id_sloc, g.id_sloc";
+        $whxColumns = $isWh ? ', c.batch_no, c.po_no' : ', NULL AS batch_no, NULL AS po_no';
+        $whxGroupBy = $isWh ? ', c.batch_no, c.po_no, g.id_warehouse' : ', c.id_sloc, g.id_sloc';
 
         $sql = "
             SELECT a.entry_date, CAST(a.adjust_no AS TEXT) AS adjust_no,
@@ -65,7 +75,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                    CAST(c.trace_no AS TEXT) AS trace_no,
                    CONCAT('Qty: ', a.before_adjust, ' >>> ', a.after_adjust, ' MT') AS adjustment,
                    a.id_adjust_head,
-                   {$this->dbGroupConcat("DISTINCT CONCAT(e.description, ' / ', d.batch_sap, ' / Qty: ', " . $this->dbNumberFormat('d.before_adjust', 3) . ", ' >>> ', " . $this->dbNumberFormat('d.after_adjust', 3) . ", ' MT')", ' | ', true)} AS supplier,
+                   {$this->dbGroupConcat("DISTINCT CONCAT(e.description, ' / ', d.batch_sap, ' / Qty: ', ".$this->dbNumberFormat('d.before_adjust', 3).", ' >>> ', ".$this->dbNumberFormat('d.after_adjust', 3).", ' MT')", ' | ', true)} AS supplier,
                    a.created_by, a.created_at, a.status, a.after_adjust,
                    {$slocColumn},
                    CASE WHEN c.qty IS NOT NULL AND a.after_adjust <> c.qty THEN 0 ELSE 1 END AS adjust_flag,
@@ -91,7 +101,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
               ) f ON CAST(a.adjust_no AS TEXT) = CAST(f.to_trace_no AS TEXT)
               {$slocJoinG}
               {$slocJoinH}
-             WHERE a.status IN (1, 2, 3, 4)
+             WHERE a.status IN ({$statusPlaceholders})
                AND SUBSTRING(CAST(a.adjust_no AS TEXT), 1, 1) = '{$substrFilter}'
                AND ({$plantFilter['sql']})
             GROUP BY a.id_adjust_head, a.entry_date, a.adjust_no, a.id_material, a.id_sloc,
@@ -108,12 +118,12 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $offset = ($page - 1) * $perPage;
 
         $countSql = "SELECT COUNT(*) AS total FROM ({$sql}) AS count_query";
-        $paginatedSql = $sql . " LIMIT ? OFFSET ?";
+        $paginatedSql = $sql.' LIMIT ? OFFSET ?';
 
-        $bindings = array_merge($plantFilter['bindings'], [$perPage, $offset]);
+        $bindings = array_merge($statusFilter, $plantFilter['bindings'], [$perPage, $offset]);
 
         $results = DB::connection($this->connection)->select($paginatedSql, $bindings);
-        $countResult = DB::connection($this->connection)->select($countSql, $plantFilter['bindings']);
+        $countResult = DB::connection($this->connection)->select($countSql, array_merge($statusFilter, $plantFilter['bindings']));
         $total = (int) ($countResult[0]->total ?? 0);
 
         return [
@@ -193,9 +203,13 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function generateEntryNo(?string $entryDate, mixed $plantId): ?string
     {
-        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        // ponytail: RRR fixed at '000' — no materialId param at this call site
+        // (entry no previewed before material line items are selected).
+        // Upgrade: accept materialId and resolve real m_material.id_rundown per §4.9 if a per-material RRR is required upstream.
+        $svc = app(TraceNumberService::class);
         $date = $entryDate ? Carbon::parse($entryDate)->format('ymd') : date('ymd');
         $plantCode = $svc->resolvePlantCode((string) app(PlantContextServiceInterface::class)->resolvePlantId($plantId));
+
         return $svc->generate('9', $date, '000', $plantCode, 't_trace_header', 'to_trace_no');
     }
 
@@ -210,7 +224,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
     public function createAdjustmentHeader(string $user, array $data, mixed $plantId): array
     {
         $resolvedCode = app(PlantContextServiceInterface::class)->resolvePlantId($plantId);
-        $idSlocVal = !empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['tf_number'] ?? null];
+        $idSlocVal = ! empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['tf_number'] ?? null];
         $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
 
         $id = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
@@ -250,14 +264,19 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function approveAdjustment(int $headerId, int $status, string $user): array
     {
-        DB::connection($this->connection)->table('t_adjustment_header')
+        $affected = DB::connection($this->connection)->table('t_adjustment_header')
             ->where('id_adjust_head', $headerId)
+            ->where('status', 1)
             ->update([
                 'status' => $status,
                 'approved_by' => $user,
                 'approved_at' => now(),
                 'updated_by' => $user,
             ]);
+
+        if ($affected === 0) {
+            return ['response' => 2, 'message' => 'Adjustment already processed'];
+        }
 
         return ['response' => 1];
     }
@@ -268,7 +287,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT * FROM t_adjustment_header WHERE id_adjust_head = ? AND status IN (1, 2, 3, 4) FOR UPDATE',
             [$headerId]
         );
-        if (!$header) {
+        if (! $header) {
             return ['response' => 0, 'message' => 'Adjustment not found'];
         }
 
@@ -280,13 +299,21 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     'updated_by' => $header->approved_by ?? 'system',
                 ]);
 
-            DB::connection($this->connection)->table('t_balance_detail')
-                ->where('id_balance_head', $header->id_balance_head)
-                ->where('status', 1)
-                ->update([
-                    'qty' => DB::raw('after_adjust'),
-                    'updated_by' => $header->approved_by ?? 'system',
-                ]);
+            $details = DB::connection($this->connection)->select(
+                'SELECT id_balance_tail, after_adjust FROM t_adjustment_detail
+                  WHERE id_adjust_head = ? AND status = 1',
+                [$headerId]
+            );
+
+            foreach ($details as $d) {
+                DB::connection($this->connection)->table('t_balance_detail')
+                    ->where('id_balance_tail', $d->id_balance_tail)
+                    ->where('status', 1)
+                    ->update([
+                        'qty' => $d->after_adjust,
+                        'updated_by' => $header->approved_by ?? 'system',
+                    ]);
+            }
 
             DB::connection($this->connection)->table('t_adjustment_header')
                 ->where('id_adjust_head', $headerId)
@@ -298,13 +325,18 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function cancelAdjustment(int $headerId, string $reason, string $user): array
     {
-        DB::connection($this->connection)->table('t_adjustment_header')
+        $affected = DB::connection($this->connection)->table('t_adjustment_header')
             ->where('id_adjust_head', $headerId)
+            ->whereIn('status', [1, 2])
             ->update([
                 'status' => 5,
                 'reason' => $reason,
                 'updated_by' => $user,
             ]);
+
+        if ($affected === 0) {
+            return ['response' => 2, 'message' => 'Cannot cancel adjustment in current status'];
+        }
 
         return ['response' => 1];
     }
@@ -312,7 +344,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
     public function getAdjustmentDetail(int $headerId): ?array
     {
         $header = $this->getAdjustmentHeader($headerId);
-        if (!$header) {
+        if (! $header) {
             return null;
         }
 
@@ -388,11 +420,11 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             return [];
         }
 
-        $code3   = $tank[0]->code_3 ?? '';
+        $code3 = $tank[0]->code_3 ?? '';
         $plantId = $tank[0]->id_plant ?? '';
-        $desc    = $tank[0]->description ?? '';
+        $desc = $tank[0]->description ?? '';
 
-        if (!empty($code3)) {
+        if (! empty($code3)) {
             $rows = DB::connection($this->connection)->select(
                 'SELECT a.id_sloc AS id_sloc_tail, a.tf_number, a.description, a.code_3
                    FROM m_sloc a
@@ -417,8 +449,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         foreach ($rows as $item) {
             $tfNumber = $item->tf_number ?? '';
             $item->tankName = $tfNumber !== ''
-                ? ($item->description . ' (' . $tfNumber . ')')
-                : ($item->description . ' [' . $item->id_sloc_tail . ']');
+                ? ($item->description.' ('.$tfNumber.')')
+                : ($item->description.' ['.$item->id_sloc_tail.']');
         }
 
         return $rows;
@@ -457,6 +489,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         );
 
         $locked = ($result[0]->lock_status ?? '0') === '1';
+
         return ['response' => $locked ? 99 : 0];
     }
 
@@ -467,7 +500,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                FROM t_balance_detail b
                LEFT JOIN m_supplier a ON a.id_supplier = b.id_supplier
               WHERE b.id_material = ?
-                AND b.id_sloc = ?
+                AND b.id_sloc @> to_jsonb(?::int)
                 AND b.qty > 0
                 AND a.status = 1
               GROUP BY a.id_supplier, a.description, a.code
@@ -482,7 +515,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT b.batch_sap, SUM(b.qty) AS qty, MIN(b.created_at) AS first_created
                FROM t_balance_detail b
               WHERE b.id_material = ?
-                AND b.id_sloc = ?
+                AND b.id_sloc @> to_jsonb(?::int)
                 AND b.id_supplier = ?
                 AND b.qty > 0
                 AND b.status = 1
@@ -512,26 +545,29 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $matl = DB::connection($this->connection)->selectOne(
             'SELECT id_rundown FROM m_material WHERE id_material = ?', [$idMaterial]
         );
-        if (!$matl) return [['response' => 4]];
+        if (! $matl) {
+            return ['response' => 4];
+        }
         $batchId = $matl->id_rundown;
-        $batchMapping = $batchMoveType . $batchEntryDate . $batchId . $lastTwoDigitIdPlant;
+        $batchMapping = $batchMoveType.$batchEntryDate.$batchId.$lastTwoDigitIdPlant;
 
         $datBatch = DB::connection($this->connection)->select(
             'SELECT a.adjust_no, COUNT(a.adjust_no) AS flag
                FROM (SELECT a.adjust_no
                        FROM t_adjustment_header a
-                      WHERE ' . \Modules\Shared\Helpers\TraceHelper::only14Digit('a.adjust_no') . '
+                      WHERE '.TraceHelper::only14Digit('a.adjust_no').'
                         AND SUBSTRING(CAST(a.adjust_no AS TEXT),1,12) = ?
                       ORDER BY a.adjust_no DESC
-                      LIMIT 1) a',
+                      LIMIT 1
+                      FOR UPDATE) a',
             [$batchMapping]
         );
         if ($datBatch[0]->flag > 0) {
             $existingNo = (string) $datBatch[0]->adjust_no;
             $nextSeq = ((int) substr($existingNo, 12, 2)) + 1;
-            $batchNo = substr($existingNo, 0, 12) . str_pad((string) $nextSeq, 2, '0', STR_PAD_LEFT);
+            $batchNo = substr($existingNo, 0, 12).str_pad((string) $nextSeq, 2, '0', STR_PAD_LEFT);
         } else {
-            $batchNo = $batchMapping . '01';
+            $batchNo = $batchMapping.'01';
         }
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Get existing balance Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -554,7 +590,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             [$idSloc, $idMaterial]
         );
 
-        if (count($datBal) === 0) return [['response' => 4]];
+        if (count($datBal) === 0) {
+            return ['response' => 4];
+        }
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Get total balance Ã¢â€â‚¬Ã¢â€â‚¬ */
         $datTotalBal = DB::connection($this->connection)->select(
@@ -572,7 +610,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         );
 
         $totalBal = (float) ($datTotalBal[0]->total_qty ?? 0);
-        if ($totalBal == 0) return [['response' => 5]];
+        if ($totalBal == 0) {
+            return ['response' => 5];
+        }
 
         $traceNo = $datBal[0]->trace_no;
         $idHead = (int) $datBal[0]->id_balance_head;
@@ -585,7 +625,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
         if ($diffQty > 0) {
             $diffQtyLastTrans = $headBalQty - $diffQty;
-            if ($diffQtyLastTrans < 0) return [['response' => 9]];
+            if ($diffQtyLastTrans < 0) {
+                return ['response' => 9];
+            }
             $beforeAdjust = $headBalQty;
             $inQty = $inBalQty - $diffQty;
             $afterAdjust = $beforeAdjust - $diffQty;
@@ -596,7 +638,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             $afterAdjust = $beforeAdjust + (-1 * $diffQty);
             $adjustType = 'IN';
         } else {
-            return [['response' => 10]];
+            return ['response' => 10];
         }
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Check previous header transaction Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -609,12 +651,14 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                LEFT JOIN t_balance_header a ON a.id_balance_head = bb.id_balance_head AND b.status = 1
               WHERE b.to_trace_no = ?
                 AND a.status = 1
-                AND b.id_sloc = ?
+                AND CAST(? AS TEXT) = ANY(SELECT jsonb_array_elements_text(b.id_sloc::jsonb))
              FOR UPDATE',
             [$traceNo, $idSloc]
         );
 
-        if (empty($prevTraceBalance)) return [['response' => 11]];
+        if (empty($prevTraceBalance)) {
+            return ['response' => 11];
+        }
 
         $prevBalIdHead = (int) $prevTraceBalance[0]->id_balance_head;
         $prevBalQty = (float) ($prevTraceBalance[0]->qty ?? 0);
@@ -626,7 +670,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
         if ($adjustType === 'IN') {
             $diffPrevBalanceQty = $prevBalQty - $prevTraceOutQty + (-1 * $diffQty);
-            if ($diffPrevBalanceQty < 0) return [['response' => 9]];
+            if ($diffPrevBalanceQty < 0) {
+                return ['response' => 9];
+            }
             $newPrevTraceOutQty = $prevTraceOutQty + (-1 * $diffQty);
         } else {
             $newPrevTraceOutQty = $prevTraceOutQty - $diffQty;
@@ -634,9 +680,11 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
         $newPrevBalOutQty = $prevBalOutQty - $prevTraceOutQty + $newPrevTraceOutQty;
         $newPrevBalQty = $prevBalQty + $prevTraceOutQty - $newPrevTraceOutQty;
-        if ($newPrevBalQty < 0) return [['response' => 9]];
+        if ($newPrevBalQty < 0) {
+            return ['response' => 9];
+        }
 
-        $idSlocVal = !empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['tf_number'] ?? $idSloc];
+        $idSlocVal = ! empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['tf_number'] ?? $idSloc];
         $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Insert adjustment header Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -680,9 +728,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ HEADER LOGGING Ã¢â€â‚¬Ã¢â€â‚¬ */
         $this->logTransaction('T_BALANCE_HEAD', 'ADJUST BALANCE',
-            'IDHEAD: ' . $idHead . ' | DATE: ' . $entryDate .
-            ' / MATERIAL: ' . $idMaterial . ' / QTY: ' . $beforeAdjust . ' >>> ' . $afterAdjust .
-            ' / IN_QTY: ' . $inBalQty . ' >>> ' . $inQty . ' | Status: 1', $user);
+            'IDHEAD: '.$idHead.' | DATE: '.$entryDate.
+            ' / MATERIAL: '.$idMaterial.' / QTY: '.$beforeAdjust.' >>> '.$afterAdjust.
+            ' / IN_QTY: '.$inBalQty.' >>> '.$inQty.' | Status: 1', $user);
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Get supplier detail Ã¢â€â‚¬Ã¢â€â‚¬ */
         $datDet = DB::connection($this->connection)->select(
@@ -729,7 +777,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 $dataPerHead['det'][] = ['qty' => $bal];
             }
             $this->adjustAmtToTotal($dataPerHead, $diffQty);
-            $diffDetQty = array_map(fn($r) => $r['qty'], $dataPerHead['det']);
+            $diffDetQty = array_map(fn ($r) => $r['qty'], $dataPerHead['det']);
         } else {
             $diffDetQty = [];
         }
@@ -777,9 +825,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
             /* Detail logging */
             $this->logTransaction('T_BALANCE_TAIL', 'ADJUST BALANCE',
-                ' IDTAIL: ' . $idTail[$i] . ' / SUPPLIER: ' . $idSupplier[$i] .
-                ' / MATERIAL: ' . $idMaterial . ' / QTY: ' . $balQty[$i] . ' >>> ' . $afterAdjustDet .
-                ' / IN_QTY: ' . $balInQty[$i] . ' >>> ' . $inDetQty . ' | Status: 1', $user);
+                ' IDTAIL: '.$idTail[$i].' / SUPPLIER: '.$idSupplier[$i].
+                ' / MATERIAL: '.$idMaterial.' / QTY: '.$balQty[$i].' >>> '.$afterAdjustDet.
+                ' / IN_QTY: '.$balInQty[$i].' >>> '.$inDetQty.' | Status: 1', $user);
         }
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Get PREVIOUS supplier detail Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -822,7 +870,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 $dataPerHead2['det'][] = ['qty' => $bal];
             }
             $this->adjustAmtToTotal($dataPerHead2, $diffQty);
-            $diffDetQty2 = array_map(fn($r) => $r['qty'], $dataPerHead2['det']);
+            $diffDetQty2 = array_map(fn ($r) => $r['qty'], $dataPerHead2['det']);
         } else {
             $diffDetQty2 = [];
         }
@@ -851,7 +899,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             );
         }
 
-        return [['response' => 1]];
+        return ['response' => 1];
     }
 
     // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -865,10 +913,14 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT entry_date FROM t_adjustment_header WHERE id_adjust_head = ? AND status = 1',
             [$id]
         );
-        if (empty($entryDateResult)) return [['response' => 2]];
+        if (empty($entryDateResult)) {
+            return ['response' => 2];
+        }
         $currEntryDate = $entryDateResult[0]->entry_date;
         $lockStatus = $this->getLockStatus($currEntryDate);
-        if (($lockStatus['response'] ?? 0) === 99) return [['response' => 99]];
+        if (($lockStatus['response'] ?? 0) === 99) {
+            return ['response' => 99];
+        }
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Get header data Ã¢â€â‚¬Ã¢â€â‚¬ */
         $dat = DB::connection($this->connection)->select(
@@ -878,8 +930,12 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
               WHERE a.id_adjust_head = ? AND a.status = 1',
             [$id]
         );
-        if (empty($dat)) return [['response' => 2]];
-        if ($dat[0]->id_trace_head === null) return [['response' => 3]];
+        if (empty($dat)) {
+            return ['response' => 2];
+        }
+        if ($dat[0]->id_trace_head === null) {
+            return ['response' => 3];
+        }
 
         $idHead = (int) $dat[0]->id_balance_head;
         $beforeAdjust = (float) $dat[0]->before_adjust;
@@ -893,7 +949,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT qty, in_qty, out_qty FROM t_balance_header WHERE id_balance_head = ? AND status = 1',
             [$idHead]
         );
-        if (empty($datHead)) return [['response' => 2]];
+        if (empty($datHead)) {
+            return ['response' => 2];
+        }
 
         $newBalQty = $beforeAdjust;
         $newBalInQty = (float) $datHead[0]->in_qty - $adjustInQty;
@@ -956,7 +1014,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 [$idTail]
             );
 
-            if (!empty($datBalTail)) {
+            if (! empty($datBalTail)) {
                 $balInQty = (float) $datBalTail[0]->in_qty;
                 $balOutQty = (float) $datBalTail[0]->out_qty;
 
@@ -988,12 +1046,126 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             [$user, $idTraceHead]
         );
 
-        return [['response' => 1]];
+        return ['response' => 1];
     }
 
-    // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
+    // --- Destroy warehouse adjustment ---
+
+    public function destroyAdjustmentWhx(int $id, string $user): array
+    {
+        /* Get adjustment header data */
+        $dat = DB::connection($this->connection)->select(
+            'SELECT a.before_adjust, a.id_balance_head, a.in_qty, a.out_qty, a.adjust_no, b.id_trace_head
+               FROM t_adjustment_header a
+               LEFT JOIN t_trace_header b ON b.to_trace_no = a.adjust_no AND b.status = 1
+              WHERE a.id_adjust_head = ?
+                AND a.status = 1',
+            [$id]
+        );
+        if (empty($dat)) {
+            return ['response' => 2];
+        }
+        $idHead = (int) $dat[0]->id_balance_head;
+        $beforeAdjust = (float) $dat[0]->before_adjust;
+        $adjustInQty = (float) ($dat[0]->in_qty ?? 0);
+        $adjustOutQty = (float) ($dat[0]->out_qty ?? 0);
+        $traceNo = $dat[0]->adjust_no;
+        $idTraceHead = (int) $dat[0]->id_trace_head;
+
+        /* Get warehouse header data */
+        $datHead = DB::connection($this->connection)->select(
+            'SELECT qty, in_qty, out_qty FROM t_warehouse_header WHERE id_whx_head = ? AND status = 1',
+            [$idHead]
+        );
+        if (empty($datHead)) {
+            return ['response' => 2];
+        }
+
+        $newBalQty = $beforeAdjust;
+        $newBalInQty = (float) $datHead[0]->in_qty - $adjustInQty;
+        $newBalOutQty = (float) $datHead[0]->out_qty - $adjustOutQty;
+
+        /* Storage init check */
+        $flagStoreInitDat = DB::connection($this->connection)->select(
+            'SELECT COALESCE(a.from_trace_no, 1) AS init FROM t_trace_header a WHERE a.id_trace_head = ? AND a.status = 1',
+            [$idTraceHead]
+        );
+        $flagStoreInit = $flagStoreInitDat[0]->init ?? 1;
+
+        if ($flagStoreInit == 1) {
+            DB::connection($this->connection)->update(
+                'UPDATE t_warehouse_header SET qty = ?, in_qty = ?, out_qty = ?, status = 0 WHERE id_whx_head = ? AND status = 1',
+                [$newBalQty, $newBalInQty, $newBalOutQty, $idHead]
+            );
+        } else {
+            DB::connection($this->connection)->update(
+                'UPDATE t_warehouse_header SET qty = ?, in_qty = ?, out_qty = ? WHERE id_whx_head = ? AND status = 1',
+                [$newBalQty, $newBalInQty, $newBalOutQty, $idHead]
+            );
+        }
+
+        /* Deactivate trace header */
+        DB::connection($this->connection)->update(
+            'UPDATE t_trace_header SET status = 0, updated_by = ? WHERE to_trace_no = ? AND status = 1',
+            [$user, $traceNo]
+        );
+
+        /* Deactivate adjustment header */
+        DB::connection($this->connection)->update(
+            'UPDATE t_adjustment_header SET status = 0, updated_by = ? WHERE id_adjust_head = ? AND status = 1',
+            [$user, $id]
+        );
+
+        /* Get adjustment detail data */
+        $datAdjustTail = DB::connection($this->connection)->select(
+            'SELECT before_adjust, id_balance_tail, in_qty, out_qty, id_adjust_tail FROM t_adjustment_detail WHERE id_adjust_head = ? AND status = 1',
+            [$id]
+        );
+
+        foreach ($datAdjustTail as $d) {
+            $idTail = (int) $d->id_balance_tail;
+            $idAdjustTail = (int) $d->id_adjust_tail;
+            $beforeAdjustTail = (float) $d->before_adjust;
+            $adjustInQtyTail = (float) ($d->in_qty ?? 0);
+            $adjustOutQtyTail = (float) ($d->out_qty ?? 0);
+
+            $datBalTail = DB::connection($this->connection)->select(
+                'SELECT in_qty, out_qty FROM t_warehouse_detail WHERE id_whx_tail = ? AND status = 1',
+                [$idTail]
+            );
+
+            if (! empty($datBalTail)) {
+                $balInQty = (float) $datBalTail[0]->in_qty;
+                $balOutQty = (float) $datBalTail[0]->out_qty;
+
+                DB::connection($this->connection)->update(
+                    'UPDATE t_adjustment_detail SET status = 0, updated_by = ? WHERE id_adjust_tail = ? AND status = 1',
+                    [$user, $idAdjustTail]
+                );
+
+                if ($flagStoreInit == 1) {
+                    DB::connection($this->connection)->update(
+                        'UPDATE t_warehouse_detail SET qty = ?, in_qty = ?, out_qty = ?, status = 0 WHERE id_whx_tail = ?',
+                        [$beforeAdjustTail, $balInQty - $adjustInQtyTail, $balOutQty - $adjustOutQtyTail, $idTail]
+                    );
+                } else {
+                    DB::connection($this->connection)->update(
+                        'UPDATE t_warehouse_detail SET qty = ?, in_qty = ?, out_qty = ? WHERE id_whx_tail = ?',
+                        [$beforeAdjustTail, $balInQty - $adjustInQtyTail, $balOutQty - $adjustOutQtyTail, $idTail]
+                    );
+                }
+            }
+        }
+
+        DB::connection($this->connection)->update(
+            'UPDATE t_trace_detail SET status = 0, updated_by = ? WHERE id_trace_head = ? AND status = 1',
+            [$user, $idTraceHead]
+        );
+
+        return ['response' => 1];
+    }
+
     //  Add / edit entry supplier
-    // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
 
     public function addEntrySupplier(string $user, array $data, mixed $plantId): array
     {
@@ -1013,7 +1185,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                  VALUES (?, ?, ?, ?, ?, ?, ?)',
                 [$adjNumber, $idSupplier, $idMaterial, $qty, $batchSap, $idPlant, $user]
             );
-            return [['response' => $ok ? 1 : 0]];
+
+            return ['response' => $ok ? 1 : 0];
         }
 
         /* UPDATE mode */
@@ -1033,9 +1206,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             $idMaterialOld = $dat[0]->id_material;
 
             $this->logTransaction('T_BALANCE_TAIL', 'UPDATE',
-                'IDHEAD: ' . $idHead . ' IDTAIL: ' . $idTail .
-                ' | ID_SUPPLIER: ' . $idSupplierOld . ' >>> ' . $idSupplier .
-                ' / QTY: ' . $qtyOld . ' >>> ' . $qty . ' ' . $idMaterialOld . ' >>> ' . $idMaterial .
+                'IDHEAD: '.$idHead.' IDTAIL: '.$idTail.
+                ' | ID_SUPPLIER: '.$idSupplierOld.' >>> '.$idSupplier.
+                ' / QTY: '.$qtyOld.' >>> '.$qty.' '.$idMaterialOld.' >>> '.$idMaterial.
                 ' | Status: 1', $user);
 
             DB::connection($this->connection)->update(
@@ -1050,7 +1223,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             );
 
             $this->syncBalanceHeaderFromDetails($idHead, $user);
-            return [['response' => $ok ? 1 : 0]];
+
+            return ['response' => $ok ? 1 : 0];
         }
 
         /* Supplier not in detail yet Ã¢â‚¬â€ check if exists by id_supplier */
@@ -1070,9 +1244,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             $idTail = (int) ($dat2[0]->id_balance_tail ?? 0);
 
             $this->logTransaction('T_BALANCE_TAIL', 'UPDATE',
-                'IDHEAD: ' . $idHead . ' IDTAIL: ' . $idTail .
-                ' | ID_SUPPLIER: ' . $idSupplier . ' / QTY: ' . $qty .
-                ' / BATCH_SAP: ' . $batchSap . ' / ID_MATERIAL: ' . $idMaterial . ' | Status: 1', $user);
+                'IDHEAD: '.$idHead.' IDTAIL: '.$idTail.
+                ' | ID_SUPPLIER: '.$idSupplier.' / QTY: '.$qty.
+                ' / BATCH_SAP: '.$batchSap.' / ID_MATERIAL: '.$idMaterial.' | Status: 1', $user);
 
             DB::connection($this->connection)->update(
                 'UPDATE t_trace_detail SET id_material = ?, in_qty = ?, batch_sap = ?, updated_by = ?
@@ -1086,7 +1260,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             );
 
             $this->syncBalanceHeaderFromDetails($idHead, $user);
-            return [['response' => $ok ? 1 : 0]];
+
+            return ['response' => $ok ? 1 : 0];
         }
 
         /* New supplier entry Ã¢â‚¬â€ INSERT */
@@ -1118,12 +1293,13 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         }
 
         $this->logTransaction('T_BALANCE_TAIL', 'UPDATE',
-            'IDHEAD: ' . $idHead . ' IDTAIL: ' . $idTailNew .
-            ' | ID_SUPPLIER: ' . $idSupplier . ' / QTY: ' . $qty . ' / BATCH_SAP: ' . $batchSap .
+            'IDHEAD: '.$idHead.' IDTAIL: '.$idTailNew.
+            ' | ID_SUPPLIER: '.$idSupplier.' / QTY: '.$qty.' / BATCH_SAP: '.$batchSap.
              ' | Status: 1', $user);
 
         $this->syncBalanceHeaderFromDetails($idHead, $user);
-        return [['response' => 1]];
+
+        return ['response' => 1];
     }
 
     /**
@@ -1158,7 +1334,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         DB::connection($this->connection)->delete(
             'DELETE FROM t_balance_temporary WHERE id_balance_temp = ?', [$id]
         );
-        return [['response' => 1]];
+
+        return ['response' => 1];
     }
 
     // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -1178,15 +1355,17 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $mode = $data['mode'] ?? 'ADD';
         $idSlocTail = $data['tankNo'] ?? [];
         $idSlocTailJson = is_array($idSlocTail) ? json_encode($idSlocTail) : (string) $idSlocTail;
-        $idSlocVal = !empty($data['tankNo']) ? (is_array($data['tankNo']) ? $data['tankNo'] : [$data['tankNo']]) : [$data['tank'] ?? $idSloc];
+        $idSlocVal = ! empty($data['tankNo']) ? (is_array($data['tankNo']) ? $data['tankNo'] : [$data['tankNo']]) : [$data['tank'] ?? $idSloc];
         $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
-        $idSlocInt  = (int) ($idSlocVal[0] ?? $idSloc); // ponytail: t_balance_header.id_sloc is integer; use first element
+        $idSlocInt = (int) ($idSlocVal[0] ?? $idSloc); // ponytail: t_balance_header.id_sloc is integer; use first element
 
         $suppliers = DB::connection($this->connection)->select(
             'SELECT id_supplier, qty AS qty_tail, batch_sap FROM t_balance_temporary WHERE entry_no = ?',
             [$entryNo]
         );
-        if (count($suppliers) === 0) return [['response' => 6]];
+        if (count($suppliers) === 0) {
+            return ['response' => 6];
+        }
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Generate new entry number Ã¢â€â‚¬Ã¢â€â‚¬ */
         $batchMoveType = substr($entryNo, 0, 1);
@@ -1197,7 +1376,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT id_rundown, type FROM m_material WHERE id_material = ?', [$idMaterial]
         );
         $batchId = $matl->id_rundown ?? '00';
-        $newEntryNo = $batchMoveType . $batchEntryDate . $batchId . $lastTwoDigitIdPlant . $batchSequence;
+        $newEntryNo = $batchMoveType.$batchEntryDate.$batchId.$lastTwoDigitIdPlant.$batchSequence;
 
         if ($mode === 'ADD') {
             /* Ã¢â€â‚¬Ã¢â€â‚¬ Insert balance header Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1228,7 +1407,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             ], 'id_trace_head');
 
             /* Ã¢â€â‚¬Ã¢â€â‚¬ Insert adjustment header Ã¢â€â‚¬Ã¢â€â‚¬ */
-            DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
+            $idAdjustHead = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
                 'entry_date' => $entryDate,
                 'adjust_no' => $newEntryNo,
                 'id_balance_head' => $idHead,
@@ -1243,10 +1422,10 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
             /* Ã¢â€â‚¬Ã¢â€â‚¬ Logging Ã¢â€â‚¬Ã¢â€â‚¬ */
             $this->logTransaction('T_ADJUST_HEAD', 'ADD ADJUST',
-                'IDADJUSTHEAD: ' . $idHead . ' | IDHEAD: ' . $idHead .
-                ' | DATE: ' . $entryDate . ' / MATERIAL: ' . $idMaterial .
-                ' / IN_QTY: ' . $qty . ' / OUT_QTY: 0' .
-                ' / BEFORE_ADJUST: 0 / AFTER_ADJUST: ' . $qty . ' | Status: 1', $user);
+                'IDADJUSTHEAD: '.$idAdjustHead.' | IDHEAD: '.$idHead.
+                ' | DATE: '.$entryDate.' / MATERIAL: '.$idMaterial.
+                ' / IN_QTY: '.$qty.' / OUT_QTY: 0'.
+                ' / BEFORE_ADJUST: 0 / AFTER_ADJUST: '.$qty.' | Status: 1', $user);
 
             /* Ã¢â€â‚¬Ã¢â€â‚¬ Process suppliers Ã¢â€â‚¬Ã¢â€â‚¬ */
             foreach ($suppliers as $s) {
@@ -1275,10 +1454,10 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     'id_sloc_tail' => $idSlocTailJson,
                     'id_plant' => $idPlant,
                     'created_by' => $user,
-                ], 'id_trace_head');
+                ], 'id_trace_tail');
 
                 DB::connection($this->connection)->table('t_adjustment_detail')->insertGetId([
-                    'id_adjust_head' => $idHead,
+                    'id_adjust_head' => $idAdjustHead,
                     'id_balance_tail' => $idTail,
                     'id_supplier' => $s->id_supplier,
                     'id_material' => $idMaterial,
@@ -1294,10 +1473,10 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 ], 'id_adjust_tail');
 
                 $this->logTransaction('T_BALANCE_TAIL', 'ADD',
-                    'IDHEAD: ' . $idHead . ' IDTAIL: ' . $idTail .
-                    ' | DATE: ' . $entryDate . ' / BATCH: ' . $entryNo . ' >>> ' . $newEntryNo .
-                    ' / TANK: ' . $idSloc . ' / SUPPLIER: ' . $s->id_supplier .
-                    ' / QTY_TAIL: ' . $s->qty_tail . ' / BATCH_SAP: ' . $s->batch_sap . ' | Status: 1', $user);
+                    'IDHEAD: '.$idHead.' IDTAIL: '.$idTail.
+                    ' | DATE: '.$entryDate.' / BATCH: '.$entryNo.' >>> '.$newEntryNo.
+                    ' / TANK: '.$idSloc.' / SUPPLIER: '.$s->id_supplier.
+                    ' / QTY_TAIL: '.$s->qty_tail.' / BATCH_SAP: '.$s->batch_sap.' | Status: 1', $user);
             }
 
             /* Ã¢â€â‚¬Ã¢â€â‚¬ Cleanup temp & create material doc Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1306,12 +1485,12 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             );
 
             if ($materialDoc) {
-                app(\Modules\Shared\Services\TransactionCoreService::class)
+                app(TransactionCoreService::class)
                     ->createMaterialDocument($user, $idTraceHead, $materialDoc, 'ADD');
             }
         }
 
-        return [['response' => 1]];
+        return ['response' => 1];
     }
 
     // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -1331,12 +1510,12 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $batchSap = $data['batch_sap'] ?? '';
         $adjustType = $data['adjust_type'] ?? '';
 
-        if (!$idMaterial || !$idSloc || !$idSupplier || $adjustQty <= 0) {
-            return [['response' => 14]];
+        if (! $idMaterial || ! $idSloc || ! $idSupplier || $adjustQty <= 0) {
+            return ['response' => 14];
         }
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Resolve idHead if not provided Ã¢â€â‚¬Ã¢â€â‚¬ */
-        if (!$idHead && $batchSap) {
+        if (! $idHead && $batchSap) {
             $dat = DB::connection($this->connection)->select(
                 'SELECT DISTINCT id_balance_head
                    FROM t_balance_detail
@@ -1355,7 +1534,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                       LIMIT 1',
                     [$idMaterial, $idSloc]
                 );
-                if (count($dat2) === 0) return [['response' => 12]];
+                if (count($dat2) === 0) {
+                    return ['response' => 12];
+                }
                 $idHead = (int) $dat2[0]->id_balance_head;
             }
         }
@@ -1366,7 +1547,9 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
               ORDER BY id_trace_head DESC LIMIT 1',
             [$idHead]
         );
-        if (count($trace) === 0) return [['response' => 13]];
+        if (count($trace) === 0) {
+            return ['response' => 13];
+        }
         $idTraceHead = (int) $trace[0]->id_trace_head;
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Check available qty (OUT) Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1378,10 +1561,12 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 [$idHead, $idMaterial, $idSloc, $idSupplier]
             );
             $available = (float) ($dat3[0]->total_qty ?? 0);
-            if ($available < $adjustQty) return [['response' => 15]];
+            if ($available < $adjustQty) {
+                return ['response' => 15];
+            }
         }
 
-        $idSlocVal = !empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['tf_number'] ?? $idSloc];
+        $idSlocVal = ! empty($data['id_sloc']) ? (is_array($data['id_sloc']) ? $data['id_sloc'] : [$data['id_sloc']]) : [$data['tf_number'] ?? $idSloc];
         $idSlocJson = json_encode(array_values(array_filter($idSlocVal)));
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Insert adjustment header Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1410,8 +1595,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ LOGGING Ã¢â€â‚¬Ã¢â€â‚¬ */
         $this->logTransaction('T_ADJUST_HEAD', 'ADD SUPPLIER ADJUST',
-            'IDADJUSTHEAD: ' . $idAdjustHead . ' | IDHEAD: ' . $idHead .
-            ' | SUPPLIER: ' . $idSupplier . ' | TYPE: ' . $adjustType . ' | QTY: ' . $adjustQty, $user);
+            'IDADJUSTHEAD: '.$idAdjustHead.' | IDHEAD: '.$idHead.
+            ' | SUPPLIER: '.$idSupplier.' | TYPE: '.$adjustType.' | QTY: '.$adjustQty, $user);
 
         /* Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â ADJUST OUT (FIFO) Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â */
         if ($adjustType === 'out') {
@@ -1427,13 +1612,15 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             );
 
             foreach ($rows as $row) {
-                if ($qtyToDeduct <= 0) break;
+                if ($qtyToDeduct <= 0) {
+                    break;
+                }
 
                 $takeQty = min((float) $row->qty, $qtyToDeduct);
                 $afterQty = (float) $row->qty - $takeQty;
 
                 DB::connection($this->connection)->update(
-                    'UPDATE t_balance_detail SET qty = ?, out_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
+                    'UPDATE t_balance_detail SET qty = ?, out_qty = COALESCE(out_qty, 0) + ?, updated_by = ? WHERE id_balance_tail = ?',
                     [$afterQty, $takeQty, $user, $row->id_balance_tail]
                 );
 
@@ -1449,7 +1636,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     'tf_number' => $idSloc,
                     'id_plant' => $idPlant,
                     'created_by' => $user,
-                ], 'id_trace_tail');
+                ], 'id_adjust_tail');
 
                 DB::connection($this->connection)->table('t_trace_detail')->insert([
                     'id_trace_head' => $idTraceHead,
@@ -1467,7 +1654,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             }
 
             DB::connection($this->connection)->update(
-                'UPDATE t_trace_header SET out_qty = ?, updated_by = ? WHERE id_trace_head = ?',
+                'UPDATE t_trace_header SET out_qty = COALESCE(out_qty, 0) + ?, updated_by = ? WHERE id_trace_head = ?',
                 [$adjustQty, $user, $idTraceHead]
             );
         }
@@ -1488,7 +1675,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 $afterQty = $beforeQty + $adjustQty;
 
                 DB::connection($this->connection)->update(
-                    'UPDATE t_balance_detail SET qty = ?, in_qty = ?, updated_by = ? WHERE id_balance_tail = ?',
+                    'UPDATE t_balance_detail SET qty = ?, in_qty = COALESCE(in_qty, 0) + ?, updated_by = ? WHERE id_balance_tail = ?',
                     [$afterQty, $adjustQty, $user, $idTail]
                 );
             } else {
@@ -1535,7 +1722,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             ]);
 
             DB::connection($this->connection)->update(
-                'UPDATE t_trace_header SET in_qty = ?, updated_by = ? WHERE id_trace_head = ?',
+                'UPDATE t_trace_header SET in_qty = COALESCE(in_qty, 0) + ?, updated_by = ? WHERE id_trace_head = ?',
                 [$adjustQty, $user, $idTraceHead]
             );
         }
@@ -1549,12 +1736,12 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $totalQty = (float) ($sum[0]->total_qty ?? 0);
 
         DB::connection($this->connection)->update(
-            'UPDATE t_balance_header SET qty = ?, in_qty = ?, out_qty = ?, updated_by = ?
+            'UPDATE t_balance_header SET qty = ?, in_qty = in_qty + ?, out_qty = out_qty + ?, updated_by = ?
               WHERE id_balance_head = ?',
             [$totalQty,
-             $adjustType === 'in' ? $adjustQty : 0,
-             $adjustType === 'out' ? $adjustQty : 0,
-             $user, $idHead]
+                $adjustType === 'in' ? $adjustQty : 0,
+                $adjustType === 'out' ? $adjustQty : 0,
+                $user, $idHead]
         );
 
         $afterSupplierQty = $adjustType === 'in'
@@ -1566,7 +1753,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             [$beforeSupplierQty, $afterSupplierQty, $idAdjustHead]
         );
 
-        return [['response' => 1]];
+        return ['response' => 1];
     }
 
     // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -1583,17 +1770,19 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
               WHERE a.id_adjust_head = ?',
             [$idAdjustHead]
         );
-        if (!$header || !$header->id_trace_head) return [['response' => 0]];
+        if (! $header || ! $header->id_trace_head) {
+            return ['response' => 0];
+        }
 
         $existing = DB::connection($this->connection)->selectOne(
             'SELECT id_matdoc FROM t_material_document WHERE id_trace_head = ? AND status = 1',
             [$header->id_trace_head]
         );
 
-        app(\Modules\Shared\Services\TransactionCoreService::class)
+        app(TransactionCoreService::class)
             ->createMaterialDocument($user, $header->id_trace_head, $materialDoc, $existing ? 'UPDATE' : 'ADD');
 
-        return [['response' => 1]];
+        return ['response' => 1];
     }
 
     // Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
@@ -1637,7 +1826,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
               ORDER BY a.period DESC";
 
         $countSql = "SELECT COUNT(*) AS total FROM ({$sql}) AS count_query";
-        $paginatedSql = $sql . " LIMIT ? OFFSET ?";
+        $paginatedSql = $sql.' LIMIT ? OFFSET ?';
 
         $results = DB::connection($this->connection)->select($paginatedSql, [$perPage, $offset]);
         $countResult = DB::connection($this->connection)->select($countSql);
@@ -1673,7 +1862,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             $period = $data['period'] ?? '';
             $batch = $data['batch'] ?? '';
 
-            if (!$period) {
+            if (! $period) {
                 return ['response' => 0, 'message' => 'Period is required'];
             }
 
@@ -1698,14 +1887,14 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             return [
                 'response' => 1,
                 'message' => 'Period created successfully',
-                'id_head' => $idHead
+                'id_head' => $idHead,
             ];
 
         } elseif ($mode === 'UPDATE') {
             $idHead = $data['id_head'] ?? null;
             $batch = $data['batch'] ?? '';
 
-            if (!$idHead) {
+            if (! $idHead) {
                 return ['response' => 0, 'message' => 'ID Head is required for update'];
             }
 
@@ -1719,19 +1908,20 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
             return [
                 'response' => 1,
-                'message' => 'Period updated successfully'
+                'message' => 'Period updated successfully',
             ];
 
         } elseif ($mode === 'UPLOAD') {
             $idHead = $data['id_head'] ?? null;
-            if (!$idHead || !$file) {
+            if (! $idHead || ! $file) {
                 return ['response' => 0, 'message' => 'ID Head and file are required for upload'];
             }
 
             // Parse Excel file
-            $rows = \Maatwebsite\Excel\Facades\Excel::toArray(new \Modules\Adjustment\Imports\PeriodTailImport, $file);
+            $rows = Excel::toArray(new PeriodTailImport, $file);
 
             $importedCount = 0;
+            $errors = [];
             // Clear existing details
             DB::connection($this->connection)->table('t_report_pspa_detail')
                 ->where('id_pspa_head', $idHead)
@@ -1739,22 +1929,51 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
             foreach ($rows as $sheet) {
                 foreach ($sheet as $index => $row) {
-                    if ($index === 0) continue; // Skip header row
-                    if (empty($row)) continue;
+                    if ($index === 0) {
+                        continue;
+                    } // Skip header row
+                    if (empty($row)) {
+                        continue;
+                    }
 
-                    // Map columns based on Excel structure
-                    $idSloc = (int) ($row[0] ?? 0);
+                    $tfNumber = $row[0] ?? '';
                     $idMaterial = (int) ($row[1] ?? 0);
                     $physicalStock = (float) ($row[2] ?? 0);
                     $bookStock = (float) ($row[3] ?? 0);
-                    $tfNumber = $row[4] ?? '';
 
-                    if ($idSloc && $idMaterial) {
+                    // Integrity check: tf_number exists in m_sloc
+                    $sloc = null;
+                    if ($tfNumber) {
+                        $sloc = DB::connection($this->connection)->selectOne(
+                            'SELECT id_sloc FROM m_sloc WHERE tf_number = ? AND status = 1 LIMIT 1',
+                            [$tfNumber]
+                        );
+                        if (! $sloc) {
+                            $errors[] = 'Row '.($index + 1).": tf_number '{$tfNumber}' not found in m_sloc";
+
+                            continue;
+                        }
+                    }
+
+                    // Integrity check: id_material exists in m_material
+                    if ($idMaterial) {
+                        $matl = DB::connection($this->connection)->selectOne(
+                            'SELECT id_material FROM m_material WHERE id_material = ? AND status = 1 LIMIT 1',
+                            [$idMaterial]
+                        );
+                        if (! $matl) {
+                            $errors[] = 'Row '.($index + 1).": material id {$idMaterial} not found in m_material";
+
+                            continue;
+                        }
+                    }
+
+                    if ($sloc && $idMaterial) {
                         DB::connection($this->connection)->table('t_report_pspa_detail')->insert([
                             'id_pspa_head' => $idHead,
                             'tf_number' => $tfNumber,
                             'id_material' => $idMaterial,
-                            'id_sloc' => $idSloc, // wait, $idSloc maps to tf_number or id_sloc? Wait, the old code had an issue here! Let's check the old code.
+                            'id_sloc' => $sloc->id_sloc,
                             'physical_stock' => $physicalStock,
                             'book_stock' => $bookStock,
                             'status' => 1,
@@ -1763,6 +1982,15 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                         $importedCount++;
                     }
                 }
+            }
+
+            if (count($errors) > 0) {
+                return [
+                    'response' => 0,
+                    'message' => 'Validation errors',
+                    'errors' => $errors,
+                    'imported_count' => $importedCount,
+                ];
             }
 
             // Mark header as uploaded
@@ -1778,7 +2006,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'response' => 1,
                 'id_head' => $idHead,
                 'imported_count' => $importedCount,
-                'message' => "Successfully imported {$importedCount} rows"
+                'message' => "Successfully imported {$importedCount} rows",
             ];
         }
 
@@ -1787,23 +2015,21 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function periodViewOnHand(string $user, int $idHead): array
     {
-        // Get period header info
         $header = DB::connection($this->connection)->selectOne(
             'SELECT *, id_report_head AS id_pspa_head FROM t_report_pspa_head WHERE id_report_head = ?',
             [$idHead]
         );
 
-        if (!$header) {
+        if (! $header) {
             return ['response' => 0, 'message' => 'Period header not found'];
         }
 
-        // Get details and calculate on-hand from t_balance
-        return DB::connection($this->connection)->select(
+        $rows = DB::connection($this->connection)->select(
             'SELECT a.id_pspa_detail, a.id_sloc, a.id_material,
                     b.description AS tank_name, c.description AS material_name,
                     a.physical_stock, a.book_stock,
-                    COALESCE(d.on_hand, 0) AS system_on_hand,
-                    (COALESCE(d.on_hand, 0) - a.physical_stock) AS variance
+                    a.adj_type, a.on_hand_qty,
+                    COALESCE(d.on_hand, 0) AS system_on_hand
                FROM t_report_pspa_detail a
                LEFT JOIN m_sloc b ON a.id_sloc = b.id_sloc
                LEFT JOIN m_material c ON a.id_material = c.id_material
@@ -1818,14 +2044,305 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
               ORDER BY b.description, c.description',
             [$idHead]
         );
+
+        $results = [];
+        foreach ($rows as $row) {
+            $systemOnHand = (float) ($row->system_on_hand ?? 0);
+            $physicalStock = (float) ($row->physical_stock ?? 0);
+            $variance = $systemOnHand - $physicalStock;
+
+            $adjType = '-';
+            if ($variance > 0) {
+                $adjType = 'IN';
+            } elseif ($variance < 0) {
+                $adjType = 'OUT';
+                $variance = abs($variance);
+            }
+
+            // Update record only if adj_type changed
+            if (($row->adj_type ?? null) !== $adjType || (float) ($row->on_hand_qty ?? 0) !== $systemOnHand) {
+                DB::connection($this->connection)->table('t_report_pspa_detail')
+                    ->where('id_pspa_detail', $row->id_pspa_detail)
+                    ->update([
+                        'on_hand_qty' => $systemOnHand,
+                        'adj_type' => $adjType,
+                        'populated_at' => now(),
+                    ]);
+            }
+
+            $results[] = (object) [
+                'id_pspa_detail' => $row->id_pspa_detail,
+                'id_sloc' => $row->id_sloc,
+                'id_material' => $row->id_material,
+                'tank_name' => $row->tank_name ?? '',
+                'material_name' => $row->material_name ?? '',
+                'physical_stock' => $physicalStock,
+                'book_stock' => $row->book_stock ?? 0,
+                'system_on_hand' => $systemOnHand,
+                'variance' => $variance,
+                'adj_type' => $adjType,
+            ];
+        }
+
+        return ['response' => 1, 'data' => $results];
     }
 
     public function periodViewAdjustment(string $user, int $idHead): array
     {
-        // Update status to CALCULATED
+        $header = DB::connection($this->connection)->selectOne(
+            'SELECT * FROM t_report_pspa_head WHERE id_report_head = ?', [$idHead]
+        );
+        if (! $header) {
+            return ['response' => 0, 'message' => 'Period header not found'];
+        }
+
+        $unpopulated = DB::connection($this->connection)->select(
+            'SELECT COUNT(*) AS cnt FROM t_report_pspa_detail
+              WHERE id_pspa_head = ? AND on_hand_qty IS NULL AND status = 1',
+            [$idHead]
+        );
+        if (($unpopulated[0]->cnt ?? 0) > 0) {
+            return ['response' => 8, 'message' => 'On-hand data not fully populated. Run Calc Qty (On-Hand) first.'];
+        }
+
+        $rows = DB::connection($this->connection)->select(
+            'SELECT a.*, b.code AS material_code, b.description AS material_desc, b.type AS material_type
+               FROM t_report_pspa_detail a
+               LEFT JOIN m_material b ON a.id_material = b.id_material
+              WHERE a.id_pspa_head = ? AND a.status = 1',
+            [$idHead]
+        );
+
+        $idPlant = $header->id_plant ?? '1002';
+        $period = $header->period ?? date('Y-m');
+        $entryDate = date('Y-m-d', strtotime($period.'-01'));
+        $lastTwoDigitPlant = substr((string) $idPlant, 2, 2);
+        $pendingCount = 0;
+
+        foreach ($rows as $row) {
+            $idSloc = (int) ($row->id_sloc ?? 0);
+            $idMaterial = (int) ($row->id_material ?? 0);
+            $physicalStock = (float) ($row->physical_stock ?? 0);
+            $systemOnHand = (float) ($row->on_hand_qty ?? 0);
+            $adjType = $row->adj_type ?? '-';
+
+            if ($adjType === '-' || $physicalStock == $systemOnHand) {
+                DB::connection($this->connection)->table('t_report_pspa_detail')
+                    ->where('id_pspa_detail', $row->id_pspa_detail)
+                    ->update(['adjust_status' => 1, 'updated_by' => $user]);
+
+                continue;
+            }
+
+            if (($row->adjust_status ?? 0) == 1) {
+                continue;
+            }
+
+            $diffQty = abs($systemOnHand - $physicalStock);
+            if ($diffQty < 0.001) {
+                continue;
+            }
+
+            $rundown = DB::connection($this->connection)->selectOne(
+                'SELECT id_rundown FROM m_material WHERE id_material = ?', [$idMaterial]
+            );
+            $batchId = $rundown->id_rundown ?? '00';
+            $datePrefix = substr(str_replace('-', '', $entryDate), 2);
+            $batchMapping = ($adjType === 'IN' ? '9' : '8').$datePrefix.$batchId.$lastTwoDigitPlant;
+
+            $lastAdj = DB::connection($this->connection)->selectOne(
+                'SELECT adjust_no FROM t_adjustment_header
+                  WHERE SUBSTRING(CAST(adjust_no AS TEXT), 1, 12) = ?
+                  ORDER BY adjust_no DESC LIMIT 1 FOR UPDATE',
+                [$batchMapping]
+            );
+            $nextSeq = $lastAdj ? ((int) substr($lastAdj->adjust_no, 12, 2)) + 1 : 1;
+            $adjustNo = $batchMapping.str_pad((string) $nextSeq, 2, '0', STR_PAD_LEFT);
+
+            // Get last balance for this material+sloc
+            $balance = DB::connection($this->connection)->selectOne(
+                'SELECT id_balance_head, qty FROM t_balance_header
+                  WHERE id_material = ? AND id_sloc = ? AND status = 1
+                  ORDER BY id_balance_head DESC LIMIT 1 FOR UPDATE',
+                [$idMaterial, $idSloc]
+            );
+
+            // Get supplier composition from latest balance detail
+            $suppliers = $balance ? DB::connection($this->connection)->select(
+                'SELECT a.id_supplier, a.batch_sap, a.qty
+                   FROM t_balance_detail a
+                  WHERE a.id_balance_head = ? AND a.status = 1 AND a.qty > 0',
+                [$balance->id_balance_head]
+            ) : [];
+
+            if ($adjType === 'IN') {
+                $beforeQty = $balance ? (float) $balance->qty : 0;
+                $afterQty = $beforeQty + $diffQty;
+                $idSlocJson = json_encode([(string) $idSloc]);
+
+                // Insert balance header
+                $idBalanceHead = DB::connection($this->connection)->table('t_balance_header')->insertGetId([
+                    'trace_no' => $adjustNo,
+                    'id_material' => $idMaterial,
+                    'id_sloc' => $idSloc,
+                    'entry_date' => $entryDate,
+                    'qty' => $diffQty,
+                    'in_qty' => $diffQty,
+                    'init_qty' => $diffQty,
+                    'id_plant' => $idPlant,
+                    'created_by' => $user,
+                ], 'id_balance_head');
+
+                // Insert trace header
+                $idTraceHead = DB::connection($this->connection)->table('t_trace_header')->insertGetId([
+                    'to_trace_no' => $adjustNo,
+                    'id_balance_head' => $idBalanceHead,
+                    'id_material' => $idMaterial,
+                    'entry_date' => $entryDate,
+                    'id_sloc' => $idSlocJson,
+                    'in_qty' => $diffQty,
+                    'id_plant' => $idPlant,
+                    'created_by' => $user,
+                ], 'id_trace_head');
+
+                // Insert adjustment header
+                $idAdjHead = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
+                    'entry_date' => $entryDate,
+                    'adjust_no' => $adjustNo,
+                    'id_balance_head' => $idBalanceHead,
+                    'id_material' => $idMaterial,
+                    'id_sloc' => $idSlocJson,
+                    'in_qty' => $diffQty,
+                    'before_adjust' => 0,
+                    'after_adjust' => $diffQty,
+                    'id_plant' => $idPlant,
+                    'created_by' => $user,
+                ], 'id_adjust_head');
+
+                // Process suppliers proportionally
+                $totalSupplierQty = array_sum(array_map(fn ($s) => (float) $s->qty, $suppliers));
+                foreach ($suppliers as $s) {
+                    $compQty = $totalSupplierQty > 0
+                        ? round($diffQty * ((float) $s->qty / $totalSupplierQty), 3)
+                        : round($diffQty / max(count($suppliers), 1), 3);
+
+                    $idTail = DB::connection($this->connection)->table('t_balance_detail')->insertGetId([
+                        'id_balance_head' => $idBalanceHead,
+                        'id_supplier' => $s->id_supplier,
+                        'id_material' => $idMaterial,
+                        'qty' => $compQty,
+                        'in_qty' => $compQty,
+                        'init_qty' => $compQty,
+                        'batch_sap' => $s->batch_sap ?? '',
+                        'id_sloc' => $idSloc,
+                        'id_plant' => $idPlant,
+                        'created_by' => $user,
+                    ], 'id_balance_tail');
+
+                    DB::connection($this->connection)->table('t_trace_detail')->insert([
+                        'id_trace_head' => $idTraceHead,
+                        'id_balance_tail' => $idTail,
+                        'id_supplier' => $s->id_supplier,
+                        'id_material' => $idMaterial,
+                        'batch_sap' => $s->batch_sap ?? '',
+                        'in_qty' => $compQty,
+                        'id_sloc' => $idSloc,
+                        'id_plant' => $idPlant,
+                        'created_by' => $user,
+                    ]);
+
+                    DB::connection($this->connection)->table('t_adjustment_detail')->insert([
+                        'id_adjust_head' => $idAdjHead,
+                        'id_balance_tail' => $idTail,
+                        'id_supplier' => $s->id_supplier,
+                        'id_material' => $idMaterial,
+                        'batch_sap' => $s->batch_sap ?? '',
+                        'in_qty' => $compQty,
+                        'before_adjust' => 0,
+                        'after_adjust' => $compQty,
+                        'id_sloc' => $idSloc,
+                        'id_plant' => $idPlant,
+                        'created_by' => $user,
+                    ]);
+                }
+            } else {
+                // OUT: deduct from balance
+                if (! $balance) {
+                    DB::connection($this->connection)->table('t_report_pspa_detail')
+                        ->where('id_pspa_detail', $row->id_pspa_detail)
+                        ->update(['adjust_status' => 2, 'updated_by' => $user]);
+
+                    continue;
+                }
+
+                $beforeQty = (float) $balance->qty;
+                $afterQty = max(0, $beforeQty - $diffQty);
+                $idSlocJson = json_encode([(string) $idSloc]);
+
+                // Insert adjustment header (OUT)
+                $idAdjHead = DB::connection($this->connection)->table('t_adjustment_header')->insertGetId([
+                    'entry_date' => $entryDate,
+                    'adjust_no' => $adjustNo,
+                    'id_balance_head' => $balance->id_balance_head,
+                    'id_material' => $idMaterial,
+                    'id_sloc' => $idSlocJson,
+                    'out_qty' => $diffQty,
+                    'before_adjust' => $beforeQty,
+                    'after_adjust' => $afterQty,
+                    'id_plant' => $idPlant,
+                    'created_by' => $user,
+                ], 'id_adjust_head');
+
+                // Update balance header
+                DB::connection($this->connection)->table('t_balance_header')
+                    ->where('id_balance_head', $balance->id_balance_head)
+                    ->update([
+                        'qty' => $afterQty,
+                        'out_qty' => DB::raw('COALESCE(out_qty, 0) + '.$diffQty),
+                        'updated_by' => $user,
+                    ]);
+
+                // Deduct from suppliers proportionally
+                $totalSupplierQty = array_sum(array_map(fn ($s) => (float) $s->qty, $suppliers));
+                foreach ($suppliers as $s) {
+                    $deductQty = $totalSupplierQty > 0
+                        ? round($diffQty * ((float) $s->qty / $totalSupplierQty), 3)
+                        : round($diffQty / max(count($suppliers), 1), 3);
+                    $afterDetQty = max(0, (float) $s->qty - $deductQty);
+
+                    DB::connection($this->connection)->table('t_balance_detail')
+                        ->where('id_balance_tail', $s->id_balance_tail ?? 0)
+                        ->update([
+                            'qty' => $afterDetQty,
+                            'out_qty' => DB::raw('COALESCE(out_qty, 0) + '.$deductQty),
+                            'updated_by' => $user,
+                        ]);
+                }
+            }
+
+            // Mark detail as adjusted
+            DB::connection($this->connection)->table('t_report_pspa_detail')
+                ->where('id_pspa_detail', $row->id_pspa_detail)
+                ->update([
+                    'adjust_number' => $adjustNo,
+                    'adjust_status' => 1,
+                    'updated_by' => $user,
+                ]);
+        }
+
+        // Check if all done
+        $pending = DB::connection($this->connection)->select(
+            'SELECT COUNT(*) AS cnt FROM t_report_pspa_detail
+              WHERE id_pspa_head = ? AND (adjust_status IS NULL OR adjust_status = 0) AND status = 1',
+            [$idHead]
+        );
+
         DB::connection($this->connection)->table('t_report_pspa_head')
             ->where('id_report_head', $idHead)
-            ->update(['status' => 2, 'updated_by' => $user]);
+            ->update([
+                'status' => ($pending[0]->cnt ?? 0) == 0 ? 2 : 1,
+                'updated_by' => $user,
+            ]);
 
         return ['response' => 1, 'message' => 'Period adjustment calculated'];
     }
@@ -1837,6 +2354,15 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             ->update(['status' => 3, 'updated_by' => $user]);
 
         return ['response' => 1, 'message' => 'Period locked successfully'];
+    }
+
+    public function periodHeaderUnlock(string $user, int $idHead): array
+    {
+        DB::connection($this->connection)->table('t_report_pspa_head')
+            ->where('id_report_head', $idHead)
+            ->update(['status' => 2, 'updated_by' => $user]);
+
+        return ['response' => 1, 'message' => 'Period unlocked successfully'];
     }
 
     public function destroyAdjustmentPeriod(int $id, string $user): array
@@ -1902,7 +2428,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
 
     public function getAdjustStatus(?string $adjustNo, ?int $idAdjustHead): array
     {
-        if (!$adjustNo && !$idAdjustHead) {
+        if (! $adjustNo && ! $idAdjustHead) {
             return ['response' => 0, 'message' => 'Either adjust_no or id_adjust_head is required'];
         }
 
@@ -1917,13 +2443,13 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                        END AS status_label,
                        a.entry_date, a.id_material, a.id_sloc AS tf_number
                   FROM t_adjustment_header a
-                 WHERE " . ($adjustNo ? 'a.adjust_no = ?' : 'a.id_adjust_head = ?') . "
-                 LIMIT 1";
+                 WHERE ".($adjustNo ? 'a.adjust_no = ?' : 'a.id_adjust_head = ?').'
+                 LIMIT 1';
         $param = $adjustNo ?? $idAdjustHead;
 
         $row = DB::connection($this->connection)->selectOne($sql, [$param]);
 
-        if (!$row) {
+        if (! $row) {
             return ['response' => 0, 'message' => 'Adjustment not found'];
         }
 
@@ -1941,7 +2467,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $adjustQty = (float) ($data['qty'] ?? 0);
         $entryDate = $data['entry_date'] ?? date('Y-m-d');
 
-        if (!$idMaterialPck || !$idWarehouse) {
+        if (! $idMaterialPck || ! $idWarehouse) {
             return ['response' => 0, 'message' => 'id_material and tf_number (warehouse) are required'];
         }
 
@@ -1949,7 +2475,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT id_materialpck, code, description FROM m_material_pck WHERE id_materialpck = ? AND status = 1',
             [$idMaterialPck]
         );
-        if (!$material) {
+        if (! $material) {
             return ['response' => 0, 'message' => 'WHX material not found or inactive'];
         }
 
@@ -1957,16 +2483,16 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'SELECT id_warehouse, id_batch FROM m_warehouse WHERE id_warehouse = ? AND status = 1',
             [$idWarehouse]
         );
-        if (!$warehouse) {
+        if (! $warehouse) {
             return ['response' => 0, 'message' => 'Warehouse not found or inactive'];
         }
 
         $batchId = $warehouse->id_batch;
         $datePrefix = substr(str_replace('-', '', $entryDate), 2);
 
-        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $svc = app(TraceNumberService::class);
         $plantCode = $svc->resolvePlantCode((string) $idPlant);
-        $section = str_pad((string)$batchId, 3, '0', STR_PAD_LEFT);
+        $section = str_pad((string) $batchId, 3, '0', STR_PAD_LEFT);
         $adjustNo = $svc->generate('6', $datePrefix, $section, $plantCode, 't_trace_header', 'to_trace_no');
 
         $idSlocJson = json_encode([(string) $idWarehouse]);
@@ -1988,7 +2514,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         DB::connection($this->connection)->table('log_transactions')->insert([
             'log_module' => 'T_ADJ_HEAD',
             'log_type' => 'CREATE_WHX',
-            'log_description' => 'ID: ' . $idHead . ' | ADJUST_NO: ' . $adjustNo . ' | QTY: ' . $adjustQty,
+            'log_description' => 'ID: '.$idHead.' | ADJUST_NO: '.$adjustNo.' | QTY: '.$adjustQty,
             'created_by' => $user,
             'created_at' => now(),
         ]);
@@ -2005,7 +2531,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $value = (float) ($data['value'] ?? 0);
         $remark = $data['remark'] ?? '';
 
-        if (!$idMaterialPck || !$idWarehouse) {
+        if (! $idMaterialPck || ! $idWarehouse) {
             return ['response' => 0, 'message' => 'id_material and tf_number (warehouse) are required'];
         }
 
@@ -2025,7 +2551,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         DB::connection($this->connection)->table('log_transactions')->insert([
             'log_module' => 'T_BAL_TEMP',
             'log_type' => 'INIT_WHX',
-            'log_description' => 'ID: ' . $id . ' | MATERIAL: ' . $idMaterialPck . ' | WAREHOUSE: ' . $idWarehouse . ' | VALUE: ' . $value,
+            'log_description' => 'ID: '.$id.' | MATERIAL: '.$idMaterialPck.' | WAREHOUSE: '.$idWarehouse.' | VALUE: '.$value,
             'created_by' => $user,
             'created_at' => now(),
         ]);

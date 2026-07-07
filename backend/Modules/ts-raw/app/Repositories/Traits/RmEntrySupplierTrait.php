@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Repositories\Traits;
 
 use Illuminate\Support\Facades\DB;
@@ -18,21 +20,156 @@ trait RmEntrySupplierTrait
                 AND (code LIKE ? OR description LIKE ?)
               ORDER BY code
               LIMIT 20",
-            ['%' . $query . '%', '%' . $query . '%']
+            ['%'.$query.'%', '%'.$query.'%']
         );
     }
 
     public function addSupplierTemp(array $data, string $user): array
     {
+        $mode = $data['mode'] ?? 'ADD';
+        $entryNo = $data['entry_no'] ?? '';
+        $idMaterial = (int) ($data['id_material'] ?? 0);
+        $idSupplier = (int) ($data['id_supplier'] ?? 0);
+        $qty = (float) str_replace(',', '', $data['qty'] ?? '0');
+        $batchSap = $data['batch_sap'] ?? '';
+        $idTail = isset($data['idTail']) ? (int) $data['idTail'] : null;
+        $idHead = isset($data['idHead']) ? (int) $data['idHead'] : null;
+
+        /* UPDATE mode: modify committed t_balance_detail + t_trace_detail */
+        if ($mode === 'UPDATE' && $idTail !== null) {
+            $existing = DB::connection('eudr_ts')->selectOne(
+                'SELECT id_supplier, qty FROM t_balance_detail WHERE id_balance_tail = ? AND status = 1',
+                [$idTail]
+            );
+
+            if ($existing) {
+                // Case 1: idTail found — update existing detail row
+                $oldSupplier = (int) $existing->id_supplier;
+                $oldQty = (float) $existing->qty;
+
+                DB::connection('eudr_ts')->table('log_transactions')->insert([
+                    'log_module' => 'T_BALANCE_TAIL',
+                    'log_type' => 'UPDATE',
+                    'log_description' => 'IDHEAD: '.($idHead ?? 0).' IDTAIL: '.$idTail.
+                        ' | ID_SUPPLIER: '.$oldSupplier.' >>> '.$idSupplier.
+                        ' / QTY: '.$oldQty.' >>> '.$qty.' | Status: 1',
+                    'created_by' => $user,
+                ]);
+
+                DB::connection('eudr_ts')->update(
+                    'UPDATE t_trace_detail SET id_supplier = ?, in_qty = ?, batch_sap = ?, updated_by = ?
+                      WHERE id_balance_tail = ?',
+                    [$idSupplier, $qty, $batchSap, $user, $idTail]
+                );
+
+                DB::connection('eudr_ts')->update(
+                    'UPDATE t_balance_detail SET id_supplier = ?, qty = ?, init_qty = ?, batch_sap = ?, updated_by = ?
+                      WHERE id_balance_tail = ?',
+                    [$idSupplier, $qty, $qty, $batchSap, $user, $idTail]
+                );
+
+                $this->recalcBalanceHeaderQty($idHead, $user);
+
+                return ['response' => 1];
+            }
+
+            // Case 2: idTail not found — check if supplier exists for this idHead
+            if ($idHead !== null) {
+                $existingBySupplier = DB::connection('eudr_ts')->selectOne(
+                    'SELECT id_supplier, qty, id_balance_tail, batch_sap
+                       FROM t_balance_detail
+                      WHERE id_supplier = ? AND id_balance_head = ? AND status = 1',
+                    [$idSupplier, $idHead]
+                );
+
+                if ($existingBySupplier) {
+                    $oldQty = (float) $existingBySupplier->qty;
+                    $foundTail = (int) $existingBySupplier->id_balance_tail;
+                    $oldBatch = $existingBySupplier->batch_sap ?? '';
+
+                    DB::connection('eudr_ts')->table('log_transactions')->insert([
+                        'log_module' => 'T_BALANCE_TAIL',
+                        'log_type' => 'UPDATE',
+                        'log_description' => 'IDHEAD: '.$idHead.' IDTAIL: '.$foundTail.
+                            ' | ID_SUPPLIER: '.$idSupplier.' / QTY: '.$oldQty.' >>> '.$qty.
+                            ' / BATCH_SAP: '.$oldBatch.' >>> '.$batchSap.' | Status: 1',
+                        'created_by' => $user,
+                    ]);
+
+                    DB::connection('eudr_ts')->update(
+                        'UPDATE t_trace_detail SET in_qty = ?, batch_sap = ?, updated_by = ?
+                          WHERE id_balance_tail = ?',
+                        [$qty, $batchSap, $user, $foundTail]
+                    );
+
+                    DB::connection('eudr_ts')->update(
+                        'UPDATE t_balance_detail SET qty = ?, init_qty = ?, batch_sap = ?, updated_by = ?
+                          WHERE id_supplier = ? AND id_balance_head = ?',
+                        [$qty, $qty, $batchSap, $user, $idSupplier, $idHead]
+                    );
+
+                    $this->recalcBalanceHeaderQty($idHead, $user);
+
+                    return ['response' => 1];
+                }
+
+                // Case 3: insert new detail + trace rows
+                $newTail = DB::connection('eudr_ts')->table('t_balance_detail')->insertGetId([
+                    'id_balance_head' => $idHead,
+                    'id_supplier' => $idSupplier,
+                    'id_material' => $idMaterial,
+                    'qty' => $qty,
+                    'init_qty' => $qty,
+                    'batch_sap' => $batchSap,
+                    'created_by' => $user,
+                    'updated_by' => $user,
+                ], 'id_balance_tail');
+
+                $traceHead = DB::connection('eudr_ts')->selectOne(
+                    'SELECT id_trace_head FROM t_trace_header WHERE id_balance_head = ?',
+                    [$idHead]
+                );
+
+                if ($traceHead) {
+                    DB::connection('eudr_ts')->table('t_trace_detail')->insert([
+                        'id_trace_head' => $traceHead->id_trace_head,
+                        'id_balance_tail' => $newTail,
+                        'id_supplier' => $idSupplier,
+                        'id_material' => $idMaterial,
+                        'in_qty' => $qty,
+                        'batch_sap' => $batchSap,
+                        'created_by' => $user,
+                        'updated_by' => $user,
+                    ]);
+                }
+
+                DB::connection('eudr_ts')->table('log_transactions')->insert([
+                    'log_module' => 'T_BALANCE_TAIL',
+                    'log_type' => 'UPDATE',
+                    'log_description' => 'IDHEAD: '.$idHead.' IDTAIL: '.$newTail.
+                        ' | ID_SUPPLIER: '.$idSupplier.' / QTY: '.$qty.
+                        ' / BATCH_SAP: '.$batchSap.' | Status: 1',
+                    'created_by' => $user,
+                ]);
+
+                $this->recalcBalanceHeaderQty($idHead, $user);
+
+                return ['response' => 1];
+            }
+
+            return ['response' => 0];
+        }
+
+        /* ADD mode: insert into t_balance_temporary */
         $requiredKeys = ['entry_no', 'id_material', 'qty'];
         foreach ($requiredKeys as $key) {
-            if (!isset($data[$key])) {
+            if (! isset($data[$key])) {
                 throw new \Exception("Required field '{$key}' is missing");
             }
         }
 
         $idManufacturer = null;
-        if (!empty($data['id_manufacturer'])) {
+        if (! empty($data['id_manufacturer'])) {
             $val = $data['id_manufacturer'];
             if (is_numeric($val)) {
                 $idManufacturer = (int) $val;
@@ -52,7 +189,7 @@ trait RmEntrySupplierTrait
                     $code = $baseCode;
                     $counter = 1;
                     while (DB::connection('eudr_ts')->table('m_manufacturer')->where('code', $code)->exists()) {
-                        $code = substr($baseCode, 0, 35) . '-' . $counter;
+                        $code = substr($baseCode, 0, 35).'-'.$counter;
                         $counter++;
                     }
 
@@ -98,33 +235,33 @@ trait RmEntrySupplierTrait
     {
         $hasManufacturer = $this->columnExists('t_balance_temporary', 'id_manufacturer');
 
-        $sql = "SELECT a.id_balance_temp, a.id_supplier, a.id_material, a.batch_sap, a.qty,
+        $sql = 'SELECT a.id_balance_temp, a.id_supplier, a.id_material, a.batch_sap, a.qty,
                        b.code AS supplier_code, b.description AS supplier_name,
-                       c.code AS material_code";
+                       c.code AS material_code';
 
         if ($hasManufacturer) {
-            $sql .= ", a.id_manufacturer,
-                       d.code AS manufacturer_code, d.description AS manufacturer_name";
+            $sql .= ', a.id_manufacturer,
+                       d.description AS manufacturer_name';
         }
 
-        $sql .= "  FROM t_balance_temporary a
+        $sql .= '  FROM t_balance_temporary a
                   LEFT JOIN m_supplier b ON a.id_supplier = b.id_supplier
-                  LEFT JOIN m_material c ON a.id_material = c.id_material";
+                  LEFT JOIN m_material c ON a.id_material = c.id_material';
 
         if ($hasManufacturer) {
-            $sql .= " LEFT JOIN m_manufacturer d ON a.id_manufacturer = d.id_manufacturer";
+            $sql .= ' LEFT JOIN m_manufacturer d ON a.id_manufacturer = d.id_manufacturer';
         }
 
-        $sql .= " WHERE a.entry_no = ? AND a.status = 1 ORDER BY a.id_balance_temp";
+        $sql .= ' WHERE a.entry_no = ? AND a.status = 1 ORDER BY a.id_balance_temp';
 
         $results = DB::connection('eudr_ts')->select($sql, [$entryNo]);
 
         return array_map(function ($item) {
             return [
                 'id' => $item->id_balance_temp,
-                'supplier' => $item->supplier_code ? ($item->supplier_code . ' :: ' . $item->supplier_name) : 'N/A',
+                'supplier' => $item->supplier_code ? ($item->supplier_code.' :: '.$item->supplier_name) : 'N/A',
                 'material' => $item->material_code ?? 'N/A',
-                'manufacturer' => isset($item->manufacturer_code) && $item->manufacturer_code ? ($item->manufacturer_code . ' :: ' . $item->manufacturer_name) : 'N/A',
+                'manufacturer' => isset($item->manufacturer_name) && $item->manufacturer_name ? $item->manufacturer_name : 'N/A',
                 'batch_sap' => $item->batch_sap ?? 'N/A',
                 'qty' => (float) $item->qty,
             ];
@@ -137,16 +274,18 @@ trait RmEntrySupplierTrait
             $driver = DB::connection('eudr_ts')->getDriverName();
             if ($driver === 'pgsql') {
                 $result = DB::connection('eudr_ts')->select(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+                    'SELECT column_name FROM information_schema.columns WHERE table_name = ? AND column_name = ?',
                     [$table, $column]
                 );
-                return !empty($result);
+
+                return ! empty($result);
             }
             $result = DB::connection('eudr_ts')->select(
                 "SHOW COLUMNS FROM {$table} WHERE Field = ?",
                 [$column]
             );
-            return !empty($result);
+
+            return ! empty($result);
         } catch (\Exception $e) {
             return false;
         }
@@ -156,7 +295,7 @@ trait RmEntrySupplierTrait
     {
         return (bool) DB::connection('eudr_ts')->table('t_balance_temporary')
             ->where('id_balance_temp', $id)
-            ->update(['status' => 0, 'updated_by' => $user]);
+            ->update(['status' => 0, 'updated_by' => $user, 'updated_at' => now()]);
     }
 
     public function getTotalQtyTemp(string $entryNo): float
@@ -165,6 +304,7 @@ trait RmEntrySupplierTrait
             'SELECT COALESCE(SUM(qty), 0) AS total FROM t_balance_temporary WHERE entry_no = ? AND status = 1',
             [$entryNo]
         );
+
         return floatval($result[0]->total ?? 0);
     }
 
@@ -182,7 +322,7 @@ trait RmEntrySupplierTrait
     {
         return (bool) DB::connection('eudr_ts')->table('t_balance_temporary')
             ->where('entry_no', $entryNo)
-            ->update(['status' => 0, 'updated_by' => $user]);
+            ->update(['status' => 0, 'updated_by' => $user, 'updated_at' => now()]);
     }
 
     public function generateBatchCode($supplierId): ?string
@@ -222,5 +362,28 @@ trait RmEntrySupplierTrait
         );
 
         return $result[0]->batchcode ?? $result[0]->batchCode ?? null;
+    }
+
+    protected function recalcBalanceHeaderQty(?int $idHead, string $user): void
+    {
+        if ($idHead === null) {
+            return;
+        }
+
+        $sum = DB::connection('eudr_ts')->selectOne(
+            'SELECT COALESCE(SUM(init_qty), 0) AS qty FROM t_balance_detail WHERE id_balance_head = ? AND status = 1',
+            [$idHead]
+        );
+        $newTotal = (float) ($sum->qty ?? 0);
+
+        DB::connection('eudr_ts')->update(
+            'UPDATE t_balance_header SET init_qty = ?, qty = ?, updated_by = ? WHERE id_balance_head = ?',
+            [$newTotal, $newTotal, $user, $idHead]
+        );
+
+        DB::connection('eudr_ts')->update(
+            'UPDATE t_trace_header SET in_qty = ?, updated_by = ? WHERE id_balance_head = ?',
+            [$newTotal, $user, $idHead]
+        );
     }
 }

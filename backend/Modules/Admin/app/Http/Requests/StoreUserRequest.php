@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Admin\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
@@ -14,11 +16,11 @@ class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8'],
-            'role'     => ['required', 'string', 'exists:roles,name'],
-            'plants'   => ['nullable', 'array'],
+            'role' => ['required', 'string', 'exists:roles,name'],
+            'plants' => ['nullable', 'array'],
             'plants.*' => ['string', 'exists:m_plant,code_3'],
         ];
     }

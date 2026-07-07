@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Manufacturer\Services;
 
 use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;
@@ -11,11 +13,15 @@ class ManufacturerService implements ManufacturerServiceInterface
         protected ManufacturerRepositoryInterface $manufacturerRepo
     ) {}
 
-    public function listManufacturers(): array { return $this->manufacturerRepo->getAll(); }
+    public function listManufacturers(): array
+    {
+        return $this->manufacturerRepo->getAll();
+    }
 
     public function storeManufacturer(array $data): array
     {
         $result = $this->manufacturerRepo->create($data);
+
         return $result
             ? ['status' => 1, 'message' => 'Manufacturer created successfully']
             : ['status' => 0, 'message' => 'Manufacturer code already exists'];
@@ -24,6 +30,7 @@ class ManufacturerService implements ManufacturerServiceInterface
     public function updateManufacturer(int $id, array $data): array
     {
         $result = $this->manufacturerRepo->update($id, $data);
+
         return $result
             ? ['status' => 1, 'message' => 'Manufacturer updated successfully']
             : ['status' => 0, 'message' => 'Failed to update manufacturer'];
@@ -43,5 +50,8 @@ class ManufacturerService implements ManufacturerServiceInterface
             : ['status' => 0, 'message' => 'Failed to activate'];
     }
 
-    public function getActiveManufacturers(): array { return $this->manufacturerRepo->getActive(); }
+    public function getActiveManufacturers(): array
+    {
+        return $this->manufacturerRepo->getActive();
+    }
 }

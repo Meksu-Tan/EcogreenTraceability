@@ -1,12 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\TsBlending\Services\BlendingService;
-use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
-use Illuminate\Support\Collection;
 use Mockery;
+use Modules\TsBlending\Repositories\Contracts\BlendingRepositoryInterface;
+use Modules\TsBlending\Services\BlendingService;
+use Tests\TestCase;
 
 class BlendingServiceTest extends TestCase
 {
@@ -23,7 +24,7 @@ class BlendingServiceTest extends TestCase
     public function test_it_delegates_get_active_materials_to_repository(): void
     {
         $repoMock = Mockery::mock(BlendingRepositoryInterface::class);
-        $expected = collect([(object)['id_material' => 1, 'description' => 'CPO']]);
+        $expected = collect([(object) ['id_material' => 1, 'description' => 'CPO']]);
 
         $repoMock->shouldReceive('getActiveMaterials')
             ->once()
@@ -137,11 +138,11 @@ class BlendingServiceTest extends TestCase
 
         $service = new BlendingService($repoMock);
         $result = $service->addMaterialToBlending('admin', [
-            'entryNo'          => '82605240010101',
+            'entryNo' => '82605240010101',
             'idMaterialSource' => 3,
-            'qty'              => '100',
-            'idSloc'           => 5,
-            'mode'             => 'ADD',
+            'qty' => '100',
+            'idSloc' => 5,
+            'mode' => 'ADD',
         ], 0);
 
         $this->assertEquals(['response' => 2], $result);
@@ -163,11 +164,11 @@ class BlendingServiceTest extends TestCase
 
         $service = new BlendingService($repoMock);
         $result = $service->addMaterialToBlending('admin', [
-            'entryNo'          => '82605240010101',
+            'entryNo' => '82605240010101',
             'idMaterialSource' => 3,
-            'qty'              => '100',
-            'idSloc'           => 5,
-            'mode'             => 'ADD',
+            'qty' => '100',
+            'idSloc' => 5,
+            'mode' => 'ADD',
         ], 0);
 
         $this->assertEquals($expected, $result);
@@ -187,11 +188,11 @@ class BlendingServiceTest extends TestCase
 
         $service = new BlendingService($repoMock);
         $result = $service->addMaterialToBlending('admin', [
-            'entryNo'          => '82605240010101',
+            'entryNo' => '82605240010101',
             'idMaterialSource' => 3,
-            'qty'              => '50.5',
-            'idSloc'           => 5,
-            'mode'             => 'EDIT',
+            'qty' => '50.5',
+            'idSloc' => 5,
+            'mode' => 'EDIT',
         ], 0);
 
         $this->assertEquals($expected, $result);
@@ -212,11 +213,11 @@ class BlendingServiceTest extends TestCase
 
         $service = new BlendingService($repoMock);
         $result = $service->addMaterialToBlending('admin', [
-            'entryNo'          => '82605240010101',
+            'entryNo' => '82605240010101',
             'idMaterialSource' => 3,
-            'qty'              => '1,500.25',
-            'idSloc'           => 5,
-            'mode'             => 'ADD',
+            'qty' => '1,500.25',
+            'idSloc' => 5,
+            'mode' => 'ADD',
         ], 0);
 
         $this->assertEquals(['response' => 1], $result);
@@ -270,12 +271,12 @@ class BlendingServiceTest extends TestCase
 
         $service = new BlendingService($repoMock);
         $result = $service->executeBlending('admin', [
-            'entry_no'    => '82605240010101',
-            'entry_date'  => '2026-06-12',
+            'entry_no' => '82605240010101',
+            'entry_date' => '2026-06-12',
             'id_material' => 3,
             'material_doc' => '',
-            'qty'         => '100',
-            'tankNo'      => [],
+            'qty' => '100',
+            'tankNo' => [],
         ], 0);
 
         $this->assertEquals(['response' => 99], $result);
@@ -300,12 +301,12 @@ class BlendingServiceTest extends TestCase
 
         $service = new BlendingService($repoMock);
         $result = $service->executeBlending('admin', [
-            'entry_no'    => '82605240010101',
-            'entry_date'  => '2026-06-12',
+            'entry_no' => '82605240010101',
+            'entry_date' => '2026-06-12',
             'id_material' => 3,
             'material_doc' => '',
-            'qty'         => '100',
-            'tankNo'      => [],
+            'qty' => '100',
+            'tankNo' => [],
         ], 0);
 
         $this->assertEquals(['response' => 4], $result);
@@ -334,12 +335,12 @@ class BlendingServiceTest extends TestCase
 
         $service = new BlendingService($repoMock);
         $result = $service->executeBlending('admin', [
-            'entry_no'    => '82605240010101',
-            'entry_date'  => '2026-06-12',
+            'entry_no' => '82605240010101',
+            'entry_date' => '2026-06-12',
             'id_material' => 3,
             'material_doc' => '',
-            'qty'         => '100',
-            'tankNo'      => [],
+            'qty' => '100',
+            'tankNo' => [],
         ], 0);
 
         $this->assertEquals(['response' => 4], $result);
@@ -387,7 +388,7 @@ class BlendingServiceTest extends TestCase
     public function test_it_gets_tanks_without_plant_filter(): void
     {
         $repoMock = Mockery::mock(BlendingRepositoryInterface::class);
-        $expected = collect([(object)['id_sloc' => 1, 'description' => 'T-01']]);
+        $expected = collect([(object) ['id_sloc' => 1, 'description' => 'T-01']]);
 
         $repoMock->shouldReceive('getTanks')
             ->once()

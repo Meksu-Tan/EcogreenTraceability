@@ -1,4 +1,7 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
+
 namespace Modules\Shared\Helpers;
 
 use Illuminate\Support\Facades\DB;
@@ -20,6 +23,32 @@ class Feed
 {
     protected $connection = 'eudr_ts';
 
+    private static function normalizeIdSloc($idSloc): string
+    {
+        if (empty($idSloc)) {
+            return '[]';
+        }
+        if (is_string($idSloc)) {
+            $decoded = json_decode($idSloc, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $idSloc;
+            }
+            if (is_numeric($idSloc)) {
+                return json_encode([(int) $idSloc]);
+            }
+
+            return '[]';
+        }
+        if (is_array($idSloc)) {
+            return json_encode(array_values($idSloc));
+        }
+        if (is_numeric($idSloc)) {
+            return json_encode([(int) $idSloc]);
+        }
+
+        return '[]';
+    }
+
     public static function getAvailableQty(array $feedData): float
     {
         $connection = 'eudr_ts';
@@ -32,7 +61,7 @@ class Feed
 
         $params = [$feedData['id_material']];
 
-        if (!empty($feedData['id_sloc'])) {
+        if (! empty($feedData['id_sloc'])) {
             $slocVal = $feedData['id_sloc'];
             $slocIds = [];
             if (is_array($slocVal)) {
@@ -45,20 +74,20 @@ class Feed
                     $slocIds = [$slocVal];
                 }
             }
-            $slocIds = array_map('strval', array_filter($slocIds));
+            $slocIds = array_map('intval', array_filter($slocIds));
 
-            if (!empty($slocIds)) {
+            if (! empty($slocIds)) {
                 $conditions = [];
                 foreach ($slocIds as $id) {
-                    $conditions[] = "id_sloc = ?";
+                    $conditions[] = 'id_sloc = ?';
                     $params[] = $id;
                 }
-                $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
+                $sql .= ' AND ('.implode(' OR ', $conditions).')';
             }
         }
 
         $tracePrefixes = $feedData['trace_prefixes'] ?? null;
-        if (!empty($tracePrefixes)) {
+        if (! empty($tracePrefixes)) {
             $placeholders = implode(',', array_fill(0, count($tracePrefixes), '?'));
             $sql .= " AND SUBSTRING(trace_no,1,1) IN ($placeholders)";
             $params = array_merge($params, $tracePrefixes);
@@ -83,7 +112,7 @@ class Feed
 
         $params = [$feedData['id_material']];
 
-        if (!empty($feedData['id_sloc'])) {
+        if (! empty($feedData['id_sloc'])) {
             $slocVal = $feedData['id_sloc'];
             $slocIds = [];
             if (is_array($slocVal)) {
@@ -96,20 +125,20 @@ class Feed
                     $slocIds = [$slocVal];
                 }
             }
-            $slocIds = array_map('strval', array_filter($slocIds));
+            $slocIds = array_map('intval', array_filter($slocIds));
 
-            if (!empty($slocIds)) {
+            if (! empty($slocIds)) {
                 $conditions = [];
                 foreach ($slocIds as $id) {
-                    $conditions[] = "id_sloc = ?";
+                    $conditions[] = 'id_sloc = ?';
                     $params[] = $id;
                 }
-                $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
+                $sql .= ' AND ('.implode(' OR ', $conditions).')';
             }
         }
 
         $tracePrefixes = $feedData['trace_prefixes'] ?? null;
-        if (!empty($tracePrefixes)) {
+        if (! empty($tracePrefixes)) {
             $placeholders = implode(',', array_fill(0, count($tracePrefixes), '?'));
             $sql .= " AND SUBSTRING(trace_no,1,1) IN ($placeholders)";
             $params = array_merge($params, $tracePrefixes);
@@ -119,7 +148,7 @@ class Feed
 
         return DB::connection($connection)->transaction(function () use ($feedData, $sql, $params, $connection) {
 
-            $balHeads = DB::connection($connection)->select($sql . ' FOR UPDATE', $params);
+            $balHeads = DB::connection($connection)->select($sql.' FOR UPDATE', $params);
 
             if (count($balHeads) === 0) {
                 return [
@@ -131,8 +160,20 @@ class Feed
                 ];
             }
 
+            if (! empty($tracePrefixes)) {
+                $allowedPrefixes = array_map('strval', $tracePrefixes);
+                foreach ($balHeads as $head) {
+                    if (! in_array(substr((string) $head->trace_no, 0, 1), $allowedPrefixes, true)) {
+                        throw new \RuntimeException(
+                            'Feed::generalFeed - balance trace_no '.$head->trace_no.
+                            ' has prefix outside allowed consumption set ['.implode(',', $allowedPrefixes).']'
+                        );
+                    }
+                }
+            }
+
             $totalAvailable = array_sum(array_column($balHeads, 'qty'));
-            if (round((float)$totalAvailable, 4) < round((float)$feedData['qty'], 4)) {
+            if (round((float) $totalAvailable, 4) < round((float) $feedData['qty'], 4)) {
                 return [
                     'response' => 3,
                     'trace_head_ids' => [],
@@ -149,7 +190,9 @@ class Feed
             $totalOut = 0;
 
             foreach ($balHeads as $head) {
-                if ($qtyWh <= 0) break;
+                if ($qtyWh <= 0) {
+                    break;
+                }
 
                 $idHead = $head->id_balance_head;
                 $fromTrace = $head->trace_no;
@@ -157,7 +200,9 @@ class Feed
                 $headQty = (float) $head->qty;
                 $headOut = (float) $head->out_qty;
 
-                if ($headQty <= 0) continue;
+                if ($headQty <= 0) {
+                    continue;
+                }
 
                 $balanceAfter = $headQty - $qtyWh;
 
@@ -191,7 +236,7 @@ class Feed
                     'id_balance_head' => $idHead,
                     'id_material' => $feedData['id_material'],
                     'entry_date' => $feedData['entry_date'],
-                    'id_sloc' => $feedData['id_sloc'] ?? '[]',
+                    'id_sloc' => self::normalizeIdSloc($feedData['id_sloc'] ?? '[]'),
                     'out_qty' => $useQty,
                     'last_qtf' => $feedData['last_qtf'] ?? 0,
                     'curr_qtf' => $feedData['qty'],
@@ -257,7 +302,9 @@ class Feed
                 $qtyTail = $useQty;
 
                 foreach ($balTails as $tail) {
-                    if ($qtyTail <= 0) break;
+                    if ($qtyTail <= 0) {
+                        break;
+                    }
 
                     $tailQty = (float) $tail->qty;
                     $tailOut = (float) $tail->out_qty;
@@ -276,9 +323,9 @@ class Feed
                         $qtyTail = 0;
                     }
 
-                    $key = $tail->id_supplier . '|' . $tail->id_manufacturer . '|' . $tail->batch_sap;
+                    $key = $tail->id_supplier.'|'.$tail->id_manufacturer.'|'.$tail->batch_sap;
 
-                    if (!isset($feedInDetails[$key])) {
+                    if (! isset($feedInDetails[$key])) {
                         $feedInDetails[$key] = [
                             'id_supplier' => $tail->id_supplier,
                             'id_manufacturer' => $tail->id_manufacturer ?? null,
@@ -305,7 +352,7 @@ class Feed
                         'id_material' => $feedData['id_material'],
                         'out_qty' => round((float) $useTailQty, 4),
                         'batch_sap' => $tail->batch_sap,
-                        'id_sloc' => $feedData['id_sloc'] ?? '[]',
+                        'id_sloc' => self::normalizeIdSloc($feedData['id_sloc'] ?? '[]'),
                         'id_plant' => $feedData['id_plant'],
                         'created_by' => $feedData['user'],
                     ]);
@@ -314,7 +361,7 @@ class Feed
 
             if (round((float) $qtyWh, 4) > 0) {
                 throw new \RuntimeException(
-                    'Feed::generalFeed - insufficient balance after FIFO loop. Remaining qty: ' . $qtyWh
+                    'Feed::generalFeed - insufficient balance after FIFO loop. Remaining qty: '.$qtyWh
                 );
             }
 
@@ -340,7 +387,7 @@ class Feed
 
         $sqlParams = [$params['id_material']];
 
-        if (!empty($params['id_sloc'])) {
+        if (! empty($params['id_sloc'])) {
             $slocVal = $params['id_sloc'];
             $slocIds = [];
             if (is_array($slocVal)) {
@@ -353,20 +400,20 @@ class Feed
                     $slocIds = [$slocVal];
                 }
             }
-            $slocIds = array_map('strval', array_filter($slocIds));
+            $slocIds = array_map('intval', array_filter($slocIds));
 
-            if (!empty($slocIds)) {
+            if (! empty($slocIds)) {
                 $conditions = [];
                 foreach ($slocIds as $id) {
-                    $conditions[] = "id_sloc = ?";
+                    $conditions[] = 'id_sloc = ?';
                     $sqlParams[] = $id;
                 }
-                $sql .= ' AND (' . implode(' OR ', $conditions) . ')';
+                $sql .= ' AND ('.implode(' OR ', $conditions).')';
             }
         }
 
         $tracePrefixes = $params['trace_prefixes'] ?? null;
-        if (!empty($tracePrefixes)) {
+        if (! empty($tracePrefixes)) {
             $placeholders = implode(',', array_fill(0, count($tracePrefixes), '?'));
             $sql .= " AND SUBSTRING(trace_no,1,1) IN ($placeholders)";
             $sqlParams = array_merge($sqlParams, $tracePrefixes);
@@ -379,7 +426,7 @@ class Feed
         return [
             'total_available' => array_sum(array_column($balHeads, 'qty')),
             'stock_details' => $balHeads,
-            'parameters' => $params
+            'parameters' => $params,
         ];
     }
 
@@ -389,7 +436,9 @@ class Feed
      */
     public static function normalizeSupplierRundown(array $traceHeadIds, float $targetQty): void
     {
-        if (empty($traceHeadIds) || $targetQty <= 0) return;
+        if (empty($traceHeadIds) || $targetQty <= 0) {
+            return;
+        }
 
         $rows = DB::connection('eudr_ts')->table('t_trace_detail')
             ->select('id_trace_tail', 'out_qty')
@@ -397,19 +446,23 @@ class Feed
             ->where('status', 1)
             ->get();
 
-        if ($rows->isEmpty()) return;
+        if ($rows->isEmpty()) {
+            return;
+        }
 
         $total = $rows->sum('out_qty');
-        if (round($total, 6) == 0) return;
+        if (round($total, 6) == 0) {
+            return;
+        }
 
-        $factor   = $targetQty / $total;
+        $factor = $targetQty / $total;
         $newTotal = 0;
         $adjusted = [];
 
         foreach ($rows as $i => $row) {
-            $val           = round($row->out_qty * $factor, 4);
-            $adjusted[$i]  = ['id' => $row->id_trace_tail, 'out_qty' => $val];
-            $newTotal     += $val;
+            $val = round($row->out_qty * $factor, 4);
+            $adjusted[$i] = ['id' => $row->id_trace_tail, 'out_qty' => $val];
+            $newTotal += $val;
         }
 
         // Apply rounding correction to last row

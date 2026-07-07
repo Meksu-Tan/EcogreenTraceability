@@ -53,6 +53,9 @@
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('material')">
                     Material<span class="sort-icon" :class="{ active: sortKey === 'material', desc: sortKey === 'material' && sortDir === 'desc' }">▲</span>
                   </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('manufacturer_name')">
+                    Manufacturer<span class="sort-icon" :class="{ active: sortKey === 'manufacturer_name', desc: sortKey === 'manufacturer_name' && sortDir === 'desc' }">▲</span>
+                  </th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('tank')">
                     Sloc<span class="sort-icon" :class="{ active: sortKey === 'tank', desc: sortKey === 'tank' && sortDir === 'desc' }">▲</span>
                   </th>
@@ -79,7 +82,7 @@
               </thead>
               <tbody v-if="tableData.length === 0">
                 <tr>
-                  <td colspan="14" class="text-center pa-8">
+                  <td colspan="15" class="text-center pa-8">
                     <VIcon icon="ri-flask-line" size="48" class="text-disabled mb-2" />
                     <p>No data for {{ selectedYear }}.</p>
                   </td>
@@ -93,6 +96,7 @@
                   <td class="font-monospace text-caption">{{ row.material_document || '-' }}</td>
                   <td class="font-monospace text-caption">{{ row.po_so || '-' }}</td>
                   <td class="font-weight-medium text-truncate text-caption" style="max-width:200px" :title="row.material">{{ row.material }}</td>
+                  <td class="text-caption">{{ row.manufacturer_name || '-' }}</td>
                   <td class="text-caption">{{ row.tf_number || '-' }}</td>
                   <td class="text-right font-monospace text-caption">{{ row.init_qty || row.qty }}</td>
                   <td class="text-right font-monospace font-weight-bold text-caption">{{ row.qty }}</td>

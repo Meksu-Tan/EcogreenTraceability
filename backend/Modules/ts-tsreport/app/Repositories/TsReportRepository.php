@@ -1,18 +1,19 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsTsreport\Repositories;
 
-use Modules\TsTsreport\Repositories\Contracts\TsReportRepositoryInterface;
+use Illuminate\Support\Facades\DB;
+use Modules\Shared\Helpers\TraceHelper;
 use Modules\Shared\Repositories\Traits\PlantFilterTrait;
 use Modules\Shared\Traits\DbCompatTrait;
-use Modules\Shared\Helpers\TraceHelper;
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
+use Modules\TsTsreport\Repositories\Contracts\TsReportRepositoryInterface;
 
 class TsReportRepository implements TsReportRepositoryInterface
 {
-    use PlantFilterTrait;
     use DbCompatTrait;
+    use PlantFilterTrait;
 
     protected string $connection = 'eudr_ts';
 
@@ -22,14 +23,14 @@ class TsReportRepository implements TsReportRepositoryInterface
         $plantId = $filters['id_plant'] ?? $filters['plant_id'] ?? null;
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('b', $plantId, $userId);
-        $condWip = TraceHelper::plantCondition('b.to_trace_no', ['00'], 'NOT IN');
+        $condWip = TraceHelper::warehouseCondition('b.to_trace_no', '<>', '000');
 
-        $fmtInQty  = $this->dbNumberFormat('b.in_qty', 3);
+        $fmtInQty = $this->dbNumberFormat('b.in_qty', 3);
         $fmtOutQty = $this->dbNumberFormat('b.out_qty', 3);
-        $fmtQty    = $this->dbNumberFormat('c.qty', 3);
+        $fmtQty = $this->dbNumberFormat('c.qty', 3);
         $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT c.qty)', 3);
-        $gcFTrace  = $this->dbGroupConcat('DISTINCT c.from_trace_no', ' | ');
-        $gcSupp    = $this->dbGroupConcat(
+        $gcFTrace = $this->dbGroupConcat('DISTINCT c.from_trace_no', ' | ');
+        $gcSupp = $this->dbGroupConcat(
             "CONCAT(d.description, ' / ', c.batch_sap, ' / Qty: ', {$fmtQty}, ' MT')",
             ' | ',
             true
@@ -94,21 +95,19 @@ class TsReportRepository implements TsReportRepositoryInterface
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
 
         $condRmDirect = TraceHelper::warehouseCondition('a.to_trace_no', '=', '000');
-        $condRmTransfer = !empty($plantId)
-            ? TraceHelper::plantCondition('a.to_trace_no', [$plantId])
-            : '1=1';
+        $condRmTransfer = TraceHelper::warehouseCondition('a.to_trace_no', '<>', '000');
 
-        $fmtInQty    = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
-        $fmtOutQty   = $this->dbNumberFormat('SUM(DISTINCT a.out_qty)', 3);
-        $fmtBQty     = $this->dbNumberFormat('b.qty', 3);
-        $fmtBalSup   = $this->dbNumberFormat('SUM(DISTINCT b.qty)', 3);
-        $gcTraceNo   = $this->dbGroupConcat('DISTINCT a.to_trace_no', ' | ');
-        $gcSupp      = $this->dbGroupConcat(
+        $fmtInQty = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
+        $fmtOutQty = $this->dbNumberFormat('SUM(DISTINCT a.out_qty)', 3);
+        $fmtBQty = $this->dbNumberFormat('b.qty', 3);
+        $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT b.qty)', 3);
+        $gcTraceNo = $this->dbGroupConcat('DISTINCT a.to_trace_no', ' | ');
+        $gcSupp = $this->dbGroupConcat(
             "CONCAT(d.description, ' / ', b.batch_sap, ' / Qty: ', {$fmtBQty}, ' MT')",
             ' | ',
             true
         );
-        $slocCond    = $this->dbSlocJsonClause('e.id_sloc', 'f.id_sloc');
+        $slocCond = $this->dbSlocJsonClause('e.id_sloc', 'f.id_sloc');
 
         return DB::connection($this->connection)->select(
             "SELECT a.entry_date, a.id_trace_head, {$gcTraceNo} AS to_trace_no,
@@ -174,13 +173,13 @@ class TsReportRepository implements TsReportRepositoryInterface
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
 
-        $condPck = TraceHelper::plantCondition('a.to_trace_no', ['00'], 'NOT IN');
+        $condPck = TraceHelper::warehouseCondition('a.to_trace_no', '<>', '000');
 
-        $fmtInQty  = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
+        $fmtInQty = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
         $fmtOutQty = $this->dbNumberFormat('SUM(DISTINCT a.out_qty)', 3);
-        $fmtBQty   = $this->dbNumberFormat('b.qty', 3);
+        $fmtBQty = $this->dbNumberFormat('b.qty', 3);
         $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT b.qty)', 3);
-        $gcSupp    = $this->dbGroupConcat(
+        $gcSupp = $this->dbGroupConcat(
             "CONCAT(d.description,' / ',b.batch_sap,' / Qty: ',{$fmtBQty},' MT')",
             ' | ',
             true
@@ -224,11 +223,11 @@ class TsReportRepository implements TsReportRepositoryInterface
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
 
-        $fmtInQty  = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
+        $fmtInQty = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
         $fmtOutQty = $this->dbNumberFormat('SUM(DISTINCT a.out_qty)', 3);
-        $fmtBQty   = $this->dbNumberFormat('b.qty', 3);
+        $fmtBQty = $this->dbNumberFormat('b.qty', 3);
         $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT b.qty)', 3);
-        $gcSupp    = $this->dbGroupConcat(
+        $gcSupp = $this->dbGroupConcat(
             "CONCAT(d.description,' / ',b.batch_sap,' / Qty: ',{$fmtBQty},' MT')",
             ' | ',
             true
@@ -269,18 +268,18 @@ class TsReportRepository implements TsReportRepositoryInterface
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
 
-        $condTransfer = TraceHelper::plantCondition('a.to_trace_no', ['00'], 'NOT IN');
+        $condTransfer = TraceHelper::warehouseCondition('a.to_trace_no', '<>', '000');
 
-        $fmtInQty  = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
+        $fmtInQty = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
         $fmtOutQty = $this->dbNumberFormat('SUM(DISTINCT a.out_qty)', 3);
-        $fmtBQty   = $this->dbNumberFormat('b.qty', 3);
+        $fmtBQty = $this->dbNumberFormat('b.qty', 3);
         $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT b.qty)', 3);
-        $gcSupp    = $this->dbGroupConcat(
+        $gcSupp = $this->dbGroupConcat(
             "CONCAT(d.description,' / ',b.batch_sap,' / Qty: ',{$fmtBQty},' MT')",
             ' | ',
             true
         );
-        $slocCond  = $this->dbSlocJsonClause('a.id_sloc', 'f.id_sloc');
+        $slocCond = $this->dbSlocJsonClause('a.id_sloc', 'f.id_sloc');
 
         return DB::connection($this->connection)->select(
             "SELECT a.entry_date, a.id_trace_head, a.to_trace_no,
@@ -317,14 +316,14 @@ class TsReportRepository implements TsReportRepositoryInterface
         $plantId = $filters['id_plant'] ?? $filters['plant_id'] ?? null;
         $userId = $filters['user_id'] ?? null;
         $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
-        
-        $condWip = TraceHelper::plantCondition('a.to_trace_no', ['00'], 'NOT IN');
 
-        $fmtInQty  = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
+        $condWip = TraceHelper::warehouseCondition('a.to_trace_no', '<>', '000');
+
+        $fmtInQty = $this->dbNumberFormat('SUM(DISTINCT a.in_qty)', 3);
         $fmtOutQty = $this->dbNumberFormat('SUM(DISTINCT a.out_qty)', 3);
-        $fmtBQty   = $this->dbNumberFormat('b.qty', 3);
+        $fmtBQty = $this->dbNumberFormat('b.qty', 3);
         $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT b.qty)', 3);
-        $gcSupp    = $this->dbGroupConcat(
+        $gcSupp = $this->dbGroupConcat(
             "CONCAT(d.description,' / ',b.batch_sap,' / Qty: ',{$fmtBQty},' MT')",
             ' | ',
             true

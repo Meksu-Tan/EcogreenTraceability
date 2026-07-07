@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Providers;
 
 use Illuminate\Database\Connection;
@@ -9,8 +11,8 @@ use Modules\TraceBackward\Repositories\Concerns\BackwardListQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardSearchQuery;
 use Modules\TraceBackward\Repositories\Concerns\BackwardTraceQuery;
 use Modules\TraceBackward\Repositories\Concerns\ShipmentLookupQuery;
-use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterface;
-use Modules\TraceBackward\Repositories\TraceBackwardRepository;
+use Modules\TraceBackward\Repositories\EloquentTraceBackwardRepository;
+use Modules\TraceBackward\Repositories\TraceBackwardRepositoryInterface;
 use Modules\TraceBackward\Services\Contracts\ShipmentTraceVerificationServiceInterface;
 use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
 use Modules\TraceBackward\Services\ShipmentTraceVerificationService;
@@ -25,7 +27,8 @@ class TraceBackwardServiceProvider extends ServiceProvider
 
         $this->app->bind(TraceBackwardRepositoryInterface::class, function ($app) {
             $conn = $app['db']->connection('eudr_ts');
-            return new TraceBackwardRepository(
+
+            return new EloquentTraceBackwardRepository(
                 $conn,
                 new BackwardListQuery($conn),
                 new BackwardDetailQuery($conn),
@@ -42,12 +45,12 @@ class TraceBackwardServiceProvider extends ServiceProvider
             BackwardSearchQuery::class,
             ShipmentLookupQuery::class,
         ])
-        ->needs(Connection::class)
-        ->give(fn ($app) => $app['db']->connection('eudr_ts'));
+            ->needs(Connection::class)
+            ->give(fn ($app) => $app['db']->connection('eudr_ts'));
     }
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
     }
 }

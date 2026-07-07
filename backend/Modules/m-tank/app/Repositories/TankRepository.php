@@ -1,14 +1,17 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Tank\Repositories;
 
+use Modules\Shared\Traits\TransactionLoggerTrait;
 use Modules\Tank\Models\Tank;
 use Modules\Tank\Repositories\Contracts\TankRepositoryInterface;
-use Modules\Shared\Traits\TransactionLoggerTrait;
 
 class TankRepository implements TankRepositoryInterface
 {
     use TransactionLoggerTrait;
+
     public function getAll(): array
     {
         return Tank::selectRaw('id_sloc as id, id_plant AS plant_code, plant_name, tf_number, tf_number AS tank_number, tank_height, description, status, created_at, created_by, updated_at, updated_by')
@@ -20,7 +23,7 @@ class TankRepository implements TankRepositoryInterface
     public function findById(int $id): ?object
     {
         $model = Tank::find($id);
-        if (!$model) {
+        if (! $model) {
             return null;
         }
 
@@ -51,7 +54,7 @@ class TankRepository implements TankRepositoryInterface
         }
 
         $id = $data['id'] ?? null;
-        if (!$id) {
+        if (! $id) {
             $maxId = Tank::max('id_sloc') ?? 0;
             $id = $maxId + 1;
         }
@@ -69,8 +72,9 @@ class TankRepository implements TankRepositoryInterface
 
         if ($model) {
             $this->logTransaction('M_SLOC', 'ADD',
-                'ID: ' . $id . ' | TANK: ' . $data['tank_number'] . ' | PLANT: ' . $data['plant_code'] . ' | HEIGHT: ' . $data['tank_height'],
+                'ID: '.$id.' | TANK: '.$data['tank_number'].' | PLANT: '.$data['plant_code'].' | HEIGHT: '.$data['tank_height'],
                 $data['created_by'] ?? 'System');
+
             return (int) $id;
         }
 
@@ -80,12 +84,12 @@ class TankRepository implements TankRepositoryInterface
     public function update(int $id, array $data): bool
     {
         $model = Tank::find($id);
-        if (!$model) {
+        if (! $model) {
             return false;
         }
 
         $this->logTransaction('M_SLOC', 'UPDATE',
-            'ID: ' . $id . ' | TANK: ' . $model->tf_number . ' >> ' . $data['tank_number'],
+            'ID: '.$id.' | TANK: '.$model->tf_number.' >> '.$data['tank_number'],
             $data['updated_by'] ?? 'System');
 
         return (bool) $model->update([
@@ -100,10 +104,10 @@ class TankRepository implements TankRepositoryInterface
 
     public function deactivate(int $id, string $user): bool
     {
-        $this->logTransaction('M_SLOC', 'DE-ACTIVATE', 'Id: ' . $id . ' | Status: 1 >> 0', $user);
+        $this->logTransaction('M_SLOC', 'DE-ACTIVATE', 'Id: '.$id.' | Status: 1 >> 0', $user);
 
         $model = Tank::find($id);
-        if (!$model) {
+        if (! $model) {
             return false;
         }
 
@@ -112,10 +116,10 @@ class TankRepository implements TankRepositoryInterface
 
     public function activate(int $id, string $user): bool
     {
-        $this->logTransaction('M_SLOC', 'ACTIVATE', 'Id: ' . $id . ' | Status: 0 >> 1', $user);
+        $this->logTransaction('M_SLOC', 'ACTIVATE', 'Id: '.$id.' | Status: 0 >> 1', $user);
 
         $model = Tank::find($id);
-        if (!$model) {
+        if (! $model) {
             return false;
         }
 
@@ -124,34 +128,59 @@ class TankRepository implements TankRepositoryInterface
 
     public function syncUpdateOrCreate(array $data, string $user): bool
     {
-        $existing = Tank::where('tf_number', $data['tank_number'])
-            ->where('id_plant', $data['plant_code'])
-            ->first();
+        $query = Tank::query();
+        if (! empty($data['id'])) {
+            $query->where('id_tankfarm', $data['id']);
+        } else {
+            $query->where('tf_number', $data['tank_number'])
+                ->where('id_plant', $data['plant_code']);
+        }
+        $existing = $query->first();
 
         if ($existing) {
-            if ($existing->plant_name != $data['plant_name'] || $existing->tank_height != $data['tank_height']) {
+            $isChanged = $existing->plant_name != $data['plant_name']
+                      || $existing->tank_height != $data['tank_height'];
+
+            if (! empty($data['id'])) {
+                $isChanged = $isChanged || $existing->tf_number != $data['tank_number'] || $existing->id_plant != $data['plant_code'];
+            }
+
+            if ($isChanged) {
                 $existing->update([
+                    'id_plant' => $data['plant_code'],
                     'plant_name' => $data['plant_name'],
+                    'tf_number' => $data['tank_number'],
                     'tank_height' => $data['tank_height'],
                     'description' => $data['description'] ?? $existing->description,
                     'updated_by' => $user,
                 ]);
+
                 return true;
             }
+
             return false;
         } else {
             $maxId = Tank::max('id_sloc') ?? 0;
+            $newId = $maxId + 1;
+
             Tank::create([
-                'id_sloc' => $maxId + 1,
+                'id_sloc' => $newId,
+                'id_tankfarm' => $data['id'] ?? null,
                 'id_plant' => $data['plant_code'],
                 'plant_name' => $data['plant_name'],
                 'tf_number' => $data['tank_number'],
                 'tank_height' => $data['tank_height'],
-                'description' => $data['description'] ?? null,
+                'description' => $data['description'] ?? '',
                 'status' => '1',
                 'created_by' => $user,
             ]);
+
             return true;
         }
+    }
+
+    public function clearAll(): void
+    {
+        Tank::query()->delete();
     }
 }

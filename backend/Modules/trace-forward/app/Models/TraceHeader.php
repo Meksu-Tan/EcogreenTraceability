@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceForward\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,8 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 class TraceHeader extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_trace_header';
+
     protected $primaryKey = 'id_trace_head';
+
     public $timestamps = true;
 
     protected $fillable = [
@@ -38,7 +43,7 @@ class TraceHeader extends Model
     public function details()
     {
         return $this->hasMany(TraceDetail::class, 'id_trace_head', 'id_trace_head')
-                    ->where('status', 1);
+            ->where('status', 1);
     }
 
     public function materialDocument()

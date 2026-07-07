@@ -52,6 +52,7 @@
             "Modules\\TraceBackward\\": "Modules/trace-backward/app/",
             "Modules\\Adjustment\\": "Modules/m-adjustment/app/",
             "Modules\\Quantifier\\": "Modules/m-quantifier/app/",
+            "Modules\\TsAcknowledge\\": "Modules/ts-acknowledge/app/",
             "Database\\Factories\\": [
                 "database/factories/",
                 "Modules/Admin/database/factories/",

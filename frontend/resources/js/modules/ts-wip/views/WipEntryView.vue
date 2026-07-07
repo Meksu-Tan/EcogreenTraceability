@@ -66,7 +66,7 @@
 
               <div v-else-if="step.type === 'mode_switch'" class="d-flex justify-start px-2 py-2">
                 <div class="d-flex align-center ga-3 bg-surface px-4 py-2 rounded-lg border">
-                  <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">Mode</span>
+                  <span class="text-caption font-weight-bold text-medium-emphasis text-uppercase">{{ step.title || 'Mode' }}</span>
                   <VSelect
                     :model-value="modes[step.modeGroup]"
                     :items="step.config.options || []"
@@ -354,7 +354,6 @@ const EntryForm = {
   },
 }
 
-const MODE_WARNING = 'WARNING: DO NOT ENTRY SEVERAL MODES AT THE SAME TIME! ( MUST FINISH FEED & RUNDOWN ENTRY PER ONE MODE )'
 
 const plantSelectionStore = usePlantSelectionStore()
 const plantStore = useSetupPlantStore()
@@ -397,6 +396,12 @@ function initializeModes(configs = {}) {
     }
   }
 }
+
+watch(() => wipTree.value, (tree) => {
+  if (tree?.modeConfigs) {
+    initializeModes(tree.modeConfigs)
+  }
+}, { immediate: true })
 
 function onSectionModeChange(sectionKey, value) {
   modes[sectionKey] = String(value)
@@ -536,7 +541,14 @@ let activeRundownStep = null
 
 function blankForm() { return { id: '', feature: '', batchNo: '', lastQtf: 0, currQtf: 0, entryDate: today(), tank: null, tankNo: [], wipMode: 1 } }
 function today() { return new Date().toISOString().slice(0, 10) }
-function resetForm(target, step) { Object.assign(target, blankForm(), { id: step.id, feature: step.title, wipMode: step.sectionMode ?? 1 }) }
+function resolveWipMode(step) {
+  for (const group of Object.keys(step.conditions || {})) {
+    const value = modes[group]
+    if (value === '1' || value === '2') return Number(value)
+  }
+  return 1
+}
+function resetForm(target, step) { Object.assign(target, blankForm(), { id: step.id, feature: step.title, wipMode: resolveWipMode(step) }) }
 
 async function openFeedModal(step) {
   activeFeedStep = step
@@ -546,7 +558,7 @@ async function openFeedModal(step) {
   feedForm.batchNo = 'Generating...'
   feedModalOpen.value = true
   feedTanks.value = await fetchTanks('feed', step.id)
-  autoSelectTank(feedForm, feedTanks.value, 'feed')
+  autoSelectTank(feedForm, feedTanks.value, 'feed', step)
   await onFeedTankChange()
   feedDcsStatus.value = `${feedTanks.value.length} Feed Sloc found for plant ${resolvePlantCode()}. ${step.tag ? `DCS tag available: ${step.tag}` : 'No DCS tag configured for this entry.'}`
   const last = await store.fetchFeedLastBatch(step.id)
@@ -564,7 +576,7 @@ async function openRundownModal(step) {
   rundownForm.batchNo = 'Generating...'
   rundownModalOpen.value = true
   rundownTanks.value = await fetchTanks('rundown', step.id)
-  autoSelectTank(rundownForm, rundownTanks.value, 'rundown')
+  autoSelectTank(rundownForm, rundownTanks.value, 'rundown', step)
   await onRundownTankChange()
   rundownDcsStatus.value = `${rundownTanks.value.length} WIP Sloc found for plant ${resolvePlantCode()}. ${step.tag ? `DCS tag available: ${step.tag}` : 'No DCS tag configured for this entry.'}`
   const last = await store.fetchRundownLastBatch(step.id)
@@ -619,13 +631,27 @@ function resolvePlantCode(tank = null) {
   if (name.includes('/')) {
     return name.split('/').pop().trim()
   }
-  const map = { EOMB: '1001', EOB1: '1002', EOB2: '1003', EOB5: '1005', EOB3: '1007' }
+  // Build map dynamically from plant store
+  const plantMap = {}
+  if (plantStore?.plants?.length) {
+    for (const p of plantStore.plants) {
+      if (p.code_3 && p.code) plantMap[p.code_3] = p.code
+    }
+  } else {
+    plantMap['EOMB'] = '1001'; plantMap['EOB1'] = '1002'
+    plantMap['EOB2'] = '1003'; plantMap['EOB5'] = '1005'
+    plantMap['EOB3'] = '1007'
+  }
   const cleanName = name.replace(/[\s-]/g, '')
-  if (map[cleanName]) return map[cleanName]
+  if (plantMap[cleanName]) return plantMap[cleanName]
+  try {
+    const decoded = plantStore?.plants?.find(p => cleanName.includes(p.code_3))
+    if (decoded?.code) return String(decoded.code)
+  } catch {}
   return id ? String(id) : '0000'
 }
 
-function findAdaptiveTank(tanks, mode) {
+function findAdaptiveTank(tanks, mode, stepObj) {
   if (!Array.isArray(tanks) || tanks.length === 0) return null
 
   const plantDesc = String(plantSelectionStore.selectedPlantName || '').toUpperCase()
@@ -639,7 +665,13 @@ function findAdaptiveTank(tanks, mode) {
     keywords.push(`${type}${num}`.trim())
   }
 
-  const targetType = mode === 'feed' ? 'FEED' : 'WIP'
+  // Tank type keywords from step config, fallback to heuristics
+  const tankTypeKey = stepObj?.tank_type || (mode === 'feed' ? 'FEED' : 'WIP')
+  const tankKeywords = []
+  const stepType = stepObj?.step_type || mode
+  if (stepType === 'feed') tankKeywords.push('FEED')
+  else tankKeywords.push('WIP', 'RUNDOWN')
+
   let bestTank = null
   let bestScore = -1
 
@@ -650,8 +682,9 @@ function findAdaptiveTank(tanks, mode) {
     const matchesPlant = keywords.some(kw => tankDesc.includes(kw))
     if (matchesPlant) score += 10
 
-    if (targetType === 'FEED' && tankDesc.includes('FEED')) score += 5
-    if (targetType === 'WIP' && (tankDesc.includes('WIP') || tankDesc.includes('RUNDOWN'))) score += 5
+    for (const kw of tankKeywords) {
+      if (tankDesc.includes(kw)) { score += 5; break }
+    }
 
     if (t.details_count && Number(t.details_count) > 0) {
       score += 5
@@ -666,9 +699,9 @@ function findAdaptiveTank(tanks, mode) {
   return bestTank || tanks[0]
 }
 
-function autoSelectTank(form, tanks, mode) {
+function autoSelectTank(form, tanks, mode, stepObj) {
   if (form.tank || !Array.isArray(tanks) || tanks.length === 0) return
-  const selected = findAdaptiveTank(tanks, mode)
+  const selected = findAdaptiveTank(tanks, mode, stepObj)
   form.tank = selected ? Number(selected.id_sloc || selected.tf_number) : null
 }
 
@@ -732,12 +765,20 @@ async function fetchDcs(step, form, statusRef) {
 }
 
 async function submitFeed() {
-  const res = await store.saveFeed({ feed_id: feedForm.id, tank: feedForm.tank, tankNo: feedForm.tankNo, curr_feed: feedForm.currQtf, last_feed: feedForm.lastQtf, curr_entryDate: feedForm.entryDate, batch_no: feedForm.batchNo, feature: feedForm.feature, wip_mode: feedForm.wipMode })
-  if (res?.status === 1) { feedModalOpen.value = false; await reloadAll() }
+  try {
+    const res = await store.saveFeed({ feed_id: feedForm.id, tank: feedForm.tank, tankNo: feedForm.tankNo, curr_feed: feedForm.currQtf, last_feed: feedForm.lastQtf, curr_entryDate: feedForm.entryDate, batch_no: feedForm.batchNo, feature: feedForm.feature, wip_mode: feedForm.wipMode })
+    if (res?.status === 1) { feedModalOpen.value = false; await reloadAll() }
+  } catch (error) {
+    console.error('Feed save failed:', error)
+  }
 }
 async function submitRundown() {
-  const res = await store.saveRundown({ rundown_id: rundownForm.id, tank: rundownForm.tank, tankNo: rundownForm.tankNo, curr_rundown: rundownForm.currQtf, last_rundown: rundownForm.lastQtf, curr_entryDate: rundownForm.entryDate, batch_no: rundownForm.batchNo, feature: rundownForm.feature, wip_mode: rundownForm.wipMode })
-  if (res?.status === 1) { rundownModalOpen.value = false; await reloadAll() }
+  try {
+    const res = await store.saveRundown({ rundown_id: rundownForm.id, tank: rundownForm.tank, tankNo: rundownForm.tankNo, curr_rundown: rundownForm.currQtf, last_rundown: rundownForm.lastQtf, curr_entryDate: rundownForm.entryDate, batch_no: rundownForm.batchNo, feature: rundownForm.feature, wip_mode: rundownForm.wipMode })
+    if (res?.status === 1) { rundownModalOpen.value = false; await reloadAll() }
+  } catch (error) {
+    console.error('Rundown save failed:', error)
+  }
 }
 
 const balanceModalOpen = ref(false)
@@ -800,10 +841,12 @@ async function reloadAll() {
     initializeModes(tree.modeConfigs || {})
     for (const section of visibleSections.value) {
       const steps = section.steps.filter(s => s.type === 'feed' || s.type === 'rundown')
-      if (steps.length > 0) {
-        await Promise.all(steps.map(step =>
-          step.type === 'feed' ? store.fetchFeed(step.id, 'LATEST') : store.fetchRundown(step.id, 'LATEST')
-        ))
+      for (const step of steps) {
+        if (step.type === 'feed') {
+          await store.fetchFeed(step.id, 'LATEST')
+        } else {
+          await store.fetchRundown(step.id, 'LATEST')
+        }
       }
     }
   } finally {

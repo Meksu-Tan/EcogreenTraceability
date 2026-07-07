@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsWip\Services;
 
 /**
@@ -43,7 +45,7 @@ class BatchNumberGenerator
 
         foreach ($existingNumbers as $batchNo) {
             $parsed = self::parse((string) $batchNo);
-            $seq    = (int) $parsed['sequence'];
+            $seq = (int) $parsed['sequence'];
             if ($seq > $max) {
                 $max = $seq;
             }

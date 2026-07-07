@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\TsTransfer\Http\Controllers\TransferController;
@@ -21,6 +22,7 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         // Approval Workflow Routes
         Route::prefix('approval')->group(function () {
             Route::get('pending', [TransferController::class, 'pendingApprovals']);
+            Route::get('pending-history', [TransferController::class, 'pendingHistory']);
             Route::post('submit', [TransferController::class, 'submitForApproval']);
             Route::post('approve', [TransferController::class, 'approveTransfer']);
             Route::post('reject', [TransferController::class, 'rejectTransfer']);

@@ -1,8 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Services;
 
-use Modules\TraceBackward\Repositories\Contracts\TraceBackwardRepositoryInterface;
+use Modules\TraceBackward\Repositories\TraceBackwardRepositoryInterface;
 use Modules\TraceBackward\Services\Contracts\TraceBackwardServiceInterface;
 
 class TraceBackwardService implements TraceBackwardServiceInterface
@@ -11,9 +13,9 @@ class TraceBackwardService implements TraceBackwardServiceInterface
         protected TraceBackwardRepositoryInterface $traceBackwardRepository
     ) {}
 
-    public function backwardTrace(string $traceNo, ?int $idMaterial = null): array
+    public function backwardTrace(string $traceNo, ?int $idMaterial = null, ?int $plantId = null, ?int $userId = null): array
     {
-        return $this->traceBackwardRepository->backwardTrace($traceNo, $idMaterial);
+        return $this->traceBackwardRepository->backwardTrace($traceNo, $idMaterial, $plantId, $userId);
     }
 
     public function getBackwardList(array $filters = []): array

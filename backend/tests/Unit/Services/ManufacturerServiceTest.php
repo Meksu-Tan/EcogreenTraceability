@@ -1,11 +1,13 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Modules\Manufacturer\Services\ManufacturerService;
-use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;
 use Mockery;
+use Modules\Manufacturer\Repositories\Contracts\ManufacturerRepositoryInterface;
+use Modules\Manufacturer\Services\ManufacturerService;
+use Tests\TestCase;
 
 class ManufacturerServiceTest extends TestCase
 {

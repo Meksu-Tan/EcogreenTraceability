@@ -1,13 +1,15 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
+use Illuminate\Support\Collection;
 use Mockery;
 use Mockery\MockInterface;
-use Illuminate\Support\Collection;
-use Modules\TsPackage\Services\PackageService;
 use Modules\TsPackage\Repositories\Contracts\PackageRepositoryInterface;
+use Modules\TsPackage\Services\PackageService;
+use Tests\TestCase;
 
 class PackageServiceTest extends TestCase
 {
@@ -35,8 +37,8 @@ class PackageServiceTest extends TestCase
     public function test_it_delegates_get_dt_pck_entry_to_repository(): void
     {
         $expected = ['data' => collect([
-            (object)['id_pck' => 1, 'entry_no' => 'PCK-001'],
-            (object)['id_pck' => 2, 'entry_no' => 'PCK-002'],
+            (object) ['id_pck' => 1, 'entry_no' => 'PCK-001'],
+            (object) ['id_pck' => 2, 'entry_no' => 'PCK-002'],
         ]), 'total' => 2];
 
         $this->repoMock
@@ -70,7 +72,7 @@ class PackageServiceTest extends TestCase
     public function test_it_delegates_get_active_fg_product_to_repository(): void
     {
         $expected = collect([
-            (object)['id_material' => 10, 'description' => 'PKO'],
+            (object) ['id_material' => 10, 'description' => 'PKO'],
         ]);
 
         $this->repoMock
@@ -88,8 +90,8 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_get_wip_material_by_fg_product_to_repository(): void
     {
-        $data     = ['id_fg_material' => 10];
-        $expected = collect([(object)['id_material' => 5, 'description' => 'RBDPO']]);
+        $data = ['id_fg_material' => 10];
+        $expected = collect([(object) ['id_material' => 5, 'description' => 'RBDPO']]);
 
         $this->repoMock
             ->shouldReceive('getWipMaterialByFgProduct')
@@ -122,8 +124,8 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_get_cmb_active_tank_pck_to_repository(): void
     {
-        $data     = ['id_material' => 5];
-        $expected = collect([(object)['id_sloc' => 3, 'tank_code' => 'T-03']]);
+        $data = ['id_material' => 5];
+        $expected = collect([(object) ['id_sloc' => 3, 'tank_code' => 'T-03']]);
 
         $this->repoMock
             ->shouldReceive('getCmbActiveTankPck')
@@ -140,8 +142,8 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_get_cmb_active_warehouse_pck_to_repository(): void
     {
-        $data     = ['id_material' => 5];
-        $expected = collect([(object)['id_warehouse' => 7, 'warehouse_code' => 'WH-07']]);
+        $data = ['id_material' => 5];
+        $expected = collect([(object) ['id_warehouse' => 7, 'warehouse_code' => 'WH-07']]);
 
         $this->repoMock
             ->shouldReceive('getCmbActiveWarehousePck')
@@ -158,8 +160,8 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_get_cmb_active_specific_tank_to_repository(): void
     {
-        $data     = ['id_material' => 5, 'sloc' => 'SL01'];
-        $expected = collect([(object)['id_sloc' => 8, 'sloc' => 'SL01']]);
+        $data = ['id_material' => 5, 'sloc' => 'SL01'];
+        $expected = collect([(object) ['id_sloc' => 8, 'sloc' => 'SL01']]);
 
         $this->repoMock
             ->shouldReceive('getCmbActiveSpecificTank')
@@ -176,7 +178,7 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_store_to_repository_and_returns_result(): void
     {
-        $data     = ['id_material' => 5, 'pck_qty' => 200.0];
+        $data = ['id_material' => 5, 'pck_qty' => 200.0];
         $expected = ['response' => 1, 'message' => 'Package stored'];
 
         $this->repoMock
@@ -192,7 +194,7 @@ class PackageServiceTest extends TestCase
 
     public function test_it_returns_failure_from_store_when_repository_fails(): void
     {
-        $data     = ['id_material' => 999];
+        $data = ['id_material' => 999];
         $expected = ['response' => 0, 'message' => 'Store failed'];
 
         $this->repoMock
@@ -210,7 +212,7 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_cancel_to_repository(): void
     {
-        $data     = ['id_pck' => 10, 'cancel_reason' => 'Wrong entry'];
+        $data = ['id_pck' => 10, 'cancel_reason' => 'Wrong entry'];
         $expected = ['response' => 1, 'message' => 'Package cancelled'];
 
         $this->repoMock
@@ -226,7 +228,7 @@ class PackageServiceTest extends TestCase
 
     public function test_it_returns_failure_from_cancel_when_not_found(): void
     {
-        $data     = ['id_pck' => 999];
+        $data = ['id_pck' => 999];
         $expected = ['response' => 0, 'message' => 'Record not found'];
 
         $this->repoMock
@@ -244,7 +246,7 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_update_po_to_repository(): void
     {
-        $data     = ['id_pck' => 5, 'po_number' => 'PO-2026-001'];
+        $data = ['id_pck' => 5, 'po_number' => 'PO-2026-001'];
         $expected = ['response' => 1, 'message' => 'PO updated'];
 
         $this->repoMock
@@ -262,7 +264,7 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_update_batch_to_repository(): void
     {
-        $data     = ['id_pck' => 5, 'batch_sap' => 'BATCH-2026-001'];
+        $data = ['id_pck' => 5, 'batch_sap' => 'BATCH-2026-001'];
         $expected = ['response' => 1, 'message' => 'Batch updated'];
 
         $this->repoMock
@@ -280,7 +282,7 @@ class PackageServiceTest extends TestCase
 
     public function test_it_delegates_update_sub_tank_to_repository(): void
     {
-        $data     = ['id_pck' => 5, 'id_sub_tank' => 12];
+        $data = ['id_pck' => 5, 'id_sub_tank' => 12];
         $expected = ['response' => 1, 'message' => 'Sub tank updated'];
 
         $this->repoMock
@@ -329,8 +331,8 @@ class PackageServiceTest extends TestCase
     public function test_it_delegates_get_all_warehouses_to_repository(): void
     {
         $expected = collect([
-            (object)['id_warehouse' => 1, 'warehouse_code' => 'WH-01'],
-            (object)['id_warehouse' => 2, 'warehouse_code' => 'WH-02'],
+            (object) ['id_warehouse' => 1, 'warehouse_code' => 'WH-01'],
+            (object) ['id_warehouse' => 2, 'warehouse_code' => 'WH-02'],
         ]);
 
         $this->repoMock

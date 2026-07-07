@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Database\Migrations;
 
 use Illuminate\Database\Migrations\Migration;
@@ -13,7 +15,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::connection('eudr_ts')->hasTable('log_transactions')) {
+        if (! Schema::connection('eudr_ts')->hasTable('log_transactions')) {
             Schema::connection('eudr_ts')->create('log_transactions', function (Blueprint $table) {
                 $table->bigIncrements('id');
                 $table->string('log_module', 50);

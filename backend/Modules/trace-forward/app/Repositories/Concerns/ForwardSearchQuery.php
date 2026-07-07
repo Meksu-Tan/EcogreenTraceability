@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceForward\Repositories\Concerns;
 
 use Illuminate\Database\Connection;
@@ -8,15 +10,16 @@ use Modules\Shared\Traits\DbCompatTrait;
 
 final class ForwardSearchQuery
 {
-    use PlantFilterTrait;
     use DbCompatTrait;
+    use PlantFilterTrait;
 
     public function __construct(private Connection $connection) {}
 
-    public function execute(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null): array
+    public function execute(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null, int $page = 1, int $perPage = 100): array
     {
         $plantFilter = $this->buildTablePlantFilter('th', $plantId, $userId);
 
+        $offset = ($page - 1) * $perPage;
         $bindings = array_merge([$materialId], $plantFilter['bindings']);
         $batchWhere = '';
         if ($batchNo) {
@@ -24,7 +27,7 @@ final class ForwardSearchQuery
             $bindings[] = "{$batchNo}%";
         }
 
-        $outQtyFmt      = $this->dbNumberFormat('td.out_qty', 3);
+        $outQtyFmt = $this->dbNumberFormat('td.out_qty', 3);
         $supplierConcat = $this->dbGroupConcat("DISTINCT CONCAT(s.description, ' / ', td.batch_sap, ' / ', {$outQtyFmt}, ' MT')", ' | ');
 
         $sql = "
@@ -42,14 +45,14 @@ final class ForwardSearchQuery
              WHERE th.id_material = ?
                AND th.status = 1
                {$batchWhere}
-               AND (" . $plantFilter['sql'] . ")
+               AND (".$plantFilter['sql'].')
              GROUP BY th.id_trace_head, th.from_trace_no, th.to_trace_no,
                      th.entry_date, th.in_qty, th.out_qty, th.id_material,
                      m.code, m.description, p.description, th.id_plant
-             ORDER BY th.entry_date DESC
-             LIMIT 100
-        ";
+              ORDER BY th.entry_date DESC
+              LIMIT ? OFFSET ?
+         ';
 
-        return $this->connection->select($sql, $bindings);
+        return $this->connection->select($sql, array_merge($bindings, [$perPage, $offset]));
     }
 }

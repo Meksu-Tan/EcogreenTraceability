@@ -107,9 +107,16 @@ const activeSourceMaterials = computed(() => {
 })
 
 const materialOptions = computed(() => {
-  return (blendingStore.activeMaterials || []).map(mat => ({
+  let materials = blendingStore.activeMaterials || []
+  if (props.idMaterial) {
+    const targetMat = materials.find(m => String(m.id_material) === String(props.idMaterial))
+    if (targetMat && targetMat.type) {
+      materials = materials.filter(m => String(m.type) === String(targetMat.type))
+    }
+  }
+  return materials.map(mat => ({
     value: mat.id_material,
-    title: mat.material_code || mat.description || mat.material
+    title: (mat.material_code || mat.description || mat.material) + (mat.type ? ` [${mat.type}]` : ' [No Type]')
   }))
 })
 

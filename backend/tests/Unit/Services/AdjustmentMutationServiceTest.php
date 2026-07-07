@@ -1,16 +1,18 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Mockery;
-use Mockery\MockInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Modules\Adjustment\Services\AdjustmentMutationService;
+use Mockery;
+use Mockery\MockInterface;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
-use Modules\Shared\Services\AuditService;
+use Modules\Adjustment\Services\AdjustmentMutationService;
 use Modules\Shared\Helpers\ResponseCode;
+use Modules\Shared\Services\AuditService;
+use Tests\TestCase;
 
 /**
  * Unit tests for AdjustmentMutationService.
@@ -46,7 +48,7 @@ class AdjustmentMutationServiceTest extends TestCase
     {
         // Use real AuditService — its static methods call DB::connection('eudr_ts')
         // which is already mocked via the DB facade in each test.
-        return new AdjustmentMutationService($this->repoMock, new AuditService());
+        return new AdjustmentMutationService($this->repoMock, new AuditService);
     }
 
     /**
@@ -73,13 +75,13 @@ class AdjustmentMutationServiceTest extends TestCase
         // PeriodLockService::isLocked queries m_period_lock first — return locked
         $conn->shouldReceive('select')
             ->once()
-            ->andReturn([(object)['lock_status' => '1']]);
+            ->andReturn([(object) ['lock_status' => '1']]);
 
         $service = $this->makeService();
-        $result  = $service->createAdjustmentHeader('Admin', [
-            'entry_date'   => '2024-01-15',
-            'adjust_no'    => 'ADJ-001',
-            'id_material'  => 1,
+        $result = $service->createAdjustmentHeader('Admin', [
+            'entry_date' => '2024-01-15',
+            'adjust_no' => 'ADJ-001',
+            'id_material' => 1,
             'after_adjust' => 500.0,
         ], 1002);
 
@@ -112,10 +114,10 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->createAdjustmentHeader('Admin', [
-            'entry_date'   => '2024-01-15',
-            'adjust_no'    => 'ADJ-001',
-            'id_material'  => 1,
+        $result = $service->createAdjustmentHeader('Admin', [
+            'entry_date' => '2024-01-15',
+            'adjust_no' => 'ADJ-001',
+            'id_material' => 1,
             'after_adjust' => 500.0,
         ], 1002);
 
@@ -134,7 +136,7 @@ class AdjustmentMutationServiceTest extends TestCase
             ->andReturn(null);
 
         $service = $this->makeService();
-        $result  = $service->approveAdjustment('Admin', 999, 2);
+        $result = $service->approveAdjustment('Admin', 999, 2);
 
         $this->assertEquals(0, $result['response']);
         $this->assertEquals('Adjustment not found', $result['message']);
@@ -148,10 +150,10 @@ class AdjustmentMutationServiceTest extends TestCase
             ->shouldReceive('getAdjustmentHeader')
             ->once()
             ->with(10)
-            ->andReturn((object)['status' => 2]); // already approved
+            ->andReturn((object) ['status' => 2]); // already approved
 
         $service = $this->makeService();
-        $result  = $service->approveAdjustment('Admin', 10, 2);
+        $result = $service->approveAdjustment('Admin', 10, 2);
 
         $this->assertEquals(2, $result['response']);
         $this->assertEquals('Adjustment already processed', $result['message']);
@@ -165,7 +167,7 @@ class AdjustmentMutationServiceTest extends TestCase
             ->shouldReceive('getAdjustmentHeader')
             ->once()
             ->with(10)
-            ->andReturn((object)['status' => 1]); // pending
+            ->andReturn((object) ['status' => 1]); // pending
 
         $conn = $this->mockEudrConnection();
 
@@ -183,7 +185,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->approveAdjustment('Admin', 10, 2);
+        $result = $service->approveAdjustment('Admin', 10, 2);
 
         $this->assertEquals(1, $result['response']);
     }
@@ -199,7 +201,7 @@ class AdjustmentMutationServiceTest extends TestCase
             ->andReturn(null);
 
         $service = $this->makeService();
-        $result  = $service->executeAdjustment('Admin', 999);
+        $result = $service->executeAdjustment('Admin', 999);
 
         $this->assertEquals(0, $result['response']);
         $this->assertEquals('Adjustment not found', $result['message']);
@@ -213,10 +215,10 @@ class AdjustmentMutationServiceTest extends TestCase
             ->shouldReceive('getAdjustmentHeader')
             ->once()
             ->with(15)
-            ->andReturn((object)['status' => 1]); // pending, not approved
+            ->andReturn((object) ['status' => 1]); // pending, not approved
 
         $service = $this->makeService();
-        $result  = $service->executeAdjustment('Admin', 15);
+        $result = $service->executeAdjustment('Admin', 15);
 
         $this->assertEquals(2, $result['response']);
         $this->assertEquals('Only APPROVED adjustments can be executed', $result['message']);
@@ -230,7 +232,7 @@ class AdjustmentMutationServiceTest extends TestCase
             ->shouldReceive('getAdjustmentHeader')
             ->once()
             ->with(15)
-            ->andReturn((object)['status' => 2]); // approved
+            ->andReturn((object) ['status' => 2]); // approved
 
         $conn = $this->mockEudrConnection();
 
@@ -247,7 +249,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->executeAdjustment('Admin', 15);
+        $result = $service->executeAdjustment('Admin', 15);
 
         $this->assertEquals(1, $result['response']);
     }
@@ -263,7 +265,7 @@ class AdjustmentMutationServiceTest extends TestCase
             ->andReturn(null);
 
         $service = $this->makeService();
-        $result  = $service->cancelAdjustment('Admin', 99, 'Wrong data');
+        $result = $service->cancelAdjustment('Admin', 99, 'Wrong data');
 
         $this->assertEquals(0, $result['response']);
         $this->assertEquals('Adjustment not found', $result['message']);
@@ -277,10 +279,10 @@ class AdjustmentMutationServiceTest extends TestCase
             ->shouldReceive('getAdjustmentHeader')
             ->once()
             ->with(20)
-            ->andReturn((object)['status' => 3]); // executed — not in [1,2]
+            ->andReturn((object) ['status' => 3]); // executed — not in [1,2]
 
         $service = $this->makeService();
-        $result  = $service->cancelAdjustment('Admin', 20, 'Wrong data');
+        $result = $service->cancelAdjustment('Admin', 20, 'Wrong data');
 
         $this->assertEquals(2, $result['response']);
         $this->assertEquals('Cannot cancel adjustment in current status', $result['message']);
@@ -294,7 +296,7 @@ class AdjustmentMutationServiceTest extends TestCase
             ->shouldReceive('getAdjustmentHeader')
             ->once()
             ->with(20)
-            ->andReturn((object)['status' => 1]); // pending
+            ->andReturn((object) ['status' => 1]); // pending
 
         $conn = $this->mockEudrConnection();
 
@@ -311,7 +313,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->cancelAdjustment('Admin', 20, 'Wrong data');
+        $result = $service->cancelAdjustment('Admin', 20, 'Wrong data');
 
         $this->assertEquals(1, $result['response']);
     }
@@ -324,7 +326,7 @@ class AdjustmentMutationServiceTest extends TestCase
             ->shouldReceive('getAdjustmentHeader')
             ->once()
             ->with(21)
-            ->andReturn((object)['status' => 2]); // approved — also cancellable
+            ->andReturn((object) ['status' => 2]); // approved — also cancellable
 
         $conn = $this->mockEudrConnection();
 
@@ -341,7 +343,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->cancelAdjustment('Admin', 21, 'Data error');
+        $result = $service->cancelAdjustment('Admin', 21, 'Data error');
 
         $this->assertEquals(1, $result['response']);
     }
@@ -368,7 +370,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->storeAdjustment('Admin', $data, 1002);
+        $result = $service->storeAdjustment('Admin', $data, 1002);
 
         $this->assertEquals(1, $result['response']);
     }
@@ -395,7 +397,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->never();
 
         $service = $this->makeService();
-        $result  = $service->storeAdjustment('Admin', $data, 1002);
+        $result = $service->storeAdjustment('Admin', $data, 1002);
 
         $this->assertEquals(0, $result['response']);
     }
@@ -419,7 +421,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->destroyAdjustment(7, 'Admin');
+        $result = $service->destroyAdjustment(7, 'Admin');
 
         $this->assertEquals(1, $result['response']);
     }
@@ -445,7 +447,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->never();
 
         $service = $this->makeService();
-        $result  = $service->deleteSupplierTemp(55);
+        $result = $service->deleteSupplierTemp(55);
 
         $this->assertEquals(1, $result['response']);
     }
@@ -471,7 +473,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->addEntrySupplier('Admin', $data, 1002);
+        $result = $service->addEntrySupplier('Admin', $data, 1002);
 
         $this->assertEquals(1, $result['response']);
     }
@@ -495,7 +497,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->adjustMaterialDocument(42, 'MD-001', 'Admin');
+        $result = $service->adjustMaterialDocument(42, 'MD-001', 'Admin');
 
         $this->assertEquals(1, $result['response']);
     }
@@ -519,7 +521,7 @@ class AdjustmentMutationServiceTest extends TestCase
         $conn->shouldReceive('insert')->once()->andReturn(true);
 
         $service = $this->makeService();
-        $result  = $service->adjustMaterialDocument(42, null, 'Admin');
+        $result = $service->adjustMaterialDocument(42, null, 'Admin');
 
         $this->assertEquals(1, $result['response']);
     }

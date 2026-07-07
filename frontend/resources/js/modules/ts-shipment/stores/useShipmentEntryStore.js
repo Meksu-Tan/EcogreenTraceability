@@ -141,7 +141,7 @@ export const useShipmentEntryStore = defineStore('shipmentEntry', () => {
   }
 
   const { execute: cancelEntry } = useTransactionAction(
-    (id, traceNo) => shipmentService.cancel(id, traceNo),
+    (id, traceNo, idTraceHead, idShipHead) => shipmentService.cancel(id, traceNo, idTraceHead, idShipHead),
     fetchEntries,
     'Shipment entry cancelled'
   )

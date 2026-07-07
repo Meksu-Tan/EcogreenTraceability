@@ -91,13 +91,5 @@ function selectPlant(id, name, code = '') {
 
 onMounted(async () => {
   if (plantStore.plants.length === 0) await plantStore.fetchPlants()
-
-  // If not admin and no plant is selected, auto-select the first assigned plant
-  if (!isAdmin.value && plantSelectionStore.selectedPlantId === null) {
-    const assigned = authStore.user?.plants || []
-    if (assigned.length > 0) {
-      selectPlant(assigned[0].id_plant, assigned[0].description, assigned[0].code_3 || '')
-    }
-  }
 })
 </script>

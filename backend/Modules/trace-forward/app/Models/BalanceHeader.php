@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceForward\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,8 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 class BalanceHeader extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_balance_header';
+
     protected $primaryKey = 'id_balance_head';
+
     public $timestamps = true;
 
     protected $fillable = [

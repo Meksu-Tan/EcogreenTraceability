@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceBackward\Repositories\Concerns;
 
 use Illuminate\Database\Connection;
@@ -22,7 +24,7 @@ final class ShipmentLookupQuery
     {
         $sql = "
             SELECT sh.id_ship_head, CAST(sh.trace_no AS TEXT) AS trace_no,
-                   sh.so_no, wh.batch_no
+                   sh.so_no, sh.id_plant, wh.batch_no
               FROM t_shipment_header sh
               LEFT JOIN t_warehouse_header wh ON sh.from_trace_no = wh.trace_no AND wh.status = 1
              WHERE {$where} AND sh.status = 1

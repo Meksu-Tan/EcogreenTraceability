@@ -128,7 +128,7 @@
                   <div class="d-flex justify-center gap-1">
                     <VBtn icon="ri-article-line" size="x-small" color="primary" variant="tonal" @click="openPoModal(row)" title="Edit PO" />
                     <VBtn icon="ri-edit-box-line" size="x-small" color="warning" variant="tonal" @click="openBatchModal(row)" title="Edit Batch & Warehouse" />
-                    <VBtn icon="ri-delete-bin-7-line" size="x-small" color="error" variant="tonal" @click="onCancel(row)" title="Cancel Entry" />
+                    <VBtn v-if="!row.next_process" icon="ri-delete-bin-7-line" size="x-small" color="error" variant="tonal" @click="onCancel(row)" title="Cancel Entry" />
                   </div>
                 </td>
               </tr>

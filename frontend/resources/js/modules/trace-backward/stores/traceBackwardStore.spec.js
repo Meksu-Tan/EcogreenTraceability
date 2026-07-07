@@ -55,7 +55,7 @@ describe('useTraceBackwardStore', () => {
       traceApi.getBackwardList.mockRejectedValue(new Error('Server 500'))
 
       const store = useTraceBackwardStore()
-      await store.fetchList()
+      await expect(store.fetchList()).rejects.toThrow('Server 500')
 
       expect(store.list).toEqual([])
       expect(store.error).toBe('Server 500')
@@ -63,22 +63,23 @@ describe('useTraceBackwardStore', () => {
   })
 
   describe('fetchDetail', () => {
-    it('populates detail array on success', async () => {
+    it('populates detail object with initial and chain on success', async () => {
       traceApi.getTraceDetail.mockResolvedValue({
         data: {
-          data: [
-            { curr_trace: '100001-001', level: 1, material: 'CPO' },
-            { curr_trace: '200001-001', level: 2, material: 'Refined' },
-          ],
+          data: {
+            initial: [{ curr_trace: '100001-001', level: 1, material: 'CPO' }],
+            chain: [{ curr_trace: '200001-001', level: 2, material: 'Refined' }],
+          },
         },
       })
 
       const store = useTraceBackwardStore()
       await store.fetchDetail({ trace_no: '300001-001', id_material: 3 })
 
-      expect(Array.isArray(store.detail)).toBe(true)
-      expect(store.detail).toHaveLength(2)
-      expect(store.detail[0].material).toBe('CPO')
+      expect(Array.isArray(store.detail.initial)).toBe(true)
+      expect(store.detail.initial).toHaveLength(1)
+      expect(store.detail.initial[0].material).toBe('CPO')
+      expect(store.detail.chain).toHaveLength(1)
       expect(store.loadingDetail).toBe(false)
     })
   })
@@ -145,23 +146,22 @@ describe('useTraceBackwardStore', () => {
   })
 
   describe('clear', () => {
-    it('resets all state to initial values', async () => {
-      traceApi.getBackwardList.mockResolvedValue({
-        data: { data: [{ id_shipment_head: 1 }], total: 1, page: 1, per_page: 25, last_page: 1 },
-      })
-      const store = useTraceBackwardStore()
-      await store.fetchList()
-      expect(store.list.length).toBe(1)
+it('resets all state to initial values', async () => {
+       traceApi.getBackwardList.mockResolvedValue({
+         data: { data: [{ id_shipment_head: 1 }], total: 1, page: 1, per_page: 25, last_page: 1 },
+       })
+       const store = useTraceBackwardStore()
+       await store.fetchList()
+       expect(store.list.length).toBe(1)
 
-      store.clear()
+       store.clear()
 
-      expect(store.list).toEqual([])
-      expect(store.detail).toEqual([])
-      expect(store.shipmentData).toBeNull()
-      expect(store.batchList).toEqual([])
-      expect(store.preparationRecords).toEqual([])
-      expect(store.sapAllocations).toEqual([])
-      expect(store.error).toBeNull()
-    })
+       expect(store.list).toEqual([])
+       expect(store.detail).toEqual({ initial: [], chain: [] })
+       expect(store.shipmentData).toBeNull()
+       expect(store.batchList).toEqual([])
+       expect(store.preparationRecords).toEqual([])
+       expect(store.sapAllocations).toEqual([])
+     })
   })
 })

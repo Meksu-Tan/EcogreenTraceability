@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Services\Contracts;
 
 interface AuditServiceInterface
@@ -7,12 +9,11 @@ interface AuditServiceInterface
     /**
      * Log a transaction to log_transactions table.
      *
-     * @param string $module Module name (e.g., 'TRANSFER', 'WIP', 'BLENDING')
-     * @param string $type Operation type (e.g., 'ADD', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT')
-     * @param string $description Human-readable description
-     * @param string|null $user User performing the operation
-     * @param array $metadata Additional metadata (optional)
-     * @return bool
+     * @param  string  $module  Module name (e.g., 'TRANSFER', 'WIP', 'BLENDING')
+     * @param  string  $type  Operation type (e.g., 'ADD', 'UPDATE', 'DELETE', 'APPROVE', 'REJECT')
+     * @param  string  $description  Human-readable description
+     * @param  string|null  $user  User performing the operation
+     * @param  array  $metadata  Additional metadata (optional)
      */
     public static function log(
         string $module,

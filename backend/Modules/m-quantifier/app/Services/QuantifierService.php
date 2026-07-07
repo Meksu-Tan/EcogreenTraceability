@@ -1,10 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Quantifier\Services;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Quantifier\Repositories\Contracts\QuantifierRepositoryInterface;
 use Modules\Quantifier\Services\Contracts\QuantifierServiceInterface;
-use Illuminate\Support\Facades\DB;
 
 class QuantifierService implements QuantifierServiceInterface
 {
@@ -14,9 +16,12 @@ class QuantifierService implements QuantifierServiceInterface
 
     public function getQuantifierList(array $filters = []): array
     {
+        $result = $this->repository->getQuantifierList($filters);
+
         return [
             'status' => 1,
-            'data' => $this->repository->getQuantifierList($filters),
+            'data' => $result['data'] ?? [],
+            'total' => $result['total'] ?? 0,
             'message' => 'Quantifier list retrieved',
         ];
     }
@@ -54,6 +59,7 @@ class QuantifierService implements QuantifierServiceInterface
                     );
                     $insertedIds[] = $id;
                 }
+
                 return ['response' => 1, 'message' => 'Bulk quantifier created', 'ids' => $insertedIds];
             }
 
@@ -62,6 +68,7 @@ class QuantifierService implements QuantifierServiceInterface
                 $id = $this->repository->createQuantifier(
                     $resetDate, $flowmeter, $value, $remark, $user
                 );
+
                 return ['response' => 1, 'message' => 'Quantifier created', 'id' => $id];
             }
 
@@ -71,6 +78,7 @@ class QuantifierService implements QuantifierServiceInterface
                 $result = $this->repository->updateQuantifier(
                     $id, $resetDate, $flowmeter, $value, $remark, $user
                 );
+
                 return $result;
             }
 

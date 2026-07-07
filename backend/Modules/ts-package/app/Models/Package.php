@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsPackage\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -7,11 +9,15 @@ use Illuminate\Database\Eloquent\Model;
 class Package extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_warehouse_header';
+
     protected $primaryKey = 'id_whx_head';
+
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
@@ -47,6 +53,6 @@ class Package extends Model
     public function details()
     {
         return $this->hasMany(WarehouseDetail::class, 'id_whx_head', 'id_whx_head')
-                    ->where('status', 1);
+            ->where('status', 1);
     }
 }

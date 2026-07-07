@@ -2,23 +2,124 @@ parameters:
   paths:
     - ./app
     - ./Modules
+
+  # ---- Layer set 1: Controller -> Service -> Repository -> Model chain ----
+  # ---- Layer set 2: per-module internal isolation (MOD-003) ----
   layers:
     - name: Controller
       collectors:
         - type: classNameRegex
-          value: /.*\\\\Http\\\\Controllers\\\\.*/
+          value: /.*\\Http\\Controllers\\.*/
     - name: Service
       collectors:
         - type: classNameRegex
-          value: /.*\\\\Services\\\\.*/
+          value: /.*\\Services\\.*/
     - name: Repository
       collectors:
         - type: classNameRegex
-          value: /.*\\\\Repositories\\\\.*/
+          value: /.*\\Repositories\\.*/
     - name: Model
       collectors:
         - type: classNameRegex
-          value: /.*\\\\Models\\\\.*/
+          value: /.*\\Models\\.*/
+
+    # Shared module — allowed dependency target for every module.
+    - name: Module-Shared
+      collectors:
+        - type: directory
+          value: Modules/Shared/.*
+
+    # One Internal layer per module — Services/Repositories/Models only.
+    # Cross-module import of another module's internal = MOD-003 violation.
+    - name: Module-Admin-Internal
+      collectors:
+        - type: directory
+          value: Modules/Admin/app/(Services|Repositories|Models)/.*
+    - name: Module-Auth-Internal
+      collectors:
+        - type: directory
+          value: Modules/Auth/app/(Services|Repositories|Models)/.*
+    - name: Module-Dashboard-Internal
+      collectors:
+        - type: directory
+          value: Modules/Dashboard/app/(Services|Repositories|Models)/.*
+    - name: Module-Inquiry-Internal
+      collectors:
+        - type: directory
+          value: Modules/Inquiry/app/(Services|Repositories|Models)/.*
+    - name: Module-Adjustment-Internal
+      collectors:
+        - type: directory
+          value: Modules/m-adjustment/app/(Services|Repositories|Models)/.*
+    - name: Module-Manufacturer-Internal
+      collectors:
+        - type: directory
+          value: Modules/m-manufacturer/app/(Services|Repositories|Models)/.*
+    - name: Module-Material-Internal
+      collectors:
+        - type: directory
+          value: Modules/m-material/app/(Services|Repositories|Models)/.*
+    - name: Module-Plant-Internal
+      collectors:
+        - type: directory
+          value: Modules/m-plant/app/(Services|Repositories|Models)/.*
+    - name: Module-Quantifier-Internal
+      collectors:
+        - type: directory
+          value: Modules/m-quantifier/app/(Services|Repositories|Models)/.*
+    - name: Module-Supplier-Internal
+      collectors:
+        - type: directory
+          value: Modules/m-supplier/app/(Services|Repositories|Models)/.*
+    - name: Module-Tank-Internal
+      collectors:
+        - type: directory
+          value: Modules/m-tank/app/(Services|Repositories|Models)/.*
+    - name: Module-TraceBackward-Internal
+      collectors:
+        - type: directory
+          value: Modules/trace-backward/app/(Services|Repositories|Models)/.*
+    - name: Module-TraceForward-Internal
+      collectors:
+        - type: directory
+          value: Modules/trace-forward/app/(Services|Repositories|Models)/.*
+    - name: Module-TsBlending-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-blending/app/(Services|Repositories|Models)/.*
+    - name: Module-TsPackage-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-package/app/(Services|Repositories|Models)/.*
+    - name: Module-TsRaw-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-raw/app/(Services|Repositories|Models)/.*
+    - name: Module-TsRmreport-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-rmreport/app/(Services|Repositories|Models)/.*
+    - name: Module-TsShipment-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-shipment/app/(Services|Repositories|Models)/.*
+    - name: Module-TsStock-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-stock/app/(Services|Repositories|Models)/.*
+    - name: Module-TsTransfer-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-transfer/app/(Services|Repositories|Models)/.*
+    - name: Module-TsTsreport-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-tsreport/app/(Services|Repositories|Models)/.*
+    - name: Module-TsWip-Internal
+      collectors:
+        - type: directory
+          value: Modules/ts-wip/app/(Services|Repositories|Models)/.*
+
   ruleset:
     Controller:
       - Service
@@ -28,3 +129,29 @@ parameters:
     Repository:
       - Model
     Model: ~
+
+    # MOD-003 — every module's Internal layer may depend on Shared only,
+    # never on another module's Internal layer.
+    Module-Admin-Internal: [Module-Shared]
+    Module-Auth-Internal: [Module-Shared]
+    Module-Dashboard-Internal: [Module-Shared]
+    Module-Inquiry-Internal: [Module-Shared]
+    Module-Adjustment-Internal: [Module-Shared]
+    Module-Manufacturer-Internal: [Module-Shared]
+    Module-Material-Internal: [Module-Shared]
+    Module-Plant-Internal: [Module-Shared]
+    Module-Quantifier-Internal: [Module-Shared]
+    Module-Supplier-Internal: [Module-Shared]
+    Module-Tank-Internal: [Module-Shared]
+    Module-TraceBackward-Internal: [Module-Shared]
+    Module-TraceForward-Internal: [Module-Shared]
+    Module-TsBlending-Internal: [Module-Shared]
+    Module-TsPackage-Internal: [Module-Shared]
+    Module-TsRaw-Internal: [Module-Shared]
+    Module-TsRmreport-Internal: [Module-Shared]
+    Module-TsShipment-Internal: [Module-Shared]
+    Module-TsStock-Internal: [Module-Shared]
+    Module-TsTransfer-Internal: [Module-Shared]
+    Module-TsTsreport-Internal: [Module-Shared]
+    Module-TsWip-Internal: [Module-Shared]
+    Module-Shared: ~

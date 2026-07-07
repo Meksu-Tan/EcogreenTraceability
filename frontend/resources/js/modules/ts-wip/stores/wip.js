@@ -248,46 +248,11 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       const data = await wipApi.getQuantifierData(date, tagNumber)
       return data
     } catch (error) {
-      toastStore.error('Fetch quantifier data error')
-      throw error
-    }
-  }
-
-  // Auto-fill quantifier for feed entry
-  async function autoFillQuantifier(feedId, entryDate) {
-    try {
-      // GAP C: Fixed DCS tag names - actual Airflow historian table names
-      // These are the physical flow transmitter tag numbers from the original system
-      const quantifierTags = {
-        '101': '101_FT0113',     // CPKO Feed
-        '102': '102_FT0129',     // DA-OIL Rundown
-        '103': '103_FT0101',     // DA-OIL Feed
-        '104': '104_FT0101',     // Crude-ME Feed
-        '105': '105_FT0101',     // PKFAD Feed
-        '111': '111_FT0113',     // Glycerine Feed
-        '112': '112_FT0113',     // FA18/FA24 Feed
-        '114': '114_FT0113',     // FA14/Ecorol Wax Feed
-      }
-
-      const tagNumber = quantifierTags[feedId]
-      if (!tagNumber) {
-        toastStore.info('No quantifier tag available for this feed')
-        return null
-      }
-
-      const data = await fetchQuantifierData(entryDate, tagNumber)
-      if (data && data.length > 0) {
-        return {
-          currQtf: parseFloat(data[0].value) || 0,
-          timestamp: data[0].timestamp || entryDate
-        }
-      }
-      return null
-    } catch (error) {
-      toastStore.error('Auto-fill quantifier error')
+      toastStore.error(error?.message || 'Fetch quantifier data error')
       return null
     }
   }
+
 
   async function saveFeed(data) {
     if (!plantId.value) {
@@ -309,8 +274,9 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to save feed')
-      throw error
+      const msg = error?.response?.data?.message || error?.message || 'Failed to save feed'
+      toastStore.error(msg)
+      return { status: 0, message: msg }
     } finally {
       loading.value = false
     }
@@ -336,8 +302,9 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to save rundown')
-      throw error
+      const msg = error?.response?.data?.message || error?.message || 'Failed to save rundown'
+      toastStore.error(msg)
+      return { status: 0, message: msg }
     } finally {
       loading.value = false
     }
@@ -355,8 +322,8 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to cancel feed')
-      throw error
+      toastStore.error(error?.message || 'Failed to cancel feed')
+      return { status: 0, message: error?.message || 'Network error' }
     } finally {
       loading.value = false
     }
@@ -374,8 +341,8 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to cancel rundown')
-      throw error
+      toastStore.error(error?.message || 'Failed to cancel rundown')
+      return { status: 0, message: error?.message || 'Network error' }
     } finally {
       loading.value = false
     }
@@ -391,8 +358,8 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to save material document')
-      throw error
+      toastStore.error(error?.message || 'Failed to save material document')
+      return { status: 0, message: error?.message || 'Network error' }
     }
   }
 
@@ -406,8 +373,8 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
       }
       return res
     } catch (error) {
-      toastStore.error('Failed to update sub-tank')
-      throw error
+      toastStore.error(error?.message || 'Failed to update sub-tank')
+      return { status: 0, message: error?.message || 'Network error' }
     }
   }
 
@@ -486,7 +453,6 @@ export const useTsWipEntryStore = defineStore('transactionWipEntry', () => {
     fetchActiveTanksRundown,
     fetchActiveSpecificTanks,
     fetchQuantifierData,
-    autoFillQuantifier,
     saveFeed,
     saveRundown,
     cancelFeed,

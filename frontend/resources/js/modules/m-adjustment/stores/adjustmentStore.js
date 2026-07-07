@@ -32,13 +32,14 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   async function fetchList(params = {}) {
     await withLoading(async () => {
       const res = await adjustmentApi.getAdjustmentList(params)
-      const payload = res.data?.data || {}
-      data.value = payload.data || (Array.isArray(payload) ? payload : [])
+      const outer = res.data || {}
+      const rows = outer.data || []
+      data.value = Array.isArray(rows) ? rows : []
       listMeta.value = {
-        page: payload.page || params.page || 1,
-        perPage: payload.per_page || params.per_page || 10,
-        total: payload.total || data.value.length,
-        lastPage: payload.last_page || 1,
+        page: outer.current_page || params.page || 1,
+        perPage: outer.per_page || params.per_page || 10,
+        total: outer.total || data.value.length,
+        lastPage: outer.last_page || 1,
       }
     })
     if (error.value) data.value = []
@@ -103,6 +104,13 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     } catch { supplierList.value = [] }
   }
 
+  async function fetchSupplierByFilter(params = {}) {
+    try {
+      const res = await adjustmentApi.getSupplierByFilter(params)
+      supplierList.value = res.data?.data || []
+    } catch { supplierList.value = [] }
+  }
+
   async function fetchSuppliers(params = {}) {
     try {
       const res = await adjustmentApi.searchSuppliers(params)
@@ -134,13 +142,14 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
   async function fetchPeriodHeaders(params = {}) {
     try {
       const res = await adjustmentApi.getPeriodHeaders(params)
-      const payload = res.data?.data || {}
-      periodHeaders.value = payload.data || (Array.isArray(payload) ? payload : [])
+      const outer = res.data || {}
+      const rows = outer.data || []
+      periodHeaders.value = Array.isArray(rows) ? rows : []
       periodMeta.value = {
-        page: payload.page || params.page || 1,
-        perPage: payload.per_page || params.per_page || 10,
-        total: payload.total || periodHeaders.value.length,
-        lastPage: payload.last_page || 1,
+        page: outer.current_page || params.page || 1,
+        perPage: outer.per_page || params.per_page || 10,
+        total: outer.total || periodHeaders.value.length,
+        lastPage: outer.last_page || 1,
       }
     } catch {
       periodHeaders.value = []
@@ -283,6 +292,14 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     return res.data
   }
 
+  async function periodHeaderUnlock(data) {
+    const res = await adjustmentApi.periodHeaderUnlock(data)
+    if (res.data?.status === 1) {
+      await fetchPeriodHeaders()
+    }
+    return res.data
+  }
+
   async function destroyAdjustmentPeriod(id) {
     const res = await adjustmentApi.destroyAdjustmentPeriod(id)
     if (res.data?.status === 1) {
@@ -322,6 +339,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     fetchActiveMaterials, fetchActiveMaterialWhx, fetchActiveTanks,
     fetchActiveSpecificTanks, fetchActiveWhx,
     fetchSupplierList, fetchSuppliers, fetchBatchBySupplier, fetchLockStatus, fetchEntryNo,
+    fetchSupplierByFilter,
     fetchPeriodHeaders, fetchPeriodViewData, fetchAdjustStatus,
     storeAdjustment, storeAdjustmentWhx, destroyAdjustment,
     addEntrySupplier, deleteSupplierTemp,
@@ -329,7 +347,7 @@ export const useAdjustmentStore = defineStore('adjustment', () => {
     approveAdjustment, executeAdjustment, cancelAdjustment,
     adjustMaterialDocument,
     periodHeadersUpload, periodViewOnHand, periodViewAdjustment,
-    periodHeaderLock, destroyAdjustmentPeriod,
+    periodHeaderLock, periodHeaderUnlock, destroyAdjustmentPeriod,
     generateBatchCode,
     clearData, clearSpecificTanks,
   }

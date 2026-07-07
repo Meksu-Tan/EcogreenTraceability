@@ -1,9 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsWip\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Shared\Helpers\TraceHelper;
 
 class WipTreeService
 {
@@ -52,6 +53,7 @@ class WipTreeService
                         $prefix = substr($mapped['rundownId'], 0, 3);
                         $rundownPrefixes[$prefix] = true;
                     }
+
                     return $mapped;
                 })
                 ->values()
@@ -60,7 +62,7 @@ class WipTreeService
             return [
                 'id' => (int) $section->id,
                 'code' => (string) $section->code,
-                'key' => 'section' . $section->code,
+                'key' => 'section'.$section->code,
                 'name' => (string) $section->name,
                 'title' => (string) $section->name,
                 'steps' => $sectionSteps,
@@ -88,7 +90,9 @@ class WipTreeService
 
     private function fetchLatestTraces(array $prefixes, string $tracePrefix, ?string $idPlant): array
     {
-        if (empty($prefixes)) return [];
+        if (empty($prefixes)) {
+            return [];
+        }
 
         $placeholders = [];
         $bindings = [];
@@ -148,7 +152,7 @@ class WipTreeService
         return [
             'id' => $entryId ? (string) $entryId : (string) $step->id,
             'stepId' => (int) $step->id,
-            'key' => $type . '-' . $step->id,
+            'key' => $type.'-'.$step->id,
             'type' => $type,
             'label' => $title,
             'title' => $title,
@@ -160,8 +164,20 @@ class WipTreeService
             'dcsTag' => $step->dcs_tag ? (string) $step->dcs_tag : null,
             'modeGroup' => $step->mode_group ? (string) $step->mode_group : null,
             'modeValue' => $step->mode_value ? (string) $step->mode_value : null,
-            'conditions' => is_array($conditions) ? $conditions : [],
-            'config' => is_array($config) ? $config : [],
+            'conditions' => ($type !== 'mode_switch' && $step->mode_group && $step->mode_value)
+                ? array_merge(
+                    is_array($conditions) ? $conditions : [],
+                    [$step->mode_group => array_map('trim', explode(',', $step->mode_value))]
+                )
+                : (is_array($conditions) ? $conditions : []),
+            'config' => $type === 'mode_switch' && $step->mode_value ? [
+                'default' => array_map('trim', explode(',', $step->mode_value))[0] ?? null,
+                'options' => array_map(function ($v) {
+                    $v = trim($v);
+
+                    return ['label' => $v, 'value' => $v];
+                }, explode(',', $step->mode_value)),
+            ] : (is_array($config) ? $config : []),
             'icon' => str_starts_with($title, 'END') ? 'ri-flag-checkered-line' : 'ri-arrow-down-line',
             'latestTrace' => null,
         ];
@@ -169,9 +185,14 @@ class WipTreeService
 
     private function decodeJson(mixed $value): ?array
     {
-        if (!$value) return null;
-        if (is_array($value)) return $value;
+        if (! $value) {
+            return null;
+        }
+        if (is_array($value)) {
+            return $value;
+        }
         $decoded = json_decode((string) $value, true);
+
         return is_array($decoded) ? $decoded : null;
     }
 }

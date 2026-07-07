@@ -1,15 +1,17 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use Tests\TestCase;
-use Mockery;
-use Mockery\MockInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Modules\Adjustment\Services\AdjustmentPeriodService;
+use Mockery;
+use Mockery\MockInterface;
 use Modules\Adjustment\Repositories\Contracts\AdjustmentRepositoryInterface;
+use Modules\Adjustment\Services\AdjustmentPeriodService;
 use Modules\Shared\Services\AuditService;
+use Tests\TestCase;
 
 /**
  * Unit tests for AdjustmentPeriodService.
@@ -43,7 +45,7 @@ class AdjustmentPeriodServiceTest extends TestCase
 
     private function makeService(): AdjustmentPeriodService
     {
-        return new AdjustmentPeriodService($this->repoMock, new AuditService());
+        return new AdjustmentPeriodService($this->repoMock, new AuditService);
     }
 
     private function mockEudrConnection(): MockInterface
@@ -133,8 +135,8 @@ class AdjustmentPeriodServiceTest extends TestCase
             ->andReturnUsing(fn (callable $cb) => $cb());
 
         $expected = ['response' => 1, 'message' => 'Upload successful'];
-        $data     = ['period_date' => '2026-01-01'];
-        $file     = 'dummy_file';
+        $data = ['period_date' => '2026-01-01'];
+        $file = 'dummy_file';
 
         $this->repoMock
             ->shouldReceive('periodHeadersUpload')
@@ -279,7 +281,7 @@ class AdjustmentPeriodServiceTest extends TestCase
             ->once()
             ->andReturnUsing(fn (callable $cb) => $cb());
 
-        $data     = ['adj_no' => 'ADJ-WHX-001', 'id_material' => 2];
+        $data = ['adj_no' => 'ADJ-WHX-001', 'id_material' => 2];
         $expected = ['response' => 1, 'message' => 'WHX adjustment stored'];
 
         $this->repoMock
@@ -304,7 +306,7 @@ class AdjustmentPeriodServiceTest extends TestCase
             ->once()
             ->andReturnUsing(fn (callable $cb) => $cb());
 
-        $data     = ['adj_no' => 'ADJ-WHX-002', 'id_material' => 3];
+        $data = ['adj_no' => 'ADJ-WHX-002', 'id_material' => 3];
         $expected = ['response' => 0, 'message' => 'WHX adjustment failed'];
 
         $this->repoMock
@@ -331,7 +333,7 @@ class AdjustmentPeriodServiceTest extends TestCase
             ->once()
             ->andReturnUsing(fn (callable $cb) => $cb());
 
-        $data     = ['id_material' => 5, 'qty' => 300.0];
+        $data = ['id_material' => 5, 'qty' => 300.0];
         $expected = ['response' => 1, 'message' => 'WHX init done'];
 
         $this->repoMock
@@ -355,7 +357,7 @@ class AdjustmentPeriodServiceTest extends TestCase
             ->once()
             ->andReturnUsing(fn (callable $cb) => $cb());
 
-        $data     = ['id_material' => 6, 'qty' => 0.0];
+        $data = ['id_material' => 6, 'qty' => 0.0];
         $expected = ['response' => 0, 'message' => 'Init failed'];
 
         $this->repoMock

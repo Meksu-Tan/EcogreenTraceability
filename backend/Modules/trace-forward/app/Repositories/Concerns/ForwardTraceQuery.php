@@ -1,20 +1,25 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TraceForward\Repositories\Concerns;
 
 use Illuminate\Database\Connection;
+use Modules\Shared\Repositories\Traits\PlantFilterTrait;
 use Modules\Shared\Traits\DbCompatTrait;
 
 final class ForwardTraceQuery
 {
-    use DbCompatTrait;
+    use DbCompatTrait, PlantFilterTrait;
 
     public function __construct(private Connection $connection) {}
 
-    public function execute(string $traceNo, ?int $idMaterial = null): array
+    public function execute(string $traceNo, ?int $idMaterial = null, ?int $plantId = null, ?int $userId = null): array
     {
         $materialFilter = $idMaterial ? ' AND b.id_material = ?' : '';
         $materialBinding = $idMaterial ? [$traceNo, $idMaterial] : [$traceNo];
+        $plantFilter = $this->buildTablePlantFilter('b', $plantId, $userId);
+        $recursivePlantFilter = $plantFilter['bindings'] ? ' AND t.id_plant = ?' : '';
 
         $cte = '
             WITH RECURSIVE ForwardBOM AS (
@@ -35,7 +40,7 @@ final class ForwardTraceQuery
                     CONCAT(b.from_trace_no, \'>\', b.to_trace_no) AS trace_chain
                 FROM t_trace_header b
                 LEFT JOIN t_material_document c ON b.id_trace_head = c.id_trace_head
-                WHERE b.to_trace_no = ? AND b.status = 1' . $materialFilter . '
+                WHERE b.to_trace_no = ? AND b.status = 1'.$materialFilter." AND {$plantFilter['sql']}".'
                 UNION ALL
                 SELECT
                     ForwardBOM.parent_trace_no,
@@ -58,20 +63,20 @@ final class ForwardTraceQuery
                                 AND t2.status = \'1\') AS TEXT), 2, \'0\')) AS path,
                     CONCAT(ForwardBOM.trace_chain, \'>\', t.to_trace_no) AS trace_chain
                 FROM ForwardBOM
-                JOIN t_trace_header t ON ForwardBOM.child_trace_no = t.from_trace_no AND t.status = 1
+                JOIN t_trace_header t ON ForwardBOM.child_trace_no = t.from_trace_no AND t.status = 1'.$recursivePlantFilter.'
                 LEFT JOIN t_material_document tt ON tt.id_trace_head = t.id_trace_head
                 WHERE ForwardBOM.level < 50
                   AND POSITION(CONCAT(\'>\', t.to_trace_no, \'>\') IN CONCAT(\'>\', ForwardBOM.trace_chain, \'>\')) = 0
             )';
 
-        $inQtyFmt    = $this->dbNumberFormat('c.in_qty', 3);
-        $outQtyFmt   = $this->dbNumberFormat('c.out_qty', 3);
-        $tdInQtyFmt  = $this->dbNumberFormat('td.in_qty', 3);
+        $inQtyFmt = $this->dbNumberFormat('c.in_qty', 3);
+        $outQtyFmt = $this->dbNumberFormat('c.out_qty', 3);
+        $tdInQtyFmt = $this->dbNumberFormat('td.in_qty', 3);
         $tdOutQtyFmt = $this->dbNumberFormat('td.out_qty', 3);
-        $supplierConcat    = "STRING_AGG(DISTINCT CONCAT(sup.description, ' / ', td.batch_sap, ' / ', {$tdInQtyFmt}, ' MT'), ' || ')";
+        $supplierConcat = "STRING_AGG(DISTINCT CONCAT(sup.description, ' / ', td.batch_sap, ' / ', {$tdInQtyFmt}, ' MT'), ' || ')";
         $supplierConcatOut = "STRING_AGG(DISTINCT CONCAT(sup.description, ' / ', td.batch_sap, ' / ', {$tdOutQtyFmt}, ' MT'), ' || ')";
 
-        $select = $cte . "
+        $select = $cte."
             SELECT
                 c.parent_trace_no,
                 c.id_trace_head,
@@ -114,6 +119,6 @@ final class ForwardTraceQuery
             ORDER BY path
         ";
 
-        return $this->connection->select($select, $materialBinding);
+        return $this->connection->select($select, array_merge($materialBinding, $plantFilter['bindings'], $plantFilter['bindings']));
     }
 }

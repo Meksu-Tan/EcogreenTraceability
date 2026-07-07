@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Shared\Traits;
 
 /**
@@ -19,6 +21,7 @@ trait DbCompatTrait
         }
         $d = $distinct ? 'DISTINCT ' : '';
         $o = $orderBy ? " ORDER BY {$orderBy}" : '';
+
         return "STRING_AGG({$d}{$expr}, '{$sep}'{$o})";
     }
 
@@ -29,6 +32,7 @@ trait DbCompatTrait
             ['YYYY', 'YY', 'MM', 'DD', 'HH24', 'MI', 'SS'],
             $mysqlFmt
         );
+
         return "TO_CHAR({$col}, '{$pgFmt}')";
     }
 
@@ -66,6 +70,7 @@ trait DbCompatTrait
     {
         $zeros = str_repeat('0', $decimals);
         $pgCol = preg_replace('/\bROUND\(([^,]+),(\d+)\)/', 'ROUND(CAST($1 AS numeric),$2)', $col);
+
         return "TO_CHAR(ROUND(CAST({$pgCol} AS numeric), {$decimals}), 'FM999999999999990.{$zeros}')";
     }
 
@@ -100,8 +105,8 @@ trait DbCompatTrait
     protected function buildPlantNameSql(string $traceNoCol, string $idPlantCol): string
     {
         $textType = 'TEXT';
-        $cast     = "CAST({$traceNoCol} AS {$textType})";
-        $castId   = "CAST({$idPlantCol} AS {$textType})";
+        $cast = "CAST({$traceNoCol} AS {$textType})";
+        $castId = "CAST({$idPlantCol} AS {$textType})";
 
         return "CASE
             WHEN LENGTH({$cast}) >= 14 THEN
@@ -128,6 +133,7 @@ trait DbCompatTrait
     protected function isPgsql(): bool
     {
         $conn = property_exists($this, 'connection') ? ($this->connection ?? config('database.default')) : config('database.default');
+
         return config("database.connections.{$conn}.driver") === 'pgsql';
     }
 }

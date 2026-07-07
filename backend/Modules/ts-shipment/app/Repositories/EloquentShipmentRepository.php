@@ -1,17 +1,22 @@
-<?php declare(strict_types=1);
+<?php
+
+declare(strict_types=1);
 
 namespace Modules\TsShipment\Repositories;
 
-use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
-use Modules\Shared\Constants\TransactionResponseCode;
-use Modules\Shared\Helpers\QuantityDistributionHelper;
-use Modules\Shared\Traits\DbCompatTrait;
-use Modules\Shared\Traits\TransactionLoggerTrait;
-use Modules\Shared\Services\PeriodLockService;
-use Modules\TsShipment\Support\DispatchType;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Modules\Shared\Constants\TransactionResponseCode;
+use Modules\Shared\Helpers\QuantityDistributionHelper;
+use Modules\Shared\Helpers\TraceHelper;
+use Modules\Shared\Services\PeriodLockService;
+use Modules\Shared\Services\TraceNumberService;
+use Modules\Shared\Services\TransactionCancellationService;
+use Modules\Shared\Traits\DbCompatTrait;
+use Modules\Shared\Traits\TransactionLoggerTrait;
+use Modules\TsShipment\Repositories\Contracts\ShipmentRepositoryInterface;
+use Modules\TsShipment\Support\DispatchType;
 
 /**
  * @todo Technical Debt: This class is 675 lines (limit: 200). Requires refactoring into smaller, focused classes.
@@ -28,7 +33,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
     public function getDtShipEntry(int $plantId = 0, int $page = 1, int $perPage = 50): array
     {
         $castToText = $this->isPgsql() ? 'TEXT' : 'CHAR';
-        $orderBy  = $this->isPgsql()
+        $orderBy = $this->isPgsql()
             ? 'ORDER BY a.entry_date DESC, MIN(a.id_ship_head) DESC'
             : 'ORDER BY a.entry_date DESC, a.id_ship_head DESC';
 
@@ -55,7 +60,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                    MIN(f.id_trace_head) AS id_trace_head, MIN(f.id_balance_head) AS id_balance_head, a.trace_no, a.from_trace_no, MIN(f.batch_no) AS batch_no,
                    {$this->dbGroupConcat("CONCAT(d.description, ' / ', d.batch_sap, ' / Qty: ', {$this->dbNumberFormat('d.qty', 3)}, ' MT')", ' | ', true)} AS supplier,
                    {$this->dbNumberFormat('ROUND(CAST(dd.qty AS numeric),3)', 3)} AS balance_supplier, MAX(a.doc_url) AS doc_url,
-                   MAX(" . \Modules\Shared\Helpers\TraceHelper::plantNameExpression('a.trace_no') . ") AS plant_name,
+                   MAX(".TraceHelper::plantNameExpression('a.trace_no').") AS plant_name,
                    MAX(CASE
                        WHEN a.trace_no = (SELECT to_trace_no
                                             FROM t_trace_header
@@ -68,7 +73,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                         WHEN a.trace_no = (SELECT from_trace_no
                                              FROM t_trace_header
                                             WHERE SUBSTRING(from_trace_no, 1, 1) = '4'
-                                              AND " . \Modules\Shared\Helpers\TraceHelper::warehouseCondition('from_trace_no', '<>', '000') . "
+                                              AND ".TraceHelper::warehouseCondition('from_trace_no', '<>', '000')."
                                               AND status = 1
                                             ORDER BY from_trace_no DESC LIMIT 1) THEN 1
                        ELSE NULL
@@ -84,7 +89,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                           GROUP BY dd.trace_no, e.description, d.batch_sap
                         ) d ON a.trace_no = d.trace_no
                LEFT JOIN (SELECT dd.trace_no, {$rndEe} AS qty,
-                                {$this->dbGroupConcat('CAST(dd.from_trace_no AS ' . $castToText . ')', ' + ', true)} AS from_trace_no
+                                {$this->dbGroupConcat('CAST(dd.from_trace_no AS '.$castToText.')', ' + ', true)} AS from_trace_no
                            FROM t_shipment_header dd
                            LEFT JOIN t_shipment_detail ee ON dd.id_ship_head = ee.id_ship_head
                           WHERE dd.status = 1
@@ -106,15 +111,15 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
         ", $bindings);
 
         $countBindings = $plantId > 0 ? [$plantId] : [];
-        $countResult = DB::connection($this->connection)->select("
+        $countResult = DB::connection($this->connection)->select('
             SELECT COUNT(DISTINCT a.trace_no) AS total
               FROM t_shipment_header a
              WHERE a.status = 1
-               " . ($plantId > 0 ? 'AND a.id_plant = ?' : '') . "
-        ", $countBindings);
+               '.($plantId > 0 ? 'AND a.id_plant = ?' : '').'
+        ', $countBindings);
 
         return [
-            'data'  => collect($results),
+            'data' => collect($results),
             'total' => (int) ($countResult[0]->total ?? 0),
         ];
     }
@@ -128,6 +133,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
              WHERE a.status = 1
              ORDER BY material ASC
         ");
+
         return collect($results);
     }
 
@@ -146,6 +152,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                        CONCAT(b.description, ' (', b.code, ') || Balance : ', {$this->dbNumberFormat('COALESCE(SUM(a.qty),0)', 3)}, ' MT') AS wip_material
                   FROM m_material b
                   LEFT JOIN t_balance_header a ON a.id_material = b.id_material AND a.status = 1 AND a.id_plant = ?
+                   AND SUBSTRING(a.trace_no FROM 1 FOR 1) IN ('1','2','3','7','8','9')
                  WHERE b.id_material = ?
                    AND b.status = 1
                  GROUP BY b.description, b.code
@@ -173,8 +180,8 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
         $idMaterial = $parts[1] ?? 0;
         $idPlant = $data['id_plant'] ?? null;
 
-        $results = DB::connection($this->connection)->select("
-            SELECT " . ($this->isPgsql() ? 'DISTINCT' : '') . " a.batch_no, CONCAT(a.batch_no, ' | Qty : ', {$this->dbNumberFormat('b.qty', 3)}) AS description
+        $results = DB::connection($this->connection)->select('
+            SELECT '.($this->isPgsql() ? 'DISTINCT' : '')." a.batch_no, CONCAT(a.batch_no, ' | Qty : ', {$this->dbNumberFormat('b.qty', 3)}) AS description
               FROM t_warehouse_header a
               LEFT JOIN (SELECT b.id_material_fg, b.batch_no, SUM(b.qty) AS qty
                            FROM t_warehouse_header b
@@ -184,8 +191,8 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                AND a.status = 1
                AND a.qty > '0.000001'
                AND a.id_plant = ?
-             " . ($this->isPgsql() ? '' : 'GROUP BY a.batch_no') . "
-        ", [$idMaterial, $idPlant]);
+             ".($this->isPgsql() ? '' : 'GROUP BY a.batch_no').'
+        ', [$idMaterial, $idPlant]);
 
         return collect($results);
     }
@@ -337,7 +344,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             $entryDate = $data['entryDate'];
             $idMaterialPck = $data['fgProduct'];
             $soNo = $data['soNo'];
-            $outQty = (float)$data['qty'];
+            $outQty = (float) $data['qty'];
             $batchNo = $data['batch_no'];
             $fileName = $data['filename'] ?? null;
             $idPlant = $data['id_plant'] ?? null;
@@ -355,7 +362,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             }
 
             // Find stock headers — MOVED inside transaction below with FOR UPDATE
-            $outQty = (float)$data['qty'];
+            $outQty = (float) $data['qty'];
 
             return DB::connection($this->connection)->transaction(function () use ($idMaterial, $batchNo, $idPlant, $outQty, $entryDate, $soNo, $fileName, $user) {
                 // Read warehouse stock WITH FOR UPDATE inside transaction
@@ -377,7 +384,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 }
 
                 // Generate shipment trace no using warehouse from batch (m_warehouse)
-                $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+                $svc = app(TraceNumberService::class);
                 $plantCode = $svc->resolvePlantCode((string) $idPlant);
                 $whRow = DB::connection($this->connection)->selectOne(
                     'SELECT id_warehouse FROM m_warehouse WHERE id_batch = ? AND status = 1 LIMIT 1',
@@ -389,16 +396,20 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                 $lenHead = count($datHead);
                 $remainingOutQty = $outQty;
                 for ($i = 0; $i < $lenHead; $i++) {
-                    if ($remainingOutQty <= 0) break;
+                    if ($remainingOutQty <= 0) {
+                        break;
+                    }
 
                     $idHead = $datHead[$i]->id_whx_head;
                     $fromTraceNo = $datHead[$i]->trace_no;
-                    $qty = (float)$datHead[$i]->qty;
-                    $totalOutQty = (float)$datHead[$i]->out_qty;
-                    $initQty = (float)$datHead[$i]->init_qty;
+                    $qty = (float) $datHead[$i]->qty;
+                    $totalOutQty = (float) $datHead[$i]->out_qty;
+                    $initQty = (float) $datHead[$i]->init_qty;
                     $idWarehouse = $datHead[$i]->id_section;
 
-                    if ($qty <= 0) continue;
+                    if ($qty <= 0) {
+                        continue;
+                    }
 
                     $balanceAfter = $qty - $remainingOutQty;
                     if ($balanceAfter < 0) {
@@ -416,7 +427,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                     // Update Warehouse Header
                     DB::connection($this->connection)->update('
                         UPDATE t_warehouse_header
-                           SET qty = ?, out_qty = ?, updated_by = ?
+                           SET qty = ?, out_qty = ?, updated_by = ?, updated_at = NOW()
                          WHERE id_whx_head = ?
                     ', [$newBalance, $newTotalOutQty, $user, $idHead]);
 
@@ -449,10 +460,10 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
                     // Log transactions
                     $this->logTransaction('T_TRACE_HEAD', 'ADD SHIP',
-                        'IDTRACEHEAD: ' . $idTraceHead . 'IDHEAD: ' . $idHead . ' | DATE: ' . $entryDate . ' / OUT_QTY: ' . $useQtyWh, $user);
+                        'IDTRACEHEAD: '.$idTraceHead.'IDHEAD: '.$idHead.' | DATE: '.$entryDate.' / OUT_QTY: '.$useQtyWh, $user);
 
                     $this->logTransaction('T_WH_HEAD', 'ADD SHIP',
-                        'IDSHIPHEAD: ' . $idShipHead . 'IDTRACEHEAD: ' . $idTraceHead . ' | DATE: ' . $entryDate . ' / IN_QTY: ' . $useQtyWh, $user);
+                        'IDSHIPHEAD: '.$idShipHead.'IDTRACEHEAD: '.$idTraceHead.' | DATE: '.$entryDate.' / IN_QTY: '.$useQtyWh, $user);
 
                     // Deduct warehouse details
                     $datTail = DB::connection($this->connection)->select('
@@ -467,16 +478,20 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                     $qtyWhTail = $useQtyWh;
 
                     foreach ($datTail as $tailRow) {
-                        if ($qtyWhTail <= 0) break;
+                        if ($qtyWhTail <= 0) {
+                            break;
+                        }
 
                         $idTail = $tailRow->id_whx_tail;
                         $idSupplier = $tailRow->id_supplier;
                         $batchSap = $tailRow->batch_sap;
-                        $qtyTail = (float)$tailRow->qty;
-                        $outQtyTail = (float)$tailRow->out_qty;
-                        $initQtyTail = (float)$tailRow->init_qty;
+                        $qtyTail = (float) $tailRow->qty;
+                        $outQtyTail = (float) $tailRow->out_qty;
+                        $initQtyTail = (float) $tailRow->init_qty;
 
-                        if ($qtyTail <= 0) continue;
+                        if ($qtyTail <= 0) {
+                            continue;
+                        }
 
                         $tailBalanceAfter = $qtyTail - $qtyWhTail;
                         if ($tailBalanceAfter < 0) {
@@ -494,7 +509,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                         // Update Warehouse Detail
                         DB::connection($this->connection)->update('
                             UPDATE t_warehouse_detail
-                               SET qty = ?, out_qty = ?, updated_by = ?
+                               SET qty = ?, out_qty = ?, updated_by = ?, updated_at = NOW()
                              WHERE id_whx_tail = ?
                         ', [$newTailBalance, $newTailTotalOutQty, $user, $idTail]);
 
@@ -532,12 +547,12 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                              ORDER BY id_trace_tail DESC LIMIT 1
                         ', [$idTraceHead, $tl->id_whx_tail]);
 
-                        if (!empty($consumed) && (float)$consumed[0]->out_qty > 0) {
+                        if (! empty($consumed) && (float) $consumed[0]->out_qty > 0) {
                             $supplierAdjustList[] = [
-                                'id_tail'        => $tl->id_whx_tail,
-                                'id_supplier'    => $tl->id_supplier,
-                                'batch_sap'      => $tl->batch_sap,
-                                'qty'            => (float)$consumed[0]->out_qty,
+                                'id_tail' => $tl->id_whx_tail,
+                                'id_supplier' => $tl->id_supplier,
+                                'batch_sap' => $tl->batch_sap,
+                                'qty' => (float) $consumed[0]->out_qty,
                             ];
                         }
                     }
@@ -554,19 +569,19 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
                             DB::connection($this->connection)->update('
                                 UPDATE t_warehouse_detail
-                                   SET qty = init_qty - ?, out_qty = ?
+                                   SET qty = init_qty - ?, out_qty = ?, updated_at = NOW()
                                  WHERE id_whx_tail = ?
                             ', [$newQty, $newQty, $rowVal['id_tail']]);
 
                             DB::connection($this->connection)->update('
                                 UPDATE t_trace_detail
-                                   SET out_qty = ?
+                                   SET out_qty = ?, updated_at = NOW()
                                  WHERE id_trace_head = ? AND id_balance_tail = ?
                             ', [$newQty, $idTraceHead, $rowVal['id_tail']]);
 
                             DB::connection($this->connection)->update('
                                 UPDATE t_shipment_detail
-                                   SET qty = ?
+                                   SET qty = ?, updated_at = NOW()
                                  WHERE id_ship_head = ? AND id_material_fg = ? AND id_supplier = ? AND batch_sap = ?
                             ', [$newQty, $idShipHead, $idMaterial, $rowVal['id_supplier'], $rowVal['batch_sap']]);
                         }
@@ -578,19 +593,22 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
         } catch (\Throwable $e) {
             $code = $e->getCode() ?: TransactionResponseCode::GENERIC_FAILURE;
-            return ['response' => $code, 'message' => 'Store failed: ' . $e->getMessage()];
+
+            return ['response' => $code, 'message' => 'Store failed: '.$e->getMessage()];
         }
     }
 
     public function cancel(string $user, array $data): array
     {
         $traceNo = $data['traceNo'] ?? null;
-        if (!$traceNo) {
+        $idTraceHead = $data['idTraceHead'] ?? null;
+        $idShipHead = $data['idShipHead'] ?? null;
+        if (! $traceNo) {
             return ['response' => TransactionResponseCode::GENERIC_FAILURE, 'message' => 'Trace number is required.'];
         }
 
-        return app(\Modules\Shared\Services\TransactionCancellationService::class)
-            ->cancelShipment((string) $traceNo, $user);
+        return app(TransactionCancellationService::class)
+            ->cancelShipment((string) $traceNo, $user, $idShipHead, $idTraceHead);
     }
 
     public function updateSo(string $user, array $data): array
@@ -602,13 +620,14 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
             DB::connection($this->connection)->update('
                 UPDATE t_shipment_header
                    SET so_no = ?,
-                       updated_by = ?
+                       updated_by = ?,
+                       updated_at = NOW()
                  WHERE id_ship_head = ?
             ', [$soNo, $user, $id]);
 
             return ['response' => TransactionResponseCode::SUCCESS, 'message' => 'SO updated successfully.'];
         } catch (\Throwable $e) {
-            return ['response' => TransactionResponseCode::GENERIC_FAILURE, 'message' => 'Failed to update SO: ' . $e->getMessage()];
+            return ['response' => TransactionResponseCode::GENERIC_FAILURE, 'message' => 'Failed to update SO: '.$e->getMessage()];
         }
     }
 
@@ -621,7 +640,7 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
 
     public function generateTraceNo(int $materialId, int $plantId, ?string $batchNo = null): string
     {
-        $svc = app(\Modules\Shared\Services\TraceNumberService::class);
+        $svc = app(TraceNumberService::class);
         $plantCode = $svc->resolvePlantCode((string) $plantId);
 
         $whID = '001';

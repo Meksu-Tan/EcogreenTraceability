@@ -1,8 +1,12 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\Quantifier\Providers;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Modules\Quantifier\Policies\QuantifierPolicy;
 use Modules\Quantifier\Repositories\Contracts\QuantifierRepositoryInterface;
 use Modules\Quantifier\Repositories\QuantifierRepository;
 use Modules\Quantifier\Services\Contracts\QuantifierServiceInterface;
@@ -24,6 +28,10 @@ class QuantifierServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadRoutesFrom(__DIR__ . '/../../routes/api.php');
+        $this->loadRoutesFrom(__DIR__.'/../../routes/api.php');
+
+        Gate::define('quantifier.view', [new QuantifierPolicy, 'viewAny']);
+        Gate::define('quantifier.create', [new QuantifierPolicy, 'create']);
+        Gate::define('quantifier.delete', [new QuantifierPolicy, 'delete']);
     }
 }

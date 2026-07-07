@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import transferApi from '../services/index.js'
 import { useToastStore } from '@/stores/toast.js'
 import { registerCacheResetCallback } from '@/stores/plant.js'
@@ -17,9 +17,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
     pagination,
     setPage,
     resetCache: resetListCache,
-    fetchList: doFetchList,
-    isFresh,
-    touch
+    fetchList: doFetchList
   } = useTransactionList(
     (params) => transferApi.getTransferList(params.id_plant || 0, params.page || 1, params.per_page || 5),
     { listKey: 'transferList' }
@@ -35,6 +33,13 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
   const currentEntryNo = ref('')
   const totalStock = ref(0)
   const supplierCode = ref(null)
+
+  // Pending history state
+  const pendingHistoryList = ref([])
+  const pendingHistoryPagination = ref({ total: 0, page: 1, perPage: 5, lastPage: 1 })
+  const showPendingHistory = ref(false)
+  const pendingCount = ref(0)
+  const hasPending = computed(() => pendingCount.value > 0)
 
   const STALE_TIME = 30 * 1000
   const _cache = { activeMaterials: 0 }
@@ -59,7 +64,7 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
       const response = await transferApi.getActiveMaterials()
       activeMaterials.value = response?.data || []
       _touch('activeMaterials')
-    } catch (err) {
+    } catch {
       toastStore.error('Failed to fetch active materials:')
     }
   }
@@ -85,16 +90,16 @@ export const useTsTransferStore = defineStore('transactionTransfer', () => {
     }
 }
 
-async function fetchTotalStockMaterial(params = {}) {
-  try {
-    const response = await transferApi.getTotalStock(params)
-    totalStock.value = parseFloat(response?.data?.[0]?.total || 0)
-    return response
-  } catch (err) {
-    toastStore.error('Failed to fetch total stock:')
-    throw err
+  async function fetchTotalStockMaterial(params = {}) {
+    try {
+      const response = await transferApi.getTotalStock(params)
+      totalStock.value = parseFloat(response?.data?.[0]?.total || 0)
+      return response
+    } catch (err) {
+      toastStore.error('Failed to fetch total stock:')
+      throw err
+    }
   }
-}
 
 
   async function fetchActiveTanksRundown(params = {}) {
@@ -111,7 +116,6 @@ async function fetchTotalStockMaterial(params = {}) {
   async function fetchActiveSpecificTanksRundown(params = {}) {
     try {
       const response = await transferApi.getSpecificTanksRundown(params)
-      // ApiResponse::success() wraps Collection in data.data (2 levels)
       activeSpecificTanks.value = response?.data?.data || response?.data || []
       return response
     } catch (err) {
@@ -142,6 +146,7 @@ async function fetchTotalStockMaterial(params = {}) {
       if (response?.status === 1) {
         toastStore.success('Transfer executed successfully')
         await fetchTransferList()
+        await checkPendingCount()
       } else {
         toastStore.error(response?.message || 'Transfer failed')
       }
@@ -188,6 +193,63 @@ async function fetchTotalStockMaterial(params = {}) {
     'Transfer deactivated successfully'
   )
 
+  // Pending history methods
+  async function fetchPendingHistory(page = 1, perPage = 5) {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await transferApi.getPendingHistory(page, perPage)
+      pendingHistoryList.value = response?.data?.data || []
+      pendingHistoryPagination.value = {
+        total: response?.data?.total || 0,
+        page: response?.data?.page || 1,
+        perPage: response?.data?.per_page || 5,
+        lastPage: response?.data?.last_page || 1
+      }
+      pendingCount.value = response?.data?.total || 0
+      return response
+    } catch (err) {
+      const apiMsg = err.response?.data?.message || err.message || 'Failed to fetch pending history'
+      error.value = apiMsg
+      toastStore.error(apiMsg)
+      return { status: 0, message: apiMsg }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function approvePendingTransfer(idBalanceHead, notes = '') {
+    loading.value = true
+    error.value = null
+    try {
+      const response = await transferApi.approveTransfer(idBalanceHead, { notes })
+      if (response?.status === 1) {
+        toastStore.success('Transfer approved successfully')
+        await fetchPendingHistory(pendingHistoryPagination.value.page, pendingHistoryPagination.value.perPage)
+        await fetchTransferList()
+      } else {
+        toastStore.error(response?.message || 'Failed to approve transfer')
+      }
+      return response
+    } catch (err) {
+      const apiMsg = err.response?.data?.message || err.message || 'Failed to approve transfer'
+      error.value = apiMsg
+      toastStore.error(apiMsg)
+      return { status: 0, message: apiMsg }
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function checkPendingCount() {
+    try {
+      const response = await transferApi.getPendingHistory(1, 1)
+      pendingCount.value = response?.data?.total || 0
+    } catch {
+      // silent fail
+    }
+  }
+
   return {
     transferList,
     activeMaterials,
@@ -212,7 +274,16 @@ async function fetchTotalStockMaterial(params = {}) {
     submitTransferEntry,
     submitMatlDocNumber,
     submitUpdateEntrySubTank,
-    deleteTransfer
+    deleteTransfer,
+    // Pending history
+    pendingHistoryList,
+    pendingHistoryPagination,
+    showPendingHistory,
+    hasPending,
+    pendingCount,
+    fetchPendingHistory,
+    approvePendingTransfer,
+    checkPendingCount
   }
 })
 

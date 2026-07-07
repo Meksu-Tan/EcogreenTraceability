@@ -1,17 +1,25 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Modules\TsRaw\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Modules\Material\Models\Material;
+use Modules\Supplier\Models\Supplier;
 
 class TraceDetail extends Model
 {
     protected $connection = 'eudr_ts';
+
     protected $table = 't_trace_detail';
+
     protected $primaryKey = 'id_trace_tail';
+
     public $timestamps = true;
 
     const CREATED_AT = 'created_at';
+
     const UPDATED_AT = 'updated_at';
 
     protected $fillable = [
@@ -34,17 +42,17 @@ class TraceDetail extends Model
 
     public function traceHeader()
     {
-        return $this->belongsTo(\Modules\TsRaw\Models\TraceHeader::class, 'id_trace_head', 'id_trace_head');
+        return $this->belongsTo(TraceHeader::class, 'id_trace_head', 'id_trace_head');
     }
 
     public function supplier()
     {
-        return $this->belongsTo(\Modules\Supplier\Models\Supplier::class, 'id_supplier', 'id_supplier');
+        return $this->belongsTo(Supplier::class, 'id_supplier', 'id_supplier');
     }
 
     public function material()
     {
-        return $this->belongsTo(\Modules\Material\Models\Material::class, 'id_material', 'id_material');
+        return $this->belongsTo(Material::class, 'id_material', 'id_material');
     }
 
     public function scopeActive($query)
