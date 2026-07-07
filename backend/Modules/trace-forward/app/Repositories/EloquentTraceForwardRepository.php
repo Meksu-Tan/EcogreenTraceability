@@ -1,0 +1,68 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\TraceForward\Repositories;
+
+use Illuminate\Database\Connection;
+use Modules\TraceForward\Repositories\Concerns\ForwardDetailQuery;
+use Modules\TraceForward\Repositories\Concerns\ForwardListQuery;
+use Modules\TraceForward\Repositories\Concerns\ForwardSearchQuery;
+use Modules\TraceForward\Repositories\Concerns\ForwardTraceQuery;
+
+/**
+ * Known debt (tracked, not a TODO): This class is 61 lines in this file but delegates to 4 Concern classes
+ * (ForwardListQuery, ForwardDetailQuery, ForwardTraceQuery, ForwardSearchQuery).
+ * The effective class size across all concerns likely exceeds 200 lines. Requires audit of concern line counts.
+ * - Split into: TraceForwardListQuery, TraceForwardDetailQuery, TraceForwardSearchQuery
+ * Current concern-based decomposition is already a good pattern â€” verify each concern stays under 200 lines.
+ */
+class EloquentTraceForwardRepository implements TraceForwardRepositoryInterface
+{
+    public function __construct(
+        private readonly Connection $connection,
+        private readonly ForwardListQuery $listQuery,
+        private readonly ForwardDetailQuery $detailQuery,
+        private readonly ForwardTraceQuery $traceQuery,
+        private readonly ForwardSearchQuery $searchQuery,
+    ) {}
+
+    public function forwardTrace(string $traceNo, ?int $idMaterial = null, ?int $plantId = null, ?int $userId = null): array
+    {
+        return $this->traceQuery->execute($traceNo, $idMaterial, $plantId, $userId);
+    }
+
+    public function searchTraces(mixed $materialId, ?string $batchNo = null, ?int $plantId = null, ?int $userId = null): array
+    {
+        return $this->searchQuery->execute($materialId, $batchNo, $plantId, $userId);
+    }
+
+    public function getForwardList(array $filters = []): array
+    {
+        return $this->listQuery->execute($filters);
+    }
+
+    /**
+     * Known debt — refactor candidate: Filtering and restructuring logic below should ideally be moved to the Service layer
+     * to keep the Repository strictly focused on data retrieval.
+     */
+    public function getForwardTraceDetail(string $traceNo, int $idMaterial, ?int $plantId = null, ?int $userId = null): array
+    {
+        $rows = $this->detailQuery->execute($traceNo, $idMaterial, $plantId, $userId);
+
+        $initial = [];
+        $chain = [];
+        foreach ($rows as $row) {
+            if ($row->level == 1) {
+                $initial[] = $row;
+            } else {
+                $chain[] = $row;
+            }
+        }
+
+        return [
+            'initial' => $initial,
+            'chain' => $chain,
+        ];
+    }
+}

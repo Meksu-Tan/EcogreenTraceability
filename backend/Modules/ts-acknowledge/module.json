@@ -1,0 +1,11 @@
+{
+    "name": "TsAcknowledge",
+    "alias": "tsacknowledge",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TsAcknowledge\\Providers\\TsAcknowledgeServiceProvider"
+    ],
+    "files": []
+}

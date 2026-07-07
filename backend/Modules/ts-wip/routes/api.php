@@ -11,6 +11,8 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::post('sections', [WipProcessController::class, 'storeSection'])->middleware('can:task-update');
         Route::put('sections/reorder', [WipProcessController::class, 'reorderSections'])->middleware('can:task-update');
         Route::put('sections/{id}', [WipProcessController::class, 'updateSection'])->middleware('can:task-update');
+        Route::delete('sections/all', [WipProcessController::class, 'destroyAllSections'])->middleware('can:task-update');
+        Route::delete('sections/{id}/steps/all', [WipProcessController::class, 'destroyAllSteps'])->middleware('can:task-update');
         Route::delete('sections/{id}', [WipProcessController::class, 'destroySection'])->middleware('can:task-update');
         Route::post('steps', [WipProcessController::class, 'storeStep'])->middleware('can:task-update');
         Route::put('steps/reorder', [WipProcessController::class, 'reorderSteps'])->middleware('can:task-update');
