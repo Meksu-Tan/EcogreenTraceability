@@ -16,5 +16,7 @@ interface TsReportServiceInterface
 
     public function getTsReportTransfer(array $filters = []): array;
 
+    public function getTsReportBlending(array $filters = []): array;
+
     public function getTsReportWip(array $filters = []): array;
 }

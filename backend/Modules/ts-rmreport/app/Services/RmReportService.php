@@ -31,15 +31,6 @@ class RmReportService implements RmReportServiceInterface
         ];
     }
 
-    public function getRmListTransfer(array $filters = []): array
-    {
-        return [
-            'status' => 1,
-            'data' => $this->rmReportRepository->getRmListTransfer($filters),
-            'message' => 'RM transfer list retrieved',
-        ];
-    }
-
     public function getRmSummaryRmPrd(array $filters = []): array
     {
         return [

@@ -77,12 +77,18 @@
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('supplier')">
                     Supplier / Batch SAP / Init Qty (MT)<span class="sort-icon" :class="{ active: sortKey === 'supplier', desc: sortKey === 'supplier' && sortDir === 'desc' }">▲</span>
                   </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis sortable-th" @click="toggleSort('id_balance_detail')">
+                    Detail IDs<span class="sort-icon" :class="{ active: sortKey === 'id_balance_detail', desc: sortKey === 'id_balance_detail' && sortDir === 'desc' }">▲</span>
+                  </th>
+                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center">
+                    Traced
+                  </th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:80px">Action</th>
                 </tr>
               </thead>
               <tbody v-if="tableData.length === 0">
                 <tr>
-                  <td colspan="15" class="text-center pa-8">
+                  <td colspan="17" class="text-center pa-8">
                     <VIcon icon="ri-flask-line" size="48" class="text-disabled mb-2" />
                     <p>No data for {{ selectedYear }}.</p>
                   </td>
@@ -104,6 +110,8 @@
                   <td class="text-right font-monospace text-caption">{{ row.qty_warehouse || '-' }}</td>
                   <td class="text-right font-monospace text-caption">{{ row.qty_adjustment || '-' }}</td>
                   <td class="text-caption text-truncate" style="max-width:200px" :title="row.supplier">{{ row.supplier || '-' }}</td>
+                  <td class="text-caption text-truncate" style="max-width:200px" :title="row.id_balance_detail">{{ row.id_balance_detail || '-' }}</td>
+                  <td class="text-center">{{ row.traced || '-' }}</td>
                   <td class="text-center">
                     <VBtn size="x-small" color="success" variant="tonal" prepend-icon="ri-eye-line" @click="openDetail(row)">
                       Detail
@@ -349,8 +357,7 @@ const loadData = async () => {
       year: selectedYear.value,
       selectedYear: selectedYear.value,
       page: page.value,
-      per_page: perPage.value,
-      plant_id: 0
+      per_page: perPage.value
     })
     const responseData = rmReportStore.rmReportSummary
     tableData.value = Array.isArray(responseData) ? responseData : (responseData.data || [])
@@ -393,7 +400,6 @@ const openDetail = async (row) => {
       console.error('Failed to fetch details:', err)
     }
   } else {
-    // Fallback if no trace no / batch sap
     const baseRow = row.supplier
       ? [{ sloc: row.tf_number || '-', material: row.material, in_qty: row.init_qty || '0', out_qty: '0', balance: row.qty || '0' }]
       : []

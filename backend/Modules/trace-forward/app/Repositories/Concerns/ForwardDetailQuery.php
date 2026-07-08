@@ -16,9 +16,6 @@ final class ForwardDetailQuery
 
     public function execute(string $traceNo, int $idMaterial, ?int $plantId = null, ?int $userId = null): array
     {
-        $plantFilter = $this->buildTablePlantFilter('b', $plantId, $userId);
-        $recursivePlantFilter = $plantFilter['bindings'] ? ' AND t.id_plant = ?' : '';
-
         $cte = '
             WITH RECURSIVE ForwardBOM AS (
                 SELECT
@@ -38,7 +35,7 @@ final class ForwardDetailQuery
                     CONCAT(b.from_trace_no, \'>\', b.to_trace_no) AS trace_chain
                 FROM t_trace_header b
                 LEFT JOIN t_material_document c ON b.id_trace_head = c.id_trace_head
-                WHERE b.to_trace_no = ? AND b.id_material = ? AND b.status = 1 AND '.$plantFilter['sql'].'
+                WHERE b.to_trace_no = ? AND b.id_material = ? AND b.status = 1
 
                 UNION ALL
 
@@ -63,7 +60,7 @@ final class ForwardDetailQuery
                                 AND t2.status = \'1\') AS TEXT), 2, \'0\')) AS path,
                     CONCAT(ForwardBOM.trace_chain, \'>\', t.to_trace_no) AS trace_chain
                 FROM ForwardBOM
-                JOIN t_trace_header t ON ForwardBOM.child_trace_no = t.from_trace_no AND t.status = 1'.$recursivePlantFilter.'
+                JOIN t_trace_header t ON ForwardBOM.child_trace_no = t.from_trace_no AND t.status = 1
                 LEFT JOIN t_material_document tt ON tt.id_trace_head = t.id_trace_head
                 WHERE ForwardBOM.level < 50
                   AND POSITION(CONCAT(\'>\', t.to_trace_no, \'>\') IN CONCAT(\'>\', ForwardBOM.trace_chain, \'>\')) = 0
@@ -95,14 +92,13 @@ final class ForwardDetailQuery
                 c.level,
                 c.path,
                 COALESCE(e.detail_status, 0) AS status,
-                e.created_at,
+                th.created_at,
                 e.created_by
             FROM ForwardBOM c
             LEFT JOIN m_material d ON c.id_material = d.id_material
             LEFT JOIN (SELECT td.id_trace_head,
                               SUM(td.in_qty) AS sum_in,
                               MAX(td.status) AS detail_status,
-                              MAX(td.created_at) AS created_at,
                               MAX(td.created_by) AS created_by,
                               {$supplierConcat} AS supplier_in,
                               {$supplierConcatOut} AS supplier_out
@@ -111,12 +107,14 @@ final class ForwardDetailQuery
                          WHERE td.status = 1
                          GROUP BY td.id_trace_head
                         ) e ON c.id_trace_head = e.id_trace_head
+            LEFT JOIN t_trace_header th ON c.id_trace_head = th.id_trace_head AND th.status = 1
             LEFT JOIN m_material_pck g ON c.id_material = g.id_materialpck
             LEFT JOIN m_sloc h ON CAST(h.id_sloc AS TEXT) = CASE WHEN jsonb_typeof(c.id_sloc) = 'array' THEN (c.id_sloc->>0)::text ELSE c.id_sloc::text END
             LEFT JOIN m_warehouse i ON CAST(i.id_warehouse AS TEXT) = CASE WHEN jsonb_typeof(c.id_sloc) = 'array' THEN (c.id_sloc->>0)::text ELSE c.id_sloc::text END
+            WHERE COALESCE(e.detail_status, 0) <> 0
             ORDER BY path
         ";
 
-        return $this->connection->select($select, array_merge([$traceNo, $idMaterial], $plantFilter['bindings'], $plantFilter['bindings']));
+        return $this->connection->select($select, [$traceNo, $idMaterial]);
     }
 }

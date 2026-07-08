@@ -156,12 +156,13 @@ class MaterialController extends Controller
     {
         $idMaterial = (int) $request->query('id_material', 0);
         $idPlant = (int) $request->query('id_plant', 0);
+        $idSloc = $request->query('id_sloc') !== null && $request->query('id_sloc') !== '' ? (int) $request->query('id_sloc') : null;
 
         if ($idMaterial <= 0 || $idPlant <= 0) {
             return ApiResponse::error('id_material and id_plant are required', 422);
         }
 
-        $result = $this->materialService->fetchBalance($idPlant, $idMaterial);
+        $result = $this->materialService->fetchBalance($idPlant, $idMaterial, $idSloc);
 
         return $result['status'] === 1
             ? ApiResponse::success($result['data'], 'Balance fetched', 200)

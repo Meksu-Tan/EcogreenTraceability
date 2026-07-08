@@ -51,12 +51,14 @@ final class ForwardListQuery
             ' | '
         );
         $mdSubquery = 'SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 GROUP BY f.id_balance_head';
+        $slocTankSub = $this->dbGroupConcat('DISTINCT st.tf_number', ', ', false, 'st.tf_number ASC');
 
         $sql = "
             SELECT bh.id_balance_head, CAST(bh.trace_no AS TEXT) AS trace_no,
                    bh.entry_date,
                    CONCAT(m.code, ' :: ', m.description) AS material,
-                   t.description AS tank, t.code_3 AS tank_type,
+                   t.description AS sloc_description,
+                   {$slocTankSub} AS sloc_tank_number,
                    {$initQtyFmt} AS init_qty,
                    {$qtyFmt} AS qty,
                    {$supplierConcat} AS supplier,
@@ -66,18 +68,19 @@ final class ForwardListQuery
                     md.po_so,
                     bh.created_at, bh.created_by,
                     bh.id_material,
-                    t.tf_number
+                    bh.id_sloc
               FROM t_balance_header bh
               LEFT JOIN m_material m ON bh.id_material = m.id_material
-              LEFT JOIN m_sloc t ON {$this->dbSlocColumnClause('bh.id_sloc', 't.id_sloc')}
+              LEFT JOIN m_sloc t ON {$this->dbSlocColumnClause('bh.id_sloc', 't.id_sloc')} AND t.status = 1
+              LEFT JOIN m_sloc st ON st.code_3 = t.code_3 AND st.id_plant = t.id_plant AND st.status = 1
               LEFT JOIN t_balance_detail bd ON bh.id_balance_head = bd.id_balance_head AND bd.status = 1
               LEFT JOIN m_supplier s ON bd.id_supplier = s.id_supplier
               LEFT JOIN ({$mdSubquery}) md
                 ON md.id_balance_head = bh.id_balance_head
              WHERE ".implode(' AND ', $where)."
               GROUP BY bh.id_balance_head, bh.trace_no, bh.entry_date,
-                      m.code, m.description, t.description, t.code_3, t.tf_number,
-                      md.material_document, md.po_so, bh.created_at, bh.created_by, bh.id_material
+                      m.code, m.description, t.description, t.code_3,
+                      md.material_document, md.po_so, bh.created_at, bh.created_by, bh.id_material, bh.id_sloc
              ORDER BY {$sortColumn} {$sortDir}, bh.id_balance_head DESC
         ";
 

@@ -30,7 +30,7 @@ trait RmEntrySupplierTrait
         $entryNo = $data['entry_no'] ?? '';
         $idMaterial = (int) ($data['id_material'] ?? 0);
         $idSupplier = (int) ($data['id_supplier'] ?? 0);
-        $qty = (float) str_replace(',', '', $data['qty'] ?? '0');
+        $qty = (float) str_replace(',', '', (string) ($data['qty'] ?? '0'));
         $batchSap = $data['batch_sap'] ?? '';
         $idTail = isset($data['idTail']) ? (int) $data['idTail'] : null;
         $idHead = isset($data['idHead']) ? (int) $data['idHead'] : null;

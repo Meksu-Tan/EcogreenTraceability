@@ -21,7 +21,7 @@ interface BlendingRepositoryInterface
     /**
      * Get total stock for a material
      */
-    public function getTotalStockMaterial(int $materialId, int $plantId): float;
+    public function getTotalStockMaterial(int $materialId, int $plantId, $slocId = null): float;
 
     /**
      * Get total quantity for material entry (temporary or balance detail)

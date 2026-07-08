@@ -80,7 +80,7 @@ class BlendingServiceTest extends TestCase
 
         $repoMock->shouldReceive('getTotalStockMaterial')
             ->once()
-            ->with(3, 0)
+            ->with(3, 0, null)
             ->andReturn(150.5);
 
         $service = new BlendingService($repoMock);
@@ -95,6 +95,7 @@ class BlendingServiceTest extends TestCase
 
         $repoMock->shouldReceive('getTotalStockMaterial')
             ->once()
+            ->with(3, 0, null)
             ->andReturn(0.0);
 
         $service = new BlendingService($repoMock);

@@ -29,33 +29,30 @@ final class BackwardListQuery
             default => 'sh.entry_date',
         };
 
-        $plantFilter = $this->buildTablePlantFilter('sh', $plantId, $userId);
-        $bindings = $plantFilter['bindings'];
-        $plantSql = $plantFilter['sql'];
-
         $searchSql = '';
+        $bindings = [];
         if ($search !== null && $search !== '') {
             $like = '%'.$search.'%';
             $searchSql = ' AND (CAST(sh.trace_no AS TEXT) ILIKE ? OR sh.so_no ILIKE ?
                             OR m.description ILIKE ? OR mp.description ILIKE ?)';
-            $bindings = array_merge($bindings, [$like, $like, $like, $like]);
+            $bindings = [$like, $like, $like, $like];
         }
 
         $sql = "
             SELECT sh.id_ship_head AS id_shipment_head, sh.entry_date, CAST(sh.trace_no AS TEXT) AS trace_no,
                    sh.so_no, MAX(wh.batch_no) AS batch_no,
                    MAX(mw.description) AS sloc,
-                   CASE WHEN SUBSTRING(CAST(sh.from_trace_no AS VARCHAR), 1, 1) < '3' OR sh.from_trace_no IS NULL
+                   CASE WHEN SUBSTRING(CAST(sh.from_trace_no AS VARCHAR), 1, 1) < '3'
                         THEN CONCAT(m.code, ' :: ', m.description)
                         ELSE CONCAT(mp.code, ' :: ', mp.description)
                    END AS material,
-                   {$this->dbNumberFormat('sh.qty', 3)} AS qty,
-                   {$this->dbGroupConcat("CONCAT(s.code, ' :: ', s.description, ' / ', td.batch_sap, ' / Qty: ', {$this->dbNumberFormat('td.out_qty', 3)}, ' MT')", ' | ', true)} AS supplier,
-                   CAST(th.from_trace_no AS TEXT) AS source_trace,
-                   MAX(td2.po_so) AS po_so,
-                   MAX(src.po_so) AS source,
-                   sh.created_at, sh.created_by,
-                   sh.id_material_fg AS id_material
+                    {$this->dbNumberFormat('COALESCE(SUM(th.out_qty), 0)', 3)} AS qty,
+                    {$this->dbGroupConcat("CONCAT(s.code, ' :: ', s.description, ' / ', td.batch_sap, ' / Qty: ', {$this->dbNumberFormat('td.out_qty', 3)}, ' MT')", ' | ', true)} AS supplier,
+                    {$this->dbGroupConcat('DISTINCT CAST(th.from_trace_no AS TEXT)', ' | ', true)} AS source_trace,
+                   {$this->dbGroupConcat('td2.po_so', ' | ', true)} AS po_so,
+                   {$this->dbGroupConcat('src.po_so', ' | ', true)} AS source,
+                    sh.created_at, sh.updated_at, sh.created_by, sh.updated_by,
+                    sh.id_material_fg AS id_material
               FROM t_shipment_header sh
               LEFT JOIN m_material m ON sh.id_material_fg = m.id_material
               LEFT JOIN m_material_pck mp ON sh.id_material_fg = mp.id_materialpck
@@ -82,14 +79,14 @@ final class BackwardListQuery
                                     LEFT JOIN t_material_document hhhh ON hhh.id_trace_head = hhhh.id_trace_head
                                    WHERE h.status = 1 AND h.in_qty <> 0
                                      AND SUBSTRING(CAST(h.trace_no AS TEXT),1,1) = '9'
-                               ) src_inner
-                          GROUP BY batch_sap
+                                ) src_inner
+                           GROUP BY batch_sap
               ) src ON src.batch_sap = td.batch_sap
              WHERE sh.status = 1
-               AND ({$plantSql}){$searchSql}
-             GROUP BY sh.id_ship_head, sh.entry_date, sh.trace_no, sh.so_no,
-                     m.code, m.description, mp.code, mp.description, sh.qty, th.from_trace_no,
-                     sh.created_at, sh.created_by, sh.id_material_fg, sh.from_trace_no
+               {$searchSql}
+               GROUP BY sh.id_ship_head, sh.entry_date, sh.trace_no, sh.so_no,
+                       m.code, m.description, mp.code, mp.description,
+                       sh.created_at, sh.updated_at, sh.created_by, sh.updated_by, sh.id_material_fg, sh.from_trace_no
              ORDER BY {$sortColumn} {$sortDir}, sh.id_ship_head DESC
         ";
 

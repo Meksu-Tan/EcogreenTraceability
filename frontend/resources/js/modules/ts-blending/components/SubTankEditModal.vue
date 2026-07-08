@@ -100,8 +100,8 @@ function closeModal() {
 async function loadTanks() {
   loadingTanks.value = true
   try {
-    const response = await blendingStore.fetchActiveSpecificTanksRundown({ sloc: props.idSloc })
-    availableTanks.value = response?.data || []
+    await blendingStore.fetchActiveSpecificTanksRundown({ sloc: props.idSloc })
+    availableTanks.value = blendingStore.activeSpecificTanks || []
   } catch (err) {
     errorMsg.value = 'Failed to load tanks'
   } finally {

@@ -75,43 +75,51 @@ trait RmEntryTransferTrait
                       WHERE th.id_balance_head = a.id_balance_head AND th.status = 1)";
 
         $supplierAgg = "STRING_AGG(DISTINCT CONCAT(e.code, ' :: ', e.description, ' / ', b.batch_sap, ' / Qty : ', TRIM(TO_CHAR(ROUND(CAST(b.init_qty AS numeric),3), 'FM999999999999990.000')), ' MT / ', CASE WHEN COALESCE(b.out_qty,0) = 0 THEN '-' ELSE 'BATCH TRANSFERRED' END), ' | ')";
-
-        $tankNumbersAgg = "STRING_AGG(DISTINCT d.tf_number, ', ')";
+        $tankNumbersAgg = "STRING_AGG(DISTINCT sl.tf_number, ', ')";
 
         $query = "SELECT a.id_balance_head, a.id_material,
-                         CAST(a.trace_no AS TEXT) AS trace_no,
-                         {$qtyFmt} AS qty,
-                         CONCAT(c.code, ' :: ', c.description) AS material,
-                         {$initQtyFmt} AS init_qty,
-                         MIN(d.description) AS tank_description,
-                         {$tankNumbersAgg} AS tank_numbers,
-                         a.entry_date,
-                         MIN(a.created_by) AS created_by,
-                         MIN(a.created_at) AS created_at,
-                         {$supplierAgg} AS supplier,
-                         f.material_document, f.po_so, f.id_trace_head,
-                         {$traceSub} AS trace_info,
-                         {$this->dbNumberFormat('SUM(b.init_qty)', 3)} AS balance_supplier
-                    FROM t_balance_header a
-                    LEFT JOIN t_balance_detail b ON a.id_balance_head = b.id_balance_head AND b.status = 1
-                    JOIN m_material c ON a.id_material = c.id_material
-                    JOIN m_sloc d ON a.id_sloc = d.id_sloc AND d.status = 1 AND d.code_3 = 'STORAGE'
-                    LEFT JOIN m_supplier e ON e.id_supplier = b.id_supplier
-                    LEFT JOIN (SELECT f.id_balance_head,
+                          CAST(a.trace_no AS TEXT) AS trace_no,
+                          {$qtyFmt} AS qty,
+                          CONCAT(c.code, ' :: ', c.description) AS material,
+                          {$initQtyFmt} AS init_qty,
+                          MIN(d.description) AS tank_description,
+                          {$tankNumbersAgg} AS tank_numbers,
+                          f.id_sloc_json AS id_sloc_tail_raw,
+                          a.entry_date,
+                          MIN(a.created_by) AS created_by,
+                          MIN(a.created_at) AS created_at,
+                          {$supplierAgg} AS supplier,
+                          STRING_AGG(DISTINCT mf.description, ', ') AS manufacturer_name,
+                          f.material_document, f.po_so, f.id_trace_head,
+                          {$traceSub} AS trace_info,
+                          {$this->dbNumberFormat('SUM(b.init_qty)', 3)} AS balance_supplier
+                     FROM t_balance_header a
+                     LEFT JOIN t_balance_detail b ON a.id_balance_head = b.id_balance_head AND b.status = 1
+                     JOIN m_material c ON a.id_material = c.id_material
+                     LEFT JOIN (SELECT f.id_balance_head,
                                       MAX(g.material_document) AS material_document,
                                       MAX(g.po_so) AS po_so,
-                                      MIN(f.id_trace_head) AS id_trace_head
+                                      MIN(f.id_trace_head) AS id_trace_head,
+                                      CAST(MAX(CAST(f.id_sloc AS TEXT)) AS jsonb) AS id_sloc_json
                                  FROM t_trace_header f
                                  LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head
                                 WHERE f.status = 1
                                 GROUP BY f.id_balance_head) f
-                      ON f.id_balance_head = a.id_balance_head
-                   WHERE c.type = 'RM'
-                     AND (CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 1 OR CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 9)
-                     AND a.status = 1
-                     AND (a.id_plant = ? OR ? = '0')
-                   GROUP BY a.id_balance_head, a.id_material, a.trace_no, c.code, c.description, a.entry_date, f.material_document, f.po_so, f.id_trace_head
-                   ORDER BY MAX(a.id_balance_head) DESC";
+                       ON f.id_balance_head = a.id_balance_head
+                     LEFT JOIN m_sloc d ON a.id_sloc = d.id_sloc AND d.status = 1 AND d.code_3 = 'STORAGE'
+                     LEFT JOIN m_sloc sl ON (
+                        (f.id_sloc_json IS NOT NULL AND CAST(f.id_sloc_json AS TEXT) <> '[]' AND f.id_sloc_json @> to_jsonb(sl.id_sloc))
+                        OR
+                        ((f.id_sloc_json IS NULL OR CAST(f.id_sloc_json AS TEXT) = '[]') AND a.id_sloc = sl.id_sloc)
+                     ) AND sl.status = 1 AND sl.code_3 = 'STORAGE'
+                     LEFT JOIN m_supplier e ON e.id_supplier = b.id_supplier
+                     LEFT JOIN m_manufacturer mf ON b.id_manufacturer = mf.id_manufacturer
+                    WHERE c.type = 'RM'
+                      AND (CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 1 OR CAST(SUBSTRING(a.trace_no,1,1) AS INTEGER) = 9)
+                      AND a.status = 1
+                      AND (a.id_plant = ? OR ? = '0')
+                    GROUP BY a.id_balance_head, a.id_material, a.trace_no, c.code, c.description, a.entry_date, f.material_document, f.po_so, f.id_trace_head, f.id_sloc_json
+                    ORDER BY MAX(a.id_balance_head) DESC";
 
         $results = DB::connection('eudr_ts')->select($query, [$plantId, $plantId]);
 
@@ -123,6 +131,8 @@ trait RmEntryTransferTrait
             } else {
                 $row->tank_name = $tankDesc;
             }
+            $row->sloc_description = $tankDesc;
+            $row->sloc_tank_number = $tankNumbers;
             unset($row->tank_description);
             unset($row->tank_numbers);
             $row->traced = ($row->material_document || $row->trace_info) ? 'N/A' : '';
@@ -257,6 +267,23 @@ trait RmEntryTransferTrait
                             )
                               AND h.status = 1)";
 
+        $slocTankNumberSub = $isSqlite
+            ? "(SELECT GROUP_CONCAT(DISTINCT h.tf_number)
+                  FROM m_sloc h
+                  WHERE CONCAT(',', MAX(CAST(a.id_sloc AS TEXT)), ',') LIKE CONCAT('%,', CAST(h.id_sloc AS TEXT), ',%')
+                    AND h.status = 1)"
+            : "(SELECT STRING_AGG(DISTINCT h.tf_number, ', ')
+                            FROM m_sloc h
+                            WHERE h.id_sloc = ANY(
+                                SELECT unnest(
+                                    string_to_array(
+                                        regexp_replace(MAX(a.id_sloc::text), '[][]|\"| ', '', 'g'),
+                                        ','
+                                    )
+                                )::integer
+                            )
+                              AND h.status = 1)";
+
         $subSlocJoin = "STRING_AGG(DISTINCT CASE WHEN COALESCE(NULLIF(td.in_qty,0), NULLIF(td.out_qty,0), NULLIF(bd.qty,0), NULLIF(bd.init_qty,0), 0) > 0.0001 THEN CONCAT(COALESCE(sup.code, bsup.code), ' :: ', COALESCE(sup.description, bsup.description), ' / ', COALESCE(td.batch_sap, bd.batch_sap), ' / Qty : ', TRIM(TO_CHAR(ROUND(CAST(COALESCE(NULLIF(bd.init_qty,0), NULLIF(td.in_qty,0), bd.qty, 0) AS numeric),3), 'FM999999999999990.000')), ' MT / ', CASE WHEN '{$tankType}' = 'STORAGE' THEN CASE WHEN COALESCE(bd.out_qty,0) = 0 THEN '-' ELSE 'BATCH TRANSFERRED' END ELSE CONCAT('Qty : ', TRIM(TO_CHAR(ROUND(CAST(COALESCE(NULLIF(td.in_qty,0), NULLIF(td.out_qty,0), bd.qty, 0) AS numeric),3), 'FM999999999999990.000')), ' MT') END) ELSE NULL END, ' | ')";
 
         $query = "SELECT
@@ -268,6 +295,9 @@ trait RmEntryTransferTrait
                           c.code AS material_code,
                           MAX(c.description) AS material_name,
                           {$tankNamesSub} AS tank_name,
+                          MAX(parent_sl.description) AS sloc_description,
+                          {$slocTankNumberSub} AS sloc_tank_number,
+                          MAX(a.id_sloc::text) AS id_sloc_tail_raw,
                           {$inQtyFmt} AS in_qty,
                           {$outQtyFmt} AS out_qty,
                           MIN(a.created_by) AS created_by,
@@ -280,6 +310,7 @@ trait RmEntryTransferTrait
                      LEFT JOIN t_trace_header th ON a.from_trace_no = th.to_trace_no
                      JOIN m_material c ON a.id_material = c.id_material
                      LEFT JOIN t_balance_header bh ON a.id_balance_head = bh.id_balance_head
+                     LEFT JOIN m_sloc parent_sl ON bh.id_sloc = parent_sl.id_sloc AND parent_sl.status = 1
                      LEFT JOIN t_balance_detail bd ON bh.id_balance_head = bd.id_balance_head AND bd.status = 1
                      LEFT JOIN t_material_document md ON a.id_trace_head = md.id_trace_head
                      LEFT JOIN t_trace_detail td ON a.id_trace_head = td.id_trace_head AND td.status = 1
@@ -308,6 +339,7 @@ trait RmEntryTransferTrait
                 $row->trace_pairs_array = [];
             }
             $row->from_trace_no = $row->from_trace_no_agg;
+            $row->sloc_description = $row->sloc_description ?? $row->tank_name;
             $row->supplier = $row->supplier ?: 'N/A';
             unset($row->from_trace_no_agg);
         }
@@ -469,11 +501,16 @@ trait RmEntryTransferTrait
 
     public function getActiveMaterialsForTransfer(): array
     {
-        $sql = "SELECT a.id_material, CONCAT(UPPER(a.description), ' (', a.code, ')') AS material
+        $sql = "SELECT a.id_material,
+                       CASE WHEN dup.cnt > 1
+                            THEN CONCAT(UPPER(a.description), ' (', a.code, ' - ', COALESCE(a.qtf_rundown, ''), ')')
+                            ELSE CONCAT(UPPER(a.description), ' (', a.code, ')')
+                       END AS material
                  FROM m_material a
+                 JOIN (SELECT code, COUNT(*) AS cnt FROM m_material WHERE status = 1 GROUP BY code) dup ON a.code = dup.code
                 WHERE a.status = 1
                   AND a.id_rundown <> '-'
-                GROUP BY a.code
+                GROUP BY a.code, a.id_material, a.description, a.type, a.qtf_rundown, dup.cnt
                 ORDER BY a.description ASC";
 
         return DB::connection('eudr_ts')->select($sql);

@@ -290,6 +290,16 @@ function openSubTankModal(row) {
   showSubTankModal.value = true
 }
 
+function parseRawSloc(raw) {
+  if (!raw) return []
+  try {
+    const decoded = JSON.parse(raw)
+    return Array.isArray(decoded) ? decoded.map(Number) : [Number(raw)]
+  } catch {
+    return [Number(raw)]
+  }
+}
+
 async function onCancel(row) {
   const isConfirmed = await confirmStore.show({
     title: 'Are you sure?',

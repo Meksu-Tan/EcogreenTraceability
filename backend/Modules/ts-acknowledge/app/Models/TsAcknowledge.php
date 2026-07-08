@@ -30,7 +30,8 @@ class TsAcknowledge extends Model
         'step_type',
         'eo_dls_qty',
         'dcs_qty',
-        'manual_qty',
+        'keterangan',
+        'qty_source',
         'created_by',
         'updated_by',
     ];
@@ -40,7 +41,8 @@ class TsAcknowledge extends Model
         'section_id' => 'integer',
         'eo_dls_qty' => 'decimal:4',
         'dcs_qty' => 'decimal:4',
-        'manual_qty' => 'decimal:4',
+        'keterangan' => 'string',
+        'qty_source' => 'string',
     ];
 
     public function plant()

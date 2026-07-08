@@ -299,9 +299,10 @@ class TsReportRepository implements TsReportRepositoryInterface
                LEFT JOIN m_sloc f
                  ON {$slocCond}
               WHERE a.status=1
-                AND (SUBSTRING(a.to_trace_no,1,1)='7' OR SUBSTRING(a.to_trace_no,1,1)='9')
+                AND SUBSTRING(a.to_trace_no,1,1)='7'
                 AND {$condTransfer}
                 AND b.qty<>0 AND a.entry_date = ?
+                AND (e.approval_status = 'APPROVED' OR e.approval_status IS NULL)
                 AND ({$plantFilter['sql']})
               GROUP BY a.to_trace_no, a.id_trace_head, a.entry_date, a.from_trace_no, a.in_qty, a.out_qty,
                      b.qty, b.batch_sap, b.id_supplier, c.code, c.description, c.id_material,
@@ -361,6 +362,58 @@ class TsReportRepository implements TsReportRepositoryInterface
                     ) aa
               WHERE aa.section <> '-'
               ORDER BY aa.id_trace_head DESC",
+            array_merge([$entryDate], $plantFilter['bindings'])
+        );
+    }
+
+    public function getTsReportBlending(array $filters): array
+    {
+        $entryDate = $filters['entry_date'] ?? now()->toDateString();
+        $plantId = $filters['id_plant'] ?? $filters['plant_id'] ?? null;
+        $userId = $filters['user_id'] ?? null;
+        $plantFilter = $this->buildTablePlantFilter('a', $plantId, $userId);
+
+        $fmtInQty = $this->dbNumberFormat('a.in_qty', 3);
+        $fmtOutQty = $this->dbNumberFormat('a.out_qty', 3);
+        $fmtQty = $this->dbNumberFormat('bs.qty', 3);
+        $fmtBalSup = $this->dbNumberFormat('SUM(DISTINCT bs.qty)', 3);
+        $slocCond = $this->dbSlocJsonClause('a.id_sloc', 'f.id_sloc');
+
+        $suppExpr = "CASE WHEN td.in_qty=0 THEN CASE WHEN td.out_qty=0 THEN 0 ELSE td.out_qty END ELSE td.in_qty END";
+        $fmtSuppQty = $this->dbNumberFormat($suppExpr, 3);
+        $gcSupp = $this->dbGroupConcat(
+            "CONCAT(s.description, ' / ', td.batch_sap, ' / Qty: ', {$fmtSuppQty}, ' MT')",
+            ' | ',
+            true
+        );
+
+        return DB::connection($this->connection)->select(
+            "SELECT a.entry_date, a.id_trace_head, a.to_trace_no,
+                    {$fmtInQty} AS in_qty,
+                    {$fmtOutQty} AS out_qty, a.from_trace_no,
+                    CONCAT(c.description,' (',c.code,')') AS material, f.description AS sloc,
+                    {$gcSupp} AS supplier,
+                    {$fmtBalSup} AS balance_supplier
+               FROM t_trace_header a
+               LEFT JOIN (SELECT td.id_trace_head,
+                                 SUM({$suppExpr}) AS total_qty
+                            FROM t_trace_detail td
+                            WHERE td.status = 1
+                            GROUP BY td.id_trace_head
+                           ) bs ON a.id_trace_head = bs.id_trace_head
+               LEFT JOIN t_trace_detail td ON a.id_trace_head = td.id_trace_head AND td.status = 1
+               LEFT JOIN m_supplier s ON td.id_supplier = s.id_supplier
+               LEFT JOIN m_material c ON a.id_material = c.id_material
+               LEFT JOIN t_balance_header e ON a.to_trace_no = e.trace_no AND e.status = 1
+               LEFT JOIN m_sloc f ON {$slocCond}
+              WHERE a.status = 1
+                AND SUBSTRING(a.to_trace_no,1,1) = '8'
+                AND COALESCE(bs.total_qty, 0) <> 0
+                AND a.entry_date = ?
+                AND ({$plantFilter['sql']})
+              GROUP BY a.to_trace_no, a.id_trace_head, a.entry_date, a.from_trace_no, a.in_qty, a.out_qty,
+                     c.description, c.code, c.id_material, f.description, f.id_sloc, f.code_3
+              ORDER BY a.id_trace_head DESC",
             array_merge([$entryDate], $plantFilter['bindings'])
         );
     }

@@ -13,6 +13,7 @@ use Modules\Shared\Helpers\ResponseCode;
 use Modules\TsPackage\Http\Requests\GenerateTraceNoRequest;
 use Modules\TsPackage\Http\Requests\StorePackageEntryRequest;
 use Modules\TsPackage\Http\Requests\UpdatePackageEntryRequest;
+use Modules\TsPackage\Http\Resources\PackageEntryResource;
 use Modules\TsPackage\Services\Contracts\PackageServiceInterface;
 
 class PackageEntryController extends Controller
@@ -34,7 +35,7 @@ class PackageEntryController extends Controller
             $result = $this->packageService->getDtPckEntry($plantId, $page, $perPage);
 
             return ApiResponse::paginated(
-                is_array($result['data']) ? $result['data'] : $result['data']->values()->toArray(),
+                PackageEntryResource::collection($result['data'])->resolve(),
                 $result['total'],
                 $page,
                 $perPage,

@@ -14,7 +14,8 @@ class EloquentWarehouseRepository implements WarehouseRepositoryInterface
 
     public function getAll(): array
     {
-        return Warehouse::orderBy('id_batch', 'asc')
+        return Warehouse::selectRaw('id_warehouse as id, id_batch, code, description, status, created_at, created_by, updated_at, updated_by')
+            ->orderBy('id_batch', 'asc')
             ->get()
             ->toArray();
     }

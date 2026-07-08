@@ -66,4 +66,13 @@ class TsReportService implements TsReportServiceInterface
             'message' => 'TS Report WIP section retrieved',
         ];
     }
+
+    public function getTsReportBlending(array $filters = []): array
+    {
+        return [
+            'status' => 1,
+            'data' => $this->tsReportRepository->getTsReportBlending($filters),
+            'message' => 'TS Report Blending section retrieved',
+        ];
+    }
 }

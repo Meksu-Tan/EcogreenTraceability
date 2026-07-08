@@ -205,7 +205,9 @@
       "Bash(npx eslint *)",
       "Bash(awk -F/ '{print $NF}')",
       "Bash(xargs -0 du -b)",
-      "Bash(PGPASSWORD='Ecogreen123!' /c/Program Files/PostgreSQL/17/bin/psql.exe *)"
+      "Bash(PGPASSWORD='Ecogreen123!' /c/Program Files/PostgreSQL/17/bin/psql.exe *)",
+      "Bash(find modules/ts-wip modules/m-plant modules/m-tank -iname \"routes.js\")",
+      "Bash(find modules *)"
     ]
   }
 }

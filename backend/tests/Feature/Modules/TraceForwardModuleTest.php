@@ -80,13 +80,12 @@ class TraceForwardModuleTest extends TestCase
                     'trace_no' => '100001-001',
                     'entry_date' => '2026-01-01',
                     'material' => 'CPO :: Crude Palm Oil',
-                    'tank' => 'T001',
-                    'tank_type' => 'STORAGE',
+                    'sloc_description' => 'EOB1 STORAGE TANK',
+                    'sloc_tank_number' => 'TF-001, TF-002',
                     'init_qty' => '10.000',
                     'qty' => '8.000',
                     'supplier' => 'S001 :: Supplier A / B001 / Qty: 10.000 MT',
                     'batch_sap' => 'B001',
-                    'tf_number' => 'TF-001',
                     'traced' => 'TRACED',
                     'material_document' => 'MD-001',
                     'po_so' => 'PO-001',
@@ -112,7 +111,7 @@ class TraceForwardModuleTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonPath('data.data.0.trace_no', '100001-001')
             ->assertJsonPath('data.data.0.batch_sap', 'B001')
-            ->assertJsonPath('data.data.0.tf_number', 'TF-001')
+            ->assertJsonPath('data.data.0.sloc_description', 'EOB1 STORAGE TANK')
             ->assertJsonPath('data.data.0.traced', 'TRACED')
             ->assertJsonPath('data.data.0.po_so', 'PO-001')
             ->assertJsonPath('data.total', 1);

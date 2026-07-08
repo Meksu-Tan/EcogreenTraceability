@@ -12,7 +12,7 @@ interface BlendingServiceInterface
 
     public function generateEntryNo(int $materialId, int $plantId): ?string;
 
-    public function getTotalStockMaterial(int $materialId, int $plantId): float;
+    public function getTotalStockMaterial(int $materialId, int $plantId, $slocId = null): float;
 
     public function getTotalQtyMaterial(?string $mode, string $entryNo, ?int $idHead, int $plantId): float;
 

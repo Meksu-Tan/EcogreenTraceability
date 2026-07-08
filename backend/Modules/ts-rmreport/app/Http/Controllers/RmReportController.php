@@ -100,18 +100,4 @@ class RmReportController extends Controller
             return ApiResponse::error('Failed to retrieve RM report data', 500);
         }
     }
-
-    public function transfer(RmReportRequest $request): JsonResponse
-    {
-        try {
-            $filters = $request->validated();
-            $result = $this->rmReportService->getRmListTransfer($filters);
-
-            return ApiResponse::success(RmReportResource::collection($result['data']), $result['message'] ?? 'RM transfer list retrieved');
-        } catch (\Exception $e) {
-            Log::error('RmReport action failed', ['exception' => $e]);
-
-            return ApiResponse::error('Failed to retrieve RM report data', 500);
-        }
-    }
 }

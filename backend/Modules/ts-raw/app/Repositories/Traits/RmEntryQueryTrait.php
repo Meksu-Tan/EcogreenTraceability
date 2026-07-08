@@ -44,11 +44,11 @@ trait RmEntryQueryTrait
         $query = DB::connection('eudr_ts')->table($bhQuery, 'bh')
             ->selectRaw("
                 bh.id_balance_head, bh.id_material, bh.id_sloc AS tf_number,
-                NULL AS id_sloc_tail_raw, bh.status,
+                f.id_sloc_json AS id_sloc_tail_raw, bh.status,
                 CAST(bh.trace_no AS TEXT) AS trace_no,
                 {$this->dbNumberFormat('bh.qty', 3)} AS qty, bh.created_by, bh.created_at,
                 CONCAT(m.code, ' :: ', m.description) AS material,
-                {$this->dbNumberFormat('bh.init_qty', 3)} AS init_qty, MIN(sl.description) AS sloc_description,
+                {$this->dbNumberFormat('bh.init_qty', 3)} AS init_qty, MIN(parent_sl.description) AS sloc_description,
                 {$groupConcatSloc} AS sloc_tank_number,
                 bh.entry_date, f.material_document, f.po_so, f.id_trace_head,
                 {$balanceFmt} AS balance_supplier,
@@ -58,17 +58,26 @@ trait RmEntryQueryTrait
                 $join->on('bh.id_material', '=', 'm.id_material')
                     ->where('m.type', '=', clone DB::raw("'{$this->typeMaterial}'"));
             })
+            ->leftJoin('m_sloc as parent_sl', function ($join) {
+                $join->on(DB::raw('bh.id_sloc'), '=', DB::raw('parent_sl.id_sloc'))
+                    ->where('parent_sl.status', 1);
+            })
+            ->leftJoin(DB::raw("(SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so, MAX(f.id_trace_head) AS id_trace_head, CAST(MAX(CAST(f.id_sloc AS TEXT)) AS jsonb) AS id_sloc_json FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 AND f.id_balance_head IN ({$idCsv}) GROUP BY f.id_balance_head) as f"), 'f.id_balance_head', '=', 'bh.id_balance_head')
             ->leftJoin('m_sloc as sl', function ($join) {
-                $slocClause = $this->dbSlocJsonClause('bh.id_sloc', 'sl.id_sloc');
+                $slocClause = $this->dbSlocJsonClause('f.id_sloc_json', 'sl.id_sloc');
                 $join->on(function ($q) use ($slocClause) {
-                    $q->whereRaw($slocClause);
+                    $q->whereRaw($slocClause)
+                      ->orWhere(function ($sub) {
+                          $sub->whereNull('f.id_sloc_json')
+                              ->orWhere('f.id_sloc_json', '[]')
+                              ->whereColumn('bh.id_sloc', 'sl.id_sloc');
+                      });
                 })->where('sl.status', 1);
             })
-            ->leftJoin(DB::raw("(SELECT f.id_balance_head, MAX(g.material_document) AS material_document, MAX(g.po_so) AS po_so, MAX(f.id_trace_head) AS id_trace_head FROM t_trace_header f LEFT JOIN t_material_document g ON f.id_trace_head = g.id_trace_head WHERE f.status = 1 AND f.id_balance_head IN ({$idCsv}) GROUP BY f.id_balance_head) as f"), 'f.id_balance_head', '=', 'bh.id_balance_head')
             ->leftJoin(DB::raw("(SELECT id_balance_head, SUM(init_qty) AS supplier_qty FROM t_balance_detail WHERE status = 1 AND id_balance_head IN ({$idCsv}) GROUP BY id_balance_head) as bs"), 'bs.id_balance_head', '=', 'bh.id_balance_head')
             ->leftJoin('m_plant as p', DB::raw('bh.id_plant'), '=', DB::raw('p.code_3'))
             ->whereIn('bh.id_balance_head', $idsResult)
-            ->groupBy('bh.id_balance_head', 'bh.id_material', 'bh.id_sloc', 'bh.status', 'bh.trace_no', 'bh.qty', 'bh.created_by', 'bh.created_at', 'bh.init_qty', 'bh.entry_date', 'bh.id_plant', 'm.code', 'm.description', 'f.material_document', 'f.po_so', 'f.id_trace_head', 'bs.supplier_qty', 'p.code', 'p.description')
+            ->groupBy('bh.id_balance_head', 'bh.id_material', 'bh.id_sloc', 'f.id_sloc_json', 'bh.status', 'bh.trace_no', 'bh.qty', 'bh.created_by', 'bh.created_at', 'bh.init_qty', 'bh.entry_date', 'bh.id_plant', 'm.code', 'm.description', 'f.material_document', 'f.po_so', 'f.id_trace_head', 'bs.supplier_qty', 'p.code', 'p.description')
             ->orderByDesc('bh.id_balance_head');
 
         $results = $query->get()->toArray();
@@ -123,7 +132,8 @@ trait RmEntryQueryTrait
         $details = DB::connection('eudr_ts')->table('t_balance_detail as bd')
             ->join('t_balance_header as bh', 'bd.id_balance_head', '=', 'bh.id_balance_head')
             ->leftJoin('m_supplier as sup', 'bd.id_supplier', '=', 'sup.id_supplier')
-            ->select('bh.trace_no', 'bd.batch_sap', 'bd.init_qty', 'bd.out_qty', 'bd.id_balance_tail', 'sup.code', 'sup.description')
+            ->leftJoin('m_manufacturer as mf', 'bd.id_manufacturer', '=', 'mf.id_manufacturer')
+            ->select('bh.trace_no', 'bd.batch_sap', 'bd.init_qty', 'bd.out_qty', 'bd.id_balance_tail', 'sup.code', 'sup.description', 'mf.description as manufacturer_name')
             ->where('bd.status', 1)->whereIn('bh.trace_no', $traceNos)
             ->get();
 
@@ -131,6 +141,9 @@ trait RmEntryQueryTrait
         foreach ($details as $sd) {
             $map[$sd->trace_no]['supplier'][] = sprintf('%s :: %s / %s / Qty : %s MT / %s', $sd->code ?? 'N/A', $sd->description ?? 'Unknown', $sd->batch_sap ?? '', number_format((float) $sd->init_qty, 3), $sd->out_qty == 0 ? '-' : 'BATCH TRANSFERRED');
             $map[$sd->trace_no]['id_balance_detail'][] = $sd->id_balance_tail;
+            if (! empty($sd->manufacturer_name)) {
+                $map[$sd->trace_no]['manufacturer'][] = $sd->manufacturer_name;
+            }
         }
 
         return $map;
@@ -153,6 +166,7 @@ trait RmEntryQueryTrait
             $traceKey = $r->trace_no;
             $r->supplier = isset($supplierMap[$traceKey]) ? implode(' | ', $supplierMap[$traceKey]['supplier']) : 'N/A';
             $r->id_balance_detail = isset($supplierMap[$traceKey]) ? implode(',', $supplierMap[$traceKey]['id_balance_detail']) : '';
+            $r->manufacturer_name = isset($supplierMap[$traceKey]['manufacturer']) ? implode(', ', array_unique($supplierMap[$traceKey]['manufacturer'])) : '-';
             $r->tf_number = ! empty($r->sloc_tank_number) ? $r->sloc_description.' | '.$r->sloc_tank_number : $r->sloc_description;
             $r->tank_name = $r->tf_number;
             $r->traced = $traceStatusMap[$traceKey] ?? 'N/A';

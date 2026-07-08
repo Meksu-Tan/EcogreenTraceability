@@ -105,7 +105,7 @@ class MaterialService implements MaterialServiceInterface
         return $this->materialRepo->getActiveSourceProducts();
     }
 
-    public function fetchBalance(int $idPlant, int $idMaterial): array
+    public function fetchBalance(int $idPlant, int $idMaterial, ?int $idSloc = null): array
     {
         $plantCode = DB::connection()
             ->table('m_plant')
@@ -116,20 +116,45 @@ class MaterialService implements MaterialServiceInterface
             return ['status' => 0, 'message' => 'Plant not found', 'data' => ['qty' => 0]];
         }
 
+        $materialType = DB::connection()
+            ->table('m_material')
+            ->where('id_material', $idMaterial)
+            ->value('type');
+
         // ponytail: use t_trace_header in/out like legacy + stock on hand
         // t_balance_header.qty is remaining balance (decremented by outflows), not total stock
         // filter via m_sloc.id_plant since t_balance_header.id_plant is unreliable
-        $result = DB::connection('eudr_ts')->select(
-            "SELECT ROUND(CAST(COALESCE(SUM(th.in_qty) - SUM(th.out_qty), 0) AS numeric), 3) AS total
+        $query = "SELECT ROUND(CAST(COALESCE(SUM(th.in_qty) - SUM(th.out_qty), 0) AS numeric), 3) AS total
                FROM t_trace_header th
                JOIN t_balance_header bh ON th.id_balance_head = bh.id_balance_head
                JOIN m_sloc ms ON ms.id_sloc = bh.id_sloc
               WHERE th.status = 1
                 AND th.id_material = ?
                 AND ms.id_plant = ?
-                AND SUBSTRING(bh.trace_no, 1, 1) IN ('1','2','3','7','8','9')",
-            [$idMaterial, $plantCode]
-        );
+                AND (
+                    (? = 'WIP' AND ms.code_3 = 'WIP') OR
+                    (? = 'PRD' AND ms.code_3 = 'PRD') OR
+                    (? = 'RM' AND ms.code_3 IN ('STORAGE', 'FEED'))
+                )
+                AND SUBSTRING(bh.trace_no, 1, 1) IN ('1','2','3','7','8','9')";
+
+        $bindings = [$idMaterial, $plantCode, $materialType, $materialType, $materialType];
+
+        if ($idSloc !== null) {
+            $slocCode3 = DB::connection('eudr_ts')
+                ->table('m_sloc')
+                ->where('id_sloc', $idSloc)
+                ->value('code_3');
+            if ($slocCode3 !== null && $slocCode3 !== '') {
+                $query .= " AND ms.code_3 = ?";
+                $bindings[] = $slocCode3;
+            } else {
+                $query .= " AND ms.id_sloc = ?";
+                $bindings[] = $idSloc;
+            }
+        }
+
+        $result = DB::connection('eudr_ts')->select($query, $bindings);
 
         $qty = (float) ($result[0]->total ?? 0);
 

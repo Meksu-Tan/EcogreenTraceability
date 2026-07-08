@@ -40,7 +40,7 @@ class WipProcessRepository implements WipProcessRepositoryInterface
 
     public function deleteSection(int $id): bool
     {
-        return (bool) WipSection::query()->whereKey($id)->delete();
+        return (bool) WipSection::query()->whereKey($id)->update(['status' => 0]);
     }
 
     public function deleteAllSections(?string $plantId): bool
@@ -76,7 +76,7 @@ class WipProcessRepository implements WipProcessRepositoryInterface
 
     public function deleteStep(int $id): bool
     {
-        return (bool) WipProcessStep::query()->whereKey($id)->delete();
+        return (bool) WipProcessStep::query()->whereKey($id)->update(['status' => 0]);
     }
 
     public function deleteAllSteps(int $sectionId): bool

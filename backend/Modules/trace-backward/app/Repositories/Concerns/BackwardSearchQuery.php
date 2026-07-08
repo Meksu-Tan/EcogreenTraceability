@@ -50,7 +50,7 @@ final class BackwardSearchQuery
                AND (".$plantFilter['sql'].')
              GROUP BY sh.id_ship_head, sh.entry_date, sh.trace_no, sh.so_no,
                      m.code, m.description, mp.code, mp.description, sh.qty, th.from_trace_no,
-                     sh.created_at, sh.created_by, sh.id_material_fg, sh.from_trace_no
+                     sh.created_at, sh.updated_at, sh.created_by, sh.updated_by, sh.id_material_fg, sh.from_trace_no
               ORDER BY sh.entry_date DESC
               LIMIT ? OFFSET ?
          ';

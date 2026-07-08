@@ -101,8 +101,8 @@
                 <td class="text-caption font-weight-medium">{{ entry.material }}</td>
                 <td class="text-caption">{{ entry.manufacturer_name || '-' }}</td>
                 <td class="text-caption">
-                  <a href="#" @click.prevent="openSlocEdit(entry)" class="text-medium-emphasis text-decoration-underline">
-                    {{ entry.tank_name }}
+                  <a href="#" @click.prevent="openChildTanksModal(entry)" class="text-medium-emphasis text-decoration-underline">
+                    {{ entry.sloc_description || 'N/A' }}
                   </a>
                 </td>
                 <td class="text-right font-weight-medium text-caption" :class="entry.init_qty === entry.balance_supplier ? 'text-success' : 'text-error'">{{ entry.init_qty }}</td>
@@ -218,7 +218,11 @@
                 <td class="text-caption">{{ formatDate(log.entry_date) }}</td>
                 <td class="text-caption font-mono">{{ log.material_document || '-' }}</td>
                 <td class="font-weight-medium text-caption">{{ log.material_name }}</td>
-                <td class="text-center text-caption">{{ log.tank_name }}</td>
+                <td class="text-caption">
+                  <a href="#" @click.prevent="openChildTanksModal(log)" class="text-medium-emphasis text-decoration-underline">
+                    {{ log.sloc_description || 'N/A' }}
+                  </a>
+                </td>
                 <td class="text-right font-weight-medium text-caption">{{ log.in_qty }}</td>
                 <td class="text-right font-weight-medium text-caption">{{ log.in_qty }}</td>
                 <td class="text-right font-weight-bold text-caption">{{ log.in_qty }}</td>
@@ -285,6 +289,42 @@
       @close="isTransferModalOpen = false"
       @saved="fetchData"
     />
+
+    <!-- Modal for showing specific child tanks -->
+    <VDialog v-model="isChildTanksModalOpen" max-width="500">
+      <VCard>
+        <VCardTitle class="bg-neutral-50 text-uppercase text-body-2 font-weight-bold py-3">
+          Specific SLOC / Tanks Selected
+        </VCardTitle>
+        <VDivider />
+        <VCardText class="py-4">
+          <div class="mb-4">
+            <strong>Storage Location:</strong> {{ selectedEntry?.sloc_description || 'N/A' }}
+          </div>
+          <div>
+            <strong>Tank Farm Number:</strong>
+            <div class="d-flex flex-wrap ga-1 mt-2">
+              <VChip
+                v-for="(tank, idx) in (selectedEntry?.sloc_tank_number ? selectedEntry.sloc_tank_number.split(',') : [])"
+                :key="idx"
+                color="primary"
+                variant="flat"
+                size="small"
+                class="mr-1 mb-1"
+              >
+                {{ tank.trim() }}
+              </VChip>
+            </div>
+          </div>
+        </VCardText>
+        <VDivider />
+        <VCardActions>
+          <VSpacer />
+          <VBtn color="secondary" variant="text" @click="isChildTanksModalOpen = false">Close</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+<!--
     <SubSlocEditModal
       v-model:is-open="isSlocModalOpen"
       :id-head="selectedEntry?.id_balance_head"
@@ -299,6 +339,7 @@
       :mode="matlDocMode"
       @success="isMatlDocModalOpen = false; fetchData()"
     />
+-->
   </div>
 </template>
 
@@ -310,8 +351,8 @@ import { usePlantSelectionStore } from '@/stores/plant.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import RmEntryModal from '@/modules/ts-raw/components/RmEntryModal.vue'
 import TransferModal from '@/modules/ts-raw/components/TransferModal.vue'
-import SubSlocEditModal from '@/modules/ts-raw/components/SubSlocEditModal.vue'
-import MaterialDocModal from '@/modules/ts-raw/components/MaterialDocModal.vue'
+// import SubSlocEditModal from '@/modules/ts-raw/components/SubSlocEditModal.vue'
+// import MaterialDocModal from '@/modules/ts-raw/components/MaterialDocModal.vue'
 import { useToastStore } from '@/stores/toast.js'
 
 const store = useTsRawRmEntryStore()
@@ -327,6 +368,7 @@ const matlDocMode = ref('matlDoc')
 const matlDocEntry = ref(null)
 const selectedEntry = ref(null)
 const editingEntryId = ref(null)
+const isChildTanksModalOpen = ref(false)
 
 onMounted(() => {
   fetchData()
@@ -404,6 +446,11 @@ function openUpdateModal(entry) {
 function openSlocEdit(entry) {
   selectedEntry.value = entry
   isSlocModalOpen.value = true
+}
+
+function openChildTanksModal(entry) {
+  selectedEntry.value = entry
+  isChildTanksModalOpen.value = true
 }
 
 function openMatlDocEdit(entry) {

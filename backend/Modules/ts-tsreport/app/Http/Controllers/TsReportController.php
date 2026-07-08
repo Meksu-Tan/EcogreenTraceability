@@ -126,6 +126,24 @@ class TsReportController extends Controller
         }
     }
 
+    public function getBlendingSection(TsReportRequest $request): JsonResponse
+    {
+        try {
+            $filters = $request->validated();
+            $filters['user_id'] = $request->user()?->id;
+            $result = $this->tsReportService->getTsReportBlending($filters);
+            if (isset($result['status']) && $result['status'] === 0) {
+                return ApiResponse::error($result['message'] ?? 'Not found', 404);
+            }
+
+            return ApiResponse::success(TsReportResource::collection($result['data'] ?? $result));
+        } catch (\Exception $e) {
+            Log::error('TsReport blending action failed', ['exception' => $e]);
+
+            return ApiResponse::error('Failed to retrieve TS report blending data', 500);
+        }
+    }
+
     public function getAllSections(TsReportRequest $request): JsonResponse
     {
         try {
@@ -136,13 +154,14 @@ class TsReportController extends Controller
                 $filters['entry_date'] = now()->toDateString();
             }
 
-            return ApiResponse::success(new TsReportResource([
+            return ApiResponse::success([
                 'rm' => $this->tsReportService->getTsReportRm($filters)['data'] ?? [],
                 'pck' => $this->tsReportService->getTsReportPck($filters)['data'] ?? [],
                 'shipment' => $this->tsReportService->getTsReportShipment($filters)['data'] ?? [],
                 'transfer' => $this->tsReportService->getTsReportTransfer($filters)['data'] ?? [],
+                'blending' => $this->tsReportService->getTsReportBlending($filters)['data'] ?? [],
                 'wip' => $this->tsReportService->getTsReportWip($filters)['data'] ?? [],
-            ]), 'All TS Report sections retrieved', 200);
+            ], 'All TS Report sections retrieved', 200);
         } catch (\Exception $e) {
             Log::error('TsReport action failed', ['exception' => $e]);
 

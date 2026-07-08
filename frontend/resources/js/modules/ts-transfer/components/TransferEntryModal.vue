@@ -680,25 +680,42 @@ async function updateEntryNoFromSloc() {
   }
 }
 
-async function fetchTransferQty() {
+async function fetchTransferQty(type = null) {
   if (!form.id_material) {
     toastStore.error('Select material first')
     return
   }
+
+  if (type === null) {
+    await Promise.all([
+      fetchTransferQty('source'),
+      fetchTransferQty('dest')
+    ])
+    return
+  }
+
+  const idSloc = type === 'source' ? form.source_sloc : form.trf_sloc
+  if (!idSloc) {
+    if (type === 'source') {
+      sourceStockLabel.value = 'Stock (MT): N/A'
+    } else {
+      destStockLabel.value = 'Stock (MT): N/A'
+    }
+    return
+  }
+
   try {
     const res = await store.fetchTransferQty({
       idMaterial: form.id_material,
-      idPlant: plantId.value
+      idPlant: plantId.value,
+      idSloc: idSloc
     })
     if (res?.status === 1) {
       const qty = res.data?.qty || 0
       const label = `Stock (MT): ${qty}`
-      if (form.trf_type === 'in') {
-        destStockLabel.value = label
-      } else if (form.trf_type === 'out') {
+      if (type === 'source') {
         sourceStockLabel.value = label
       } else {
-        sourceStockLabel.value = label
         destStockLabel.value = label
       }
     } else {
@@ -745,7 +762,7 @@ async function updateStock(type) {
       }
     }
   } else {
-    await fetchTransferQty()
+    await fetchTransferQty(type)
   }
 }
 

@@ -54,4 +54,35 @@ class TransactionModuleTest extends TestCase
 
         $response->assertStatus(422);
     }
+
+    public function test_add_supplier_success(): void
+    {
+        $user = User::factory()->create();
+
+        \Illuminate\Support\Facades\DB::connection('eudr_ts')->table('m_material')->insert([
+            'id_material' => 1,
+            'code' => 'MAT01',
+            'description' => 'Material 1',
+            'status' => 1,
+        ]);
+
+        \Illuminate\Support\Facades\DB::connection('eudr_ts')->table('m_supplier')->insert([
+            'id_supplier' => 1,
+            'code' => 'SUP01',
+            'description' => 'Supplier 1',
+            'status' => '1',
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/transactions/rm-entries/suppliers', [
+                'entry_no' => 'ENT-001',
+                'id_supplier' => 1,
+                'id_material' => 1,
+                'qty' => 10.5,
+                'batch_sap' => 'BATCH001',
+                'mode' => 'ADD',
+            ]);
+
+        $response->assertStatus(200);
+    }
 }

@@ -111,7 +111,7 @@ export const usePackageEntryStore = defineStore('packageEntry', () => {
   async function fetchSpecificTanks(sloc, fgProduct) {
     try {
       const res = await packageService.getSpecificTanks(sloc, fgProduct)
-      specificTanks.value = res.data?.data || []
+      specificTanks.value = res?.data || []
     } catch (error) {
       toastStore.error('Failed to load specific tanks')
     }

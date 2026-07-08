@@ -129,8 +129,15 @@
                   <div class="text-truncate">{{ row.material }}</div>
                 </td>
                 <td class="text-caption text-medium-emphasis">
-                  {{ row.tank || row.tank_type || '-' }}
-                  <span v-if="row.tf_number" class="text-medium-emphasis"> | {{ row.tf_number }}</span>
+                  <a
+                    v-if="row.id_sloc"
+                    href="#"
+                    class="text-decoration-underline"
+                    @click.prevent="openSpecificTankModal(row)"
+                  >
+                    {{ row.sloc_description || '-' }}
+                  </a>
+                  <span v-else>{{ row.sloc_description || '-' }}</span>
                 </td>
                 <td class="text-right font-weight-medium font-mono text-caption text-medium-emphasis">{{ row.init_qty }}</td>
                 <td class="text-right font-weight-bold font-mono text-caption">{{ row.qty }}</td>
@@ -199,6 +206,12 @@
       :loading="loadingDetail"
       :error="error"
     />
+
+    <SpecificTankModal
+      v-model="showSpecificTankModal"
+      :main-sloc="specificTankContext.mainSloc"
+      :tank-numbers="specificTankContext.tankNumbers"
+    />
   </div>
 </template>
 
@@ -208,6 +221,7 @@ import { storeToRefs } from 'pinia'
 import { useTraceForwardStore } from '../stores/traceForwardStore'
 import { formatSupplierList } from '@/utils/formatSupplier'
 import TraceDetailModal from '@/modules/shared/components/TraceDetailModal.vue'
+import SpecificTankModal from '@/modules/shared/components/SpecificTankModal.vue'
 
 const store = useTraceForwardStore()
 const { listMeta: meta, list, detail, loading, loadingDetail, error } = storeToRefs(store)
@@ -215,6 +229,8 @@ const { listMeta: meta, list, detail, loading, loadingDetail, error } = storeToR
 const filters = reactive({ id_plant: '', search: '' })
 const showModal = ref(false)
 const modalTraceNo = ref('')
+const showSpecificTankModal = ref(false)
+const specificTankContext = reactive({ mainSloc: '', tankNumbers: '' })
 
 const sortKey = ref('entry_date')
 const sortDir = ref('desc')
@@ -271,6 +287,12 @@ function resetFilters() {
   meta.value.page = 1
   perPage.value = 10
   loadData()
+}
+
+function openSpecificTankModal(row) {
+  specificTankContext.mainSloc = row.sloc_description || ''
+  specificTankContext.tankNumbers = row.sloc_tank_number || ''
+  showSpecificTankModal.value = true
 }
 
 async function openTraceModal(row) {

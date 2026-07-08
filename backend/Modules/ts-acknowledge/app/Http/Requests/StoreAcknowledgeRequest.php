@@ -22,9 +22,11 @@ class StoreAcknowledgeRequest extends FormRequest
             'section_id' => 'nullable|integer',
             'step_type' => 'nullable|string',
             'step_id' => 'nullable|integer',
+            'transaction_id' => 'nullable|string',
             'eo_dls_qty' => 'nullable|numeric',
             'dcs_qty' => 'nullable|numeric',
-            'manual_qty' => 'nullable|numeric',
+            'keterangan' => 'nullable|string|max:500',
+            'qty_source' => 'nullable|string|in:dcs,eo_dls,manual',
         ];
     }
 }

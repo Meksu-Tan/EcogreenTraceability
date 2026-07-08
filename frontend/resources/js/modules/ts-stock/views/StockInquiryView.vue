@@ -114,7 +114,7 @@
       </VCardText>
     </VCard>
 
-    <VCard v-if="reportType === 'detail' && !loading" class="mb-4">
+    <VCard v-if="reportType === 'detail' && !loading && !showRmTable" class="mb-4">
       <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
         <span class="text-body-1 font-weight-bold">Stock Detail</span>
       </VCardTitle>
@@ -126,9 +126,9 @@
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
                 <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('entry_date','detail')">Stock Date <VIcon size="14">{{ sortIcon('entry_date','detail') }}</VIcon></th>
                 <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('material','detail')">Description <VIcon size="14">{{ sortIcon('material','detail') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('in_qty','detail')">In (MT) <VIcon size="14">{{ sortIcon('in_qty','detail') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('in','detail')">In (MT) <VIcon size="14">{{ sortIcon('in','detail') }}</VIcon></th>
                 <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('tank','detail')">Sloc <VIcon size="14">{{ sortIcon('tank','detail') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('out_qty','detail')">Out (MT) <VIcon size="14">{{ sortIcon('out_qty','detail') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('out','detail')">Out (MT) <VIcon size="14">{{ sortIcon('out','detail') }}</VIcon></th>
                 <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance','detail')">Balance Material (MT) <VIcon size="14">{{ sortIcon('balance','detail') }}</VIcon></th>
                 <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance_supplier','detail')">Balance Supplier (MT) <VIcon size="14">{{ sortIcon('balance_supplier','detail') }}</VIcon></th>
                 <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('supplier','detail')">ID / Supplier / Batch SAP / Balance (MT) / Trace <VIcon size="14">{{ sortIcon('supplier','detail') }}</VIcon></th>
@@ -141,13 +141,13 @@
               <tr v-for="(row, i) in paginatedDetail" :key="row.id_balance_head">
                 <td class="text-center text-medium-emphasis">{{ i + 1 }}</td>
                 <td>{{ row.entry_date }}</td>
-                <td class="font-weight-medium text-truncate" style="max-width:200px" :title="row.material">{{ row.material || row.description }}</td>
-                <td class="text-right font-monospace">{{ formatQty(row.in_qty) }}</td>
+                <td class="font-weight-medium text-truncate" style="max-width:250px" :title="row.material">{{ row.material || row.description }}</td>
+                <td class="text-right font-monospace whitespace-nowrap">{{ formatQty(row.in) }}</td>
                 <td>{{ row.tank || row.sloc || '-' }}</td>
-                <td class="text-right font-monospace">{{ formatQty(row.out_qty) }}</td>
-                <td class="text-right font-monospace font-weight-bold" :class="bc(row)">{{ formatQty(row.balance || row.current_qty || row.qty) }}</td>
-                <td class="text-right font-monospace" :class="bc(row)">{{ row.balance_supplier || '0.000' }}</td>
-                <td class="text-caption" style="max-width:300px">
+                <td class="text-right font-monospace whitespace-nowrap">{{ formatQty(row.out) }}</td>
+                <td class="text-right font-monospace font-weight-bold whitespace-nowrap" :class="bc(row)">{{ formatQty(row.balance || row.current_qty || row.qty) }}</td>
+                <td class="text-right font-monospace whitespace-nowrap" :class="bc(row)">{{ row.balance_supplier || '0.000' }}</td>
+                <td class="text-caption" style="min-width:400px">
                   <div class="d-flex flex-wrap ga-1" v-if="(row.supplier || row.supplier_details)">
                     <VChip size="small" density="comfortable" variant="flat" color="grey-lighten-3" class="text-black" v-for="item in (row.supplier || row.supplier_details).split('|')" :key="item" v-show="item.trim()">
                       {{ item.trim() }}
@@ -169,7 +169,7 @@
       </VCardText>
     </VCard>
 
-    <VCard v-if="reportType === 'detail' && showRmTable" class="mb-4">
+    <VCard v-if="reportType === 'detail' && !loading && showRmTable" class="mb-4">
       <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
         <span class="text-body-1 font-weight-bold">RM Storage Detail</span>
       </VCardTitle>
@@ -179,30 +179,30 @@
             <thead>
               <tr>
                 <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('entry_date','rm')">Stock Date <VIcon size="14">{{ sortIcon('entry_date','rm') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('material','rm')">Description <VIcon size="14">{{ sortIcon('material','rm') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('in_qty','rm')">In (MT) <VIcon size="14">{{ sortIcon('in_qty','rm') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('sloc','rm')">Sloc <VIcon size="14">{{ sortIcon('sloc','rm') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('out_qty','rm')">Out (MT) <VIcon size="14">{{ sortIcon('out_qty','rm') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance','rm')">Balance Material (MT) <VIcon size="14">{{ sortIcon('balance','rm') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance_supplier','rm')">Balance Supplier (MT) <VIcon size="14">{{ sortIcon('balance_supplier','rm') }}</VIcon></th>
-                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('supplier','rm')">ID / Batch SAP / Balance (MT) / Trace <VIcon size="14">{{ sortIcon('supplier','rm') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('entry_date','rm_storage')">Stock Date <VIcon size="14">{{ sortIcon('entry_date','rm_storage') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('material','rm_storage')">Description <VIcon size="14">{{ sortIcon('material','rm_storage') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('in','rm_storage')">In (MT) <VIcon size="14">{{ sortIcon('in','rm_storage') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('sloc','rm_storage')">Sloc <VIcon size="14">{{ sortIcon('sloc','rm_storage') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('out','rm_storage')">Out (MT) <VIcon size="14">{{ sortIcon('out','rm_storage') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance','rm_storage')">Balance Material (MT) <VIcon size="14">{{ sortIcon('balance','rm_storage') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance_supplier','rm_storage')">Balance Supplier (MT) <VIcon size="14">{{ sortIcon('balance_supplier','rm_storage') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('supplier','rm_storage')">ID / Batch SAP / Balance (MT) / Trace <VIcon size="14">{{ sortIcon('supplier','rm_storage') }}</VIcon></th>
               </tr>
             </thead>
-            <tbody v-if="paginatedRm.length === 0">
+            <tbody v-if="paginatedRmStorage.length === 0">
               <tr><td colspan="9" class="text-center pa-8 text-disabled text-body-2">No RM storage data.</td></tr>
             </tbody>
             <tbody v-else>
-              <tr v-for="(row, i) in paginatedRm" :key="i">
+              <tr v-for="(row, i) in paginatedRmStorage" :key="i">
                 <td class="text-center text-medium-emphasis">{{ i + 1 }}</td>
                 <td>{{ row.entry_date }}</td>
-                <td class="font-weight-medium text-truncate" style="max-width:200px">{{ row.material }}</td>
-                <td class="text-right font-monospace">{{ formatQty(row.in_qty) }}</td>
+                <td class="font-weight-medium text-truncate" style="max-width:250px">{{ row.material }}</td>
+                <td class="text-right font-monospace whitespace-nowrap">{{ formatQty(row.in) }}</td>
                 <td>{{ row.sloc || '-' }}</td>
-                <td class="text-right font-monospace">{{ formatQty(row.out_qty) }}</td>
-                <td class="text-right font-monospace font-weight-bold" :class="bc(row)">{{ formatQty(row.balance || row.qty) }}</td>
-                <td class="text-right font-monospace" :class="bc(row)">{{ row.balance_supplier || '0.000' }}</td>
-                <td class="text-caption" style="max-width:300px">
+                <td class="text-right font-monospace whitespace-nowrap">{{ formatQty(row.out) }}</td>
+                <td class="text-right font-monospace font-weight-bold whitespace-nowrap" :class="bc(row)">{{ formatQty(row.balance || row.qty) }}</td>
+                <td class="text-right font-monospace whitespace-nowrap" :class="bc(row)">{{ row.balance_supplier || '0.000' }}</td>
+                <td class="text-caption" style="min-width:400px">
                   <div class="d-flex flex-wrap ga-1" v-if="row.supplier">
                     <VChip size="small" density="comfortable" variant="flat" color="grey-lighten-3" class="text-black" v-for="item in (row.supplier).split('|')" :key="item" v-show="item.trim()">
                       {{ item.trim() }}
@@ -214,13 +214,68 @@
             </tbody>
           </VTable>
         </div>
-      <div class="d-flex align-center justify-end pa-3 ga-4">
-        <div class="d-flex align-center ga-2">
-          <span class="text-caption text-medium-emphasis">Rows per page:</span>
-          <VSelect v-model="perPageRm" :items="[5, 10, 15, 20]" density="compact" variant="outlined" style="width:80px" hide-details />
+        <div class="d-flex align-center justify-end pa-3 ga-4">
+          <div class="d-flex align-center ga-2">
+            <span class="text-caption text-medium-emphasis">Rows per page:</span>
+            <VSelect v-model="perPageRmStorage" :items="[5, 10, 15, 20]" density="compact" variant="outlined" style="width:80px" hide-details />
+          </div>
+          <VPagination v-model="pageRmStorage" :length="Math.ceil(sortedRmStorage.length / perPageRmStorage)" size="small" :total-visible="7" />
         </div>
-        <VPagination v-model="pageRm" :length="Math.ceil(sortedRm.length / perPageRm)" size="small" :total-visible="7" />
-      </div>
+      </VCardText>
+    </VCard>
+
+    <VCard v-if="reportType === 'detail' && !loading && showRmTable" class="mb-4">
+      <VCardTitle class="d-flex align-center justify-space-between border-b pa-3 py-2">
+        <span class="text-body-1 font-weight-bold">RM Feed Detail</span>
+      </VCardTitle>
+      <VCardText class="pa-0">
+        <div class="overflow-x-auto">
+          <VTable density="compact" class="text-body-2">
+            <thead>
+              <tr>
+                <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('entry_date','rm_feed')">Stock Date <VIcon size="14">{{ sortIcon('entry_date','rm_feed') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('material','rm_feed')">Description <VIcon size="14">{{ sortIcon('material','rm_feed') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('in','rm_feed')">In (MT) <VIcon size="14">{{ sortIcon('in','rm_feed') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('sloc','rm_feed')">Sloc <VIcon size="14">{{ sortIcon('sloc','rm_feed') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('out','rm_feed')">Out (MT) <VIcon size="14">{{ sortIcon('out','rm_feed') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance','rm_feed')">Balance Material (MT) <VIcon size="14">{{ sortIcon('balance','rm_feed') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis text-right" @click="toggleSort('balance_supplier','rm_feed')">Balance Supplier (MT) <VIcon size="14">{{ sortIcon('balance_supplier','rm_feed') }}</VIcon></th>
+                <th class="sortable-th text-caption font-weight-bold text-uppercase text-medium-emphasis" @click="toggleSort('supplier','rm_feed')">ID / Batch SAP / Balance (MT) / Trace <VIcon size="14">{{ sortIcon('supplier','rm_feed') }}</VIcon></th>
+              </tr>
+            </thead>
+            <tbody v-if="paginatedRmFeed.length === 0">
+              <tr><td colspan="9" class="text-center pa-8 text-disabled text-body-2">No RM feed data.</td></tr>
+            </tbody>
+            <tbody v-else>
+              <tr v-for="(row, i) in paginatedRmFeed" :key="i">
+                <td class="text-center text-medium-emphasis">{{ i + 1 }}</td>
+                <td>{{ row.entry_date }}</td>
+                <td class="font-weight-medium text-truncate" style="max-width:250px">{{ row.material }}</td>
+                <td class="text-right font-monospace whitespace-nowrap">{{ formatQty(row.in) }}</td>
+                <td>{{ row.sloc || '-' }}</td>
+                <td class="text-right font-monospace whitespace-nowrap">{{ formatQty(row.out) }}</td>
+                <td class="text-right font-monospace font-weight-bold whitespace-nowrap" :class="bc(row)">{{ formatQty(row.balance || row.qty) }}</td>
+                <td class="text-right font-monospace whitespace-nowrap" :class="bc(row)">{{ row.balance_supplier || '0.000' }}</td>
+                <td class="text-caption" style="min-width:400px">
+                  <div class="d-flex flex-wrap ga-1" v-if="row.supplier">
+                    <VChip size="small" density="comfortable" variant="flat" color="grey-lighten-3" class="text-black" v-for="item in (row.supplier).split('|')" :key="item" v-show="item.trim()">
+                      {{ item.trim() }}
+                    </VChip>
+                  </div>
+                  <span v-else>-</span>
+                </td>
+              </tr>
+            </tbody>
+          </VTable>
+        </div>
+        <div class="d-flex align-center justify-end pa-3 ga-4">
+          <div class="d-flex align-center ga-2">
+            <span class="text-caption text-medium-emphasis">Rows per page:</span>
+            <VSelect v-model="perPageRmFeed" :items="[5, 10, 15, 20]" density="compact" variant="outlined" style="width:80px" hide-details />
+          </div>
+          <VPagination v-model="pageRmFeed" :length="Math.ceil(sortedRmFeed.length / perPageRmFeed)" size="small" :total-visible="7" />
+        </div>
       </VCardText>
     </VCard>
 
@@ -262,14 +317,14 @@
                 <tr v-for="(row, i) in paginatedSummary" :key="i">
                   <td class="text-center text-medium-emphasis">{{ i + 1 }}</td>
                   <td>{{ row.entry_date }}</td>
-                  <td class="font-weight-medium text-truncate" style="max-width:200px">{{ row.material }}</td>
-                  <td class="text-right font-monospace">{{ row.init_balance || '0.000' }}</td>
-                  <td class="text-right font-monospace">{{ row.in || '0.000' }}</td>
+                  <td class="font-weight-medium text-truncate" style="max-width:250px">{{ row.material }}</td>
+                  <td class="text-right font-monospace whitespace-nowrap">{{ row.init_balance || '0.000' }}</td>
+                  <td class="text-right font-monospace whitespace-nowrap">{{ row.in || '0.000' }}</td>
                   <td>{{ row.sloc || '-' }}</td>
-                  <td class="text-right font-monospace">{{ row.out || '0.000' }}</td>
-                  <td class="text-right font-monospace font-weight-bold" :class="sc(row)">{{ row.last_balance || '0.000' }}</td>
-                  <td class="text-right font-monospace" :class="sc(row)">{{ row.balance_supplier || '0.000' }}</td>
-                  <td class="text-caption" style="max-width:300px">
+                  <td class="text-right font-monospace whitespace-nowrap">{{ row.out || '0.000' }}</td>
+                  <td class="text-right font-monospace font-weight-bold whitespace-nowrap" :class="sc(row)">{{ row.last_balance || '0.000' }}</td>
+                  <td class="text-right font-monospace whitespace-nowrap" :class="sc(row)">{{ row.balance_supplier || '0.000' }}</td>
+                  <td class="text-caption" style="min-width:400px">
                     <div class="d-flex flex-wrap ga-1" v-if="row.supplier">
                       <VChip size="small" density="comfortable" variant="flat" color="grey-lighten-3" class="text-black" v-for="item in (row.supplier).split('|')" :key="item" v-show="item.trim()">
                         {{ item.trim() }}
@@ -316,14 +371,22 @@ const sortKeyDetail = ref('')
 const sortDirDetail = ref('asc')
 const sortKeyRm = ref('')
 const sortDirRm = ref('asc')
+const sortKeyRmStorage = ref('')
+const sortDirRmStorage = ref('asc')
+const sortKeyRmFeed = ref('')
+const sortDirRmFeed = ref('asc')
 const sortKeySummary = ref('')
 const sortDirSummary = ref('asc')
 
 const perPageDetail = ref(10)
 const perPageRm = ref(10)
+const perPageRmStorage = ref(10)
+const perPageRmFeed = ref(10)
 const perPageSummary = ref(10)
 const pageDetail = ref(1)
 const pageRm = ref(1)
+const pageRmStorage = ref(1)
+const pageRmFeed = ref(1)
 const pageSummary = ref(1)
 
 const detailFilters = reactive({
@@ -369,6 +432,8 @@ const onReportTypeChange = () => {
   stockData.value = []
   rmData.value = []
   summaryData.value = []
+  pageRmStorage.value = 1
+  pageRmFeed.value = 1
 }
 
 const onStockTypeChange = async () => {
@@ -396,6 +461,8 @@ const onView = async () => {
   loading.value = true
   pageDetail.value = 1
   pageRm.value = 1
+  pageRmStorage.value = 1
+  pageRmFeed.value = 1
   pageSummary.value = 1
   try {
     if (reportType.value === 'detail') {
@@ -407,9 +474,9 @@ const onView = async () => {
       await stockStore.fetchStock(p)
       stockData.value = stockStore.stockData || []
       const sel = materialOptions.value.find(m => m.id_material === detailFilters.materialId)
-      showRmTable.value = sel && sel.material && sel.material.includes('/RM)')
+      showRmTable.value = sel && sel.material && (sel.material.includes('/RM)') || sel.material.includes('/ RM)'))
       if (showRmTable.value) {
-        rmData.value = stockData.value.filter(r => r.material && r.material.includes('/RM)'))
+        rmData.value = stockData.value.filter(r => r.material && (r.material.includes('/RM)') || r.material.includes('/ RM)')))
       }
     } else {
       const p = { report_type: 'summary' }
@@ -467,6 +534,8 @@ const detectColumnType = (key) => {
 const toggleSort = (key, prefix) => {
   let sortKey, sortDir
   if (prefix === 'detail') { sortKey = sortKeyDetail; sortDir = sortDirDetail }
+  else if (prefix === 'rm_storage') { sortKey = sortKeyRmStorage; sortDir = sortDirRmStorage }
+  else if (prefix === 'rm_feed') { sortKey = sortKeyRmFeed; sortDir = sortDirRmFeed }
   else if (prefix === 'rm') { sortKey = sortKeyRm; sortDir = sortDirRm }
   else { sortKey = sortKeySummary; sortDir = sortDirSummary }
   if (sortKey.value === key) {
@@ -480,6 +549,8 @@ const toggleSort = (key, prefix) => {
 const sortIcon = (key, prefix) => {
   let sortKey, sortDir
   if (prefix === 'detail') { sortKey = sortKeyDetail; sortDir = sortDirDetail }
+  else if (prefix === 'rm_storage') { sortKey = sortKeyRmStorage; sortDir = sortDirRmStorage }
+  else if (prefix === 'rm_feed') { sortKey = sortKeyRmFeed; sortDir = sortDirRmFeed }
   else if (prefix === 'rm') { sortKey = sortKeyRm; sortDir = sortDirRm }
   else { sortKey = sortKeySummary; sortDir = sortDirSummary }
   if (sortKey.value !== key) return 'ri-arrow-up-down-line'
@@ -515,6 +586,16 @@ const sortedDetail = computed(() => sortData(stockData.value, sortKeyDetail, sor
 const sortedRm = computed(() => sortData(rmData.value, sortKeyRm, sortDirRm))
 const sortedSummary = computed(() => sortData(summaryData.value, sortKeySummary, sortDirSummary))
 
+const rmStorageData = computed(() => {
+  return stockData.value.filter(r => r.sloc && r.sloc.toUpperCase().includes('STORAGE'))
+})
+const rmFeedData = computed(() => {
+  return stockData.value.filter(r => r.sloc && r.sloc.toUpperCase().includes('FEED'))
+})
+
+const sortedRmStorage = computed(() => sortData(rmStorageData.value, sortKeyRmStorage, sortDirRmStorage))
+const sortedRmFeed = computed(() => sortData(rmFeedData.value, sortKeyRmFeed, sortDirRmFeed))
+
 const paginatedDetail = computed(() => {
   const start = (pageDetail.value - 1) * perPageDetail.value
   return sortedDetail.value.slice(start, start + perPageDetail.value)
@@ -522,6 +603,14 @@ const paginatedDetail = computed(() => {
 const paginatedRm = computed(() => {
   const start = (pageRm.value - 1) * perPageRm.value
   return sortedRm.value.slice(start, start + perPageRm.value)
+})
+const paginatedRmStorage = computed(() => {
+  const start = (pageRmStorage.value - 1) * perPageRmStorage.value
+  return sortedRmStorage.value.slice(start, start + perPageRmStorage.value)
+})
+const paginatedRmFeed = computed(() => {
+  const start = (pageRmFeed.value - 1) * perPageRmFeed.value
+  return sortedRmFeed.value.slice(start, start + perPageRmFeed.value)
 })
 const paginatedSummary = computed(() => {
   const start = (pageSummary.value - 1) * perPageSummary.value

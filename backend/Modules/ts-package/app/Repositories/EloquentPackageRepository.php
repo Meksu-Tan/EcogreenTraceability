@@ -163,7 +163,7 @@ class EloquentPackageRepository implements PackageRepositoryInterface
 
         $slocs = DB::connection('eudr_ts')
             ->table('m_sloc')
-            ->select('id_sloc', 'tf_number')
+            ->select('id_sloc', 'tf_number', 'description')
             ->get()
             ->keyBy('id_sloc');
 
@@ -178,8 +178,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             $tanks = [];
             foreach ($ids as $id) {
                 $id = trim((string) $id);
-                if (isset($slocs[$id]) && $slocs[$id]->tf_number) {
-                    $tanks[] = $slocs[$id]->tf_number;
+                if (isset($slocs[$id]) && $slocs[$id]->description) {
+                    $tanks[] = $slocs[$id]->description;
                 }
             }
             if (! empty($tanks)) {
@@ -361,8 +361,6 @@ class EloquentPackageRepository implements PackageRepositoryInterface
             }
 
             $item->tank = $this->formatTankName($desc) ?? $desc;
-            $item->id_sloc = (int) $item->id_sloc;
-            $item->tf_number = $item->tf_number;
 
             return $item;
         });
@@ -410,6 +408,13 @@ class EloquentPackageRepository implements PackageRepositoryInterface
         if (! $sloc) {
             return collect([]);
         }
+
+        // Handle JSON array sloc (e.g. "[5]") — extract first element
+        if (is_string($sloc) && str_starts_with($sloc, '[')) {
+            $decoded = json_decode($sloc, true);
+            $sloc = is_array($decoded) ? ($decoded[0] ?? null) : $sloc;
+        }
+        $sloc = (int) $sloc;
 
         // Find group (code_3 + id_plant) from selected sloc
         $group = DB::connection($this->connection)->selectOne(
@@ -612,6 +617,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     'init_qty' => $qtyPck,
                     'id_plant' => $idPlant,
                     'created_by' => $user,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ], 'id_whx_head');
 
                 // Insert Trace Header Rundown
@@ -626,6 +633,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                     'curr_qtf' => $qtyPck,
                     'id_plant' => $idPlant,
                     'created_by' => $user,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ], 'id_trace_head');
 
                 foreach ($finalSupplierDetails as $detail) {
@@ -641,6 +650,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                         'id_plant' => $idPlant,
                         'id_sloc' => $idSlocJson,
                         'created_by' => $user,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ], 'id_whx_tail');
 
                     DB::connection($this->connection)->table('t_trace_detail')->insert([
@@ -653,6 +664,8 @@ class EloquentPackageRepository implements PackageRepositoryInterface
                         'id_sloc' => $idSlocJson,
                         'id_plant' => $idPlant,
                         'created_by' => $user,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ]);
                 }
 

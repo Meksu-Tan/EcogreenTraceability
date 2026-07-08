@@ -39,16 +39,21 @@ trait RmEntryModelAccessTrait
      */
     public function getActiveMaterialsSearch(): array
     {
-        return Material::where('status', 1)
-            ->orderBy('description')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'id' => $item->id_material,
-                    'text' => $item->material_code.' :: '.$item->description,
-                ];
-            })
-            ->toArray();
+        $materials = Material::where('status', 1)->get();
+
+        $dupCodes = $materials->groupBy('code')->filter(fn ($g) => $g->count() > 1)->keys();
+
+        return $materials->sortBy('description')->map(function ($item) use ($dupCodes) {
+            $text = mb_strtoupper($item->description).' ('.$item->code;
+
+            if ($dupCodes->contains($item->code)) {
+                $text .= ' - '.($item->qtf_rundown ?? '');
+            }
+
+            $text .= ')';
+
+            return ['id' => $item->id_material, 'text' => $text];
+        })->values()->toArray();
     }
 
     /**

@@ -221,21 +221,19 @@
                 <tr class="bg-neutral-50">
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:48px">No</th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Material</th>
-                  <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis">Manufacturer</th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-right">Qty (MT)</th>
                   <th class="text-caption font-weight-bold text-uppercase text-medium-emphasis text-center" style="width:80px">Action</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="materialList.length === 0">
-                  <td colspan="5" class="text-center text-disabled py-6 text-body-2">
+                  <td colspan="4" class="text-center text-disabled py-6 text-body-2">
                     No material yet — use "Material &amp; Qty".
                   </td>
                 </tr>
                 <tr v-for="(mat, index) in materialList" :key="mat.id">
                   <td class="text-center text-caption text-medium-emphasis">{{ index + 1 }}</td>
                   <td class="text-caption">{{ mat.material }}</td>
-                  <td class="text-caption">{{ mat.manufacturer }}</td>
                   <td class="text-right font-weight-medium text-caption font-mono">{{ mat.qty }}</td>
                   <td class="text-center">
                     <VBtn
@@ -286,18 +284,6 @@
             item-value="value"
             density="compact"
             variant="outlined"
-          />
-          <VCombobox
-            v-model="materialForm.id_manufacturer"
-            label="Manufacturer"
-            :items="manufacturerOptions"
-            item-title="label"
-            item-value="value"
-            density="compact"
-            variant="outlined"
-            placeholder="Select or type manufacturer"
-            clearable
-            :return-object="false"
           />
           <VTextField
             v-model="materialForm.qty"

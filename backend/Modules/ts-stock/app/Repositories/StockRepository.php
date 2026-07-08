@@ -22,16 +22,20 @@ class StockRepository implements StockRepositoryInterface
         if ($type === 'WIP') {
             $sql = "SELECT id_material, UPPER(material) AS material FROM (
                         SELECT DISTINCT ON (a.id_material)
-                               CONCAT(a.description,' (',a.code,' / ',a.type,')') AS material,
+                               CASE WHEN dup.cnt > 1
+                                    THEN CONCAT(a.description,' (',a.code,' / ',a.type,' - ',COALESCE(a.qtf_rundown,''),')')
+                                    ELSE CONCAT(a.description,' (',a.code,' / ',a.type,')')
+                               END AS material,
                                CONCAT('WIP|',a.id_material) AS id_material
-                          FROM m_material a WHERE a.status=1";
+                          FROM m_material a
+                          JOIN (SELECT code, COUNT(*) AS cnt FROM m_material WHERE status=1 GROUP BY code) dup ON a.code = dup.code
+                         WHERE a.status=1";
             $bindings = [];
             if ($search !== null) {
                 $sql .= ' AND a.description ILIKE ?';
                 $bindings[] = "%{$search}%";
             }
             $sql .= ' ORDER BY a.id_material) a ORDER BY material';
-
             return DB::connection($this->connection)->select($sql, $bindings);
         }
 
@@ -54,9 +58,14 @@ class StockRepository implements StockRepositoryInterface
         return DB::connection($this->connection)->select(
             "SELECT id_material, UPPER(material) AS material FROM (
                 SELECT DISTINCT ON (a.id_material)
-                       CONCAT('WIP - ',a.description,' (',a.code,' / ',a.type,')') AS material,
+                       CASE WHEN dup.cnt > 1
+                            THEN CONCAT('WIP - ',a.description,' (',a.code,' / ',a.type,' - ',COALESCE(a.qtf_rundown,''),')')
+                            ELSE CONCAT('WIP - ',a.description,' (',a.code,' / ',a.type,')')
+                       END AS material,
                        CONCAT('WIP|',a.id_material) AS id_material
-                  FROM m_material a WHERE a.status=1 ORDER BY a.id_material
+                  FROM m_material a
+                  JOIN (SELECT code, COUNT(*) AS cnt FROM m_material WHERE status=1 GROUP BY code) dup ON a.code = dup.code
+                 WHERE a.status=1 ORDER BY a.id_material
             ) wip
             UNION ALL
             SELECT id_material, UPPER(material) AS material FROM (
@@ -155,20 +164,23 @@ class StockRepository implements StockRepositoryInterface
         if ($type === 'WIP') {
             if ($mode === 'NORMAL') {
                 $db = DB::connection($this->connection)->select('WITH requested_material AS (
-                                    SELECT a.id_material
+                                    SELECT z.id_material, z.type AS material_type
                                       FROM m_material z
-                                      LEFT JOIN (SELECT a.code, a.id_material
-                                                   FROM m_material a
-                                                  WHERE a.status = 1
-                                                    ) a
-                                        ON z.code = a.code
                                      WHERE z.id_material = ?
                                     ),
 bh_filtered AS (
-                                        SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no
+                                        SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no,
+                                               ms.description AS sloc_desc, ms.code_3 AS sloc_code3
                                           FROM t_balance_header bb
                                           JOIN requested_material rm
                                              ON bb.id_material = rm.id_material
+                                          JOIN m_sloc ms ON bb.id_sloc = ms.id_sloc 
+                                            AND ms.id_plant = ?
+                                            AND (
+                                                (rm.material_type = \'WIP\' AND ms.code_3 = \'WIP\') OR
+                                                (rm.material_type = \'PRD\' AND ms.code_3 = \'PRD\') OR
+                                                (rm.material_type = \'RM\' AND ms.code_3 IN (\'STORAGE\', \'FEED\'))
+                                            )
                                           WHERE bb.status = 1
                                             AND bb.id_sloc <> 4
                                             AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
@@ -176,39 +188,37 @@ bh_filtered AS (
                                     th_grouped AS (
                                         SELECT
                                               b.id_balance_head, b.id_material, b.id_trace_head, b.entry_date, SUM(b.in_qty) AS in_qty,
-                                              SUM(b.out_qty) AS out_qty, SUM(b.in_qty) - SUM(b.out_qty) AS balance,
-                                              STRING_AGG(DISTINCT mt.description, \'|\') AS sloc
-                                         FROM t_trace_header b
-                                         LEFT JOIN m_sloc mt
-                                           ON (CASE WHEN jsonb_typeof(b.id_sloc) = \'array\' THEN COALESCE((b.id_sloc->>0)::int, 0) ELSE (b.id_sloc#>>\'{}\')::int END) = mt.id_sloc
-                                          AND mt.id_plant = ?
-                                        WHERE b.status = 1
-                                          AND b.entry_date <= ?
+                                              SUM(b.out_qty) AS out_qty, SUM(b.in_qty) - SUM(b.out_qty) AS balance
+                                          FROM t_trace_header b
+                                          JOIN requested_material rm ON b.id_material = rm.id_material
+                                         WHERE b.status = 1
+                                           AND b.entry_date <= ?
                                         GROUP BY b.id_balance_head, b.id_material, b.entry_date, b.id_trace_head
                                     ),
                                     begin_rows AS (
                                         SELECT
-                                            bb.id_material, b.entry_date, b.id_trace_head, \'Beginning Balance\' AS description,
-                                            b.balance, b.sloc, b.in_qty  AS "in", b.out_qty AS "out"
+                                            bb.id_material, bb.id_sloc, bb.sloc_desc, bb.sloc_code3,
+                                            b.entry_date, b.id_trace_head, \'Beginning Balance\' AS description,
+                                            b.balance, b.in_qty  AS "in", b.out_qty AS "out"
                                         FROM bh_filtered bb
                                         JOIN th_grouped b
                                           ON b.id_balance_head = bb.id_balance_head
                                          AND b.id_material = bb.id_material
                                     ),
                                     begin_agg AS (
-                                        SELECT rm.id_material, SUM(br.balance) AS balance_raw,
+                                        SELECT rm.id_material, br.sloc_code3,
+                                               COALESCE(MAX(br.sloc_desc), \'Unnamed\') AS sloc_desc,
+                                               SUM(br.balance) AS balance_raw,
                                                STRING_AGG(DISTINCT br.description, \'|\') AS description,
-                                               ROUND(CAST(SUM(br."in") AS numeric),3) AS in_raw, ROUND(CAST(SUM(br."out") AS numeric),3) AS out_raw,
-                                               MAX(br.sloc) AS sloc
+                                               ROUND(CAST(SUM(br."in") AS numeric),3) AS in_raw, ROUND(CAST(SUM(br."out") AS numeric),3) AS out_raw
                                           FROM requested_material rm
                                           LEFT JOIN begin_rows br
                                             ON rm.id_material = br.id_material
-                                            WHERE br.sloc <> \'-\'
-                                         GROUP BY rm.id_material
+                                         GROUP BY rm.id_material, br.sloc_code3
                                     ),
                                     td_filtered AS (
                                         SELECT
-                                         	 c.id_balance_head, cc.id_trace_head, c.id_material, cc.id_trace_tail,
+                                        	 c.id_balance_head, cc.id_trace_head, c.id_material, cc.id_trace_tail,
                                              cc.id_supplier, cc.batch_sap, ROUND(CAST(cc.in_qty AS numeric),4) AS in_qty, ROUND(CAST(cc.out_qty AS numeric),4) AS out_qty
                                         FROM t_trace_header c
                                         LEFT JOIN t_trace_detail cc
@@ -256,9 +266,15 @@ bh_filtered AS (
                                          FROM t_balance_header bb
                                          JOIN requested_material rm
                                             ON bb.id_material = rm.id_material
+                                         JOIN m_sloc ms ON bb.id_sloc = ms.id_sloc
                                         WHERE bb.status = 1
                                           AND bb.id_sloc <> 4
                                           AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
+                                          AND (
+                                              (rm.material_type = \'WIP\' AND ms.code_3 = \'WIP\') OR
+                                              (rm.material_type = \'PRD\' AND ms.code_3 = \'PRD\') OR
+                                              (rm.material_type = \'RM\' AND ms.code_3 IN (\'STORAGE\', \'FEED\'))
+                                          )
                                     ),
                                     supplier_plant AS (
                                         SELECT
@@ -289,28 +305,21 @@ bh_filtered AS (
                                      )
                                      SELECT
                                          SUBSTRING(?,1,10) AS entry_date,
-                                        MAX(COALESCE(bgn.description, \'Beginning Balance\')) AS "description",
-                                        TO_CHAR(ROUND(CAST(COALESCE(SUM(bgn.in_raw), 0) AS numeric), 3), \'FM999999999999990.000\') AS "in",
-                                        TO_CHAR(ROUND(CAST(COALESCE(SUM(bgn.out_raw), 0) AS numeric), 3), \'FM999999999999990.000\') AS "out",
-                                        TO_CHAR(ROUND(CAST(COALESCE(SUM(bgn.balance_raw), 0) AS numeric), 3), \'FM999999999999990.000\') AS balance,
-                                        STRING_AGG(COALESCE(sup.supplier, \'|\'), \'|\') AS supplier,
-                                        MAX(COALESCE(bgn.sloc, \'-\'))     AS sloc,
-                                        COALESCE(SUM(bgn.balance_raw), 0) AS balances,
-                                        CASE WHEN 
-                                            ABS(COALESCE(SUM(sup.balance_supplier_raw),0) - COALESCE(SUM(bgn.balance_raw),0)) < 0.01 THEN 
-                                            TO_CHAR(ROUND(CAST(COALESCE(SUM(bgn.balance_raw), 0) AS numeric), 3), \'FM999999999999990.000\') ELSE 
-                                            TO_CHAR(ROUND(CAST(COALESCE(SUM(sup.balance_supplier_raw), 0) AS numeric), 3), \'FM999999999999990.000\')
+                                        COALESCE(bgn.description, \'Beginning Balance\') AS "description",
+                                        TO_CHAR(ROUND(CAST(COALESCE(bgn.in_raw, 0) AS numeric), 3), \'FM999999999999990.000\') AS "in",
+                                        TO_CHAR(ROUND(CAST(COALESCE(bgn.out_raw, 0) AS numeric), 3), \'FM999999999999990.000\') AS "out",
+                                        TO_CHAR(ROUND(CAST(COALESCE(bgn.balance_raw, 0) AS numeric), 3), \'FM999999999999990.000\') AS balance,
+                                        COALESCE(sup.supplier, \'|\') AS supplier,
+                                        COALESCE(bgn.sloc_desc, \'-\') AS sloc,
+                                        COALESCE(bgn.balance_raw, 0) AS balances,
+                                        CASE WHEN
+                                            ABS(COALESCE(sup.balance_supplier_raw,0) - COALESCE(bgn.balance_raw,0)) < 0.01 THEN
+                                            TO_CHAR(ROUND(CAST(COALESCE(bgn.balance_raw, 0) AS numeric), 3), \'FM999999999999990.000\') ELSE
+                                            TO_CHAR(ROUND(CAST(COALESCE(sup.balance_supplier_raw, 0) AS numeric), 3), \'FM999999999999990.000\')
                                          END AS balance_supplier
                                     FROM requested_material rm
                                     LEFT JOIN begin_agg     bgn ON bgn.id_material = rm.id_material
-                                    LEFT JOIN supplier_roll  sup ON sup.id_material = rm.id_material
-                                    UNION ALL
-                                    SELECT
-                                        SUBSTRING(?,1,10) AS entry_date,
-                                        \'Beginning Balance\' AS "description",
-                                        TO_CHAR(ROUND(0, 3), \'FM999999999999990.000\') AS "in", TO_CHAR(ROUND(0, 3), \'FM999999999999990.000\') AS "out", TO_CHAR(ROUND(0, 3), \'FM999999999999990.000\') AS balance,
-                                        \'|\' AS supplier, \'-\' AS sloc, 0  AS balances, TO_CHAR(ROUND(0, 3), \'FM999999999999990.000\') AS balance_supplier
-                                    LIMIT 1', [$idMaterialFix, $idSloc, $startDateVal, $startDateVal, $idSloc, $startDateVal, $startDateVal]);
+                                    LEFT JOIN supplier_roll  sup ON sup.id_material = rm.id_material', [$idMaterialFix, $idSloc, $startDateVal, $startDateVal, $idSloc, $startDateVal]);
             } elseif ($mode === 'STORAGE') {
                 $db = DB::connection($this->connection)->select('SELECT SUBSTRING(?,1,10) AS entry_date, bgn."description", bgn."in" AS "in", bgn."out" AS "out",
                                          TO_CHAR(ROUND(CAST(bgn."balance" AS numeric), 3), \'FM999999999999990.000\') AS balance, bgn."supplier", bgn."sloc", bgn."balance" AS balances,
@@ -348,10 +357,10 @@ bh_filtered AS (
                                                           ON bbb.id_sloc = bb.id_sloc
                                                        WHERE bb.id_trace_head IS NOT NULL
                                                          AND bbb.id_plant = ?
-                                                     ) b
+                                                      ) b
                                               ON a.id_material = b.id_material
                                              LEFT JOIN (SELECT d.id_material, MAX(d.id_trace_head) AS id_trace_head, MAX(d.entry_date) AS entry_date, SUM(d."balance") AS balance_supplier,
-                                                              STRING_AGG(DISTINCT CONCAT(d.id_trace_tail, \' / \', d.supplier, \' / \', d."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(d."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\'), \' MT / \', d.to_trace_no), \' | \') AS supplier
+                                                               STRING_AGG(DISTINCT CONCAT(d.id_trace_tail, \' / \', d.supplier, \' / \', d."batch_sap", \' / Qty: \', TO_CHAR(ROUND(CAST(CAST(d."balance" AS numeric) AS numeric),3), \'FM999999999999990.000\'), \' MT / \', d.to_trace_no), \' | \') AS supplier
                                                           FROM (SELECT cc.id_material, MAX(cc.id_trace_head) AS id_trace_head, MAX(cc.entry_date) AS entry_date, MAX(cc.id_trace_tail) AS id_trace_tail,
                                                                        SUM(ROUND(CAST(cc.in_qty AS numeric),4)) - SUM(ROUND(CAST(cc.out_qty AS numeric),4)) AS "balance", cc.supplier, cc."batch_sap",
                                                                        MAX(cc.to_trace_no) AS to_trace_no
@@ -475,20 +484,23 @@ bh_filtered AS (
             if ($type === 'WIP') {
                 if ($mode === 'NORMAL') {
                     $db1 = DB::connection($this->connection)->select('WITH requested_material AS (
-                                    SELECT a.id_material
+                                    SELECT z.id_material, z.type AS material_type
                                       FROM m_material z
-                                      LEFT JOIN (SELECT a.code, a.id_material
-                                                   FROM m_material a
-                                                  WHERE a.status = 1
-                                                    ) a
-                                        ON z.code = a.code
                                      WHERE z.id_material = ?
                                     ),
 bh_filtered AS (
-                                        SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no
+                                        SELECT bb.id_balance_head, bb.id_sloc, bb.id_material, bb.trace_no,
+                                               ms.description AS sloc_desc, ms.code_3 AS sloc_code3
                                           FROM t_balance_header bb
                                           JOIN requested_material rm
                                              ON bb.id_material = rm.id_material
+                                          JOIN m_sloc ms ON bb.id_sloc = ms.id_sloc 
+                                            AND ms.id_plant = ?
+                                            AND (
+                                                (rm.material_type = \'WIP\' AND ms.code_3 = \'WIP\') OR
+                                                (rm.material_type = \'PRD\' AND ms.code_3 = \'PRD\') OR
+                                                (rm.material_type = \'RM\' AND ms.code_3 IN (\'STORAGE\', \'FEED\'))
+                                            )
                                           WHERE bb.status = 1
                                             AND bb.id_sloc <> 4
                                             AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
@@ -497,35 +509,35 @@ bh_filtered AS (
                                         SELECT
                                               b.id_balance_head, b.id_material, b.id_trace_head, b.entry_date, SUM(b.in_qty) AS in_qty,
                                               SUM(b.out_qty) AS out_qty, SUM(b.in_qty) - SUM(b.out_qty) AS balance,
-                                              STRING_AGG(DISTINCT mt.description, \'|\') AS sloc, b.to_trace_no
-                                         FROM t_trace_header b
-                                         LEFT JOIN m_sloc mt
-                                           ON (CASE WHEN jsonb_typeof(b.id_sloc) = \'array\' THEN COALESCE((b.id_sloc->>0)::int, 0) ELSE (b.id_sloc#>>\'{}\')::int END) = mt.id_sloc
-                                          AND mt.id_plant = ?
-                                        WHERE b.status = 1
-                                          AND b.entry_date > ?
-                                          AND b.entry_date <= ?
+                                              MAX(b.to_trace_no) AS to_trace_no
+                                          FROM t_trace_header b
+                                          JOIN requested_material rm ON b.id_material = rm.id_material
+                                         WHERE b.status = 1
+                                           AND b.entry_date > ?
+                                           AND b.entry_date <= ?
                                         GROUP BY b.id_balance_head, b.id_material, b.entry_date, b.id_trace_head
                                     ),
                                     begin_rows AS (
                                         SELECT
-                                            bb.id_material, b.entry_date, b.id_trace_head, \'Beginning Balance\' AS description,
-                                            b.balance, b.sloc, b.in_qty  AS "in", b.out_qty AS "out", b.to_trace_no
+                                            bb.id_material, bb.id_sloc, bb.sloc_desc, bb.sloc_code3,
+                                            b.entry_date, b.id_trace_head, \'Beginning Balance\' AS description,
+                                            b.balance, b.in_qty  AS "in", b.out_qty AS "out", b.to_trace_no
                                         FROM bh_filtered bb
                                         JOIN th_grouped b
                                           ON b.id_balance_head = bb.id_balance_head
                                          AND b.id_material = bb.id_material
                                     ),
                                     begin_agg AS (
-                                        SELECT rm.id_material, SUM(br.balance) AS balance_raw,
+                                        SELECT rm.id_material, br.sloc_code3,
+                                               COALESCE(MAX(br.sloc_desc), \'Unnamed\') AS sloc_desc,
+                                               SUM(br.balance) AS balance_raw,
                                                STRING_AGG(DISTINCT br.description, \'|\') AS description,
                                                ROUND(CAST(SUM(br."in") AS numeric),3) AS in_raw, ROUND(CAST(SUM(br."out") AS numeric),3) AS out_raw,
-                                               MAX(br.sloc) AS sloc, MAX(br.to_trace_no) AS to_trace_no
+                                               MAX(br.to_trace_no) AS to_trace_no
                                           FROM requested_material rm
                                           LEFT JOIN begin_rows br
                                             ON rm.id_material = br.id_material
-                                            WHERE br.sloc <> \'-\'
-                                         GROUP BY rm.id_material
+                                         GROUP BY rm.id_material, br.sloc_code3
                                     ),
                                     td_filtered AS (
                                         SELECT
@@ -578,9 +590,15 @@ bh_filtered AS (
                                          FROM t_balance_header bb
                                          JOIN requested_material rm
                                             ON bb.id_material = rm.id_material
+                                         JOIN m_sloc ms ON bb.id_sloc = ms.id_sloc
                                         WHERE bb.status = 1
                                           AND bb.id_sloc <> 4
                                           AND SUBSTRING(bb.trace_no FROM 1 FOR 1) IN (\'1\',\'2\',\'3\',\'7\',\'8\',\'9\')
+                                          AND (
+                                              (rm.material_type = \'WIP\' AND ms.code_3 = \'WIP\') OR
+                                              (rm.material_type = \'PRD\' AND ms.code_3 = \'PRD\') OR
+                                              (rm.material_type = \'RM\' AND ms.code_3 IN (\'STORAGE\', \'FEED\'))
+                                          )
                                     ),
                                     supplier_plant AS (
                                         SELECT
@@ -588,7 +606,7 @@ bh_filtered AS (
                                         FROM supplier_lines sl
                                         JOIN bh_filtered2 bh
                                           ON sl.id_balance_head = bh.id_balance_head
-                                         AND sl.id_material     = bh.id_material
+                                          AND sl.id_material     = bh.id_material
                                         JOIN m_sloc t
                                           ON t.id_sloc = bh.id_sloc
                                        WHERE t.id_plant = ?
@@ -610,14 +628,14 @@ bh_filtered AS (
                                          GROUP BY sp.id_material
                                      )
                                      SELECT SUBSTRING(?,1,10) AS entry_date, bgn."to_trace_no" AS "description", bgn."in" AS "in", bgn."out" AS "out",
-                                              TO_CHAR(ROUND(CAST(bgn."balance" AS numeric), 3), \'FM999999999999990.000\') AS balance, bgn."supplier", bgn."sloc", bgn."balance" + ? AS balances,
-                                              CASE WHEN ABS(COALESCE(bgn.balance_supplier, 0) - (bgn."balance" + ?)) < 0.0099 THEN 
-                                              TO_CHAR(ROUND(CAST(bgn."balance" AS numeric), 3), \'FM999999999999990.000\') ELSE  TO_CHAR(ROUND(CAST(bgn."balance_supplier" AS numeric), 3), \'FM999999999999990.000\')
+                                              TO_CHAR(ROUND(CAST(bgn."balance" AS numeric), 3), \'FM999999999999990.000\') AS balance, bgn."supplier", bgn."sloc_desc" AS sloc, bgn."balance" + ? AS balances,
+                                              CASE WHEN ABS(COALESCE(bgn.balance_supplier, 0) - (bgn."balance" + ?)) < 0.0099 THEN
+                                              TO_CHAR(ROUND(CAST(bgn."balance" AS numeric), 3), \'FM999999999999990.000\') ELSE  TO_CHAR(ROUND(CAST(bgn.balance_supplier AS numeric), 3), \'FM999999999999990.000\')
                                                END AS balance_supplier
                                          FROM (SELECT STRING_AGG(c.to_trace_no, \'|\') AS to_trace_no,
                                                       TO_CHAR(ROUND(CAST(SUM(c.in_raw) AS numeric), 3), \'FM999999999999990.000\') AS "in",
                                                       TO_CHAR(ROUND(CAST(SUM(c.out_raw) AS numeric), 3), \'FM999999999999990.000\') AS "out", SUM(c."balance_raw") AS "balance",
-                                                      STRING_AGG(DISTINCT c.sloc, \'|\') AS sloc,
+                                                      MAX(c.sloc_desc) AS sloc_desc,
                                                       STRING_AGG(DISTINCT d.supplier, \'|\') AS supplier,
                                                       SUM(d.balance_supplier_raw) AS balance_supplier
                                                 FROM requested_material rm
@@ -848,7 +866,8 @@ bh_filtered AS (
                                                                                          ) b
                                                                                 ON b.id_balance_head = bb.id_balance_head AND b.id_material = bb.id_material
               WHERE bb.status = 1
-                                                                                AND (SUBSTRING(bb.trace_no,1,1) = \'1\' OR SUBSTRING(bb.trace_no,1,1) = \'2\' OR SUBSTRING(bb.trace_no,1,1) = \'3\' OR SUBSTRING(bb.trace_no,1,1) = \'7\' OR SUBSTRING(bb.trace_no,1,1) = \'8\' OR SUBSTRING(bb.trace_no,1,1) = \'9\')
+                                                                                AND (SUBSTRING(bb.trace_no,1,1) = \'1\' OR SUBSTRING(bb.trace_no,1,1) = \'9\')
+                                                                                AND bb.id_sloc = 4
                                                                                 AND b.id_trace_head IS NOT NULL
                                                                             ) bb
                                                                    ON bbb.id_sloc = bb.id_sloc
@@ -921,10 +940,11 @@ bh_filtered AS (
                                                                                          GROUP BY b.id_balance_head, b.id_material
                                                                                        ) b
                                                                                   ON b.id_balance_head = bb.id_balance_head AND b.id_material = bb.id_material
-                                                                                 WHERE bb.status = 1
-                                                                                   AND (SUBSTRING(bb.trace_no,1,1) = \'1\' OR SUBSTRING(bb.trace_no,1,1) = \'2\' OR SUBSTRING(bb.trace_no,1,1) = \'3\' OR SUBSTRING(bb.trace_no,1,1) = \'7\' OR SUBSTRING(bb.trace_no,1,1) = \'8\' OR SUBSTRING(bb.trace_no,1,1) = \'9\')
-                                                                                   AND b.id_trace_head IS NOT NULL
-                                                                            ) bb
+                                                                                  WHERE bb.status = 1
+                                                                                    AND (SUBSTRING(bb.trace_no,1,1) = \'1\' OR SUBSTRING(bb.trace_no,1,1) = \'2\' OR SUBSTRING(bb.trace_no,1,1) = \'3\' OR SUBSTRING(bb.trace_no,1,1) = \'7\' OR SUBSTRING(bb.trace_no,1,1) = \'8\' OR SUBSTRING(bb.trace_no,1,1) = \'9\')
+                                                                                    AND bb.id_sloc <> 4
+                                                                                    AND b.id_trace_head IS NOT NULL
+                                                                             ) bb
                                                                    ON bbb.id_sloc = bb.id_sloc
                                                                 WHERE bb.id_trace_head IS NOT NULL
                                                                   AND bbb.id_plant = ?

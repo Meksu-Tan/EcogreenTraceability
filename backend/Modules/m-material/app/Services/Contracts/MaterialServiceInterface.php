@@ -28,5 +28,5 @@ interface MaterialServiceInterface
 
     public function getActiveSourceProducts(): array;
 
-    public function fetchBalance(int $idPlant, int $idMaterial): array;
+    public function fetchBalance(int $idPlant, int $idMaterial, ?int $idSloc = null): array;
 }

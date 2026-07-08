@@ -18,6 +18,12 @@ class FetchDcsRequest extends FormRequest
         return [
             'plant_code' => 'required|string',
             'date' => 'required|date',
+            'type' => 'nullable|string|in:WIP,TRANSFER,BLENDING',
+            'scope' => 'nullable|string|in:row,all',
+            'section_id' => 'nullable|integer',
+            'step_type' => 'nullable|string|in:feed,rundown',
+            'step_id' => 'nullable|integer',
+            'transaction_id' => 'nullable|string',
         ];
     }
 }

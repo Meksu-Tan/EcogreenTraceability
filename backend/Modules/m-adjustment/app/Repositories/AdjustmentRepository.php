@@ -76,7 +76,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                    CONCAT('Qty: ', a.before_adjust, ' >>> ', a.after_adjust, ' MT') AS adjustment,
                    a.id_adjust_head,
                    {$this->dbGroupConcat("DISTINCT CONCAT(e.description, ' / ', d.batch_sap, ' / Qty: ', ".$this->dbNumberFormat('d.before_adjust', 3).", ' >>> ', ".$this->dbNumberFormat('d.after_adjust', 3).", ' MT')", ' | ', true)} AS supplier,
-                   a.created_by, a.created_at, a.status, a.after_adjust,
+                   a.created_by, a.created_at, a.updated_at, a.status, a.after_adjust,
                    {$slocColumn},
                    CASE WHEN c.qty IS NOT NULL AND a.after_adjust <> c.qty THEN 0 ELSE 1 END AS adjust_flag,
                    f.id_matdoc, f.material_document, f.id_trace_head,
@@ -105,7 +105,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                AND SUBSTRING(CAST(a.adjust_no AS TEXT), 1, 1) = '{$substrFilter}'
                AND ({$plantFilter['sql']})
             GROUP BY a.id_adjust_head, a.entry_date, a.adjust_no, a.id_material, a.id_sloc,
-                     a.before_adjust, a.after_adjust, a.created_by, a.created_at, a.status,
+                     a.before_adjust, a.after_adjust, a.created_by, a.created_at, a.updated_at, a.status,
                      a.id_balance_head, b.code, b.description,
                      c.trace_no, c.qty, g.description,
                      f.id_matdoc, f.material_document, f.id_trace_head
@@ -240,6 +240,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'id_plant' => $resolvedCode,
             'status' => 1,
             'created_by' => $user,
+            'created_at' => now(),
+            'updated_at' => now(),
         ], 'id_adjust_head');
 
         return ['response' => 1, 'id' => $id];
@@ -272,6 +274,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'approved_by' => $user,
                 'approved_at' => now(),
                 'updated_by' => $user,
+                'updated_at' => now(),
             ]);
 
         if ($affected === 0) {
@@ -297,6 +300,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 ->update([
                     'qty' => $header->after_adjust,
                     'updated_by' => $header->approved_by ?? 'system',
+                    'updated_at' => now(),
                 ]);
 
             $details = DB::connection($this->connection)->select(
@@ -312,12 +316,13 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     ->update([
                         'qty' => $d->after_adjust,
                         'updated_by' => $header->approved_by ?? 'system',
+                        'updated_at' => now(),
                     ]);
             }
 
             DB::connection($this->connection)->table('t_adjustment_header')
                 ->where('id_adjust_head', $headerId)
-                ->update(['status' => 4]);
+                ->update(['status' => 4, 'updated_at' => now()]);
 
             return ['response' => 1];
         });
@@ -332,6 +337,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'status' => 5,
                 'reason' => $reason,
                 'updated_by' => $user,
+                'updated_at' => now(),
             ]);
 
         if ($affected === 0) {
@@ -700,12 +706,14 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'before_adjust' => $beforeAdjust,
             'after_adjust' => $afterAdjust,
             'created_by' => $user,
+            'created_at' => now(),
+            'updated_at' => now(),
         ], 'id_adjust_head');
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Update balance header Ã¢â€â‚¬Ã¢â€â‚¬ */
         DB::connection($this->connection)->update(
-            'UPDATE t_balance_header SET qty = ?, in_qty = ?, updated_by = ? WHERE id_balance_head = ?',
-            [$afterAdjust, $inQty, $user, $idHead]
+            'UPDATE t_balance_header SET qty = ?, in_qty = ?, updated_by = ?, updated_at = ? WHERE id_balance_head = ?',
+            [$afterAdjust, $inQty, $user, now(), $idHead]
         );
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Update trace header Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1172,7 +1180,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $mode = $data['mode'] ?? 'ADD';
         $adjNumber = $data['adjNumber'] ?? '';
         $idSupplier = (int) ($data['id_supplier'] ?? 0);
-        $qty = (float) str_replace(',', '', $data['qty'] ?? '0');
+        $qty = (float) str_replace(',', '', (string) ($data['qty'] ?? '0'));
         $idHead = (int) ($data['id_head'] ?? 0);
         $idTail = (int) ($data['id_tail'] ?? 0);
         $batchSap = $data['batch_sap'] ?? '';
@@ -1349,7 +1357,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
         $entryNo = $data['entry_no'] ?? '';
         $entryDate = $data['entry_date'] ?? '';
         $idSloc = (int) ($data['tf_number'] ?? 0);
-        $qty = (float) str_replace(',', '', $data['qty'] ?? '0');
+        $qty = (float) str_replace(',', '', (string) ($data['qty'] ?? '0'));
         $idMaterial = (int) ($data['id_material'] ?? 0);
         $materialDoc = $data['material_doc'] ?? null;
         $mode = $data['mode'] ?? 'ADD';
@@ -1404,6 +1412,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'in_qty' => $qty,
                 'id_plant' => $idPlant,
                 'created_by' => $user,
+                'created_at' => now(),
+                'updated_at' => now(),
             ], 'id_trace_head');
 
             /* Ã¢â€â‚¬Ã¢â€â‚¬ Insert adjustment header Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1418,6 +1428,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'after_adjust' => $qty,
                 'id_plant' => $idPlant,
                 'created_by' => $user,
+                'created_at' => now(),
+                'updated_at' => now(),
             ], 'id_adjust_head');
 
             /* Ã¢â€â‚¬Ã¢â€â‚¬ Logging Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1582,6 +1594,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'after_adjust' => 0,
             'id_plant' => $idPlant,
             'created_by' => $user,
+            'created_at' => now(),
+            'updated_at' => now(),
         ], 'id_adjust_head');
 
         /* Ã¢â€â‚¬Ã¢â€â‚¬ Get before qty Ã¢â€â‚¬Ã¢â€â‚¬ */
@@ -1882,6 +1896,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                 'status' => 1,
                 'created_by' => $user,
                 'created_at' => now(),
+                'updated_at' => now(),
             ], 'id_report_head');
 
             return [
@@ -2191,6 +2206,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     'init_qty' => $diffQty,
                     'id_plant' => $idPlant,
                     'created_by' => $user,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ], 'id_balance_head');
 
                 // Insert trace header
@@ -2203,6 +2220,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     'in_qty' => $diffQty,
                     'id_plant' => $idPlant,
                     'created_by' => $user,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ], 'id_trace_head');
 
                 // Insert adjustment header
@@ -2217,6 +2236,8 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
                     'after_adjust' => $diffQty,
                     'id_plant' => $idPlant,
                     'created_by' => $user,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ], 'id_adjust_head');
 
                 // Process suppliers proportionally
@@ -2509,6 +2530,7 @@ class AdjustmentRepository implements AdjustmentRepositoryInterface
             'source' => 'WHX',
             'created_by' => $user,
             'created_at' => now(),
+            'updated_at' => now(),
         ], 'id_adjust_head');
 
         DB::connection($this->connection)->table('log_transactions')->insert([

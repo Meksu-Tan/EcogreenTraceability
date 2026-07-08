@@ -18,5 +18,6 @@ use Modules\TsAcknowledge\Http\Controllers\TsAcknowledgeController;
 Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1/ts-acknowledge')->group(function () {
     Route::get('/dashboard', [TsAcknowledgeController::class, 'getDashboard']);
     Route::post('/fetch-dcs', [TsAcknowledgeController::class, 'fetchDcs']);
+    Route::post('/sync-dcs', [TsAcknowledgeController::class, 'syncDcs']);
     Route::post('/save', [TsAcknowledgeController::class, 'store']);
 });

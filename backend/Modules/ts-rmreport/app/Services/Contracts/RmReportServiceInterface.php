@@ -10,8 +10,6 @@ interface RmReportServiceInterface
 
     public function getRmListDetail(array $filters = []): array;
 
-    public function getRmListTransfer(array $filters = []): array;
-
     public function getRmSummaryRmPrd(array $filters = []): array;
 
     public function getRmDetailRmPrdOnTank(string $batchSap): array;

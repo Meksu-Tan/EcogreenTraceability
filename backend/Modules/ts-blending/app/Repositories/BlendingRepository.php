@@ -29,11 +29,16 @@ class BlendingRepository implements BlendingRepositoryInterface
         $whereIdRundown = 'CAST(a.id_rundown AS TEXT) <> \'-\'';
 
         return collect(DB::connection($this->connection)->select(
-            "SELECT a.id_material, a.type, CONCAT(UPPER(a.description), ' (', a.code, ')') AS material
+            "SELECT a.id_material, a.type,
+                    CASE WHEN dup.cnt > 1
+                         THEN CONCAT(UPPER(a.description), ' (', a.code, ' - ', COALESCE(a.qtf_rundown, ''), ')')
+                         ELSE CONCAT(UPPER(a.description), ' (', a.code, ')')
+                    END AS material
                FROM m_material a
+               JOIN (SELECT code, COUNT(*) AS cnt FROM m_material WHERE status = 1 GROUP BY code) dup ON a.code = dup.code
               WHERE a.status = 1
                 AND {$whereIdRundown}
-              GROUP BY a.code, a.id_material, a.type, a.description
+              GROUP BY a.code, a.id_material, a.type, a.description, a.qtf_rundown, dup.cnt
               ORDER BY a.description ASC"
         ));
     }
@@ -48,7 +53,7 @@ class BlendingRepository implements BlendingRepositoryInterface
         return $svc->generate('8', $date, $section, $plantCode, 't_balance_header', 'trace_no');
     }
 
-    public function getTotalStockMaterial(int $materialId, int $plantId): float
+    public function getTotalStockMaterial(int $materialId, int $plantId, $slocId = null): float
     {
         // Fix: cc.id_plant is a numeric id column — compare directly, not against code_3
         $result = DB::connection($this->connection)->select(
@@ -293,7 +298,7 @@ class BlendingRepository implements BlendingRepositoryInterface
 
         $slocs = DB::connection('eudr_ts')
             ->table('m_sloc')
-            ->select('id_sloc', 'tf_number')
+            ->select('id_sloc', 'tf_number', 'description')
             ->get()
             ->keyBy('id_sloc');
 
@@ -307,8 +312,8 @@ class BlendingRepository implements BlendingRepositoryInterface
             $ids = (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) ? $decoded : [$raw];
             $tanks = [];
             foreach ($ids as $id) {
-                if (isset($slocs[$id]) && $slocs[$id]->tf_number) {
-                    $tanks[] = $slocs[$id]->tf_number;
+                if (isset($slocs[$id]) && $slocs[$id]->description) {
+                    $tanks[] = $slocs[$id]->description;
                 }
             }
             if (! empty($tanks)) {

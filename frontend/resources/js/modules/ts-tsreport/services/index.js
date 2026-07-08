@@ -8,4 +8,5 @@ export default {
   getPckSection(params = {}) { return api.get(`${BASE_URL}/pck`, { params }) },
   getShipmentSection(params = {}) { return api.get(`${BASE_URL}/shipment`, { params }) },
   getTransferSection(params = {}) { return api.get(`${BASE_URL}/transfer`, { params }) },
+  getBlendingSection(params = {}) { return api.get(`${BASE_URL}/blending`, { params }) },
 }

@@ -68,4 +68,39 @@ export const useSetupTankStore = defineStore('setupTank', () => {
   }
 })
 
-export { useSetupWarehouseStore } from './warehouseStore.js'
+export const useSetupWarehouseStore = defineStore('setupWarehouse', () => {
+  const warehouses = ref([])
+  const loading = ref(false)
+
+  async function fetchWarehouses() {
+    loading.value = true
+    try {
+      const res = await tankApi.getWarehouses()
+      warehouses.value = res.data.data
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function createWarehouse(data) {
+    const r = await tankApi.storeWarehouse(data)
+    if (r.data.status === 1) await fetchWarehouses()
+    return r.data
+  }
+
+  async function editWarehouse(id, data) {
+    const r = await tankApi.updateWarehouse(id, data)
+    if (r.data.status === 1) await fetchWarehouses()
+    return r.data
+  }
+
+  async function toggleWarehouse(id, status) {
+    const r = status == 1 ? await tankApi.deactivateWarehouse(id) : await tankApi.activateWarehouse(id)
+    if (r.data.status === 1) await fetchWarehouses()
+    return r.data
+  }
+
+  return { warehouses, loading, fetchWarehouses, createWarehouse, editWarehouse, toggleWarehouse }
+})
+
+

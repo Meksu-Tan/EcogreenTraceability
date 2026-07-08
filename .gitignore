@@ -17,3 +17,13 @@ backend/.deptrac.cache
 backend/storage/framework/cache/phpstan/
 backend/public/vendor/
 backend/resources/views/vendor/
+
+# Tool metadata and database dumps
+.context/
+.kilo/
+*graphify-out/
+dump.sql
+graphify-scope/
+ponytail/
+reference-dont-change/
+

@@ -21,6 +21,7 @@ class PackageEntryResource extends JsonResource
             'id_trace_head' => $this->id_trace_head,
             'id_balance_head' => $this->id_balance_head,
             'sloc' => $this->sloc,
+            'raw_sloc' => $this->raw_sloc,
             'init_qty' => $this->init_qty,
             'balance' => $this->balance,
             'status' => $this->status,

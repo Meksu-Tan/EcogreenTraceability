@@ -50,7 +50,7 @@ class AdjustmentController extends Controller
             $data = $this->adjustmentService->getAdjustmentList($plantId, $userId, $adjType, $filters);
 
             return ApiResponse::paginated(
-                $data['data'] ?? [],
+                AdjustmentResource::collection($data['data'] ?? [])->resolve(),
                 $data['total'] ?? 0,
                 $data['page'] ?? 1,
                 $data['per_page'] ?? 10,

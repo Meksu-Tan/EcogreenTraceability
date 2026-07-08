@@ -13,5 +13,6 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::get('pck', [TsReportController::class, 'getPckSection']);
         Route::get('shipment', [TsReportController::class, 'getShipmentSection']);
         Route::get('transfer', [TsReportController::class, 'getTransferSection']);
+        Route::get('blending', [TsReportController::class, 'getBlendingSection']);
     });
 });

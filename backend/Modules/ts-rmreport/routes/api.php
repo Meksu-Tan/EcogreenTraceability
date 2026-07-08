@@ -12,6 +12,5 @@ Route::middleware(['auth:sanctum', 'plant.context'])->prefix('api/v1')->group(fu
         Route::get('detail/adj-out', [RmReportController::class, 'detailOnAdjOut']);
         Route::get('detail/warehouse', [RmReportController::class, 'detailOnWarehouse']);
         Route::get('detail', [RmReportController::class, 'detail']);
-        Route::get('transfer', [RmReportController::class, 'transfer']);
     });
 });

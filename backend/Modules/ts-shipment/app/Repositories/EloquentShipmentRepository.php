@@ -443,6 +443,8 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                         'curr_qtf' => $useQtyWh,
                         'id_plant' => $idPlant,
                         'created_by' => $user,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ], 'id_trace_head');
 
                     // Insert Shipment Header
@@ -456,6 +458,8 @@ class EloquentShipmentRepository implements ShipmentRepositoryInterface
                         'id_plant' => $idPlant,
                         'doc_url' => $fileName,
                         'created_by' => $user,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ], 'id_ship_head');
 
                     // Log transactions

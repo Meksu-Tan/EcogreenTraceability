@@ -26,11 +26,16 @@ class EloquentTransferRepository implements TransferRepositoryInterface
     public function getActiveMaterials(): Collection
     {
         return collect(DB::connection($this->connection)->select(
-            "SELECT a.id_material, a.type, CONCAT(UPPER(a.description), ' (', a.code, ' - ', a.type, ')') AS material
+            "SELECT a.id_material, a.type,
+                    CASE WHEN dup.cnt > 1
+                         THEN CONCAT(UPPER(a.description), ' (', a.code, ' - ', a.type, ' - ', COALESCE(a.qtf_rundown, ''), ')')
+                         ELSE CONCAT(UPPER(a.description), ' (', a.code, ' - ', a.type, ')')
+                    END AS material
                FROM m_material a
+               JOIN (SELECT code, COUNT(*) AS cnt FROM m_material WHERE status = 1 GROUP BY code) dup ON a.code = dup.code
               WHERE a.status = 1
                 AND CAST(a.id_rundown AS TEXT) <> '-'
-              GROUP BY a.code, a.id_material, a.description, a.type
+              GROUP BY a.code, a.id_material, a.description, a.type, a.qtf_rundown, dup.cnt
               ORDER BY a.description ASC"
         ));
     }
@@ -239,72 +244,58 @@ class EloquentTransferRepository implements TransferRepositoryInterface
 
         $result = $result->map(function ($item) use ($slocs) {
             $item->raw_from_desc = '';
-            $item->from_tf_number = '';
+            $item->from_desc = '';
             if (isset($item->raw_id_sloc_from) && $item->raw_id_sloc_from !== null && $item->raw_id_sloc_from !== '') {
                 $decoded = json_decode((string) $item->raw_id_sloc_from, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    $firstDesc = '';
-                    $tanks = [];
+                    $descs = [];
                     foreach ($decoded as $id) {
-                        if (isset($slocs[$id])) {
-                            if (! $firstDesc) {
-                                $firstDesc = $slocs[$id]->description;
-                            }
-                            if ($slocs[$id]->tf_number) {
-                                $tanks[] = $slocs[$id]->tf_number;
-                            }
+                        if (isset($slocs[$id]) && $slocs[$id]->description) {
+                            $descs[] = $slocs[$id]->description;
                         }
                     }
-                    if ($firstDesc) {
-                        $item->raw_from_desc = $firstDesc;
-                    }
-                    if (! empty($tanks)) {
-                        sort($tanks);
-                        $item->from_tf_number = implode(', ', array_unique($tanks));
+                    if (! empty($descs)) {
+                        $descs = array_unique($descs);
+                        sort($descs);
+                        $item->raw_from_desc = implode(' | ', $descs);
+                        $item->from_desc = $item->raw_from_desc;
                     }
                 } else {
                     if (isset($slocs[$item->raw_id_sloc_from])) {
                         $item->raw_from_desc = $slocs[$item->raw_id_sloc_from]->description;
-                        $item->from_tf_number = $slocs[$item->raw_id_sloc_from]->tf_number;
+                        $item->from_desc = $item->raw_from_desc;
                     }
                 }
             }
 
             $item->raw_to_desc = '';
-            $item->to_tf_number = '';
+            $item->to_desc = '';
             if (isset($item->raw_id_sloc_to) && $item->raw_id_sloc_to !== null && $item->raw_id_sloc_to !== '') {
                 $decoded = json_decode((string) $item->raw_id_sloc_to, true);
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    $firstDesc = '';
-                    $tanks = [];
+                    $descs = [];
                     foreach ($decoded as $id) {
-                        if (isset($slocs[$id])) {
-                            if (! $firstDesc) {
-                                $firstDesc = $slocs[$id]->description;
-                            }
-                            if ($slocs[$id]->tf_number) {
-                                $tanks[] = $slocs[$id]->tf_number;
-                            }
+                        if (isset($slocs[$id]) && $slocs[$id]->description) {
+                            $descs[] = $slocs[$id]->description;
                         }
                     }
-                    if ($firstDesc) {
-                        $item->raw_to_desc = $firstDesc;
-                    }
-                    if (! empty($tanks)) {
-                        sort($tanks);
-                        $item->to_tf_number = implode(', ', array_unique($tanks));
+                    if (! empty($descs)) {
+                        $descs = array_unique($descs);
+                        sort($descs);
+                        $item->raw_to_desc = implode(' | ', $descs);
+                        $item->to_desc = $item->raw_to_desc;
                     }
                 } else {
                     if (isset($slocs[$item->raw_id_sloc_to])) {
                         $item->raw_to_desc = $slocs[$item->raw_id_sloc_to]->description;
-                        $item->to_tf_number = $slocs[$item->raw_id_sloc_to]->tf_number;
+                        $item->to_desc = $item->raw_to_desc;
                     }
                 }
             }
 
-            $fromTf = ! empty($item->from_tf_number) ? $item->from_tf_number : ($item->raw_from_desc ?: '-');
-            $toTf = ! empty($item->to_tf_number) ? $item->to_tf_number : ($item->raw_to_desc ?: '-');
-            $item->sloc = $fromTf.' >>> '.$toTf;
+            $fromDesc = ! empty($item->from_desc) ? $item->from_desc : '-';
+            $toDesc = ! empty($item->to_desc) ? $item->to_desc : '-';
+            $item->sloc = $fromDesc.' >>> '.$toDesc;
 
             return $item;
         });

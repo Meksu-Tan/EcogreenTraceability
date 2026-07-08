@@ -63,27 +63,54 @@ class EloquentAcknowledgeRepository implements AcknowledgeRepositoryInterface
 
     public function saveAcknowledgeData(array $data): object
     {
-        $record = TsAcknowledge::updateOrCreate(
-            [
-                'plant_code' => $data['plant_code'],
-                'entry_date' => $data['entry_date'],
-                'type' => $data['type'] ?? 'WIP',
-                'section_id' => $data['section_id'] ?? null,
-                'step_type' => $data['step_type'] ?? null,
-            ],
-            [
-                'transaction_id' => $data['transaction_id'] ?? null,
-                'trace_no' => $data['trace_no'] ?? null,
-                'material_name' => $data['material_name'] ?? null,
-                'source_name' => $data['source_name'] ?? null,
-                'mode_value' => $data['mode_value'] ?? null,
-                'eo_dls_qty' => $data['eo_dls_qty'] ?? null,
-                'dcs_qty' => $data['dcs_qty'] ?? null,
-                'manual_qty' => $data['manual_qty'] ?? null,
-                'created_by' => $data['created_by'] ?? null,
-                'updated_by' => $data['updated_by'] ?? null,
-            ]
-        );
+        $type = $data['type'] ?? 'WIP';
+        $transactionId = $data['transaction_id'] ?? null;
+
+        if ($type !== 'WIP' && $transactionId) {
+            $record = TsAcknowledge::updateOrCreate(
+                [
+                    'plant_code' => $data['plant_code'],
+                    'entry_date' => $data['entry_date'],
+                    'type' => $type,
+                    'transaction_id' => $transactionId,
+                ],
+                [
+                    'trace_no' => $data['trace_no'] ?? null,
+                    'material_name' => $data['material_name'] ?? null,
+                    'source_name' => $data['source_name'] ?? null,
+                    'mode_value' => $data['mode_value'] ?? null,
+                    'eo_dls_qty' => $data['eo_dls_qty'] ?? null,
+                    'dcs_qty' => $data['dcs_qty'] ?? null,
+                    'keterangan' => $data['keterangan'] ?? null,
+                    'qty_source' => $data['qty_source'] ?? null,
+                    'created_by' => $data['created_by'] ?? null,
+                    'updated_by' => $data['updated_by'] ?? null,
+                ]
+            );
+        } else {
+            $record = TsAcknowledge::updateOrCreate(
+                [
+                    'plant_code' => $data['plant_code'],
+                    'entry_date' => $data['entry_date'],
+                    'type' => $data['type'] ?? 'WIP',
+                    'section_id' => $data['section_id'] ?? null,
+                    'step_type' => $data['step_type'] ?? null,
+                ],
+                [
+                    'transaction_id' => $data['transaction_id'] ?? null,
+                    'trace_no' => $data['trace_no'] ?? null,
+                    'material_name' => $data['material_name'] ?? null,
+                    'source_name' => $data['source_name'] ?? null,
+                    'mode_value' => $data['mode_value'] ?? null,
+                    'eo_dls_qty' => $data['eo_dls_qty'] ?? null,
+                    'dcs_qty' => $data['dcs_qty'] ?? null,
+                    'keterangan' => $data['keterangan'] ?? null,
+                    'qty_source' => $data['qty_source'] ?? null,
+                    'created_by' => $data['created_by'] ?? null,
+                    'updated_by' => $data['updated_by'] ?? null,
+                ]
+            );
+        }
 
         return $record;
     }

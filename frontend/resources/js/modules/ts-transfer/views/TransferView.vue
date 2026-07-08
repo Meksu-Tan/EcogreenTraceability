@@ -285,13 +285,12 @@
       v-model:is-open="isTransferModalOpen"
       @success="onTransferSuccess"
     />
-    <SubTankEditModal
+    <TransferFromToSlocModal
       v-model:is-open="isSubTankModalOpen"
-      :id-head="subTankModalData.idHead"
-      :id-sloc="subTankModalData.idSloc"
-      :main-sloc="subTankModalData.mainSloc"
-      :id-sloc-tail="subTankModalData.idSlocTail"
-      @success="onSubTankSuccess"
+      :from-sloc-ids="parseSlocIds(subTankModalData.fromSlocRaw)"
+      :to-sloc-ids="parseSlocIds(subTankModalData.toSlocRaw)"
+      :from-desc="subTankModalData.fromDesc"
+      :to-desc="subTankModalData.toDesc"
     />
   </div>
 </template>
@@ -304,7 +303,7 @@ import { useToastStore } from '@/stores/toast.js'
 import PlantSelector from '@/modules/shared/components/PlantSelector.vue'
 import MaterialDocModal from '@/modules/ts-transfer/components/MaterialDocModal.vue'
 import TransferEntryModal from '@/modules/ts-transfer/components/TransferEntryModal.vue'
-import SubTankEditModal from '@/modules/ts-transfer/components/SubTankEditModal.vue'
+import TransferFromToSlocModal from '@/modules/ts-transfer/components/TransferFromToSlocModal.vue'
 
 const plantSelectionStore = usePlantSelectionStore()
 const transferStore = useTsTransferStore()
@@ -313,13 +312,23 @@ const toastStore = useToastStore()
 const isMatlDocModalOpen = ref(false)
 const isTransferModalOpen = ref(false)
 const isSubTankModalOpen = ref(false)
-const subTankModalData = ref({ idHead: null, idSloc: null, mainSloc: '', idSlocTail: [] })
+const subTankModalData = ref({ fromSlocRaw: '', toSlocRaw: '', fromDesc: '', toDesc: '' })
 const deactivatingId = ref(null)
 const selectedTransfer = ref(null)
 const matlDocMode = ref('ADD')
 const matlDocIdTraceHead = ref(null)
 const matlDocCurrentNumber = ref('')
 let pendingCheckInterval = null
+
+function parseSlocIds(raw) {
+  if (!raw) return []
+  try {
+    const decoded = JSON.parse(raw)
+    return Array.isArray(decoded) ? decoded.map(Number) : [Number(raw)]
+  } catch {
+    return [Number(raw)]
+  }
+}
 
 // Tab for transferred/pending view
 const activeTab = ref('transferred')
@@ -448,10 +457,10 @@ function openTransferModal() {
 
 function openSubTankModal(trf) {
   subTankModalData.value = {
-    idHead: trf.idHead,
-    idSloc: trf.raw_id_sloc_to,
-    mainSloc: trf.sloc || '',
-    idSlocTail: []
+    fromSlocRaw: trf.raw_id_sloc_from || '[]',
+    toSlocRaw: trf.raw_id_sloc_to || '[]',
+    fromDesc: trf.from_desc || trf.from_plant_name || '',
+    toDesc: trf.to_desc || trf.plant_name || ''
   }
   isSubTankModalOpen.value = true
 }

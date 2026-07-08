@@ -45,11 +45,9 @@ class BlendingService implements BlendingServiceInterface
         return $this->blendingRepo->generateBlendingEntryNo($materialId, $plantId);
     }
 
-    public function getTotalStockMaterial(int $materialId, int $plantId): float
+    public function getTotalStockMaterial(int $materialId, int $plantId, $slocId = null): float
     {
-        $plantId = (int) $this->resolvePlantCode($plantId);
-
-        return $this->blendingRepo->getTotalStockMaterial($materialId, $plantId);
+        return $this->blendingRepo->getTotalStockMaterial($materialId, $plantId, $slocId);
     }
 
     public function getTotalQtyMaterial(?string $mode, string $entryNo, ?int $idHead, int $plantId): float

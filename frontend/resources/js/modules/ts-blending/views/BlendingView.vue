@@ -357,7 +357,21 @@ function openSubTankEdit(item) {
     try { tankTails = JSON.parse(tankTails) } catch { tankTails = [] }
   }
   subTankContext.idHead = item.idHead
-  subTankContext.idSloc = item.tf_number
+  const rawSloc = item.id_sloc
+  let slocId = null
+  if (Array.isArray(rawSloc)) {
+    slocId = rawSloc[0]
+  } else if (typeof rawSloc === 'string') {
+    try {
+      const parsed = JSON.parse(rawSloc)
+      slocId = Array.isArray(parsed) ? (parsed[0] ?? null) : rawSloc
+    } catch {
+      slocId = rawSloc
+    }
+  } else if (rawSloc !== undefined && rawSloc !== null) {
+    slocId = rawSloc
+  }
+  subTankContext.idSloc = slocId
   subTankContext.mainSloc = item.sloc || ''
   subTankContext.idSlocTail = Array.isArray(tankTails) ? tankTails : []
   isSubTankModalOpen.value = true
